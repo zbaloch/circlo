@@ -1,5 +1,5 @@
-# Local dev: run from server/ with `SPRING_PROFILES_ACTIVE=local mvn spring-boot:run`.
-# Secrets come from the git-ignored server/.env.local (KEY=value lines).
+# Local dev: run from server/ with `mvn spring-boot:run -Dspring-boot.run.profiles=local`.
+# Secrets come from the git-ignored server/.env (KEY=value lines).
 spring:
   config:
-    import: optional:file:./.env.local[.properties]
+    import: optional:file:./.env[.properties]
