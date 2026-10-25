@@ -34,7 +34,7 @@ See [docs/DEV_SETUP.md](docs/DEV_SETUP.md). In short:
 
 ```bash
 cp infra/.env.example infra/.env          # fill in real local values
-cp server/.env.example server/.env.local  # fill in real local values
+cp server/.env.example server/.env        # fill in real local values
 make dev                                  # starts the database (existing install) + MinIO
 make test                                 # runs all test suites
 ```
