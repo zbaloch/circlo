@@ -1,0 +1,59 @@
+[package]
+name = "halqo-core"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.85"
+license = "AGPL-3.0-only"
+description = "Halqo crypto core: the only place Halqo implements cryptography (see docs/CRYPTO.md)"
+publish = false
+
+[lib]
+name = "halqo_core"
+crate-type = ["lib", "cdylib", "staticlib"]
+
+[dependencies]
+# Crypto (docs/CRYPTO.md section 2). One RustCrypto generation (digest 0.10 / rand_core 0.6) where possible.
+chacha20poly1305 = { version = "0.10", features = ["stream"] }
+hkdf = "0.12"
+hmac = "0.12"
+sha2 = "0.10"
+ed25519-dalek = { version = "2", features = ["rand_core", "zeroize"] }
+hpke = { version = "0.13", default-features = false, features = ["alloc", "x25519"] }
+opaque-ke = { version = "4", default-features = false, features = ["ristretto255", "argon2"] }
+argon2 = { version = "0.5", default-features = false, features = ["alloc"] }
+bip39 = { version = "2", default-features = false, features = ["std"] }
+rand_core = { version = "0.6", features = ["getrandom"] }
+# hpke 0.13 uses the rand_core 0.9 traits.
+rand_core09 = { package = "rand_core", version = "0.9", features = ["os_rng"] }
+subtle = "2.6"
+zeroize = { version = "1", features = ["derive"] }
+
+# Encoding / plumbing
+ciborium = "0.2"
+unicode-normalization = "0.1"
+thiserror = "2"
+uniffi = "0.31"
+
+[dev-dependencies]
+proptest = "1"
+hex = "0.4"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tempfile = "3"
+
+# Argon2id at 64 MiB is painfully slow unoptimised; optimise crypto deps in dev/test builds.
+[profile.dev.package.argon2]
+opt-level = 3
+[profile.dev.package.blake2]
+opt-level = 3
+[profile.dev.package.curve25519-dalek]
+opt-level = 3
+[profile.dev.package.chacha20]
+opt-level = 3
+[profile.dev.package.poly1305]
+opt-level = 3
+
+[profile.release]
+lto = true
+codegen-units = 1
+panic = "abort"
