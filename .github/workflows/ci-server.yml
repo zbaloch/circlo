@@ -2,10 +2,10 @@ name: ci-server
 
 on:
   pull_request:
-    paths: ["server/**", "docs/api/**", ".github/workflows/ci-server.yml"]
+    paths: ["server/**", "core/**", "docs/api/**", ".github/workflows/ci-server.yml"]
   push:
     branches: [main]
-    paths: ["server/**", "docs/api/**", ".github/workflows/ci-server.yml"]
+    paths: ["server/**", "core/**", "docs/api/**", ".github/workflows/ci-server.yml"]
 
 permissions:
   contents: read
@@ -46,6 +46,16 @@ jobs:
           for i in $(seq 1 30); do curl -fsS http://127.0.0.1:9000/minio/health/live && break; sleep 1; done
           docker exec -e MC_HOST_local=http://test-only-not-a-secret:test-only-not-a-secret@localhost:9000 \
             halqo-minio mc mb --ignore-existing local/halqo-media-test
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2.9.3
+        with:
+          workspaces: core
+          key: server-jni
+      - name: Build native halqo-core for the server (with the test client)
+        working-directory: core
+        run: cargo build --features jni-test-client --profile server
       - uses: actions/setup-java@v6.1.0
         with:
           distribution: temurin

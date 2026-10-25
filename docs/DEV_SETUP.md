@@ -84,6 +84,15 @@ Both `.env` files are git-ignored. Never commit them.
 
 ## 6. Run
 
+The server calls the Rust core over JNI. Build it once (and after core changes), then generate local secrets:
+```bash
+cd core && cargo build --features jni-test-client --profile server   # → core/target/server/halqo_core.dll
+cd ../server && mvn -q -DskipTests compile
+java -cp target/classes com.halqo.server.tools.GenerateSecrets >> .env   # local-dev secrets only; never production
+```
+Production builds the core with `--features jni` (no test client) and injects secrets from the secret store.
+
+
 ```powershell
 .\infra\dev-up.ps1                       # DB (existing) + MinIO + buckets; keeps WSL awake; prints URLs
 cd server; mvn spring-boot:run "-Dspring-boot.run.profiles=local"

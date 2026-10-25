@@ -1,12 +1,343 @@
 openapi: 3.1.0
 info:
   title: Halqo API
-  version: 0.1.0
+  version: 0.3.0
   description: >
-    halqo-server API. The server stores and relays ciphertext only. Request and response bodies
-    never contain plaintext content, names, emails, circle numbers or private keys.
+    halqo-server API. The server stores and relays ciphertext only. Request and response bodies never contain
+    plaintext content, names, emails, circle numbers or private keys. Byte fields are standard base64 strings;
+    IDs are UUID strings (16 bytes, the same bytes used in crypto AAD). Errors are `{"error": "<code>"}` and never
+    echo request data. See docs/CRYPTO.md for every byte format.
 servers:
   - url: http://localhost:8080
-paths: {}
+security:
+  - bearer: []
+
+paths:
+  /v1/auth/register/start:
+    post:
+      summary: Start OPAQUE registration; reserves the handle and returns the new user id
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [handle, registrationRequest]
+              properties:
+                handle: { type: string, maxLength: 64, description: "3-30 chars [a-z0-9_] after NFKC + lowercase" }
+                registrationRequest: { $ref: "#/components/schemas/Bytes" }
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  userId: { $ref: "#/components/schemas/Id" }
+                  registrationResponse: { $ref: "#/components/schemas/Bytes" }
+        "400": { $ref: "#/components/responses/Error" }
+        "409": { $ref: "#/components/responses/Error" }
+        "429": { $ref: "#/components/responses/Error" }
+
+  /v1/auth/register/finish:
+    post:
+      summary: Finish registration with OPAQUE upload, public keys and both encrypted backups
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [userId, handle, registrationUpload, recoveryPubkey, identity, device, passwordBackup, recoveryBackup]
+              properties:
+                userId: { $ref: "#/components/schemas/Id" }
+                handle: { type: string }
+                registrationUpload: { $ref: "#/components/schemas/Bytes" }
+                recoveryPubkey: { $ref: "#/components/schemas/Bytes", description: "32 bytes (CRYPTO.md 6.3)" }
+                identity: { $ref: "#/components/schemas/Identity" }
+                device: { $ref: "#/components/schemas/Device" }
+                passwordBackup: { $ref: "#/components/schemas/Bytes" }
+                recoveryBackup: { $ref: "#/components/schemas/Bytes" }
+      responses:
+        "200": { $ref: "#/components/responses/Tokens" }
+        "400": { $ref: "#/components/responses/Error" }
+
+  /v1/auth/login/start:
+    post:
+      summary: Start OPAQUE login (unknown handles get an indistinguishable fake response)
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [handle, credentialRequest]
+              properties:
+                handle: { type: string }
+                credentialRequest: { $ref: "#/components/schemas/Bytes" }
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  loginId: { $ref: "#/components/schemas/Id" }
+                  credentialResponse: { $ref: "#/components/schemas/Bytes" }
+        "429": { $ref: "#/components/responses/Error" }
+
+  /v1/auth/login/finish:
+    post:
+      summary: Finish OPAQUE login (single use, 60 s)
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [loginId, handle, credentialFinalization]
+              properties:
+                loginId: { $ref: "#/components/schemas/Id" }
+                handle: { type: string }
+                credentialFinalization: { $ref: "#/components/schemas/Bytes" }
+      responses:
+        "200": { $ref: "#/components/responses/Tokens" }
+        "401": { $ref: "#/components/responses/Error" }
+
+  /v1/auth/refresh:
+    post:
+      summary: Rotate a refresh token (single use)
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refreshToken]
+              properties:
+                refreshToken: { type: string }
+      responses:
+        "200": { $ref: "#/components/responses/Tokens" }
+        "401": { $ref: "#/components/responses/Error" }
+
+  /v1/auth/recovery/start:
+    post:
+      summary: Start recovery-phrase login; returns a challenge to sign with the recovery key
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [handle]
+              properties:
+                handle: { type: string }
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  userId: { $ref: "#/components/schemas/Id" }
+                  challengeId: { $ref: "#/components/schemas/Id" }
+                  nonce: { $ref: "#/components/schemas/Bytes" }
+                  expiresAt: { type: integer, format: int64, description: unix seconds }
+
+  /v1/auth/recovery/finish:
+    post:
+      summary: Finish recovery login; returns a recovery-scoped session
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [challengeId, signature]
+              properties:
+                challengeId: { $ref: "#/components/schemas/Id" }
+                signature: { $ref: "#/components/schemas/Bytes", description: "64 bytes, CRYPTO.md 6.3" }
+      responses:
+        "200": { $ref: "#/components/responses/Tokens" }
+        "401": { $ref: "#/components/responses/Error" }
+
+  /v1/auth/password/start:
+    post:
+      summary: Start setting a new password (OPAQUE re-registration); full or recovery scope
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [handle, registrationRequest]
+              properties:
+                handle: { type: string }
+                registrationRequest: { $ref: "#/components/schemas/Bytes" }
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  registrationResponse: { $ref: "#/components/schemas/Bytes" }
+
+  /v1/auth/password/finish:
+    post:
+      summary: Finish setting a new password; revokes all sessions and returns a full session
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [registrationUpload, passwordBackup]
+              properties:
+                registrationUpload: { $ref: "#/components/schemas/Bytes" }
+                passwordBackup: { $ref: "#/components/schemas/Bytes" }
+      responses:
+        "200": { $ref: "#/components/responses/Tokens" }
+
+  /v1/backups/{kind}:
+    parameters:
+      - { name: kind, in: path, required: true, schema: { type: string, enum: [password, recovery] } }
+    get:
+      summary: Download an encrypted key backup (recovery scope may read only kind=recovery)
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Backup" }
+        "404": { $ref: "#/components/responses/Error" }
+    put:
+      summary: Replace an encrypted key backup; version must be stored version + 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/Backup" }
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Backup" }
+        "409": { $ref: "#/components/responses/Error" }
+
+  /v1/devices:
+    get:
+      summary: List this account's devices
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/DeviceView" }
+    post:
+      summary: Register another device (certificate signed by the identity key)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/Device" }
+      responses:
+        "201":
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DeviceView" }
+
+  /v1/users/{userId}/identity:
+    parameters:
+      - { name: userId, in: path, required: true, schema: { $ref: "#/components/schemas/Id" } }
+    get:
+      summary: A user's published identity keys (clients pin them; changes trigger a warning)
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Identity" }
+
+  /v1/identity:
+    put:
+      summary: Publish a new identity key version (rotation); version must increase
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/Identity" }
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Identity" }
+
 components:
-  schemas: {}
+  securitySchemes:
+    bearer:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: HS256, iss halqo-server, aud halqo-app, scope full|recovery, 15 minutes
+
+  schemas:
+    Id: { type: string, format: uuid }
+    Bytes: { type: string, contentEncoding: base64 }
+    Identity:
+      type: object
+      required: [x25519Pub, ed25519Pub, signature, version]
+      properties:
+        x25519Pub: { $ref: "#/components/schemas/Bytes" }
+        ed25519Pub: { $ref: "#/components/schemas/Bytes" }
+        signature: { $ref: "#/components/schemas/Bytes", description: "CRYPTO.md section 7" }
+        version: { type: integer, minimum: 1, maximum: 255 }
+    Device:
+      type: object
+      required: [deviceId, devicePubkey, deviceCert]
+      properties:
+        deviceId: { $ref: "#/components/schemas/Id" }
+        devicePubkey: { $ref: "#/components/schemas/Bytes" }
+        deviceCert: { $ref: "#/components/schemas/Bytes" }
+    DeviceView:
+      allOf:
+        - { $ref: "#/components/schemas/Device" }
+        - type: object
+          properties:
+            createdAt: { type: string, format: date-time }
+            revoked: { type: boolean }
+    Backup:
+      type: object
+      required: [ciphertext, version]
+      properties:
+        ciphertext: { $ref: "#/components/schemas/Bytes" }
+        version: { type: integer }
+    Tokens:
+      type: object
+      properties:
+        userId: { $ref: "#/components/schemas/Id" }
+        accessToken: { type: string }
+        refreshToken: { type: string }
+        expiresIn: { type: integer, description: seconds }
+        scope: { type: string, enum: [full, recovery] }
+
+  responses:
+    Tokens:
+      description: Session tokens
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Tokens" }
+    Error:
+      description: Error with a fixed code
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error: { type: string }
