@@ -16,6 +16,20 @@ server:
       enabled: false
 
 halqo:
+  core:
+    # Native halqo-core built with: cargo build --features jni --profile server (in core/)
+    library: ${HALQO_CORE_LIBRARY:}
+  secrets:
+    opaque-server-setup: ${HALQO_OPAQUE_SERVER_SETUP:}
+    handle-key: ${HALQO_HANDLE_KEY:}
+    push-token-key: ${HALQO_PUSH_TOKEN_KEY:}
+    jwt-key: ${HALQO_JWT_KEY:}
+  auth:
+    access-ttl: 15m
+    refresh-ttl: 30d
+    recovery-ttl: 15m
+    challenge-ttl: 60s
+    pending-registration-ttl: 10m
   s3:
     bucket: ${HALQO_S3_BUCKET:halqo-media}
     public-endpoint: ${HALQO_S3_PUBLIC_ENDPOINT}
