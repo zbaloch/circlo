@@ -1,0 +1,6 @@
+# LF everywhere (matches .editorconfig), regardless of core.autocrlf on Windows.
+# Shell scripts run inside WSL and break with CRLF.
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+*.jar binary

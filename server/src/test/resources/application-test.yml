@@ -1,8 +1,8 @@
 # Integration tests: ONLY the halqo_test database and halqo-media-test bucket. Never halqo.
-# Locally the values come from server/.env.local; in CI from HALQO_* environment variables.
+# Locally the values come from server/.env; in CI from HALQO_* environment variables.
 spring:
   config:
-    import: optional:file:./.env.local[.properties]
+    import: optional:file:./.env[.properties]
   datasource:
     url: ${HALQO_TEST_DB_URL:jdbc:mariadb://localhost:3306/halqo_test}
   flyway:

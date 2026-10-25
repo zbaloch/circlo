@@ -6,7 +6,7 @@ end-to-end encrypted and this repository is public.
 ## Ground rules
 
 - **Never commit secrets** (passwords, API keys, signing keys, `.env` files, `google-services.json`, ...).
-  Copy `*.env.example` to the git-ignored `.env` / `.env.local` files and put real values there.
+  Copy `*.env.example` to the git-ignored `.env` files and put real values there.
 - **The server must never receive plaintext** content, names, emails, circle numbers or private keys.
 - **All crypto lives in `core/`** and follows [docs/CRYPTO.md](docs/CRYPTO.md). Changes to the crypto design
   need a spec change and review first.

@@ -10,12 +10,12 @@ Each of `core/`, `server/`, `app/` has its own `CLAUDE.md` with part-specific co
 - No logging of request bodies, IPs, or decrypted data anywhere.
 - Every phase: tests first; stop at done-criteria and summarise.
 - If a feature seems to need server-side plaintext, stop and ask.
-- Dev environment is Debian on WSL2 (Windows). Repo lives in the WSL filesystem, not /mnt/c.
-- Use the EXISTING MySQL installed in WSL (databases: halqo, halqo_test). Never add a MySQL container.
-- MinIO runs via infra/docker-compose.yml (Docker in Debian WSL). Buckets: halqo-media, halqo-media-test.
+- Main dev platform is Windows (owner decision, overrides PLAN.md's WSL repo location). The repo lives at C:\Users\zaheer\code\halqo and Rust, Java/Maven and Node run natively on Windows. Debian WSL2 (mirrored networking) hosts only the existing MySQL/MariaDB and MinIO in Docker.
+- Use the EXISTING MySQL (MariaDB 11.8) installed in WSL (databases: halqo, halqo_test), reached from Windows at localhost:3306. Never add a MySQL container.
+- MinIO runs in Docker in Debian WSL. Buckets: halqo-media, halqo-media-test.
 - Presigned URLs must be signed for http://${LAN_IP}:9000 with path-style access, so phones can reach them.
 - THIS REPO IS PUBLIC. Every commit is published forever. Never commit secrets, real user data, production hostnames or credentials of any kind.
-- Secrets live in git-ignored .env files (server/.env.local, infra/.env); commit only .env.example files with placeholder values. All config is read from HALQO_* environment variables.
+- Secrets live in git-ignored .env files (server/.env, infra/.env); commit only .env.example files with placeholder values. All config is read from HALQO_* environment variables.
 - App signing keys, push keys, google-services.json and GoogleService-Info.plist live in EAS credentials / EAS environment variables, never in the repo. Do not commit app/ios or app/android (Expo prebuild generates them).
 - Before every commit run `git status` and check nothing secret is staged; never bypass the pre-commit hook (no --no-verify).
 - If you ever see a real secret in the working tree or history, stop and tell me so I can rotate it.
