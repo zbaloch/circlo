@@ -15,6 +15,16 @@ Debian on WSL2 only hosts the **existing** MySQL/MariaDB and MinIO (Docker).
 | Python + pre-commit | Python 3.12, `python -m pip install --user pre-commit`, then `python -m pre_commit install` in the repo |
 | Android (Phase 2+) | Android Studio (SDK + emulator + NDK), `cargo install cargo-ndk`, `rustup target add aarch64-linux-android armv7-linux-androideabi x86_64-linux-android` |
 
+**Windows long paths (required for the Android build).** React Native's native build creates paths over 260
+characters. Once, in an **admin** PowerShell:
+```powershell
+New-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\FileSystem" -Name LongPathsEnabled -Value 1 -PropertyType DWORD -Force
+```
+The app pins CMake 4.1.2 (its ninja 1.12 understands long paths; `app/plugins/with-android-cmake.js`). Gradle does
+not download CMake by itself: install it with Android Studio's SDK Manager (SDK Tools → CMake 4.1.2) or unzip
+`https://dl.google.com/android/repository/cmake-4.1.2-windows.zip` into `%LOCALAPPDATA%\Android\Sdk\cmake.1.2`.
+A `subst` drive does **not** work around this (Node and Gradle resolve it back to the real path inconsistently).
+
 `make` is optional on Windows (`winget install ezwinports.make`); every Makefile target has a direct command
 in the sections below.
 
@@ -97,6 +107,19 @@ python -m pre_commit run --all-files     # secret scan + hygiene hooks
 ```
 
 ## 8. Mobile
+
+### Android dev build on Windows
+```bash
+# Git Bash
+export ANDROID_HOME="$LOCALAPPDATA/Android/Sdk"
+export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/30.0.16248370"
+export PATH="$ANDROID_HOME/platform-tools:$USERPROFILE/.cargo/bin:$PATH"
+cd app/modules/halqo-core && npm run ubrn:android   # Rust core → libhalqo_core.so + TS bindings (first run is slow)
+cd ../.. && npx expo run:android                     # builds and installs the dev client on the running emulator
+npx expo start --dev-client                          # Metro; open the app on the emulator
+```
+The crypto self-test is in the drawer ("Crypto self-test", dev builds only) or at `halqo://dev`.
+
 
 - **Android:** emulator on Windows or a phone on the same Wi-Fi. API base URL `http://<LAN_IP>:8080` in `app/.env`
   (`EXPO_PUBLIC_API_URL`). Cleartext HTTP is allowed in dev builds only.

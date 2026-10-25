@@ -1,4 +1,4 @@
-.PHONY: dev test test-core test-server test-app core-android scan
+.PHONY: dev test test-core test-server test-app core-android core-ios scan
 
 dev:
 	./infra/dev-up.sh
@@ -14,9 +14,13 @@ test-server:
 test-app:
 	@if [ -f app/package.json ]; then cd app && npm run typecheck && npm run lint && npm test; else echo "app/: nothing to test yet"; fi
 
-# Cross-compile the Rust core for Android (needs cargo-ndk and the Android NDK).
+# Build the Rust core for Android and regenerate @halqo/core (needs cargo-ndk, ANDROID_NDK_HOME).
 core-android:
-	cd core && cargo ndk -t arm64-v8a -t armeabi-v7a -t x86_64 -o ../app/modules/halqo-core/android/src/main/jniLibs build --release
+	cd app/modules/halqo-core && npm run ubrn:android
+
+# Same for iOS (needs a Mac with Xcode, or run in EAS).
+core-ios:
+	cd app/modules/halqo-core && npm run ubrn:ios
 
 scan:
 	pre-commit run --all-files
