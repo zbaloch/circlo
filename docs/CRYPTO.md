@@ -104,11 +104,13 @@ context               = "halqo/v1/opaque"
 
 ## 6. Key backup and recovery
 
-### 6.1 Backup plaintext (CBOR, padded)
+### 6.1 Backup plaintext (fixed binary layout, padded)
+Not CBOR: the backup is all secret material, so a fixed layout keeps every byte zeroizable and keeps parsers away from it.
 ```
-{ 1: id_x25519_sk:32, 2: id_ed25519_sk:32, 3: data_key:32, 4: local_root:32 (unused by server, reserved),
-  5: [ { 1: epoch_id:16, 2: C1:32, 3: profile_key:32 } ... ] }      // every epoch the user has created
+version:u8 (=0x01) || id_x25519_sk:32 || id_ed25519_sk:32 || data_key:32 || local_root:32
+|| u16(count) || count × ( epoch_id:16 || C1:32 || profile_key:32 )          // every epoch the user has created
 ```
+Decoding rejects any length other than `131 + 80 × count`, and `count > 10 000`.
 `data_key` encrypts the address book and settings blobs (section 10).
 
 ### 6.2 Password copy (`key_backups.kind = 'password'`, kind byte 0x01)
