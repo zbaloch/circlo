@@ -69,6 +69,10 @@ fn signup_on_a_login_on_b_same_identity() {
     let restored = open_password_backup(&ek_b, &user_id, &pw_backup).unwrap();
     assert_eq!(restored.ed25519_sk, id.ed25519_sk);
     assert_eq!(restored.x25519_sk, id.x25519_sk);
+    // Device B rebuilds the public keys locally (never trusting the server for them).
+    let rebuilt = identity_from_secrets(&restored.x25519_sk, &restored.ed25519_sk).unwrap();
+    assert_eq!(rebuilt.x25519_pk, id.x25519_pk);
+    assert_eq!(rebuilt.ed25519_pk, id.ed25519_pk);
 
     // Wrong password: login fails, so the backup can't be opened.
     assert_eq!(

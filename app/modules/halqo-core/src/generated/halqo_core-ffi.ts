@@ -391,6 +391,11 @@ const DEFINITIONS = {
       ret: FfiType.RustBuffer,
       hasRustCallStatus: true,
     },
+    uniffi_halqo_core_fn_func_identity_from_secrets: {
+      args: [FfiType.RustBuffer, FfiType.RustBuffer],
+      ret: FfiType.RustBuffer,
+      hasRustCallStatus: true,
+    },
     uniffi_halqo_core_fn_func_invite_token_hash: {
       args: [FfiType.RustBuffer],
       ret: FfiType.RustBuffer,
@@ -781,6 +786,11 @@ const DEFINITIONS = {
       hasRustCallStatus: false,
     },
     uniffi_halqo_core_checksum_func_identity_fingerprint: {
+      args: [],
+      ret: FfiType.UInt16,
+      hasRustCallStatus: false,
+    },
+    uniffi_halqo_core_checksum_func_identity_from_secrets: {
       args: [],
       ret: FfiType.UInt16,
       hasRustCallStatus: false,
@@ -1264,6 +1274,11 @@ interface NativeModuleInterface {
     x25519Pk: Uint8Array,
     uniffi_out_err: UniffiRustCallStatus,
   ): Uint8Array;
+  uniffi_halqo_core_fn_func_identity_from_secrets(
+    x25519Sk: Uint8Array,
+    ed25519Sk: Uint8Array,
+    uniffi_out_err: UniffiRustCallStatus,
+  ): Uint8Array;
   uniffi_halqo_core_fn_func_invite_token_hash(
     token: Uint8Array,
     uniffi_out_err: UniffiRustCallStatus,
@@ -1570,6 +1585,7 @@ interface NativeModuleInterface {
   uniffi_halqo_core_checksum_func_generate_identity(): number;
   uniffi_halqo_core_checksum_func_handle_lookup(): number;
   uniffi_halqo_core_checksum_func_identity_fingerprint(): number;
+  uniffi_halqo_core_checksum_func_identity_from_secrets(): number;
   uniffi_halqo_core_checksum_func_invite_token_hash(): number;
   uniffi_halqo_core_checksum_func_media_chunk_offset(): number;
   uniffi_halqo_core_checksum_func_media_layout(): number;
