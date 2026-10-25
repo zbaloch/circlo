@@ -127,7 +127,7 @@ pub fn server_registration_finish(upload: &[u8]) -> Result<Vec<u8>> {
 }
 
 /// `record = None` for unknown handles: opaque-ke produces an indistinguishable fake response.
-/// Returns (response for the client, serialized server state to keep until `server_login_finish`).
+/// Returns (response for the client, serialized server state). Keep the state server-side only (it is secret).
 pub fn server_login_start(
     server_setup: &[u8],
     record: Option<&[u8]>,
@@ -159,6 +159,9 @@ pub fn server_login_start(
 }
 
 /// Succeeds only if the client proved knowledge of the password.
+///
+/// SECURITY: `state` must come from server-side storage (from `server_login_start`), never from the client.
+/// It contains the expected client MAC, so anyone able to supply it could complete a login.
 pub fn server_login_finish(state: &[u8], normalized_handle: &str, finalization: &[u8]) -> Result<()> {
     let state = ServerLogin::<Suite>::deserialize(state).map_err(auth)?;
     let fin = CredentialFinalization::<Suite>::deserialize(finalization).map_err(auth)?;

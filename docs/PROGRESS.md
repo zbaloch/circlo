@@ -79,6 +79,7 @@ Memory file for Claude Code sessions. Read this first when resuming. Keep it acc
 | 2026-10-25 | Core crypto crates pinned to one RustCrypto generation (digest 0.10/rand_core 0.6), matching opaque-ke 4; hpke 0.13 (not 0.15, published the same day) | Consistency, audited versions, avoid brand-new releases |
 | 2026-10-25 | uniffi 0.31 (matches uniffi-bindgen-react-native 0.31) | Phase 2 binding generator compatibility |
 | 2026-10-25 | Server will call halqo-core via JNI for OPAQUE/HMAC/push-token sealing (Phase 3) | "All crypto lives in /core"; no trustworthy Java OPAQUE |
+| 2026-10-25 | OPAQUE server login state stays server-side only (Phase 3: short-lived row/cache, single use) | CI fuzzing showed that whoever supplies the state can complete a login; fuzz target now uses a genuine state |
 | 2026-10-25 | Only `secret-scan / gitleaks` should be a required check | Path-filtered CI workflows don't run on every PR |
 
 ## Waiting on owner

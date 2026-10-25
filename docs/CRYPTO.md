@@ -98,6 +98,8 @@ context               = "halqo/v1/opaque"
   `finish` (with the identities and KSF above) → upload `registration_record` + the backups (section 6) + public keys.
 - **Login:** client `ClientLogin::start` → server `ServerLogin::start(record or None)` → client `finish` →
   server `finish`. On success the server issues a short-lived JWT (iss `halqo-server`, aud `halqo-app`) and a refresh token.
+- The server's login state between `start` and `finish` is **secret and stays server-side** (short-lived DB row or
+  cache entry, deleted on use or expiry). It contains the expected client MAC, so it must never be sent to the client.
 - The client's OPAQUE **`export_key`** (64 bytes) never leaves the device. It derives
   `backup_pw_key = HKDF(export_key, "halqo/v1/backup-password")`.
 - **Password change:** re-register with a new password (requires a valid session), re-encrypt the password backup.
