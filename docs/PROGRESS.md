@@ -7,8 +7,9 @@ Memory file for Claude Code sessions. Read this first when resuming. Keep it acc
 | Phase | Status |
 |---|---|
 | 0 Repo, spec, local infra | Done (merged PR #2); phone check still manual |
-| 1 Rust crypto core | **Done locally** on branch `phase-1-crypto-core`; PR pending CI |
-| 2–12 | Not started |
+| 1 Rust crypto core | Done (merged PR #3) |
+| 2 RN binding + app shell | **Android done locally** on `phase-2-app-shell`; iPhone EAS build needs owner's Expo/Apple accounts |
+| 3–12 | Not started |
 
 ## Environment (as of 2026-10-25)
 
@@ -54,6 +55,21 @@ Memory file for Claude Code sessions. Read this first when resuming. Keep it acc
 - [x] Test vectors committed (`core/test_vectors/vectors_TEST_ONLY.json`) + published vectors (RFC 5869, BIP39, XChaCha draft)
 - [x] 7 cargo-fuzz targets (CI runs 30 s each on nightly)
 - [x] 200 MB file: encrypt+decrypt in 0.6 s with 8 MB peak working set (release, Windows)
+- [x] CI green, merged (PR #3); CI fuzzing found the OPAQUE server-state rule (see decisions)
+
+## Phase 2 (RN binding + app shell) — summary
+
+- [x] Expo SDK 58 app in `app/` (`@halqo/app`, RN 0.88, expo-router, NativeWind 4.2 + Tailwind 3.4, brand tokens, dark mode)
+- [x] Drawer (Profile, Circles, Devices, Settings, Recovery phrase, Log out) + 4 icon-only tabs + Home header + FABs + empty states
+- [x] `@halqo/core` generated from `core/` by uniffi-bindgen-react-native 0.31 **jsi2** flavour (`app/modules/halqo-core`);
+      app depends directly on `@ubjs/react-native`
+- [x] Dev screen "Crypto self-test" (`halqo://dev`, dev builds only)
+- [x] typecheck, lint, 9 jest tests pass
+- [x] **Android emulator (API 36.1, x86_64): all self-tests PASS** — blob tamper rejected, circle 7 reads 7/9 not 5
+      (payload 160 B), recovery phrase, OPAQUE register+login (Argon2id 64 MiB, ~0.5 s debug), 5 MB stream
+- [x] **200 MB file streamed on the emulator: PASS, app memory flat (PSS 409 MB before, 408 MB peak during)**; 43 s in
+      a debug (unoptimised) Rust build
+- [ ] iPhone via EAS dev build (needs owner: Expo account + Apple developer account; see "Waiting on owner")
 - [ ] CI green, merge
 
 ## Decisions log
@@ -80,9 +96,18 @@ Memory file for Claude Code sessions. Read this first when resuming. Keep it acc
 | 2026-10-25 | uniffi 0.31 (matches uniffi-bindgen-react-native 0.31) | Phase 2 binding generator compatibility |
 | 2026-10-25 | Server will call halqo-core via JNI for OPAQUE/HMAC/push-token sealing (Phase 3) | "All crypto lives in /core"; no trustworthy Java OPAQUE |
 | 2026-10-25 | OPAQUE server login state stays server-side only (Phase 3: short-lived row/cache, single use) | CI fuzzing showed that whoever supplies the state can complete a login; fuzz target now uses a genuine state |
+| 2026-10-26 | Expo SDK 58 / RN 0.88 / NativeWind 4.2.7 with Tailwind 3.4.19 | Latest stable; NativeWind 4 requires Tailwind 3 |
+| 2026-10-26 | Core bound with ubrn **jsi2** (shared `@ubjs/react-native` player, no per-library C++) | Simplest native build, especially on Windows |
+| 2026-10-26 | Generated TS bindings committed; built `.so`/xcframework not (regenerate with `make core-android`) | CI typechecks without Rust; binaries are 20 MB+ debug |
+| 2026-10-26 | Colour tokens in `app/src/theme/tokens.js`, shared by Tailwind and `usePalette()` | One source of truth for classes and navigation options |
+| 2026-10-26 | Full drawer navigator not rendered in jest (Reanimated 4.7 native init fails under jest-expo); screens/config tested directly, navigation checked on emulator | Upstream incompatibility; avoid fragile hand-written Reanimated mocks |
+| 2026-10-26 | Android build pins CMake 4.1.2 via config plugin; Windows LongPathsEnabled=1 | RN codegen object paths exceed 260 chars; ninja ≥1.12 needed |
 | 2026-10-25 | Only `secret-scan / gitleaks` should be a required check | Path-filtered CI workflows don't run on every PR |
 
 ## Waiting on owner
+
+0. iPhone dev build (Phase 2 criterion): needs an Expo account (`npx eas-cli@latest login`) and an Apple Developer
+   account for device provisioning. Then `cd app && npx eas-cli@latest build --profile development --platform ios`.
 
 1. Spring Boot 3.5 vs 4.x — needed before Phase 3 (Dependabot PR #1 proposes 4.1.2).
 2. Create the `halqo` MariaDB user (DEV_SETUP §3) and switch `server/.env` off `root`.
@@ -90,6 +115,9 @@ Memory file for Claude Code sessions. Read this first when resuming. Keep it acc
 4. Phone checks below.
 
 ## Needs manual check
+
+- (Phase 2) On a physical Android phone and an iPhone dev build: open drawer → "Crypto self-test" → Run checks (all PASS)
+  and "Stream 200 MB" (PASS, app stays responsive). Also toggle system dark mode and confirm colours switch.
 
 - (Phase 0) MinIO console opens at `http://<LAN_IP>:9001` from a phone on the same Wi-Fi.
 - (Phase 0) Presigned PUT from the phone: on Windows run `.\infra\dev-up.ps1`, start the server
@@ -99,6 +127,9 @@ Memory file for Claude Code sessions. Read this first when resuming. Keep it acc
   If it times out, add the firewall rules in DEV_SETUP §2.
 
 ## Known issues
+
+- Android `libhalqo_core.so` is currently a debug build (~21 MB, slow); release builds need `--release` in ubrn cargo extras (Phase 12).
+- `npm audit` reports advisories in app dev dependencies (Expo toolchain); review in Phase 12 dependency audit.
 
 - Flyway (managed by Boot 3.5) logs "MariaDB 11.8 is newer than this version of Flyway". Works; resolved by a Flyway/Boot upgrade.
 - First commit `12fbddb` is authored with a personal email and is already public (can't be undone; future commits
