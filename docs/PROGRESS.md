@@ -9,8 +9,9 @@ Memory file for Claude Code sessions. Read this first when resuming. Keep it acc
 | 0 Repo, spec, local infra | Done (merged PR #2); phone check still manual |
 | 1 Rust crypto core | Done (merged PR #3) |
 | 2 RN binding + app shell | Done on Android (merged PR #4); iPhone EAS build pending owner's Expo/Apple accounts |
-| 3 Server foundations | **Done locally** on `phase-3-server-foundations`; PR pending CI |
-| 4–12 | Not started |
+| 3 Server foundations | Done (merged PR #5) |
+| 4 App onboarding | **In progress** on `phase-4-onboarding` |
+| 5–12 | Not started |
 
 ## Environment (as of 2026-10-25)
 
@@ -86,7 +87,7 @@ Memory file for Claude Code sessions. Read this first when resuming. Keep it acc
 - [x] No request-body/IP logging (no access log; error bodies are fixed codes) — `NoPayloadLoggingIT` asserts logs during
       real traffic contain no handles, passwords, tokens, keys, user ids or IPs
 - [x] 26 server tests pass locally against halqo_test + halqo-media-test; local server smoke-tested against `halqo`
-- [ ] CI green, merge
+- [x] CI green, merged (PR #5; CI caught Flyway logging the JDBC URL — silenced)
 
 ## Decisions log
 
