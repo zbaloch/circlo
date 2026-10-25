@@ -84,6 +84,28 @@ class AuthFlowIT extends IntegrationTest {
     }
 
     @Test
+    void abandonedSignupDoesNotBlockTheHandle() {
+        // Start signup and abandon it (e.g. closed the app on the recovery-phrase screen).
+        TestApp first = new TestApp(this, "kim_abandon", "first attempt pw");
+        byte[][] reg = TestClientNative.registrationStart(first.password);
+        var start = call("POST", "/v1/auth/register/start", Map.of("handle", first.handle, "registrationRequest", reg[0]), null);
+        assertThat(start.getStatusCode().value()).isEqualTo(200);
+        String abandonedUserId = (String) start.getBody().get("userId");
+
+        // No account exists yet: logging in fails like any unknown handle.
+        assertThatThrownBy(() -> new TestApp(this, "kim_abandon", "x").login("first attempt pw")).isInstanceOf(CoreException.class);
+
+        // Starting again with the same handle works immediately and completes normally.
+        TestApp second = new TestApp(this, "kim_abandon", "second attempt pw").register();
+        assertThat(second.userId.toString()).isNotEqualTo(abandonedUserId);
+        assertThat(new TestApp(this, "kim_abandon", "second attempt pw").login("second attempt pw").getStatusCode().value())
+                .isEqualTo(200);
+
+        // Once the account is complete, the handle is taken for good.
+        new TestApp(this, "kim_abandon", "third").registerExpecting(409);
+    }
+
+    @Test
     void refreshTokensRotateAndCannotBeReused() {
         TestApp a = new TestApp(this, "frank_refresh", "pw").register();
         String old = a.refreshToken;

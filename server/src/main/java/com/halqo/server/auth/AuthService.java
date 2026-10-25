@@ -86,11 +86,11 @@ public class AuthService {
     public RegisterStart registerStart(String rawHandle, byte[] request) {
         Handle h = handle(rawHandle);
         for (UserRow u : userBy("handle_lookup", h.lookup())) {
-            boolean stalePending = u.status().equals("pending")
-                    && u.createdAt().plus(props.pendingRegistrationTtl()).isBefore(clock.instant());
-            if (!stalePending) {
+            if (u.status().equals("active")) {
                 throw ApiException.conflict("handle_taken");
             }
+            // An unfinished signup holds no keys or backups and isn't an account: a new start replaces it, so someone
+            // who abandoned signup (or whose app was closed mid-way) can start again straight away.
             jdbc.update("DELETE FROM users WHERE id = ?", (Object) u.id());
         }
         UUID userId = Ids.newId();
