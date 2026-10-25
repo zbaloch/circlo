@@ -1,278 +1,282 @@
 # Halqo cryptography specification
 
-> **Status: DRAFT v0.1 — awaiting owner review.** Nothing here is final until approved.
-> Section 13 lists every point where this draft goes *beyond* PLAN.md; those need explicit approval.
-> Phase 1 (`core/`) implements this document byte-for-byte. Any change requires editing this file first.
+> **Status: v1.0 — approved by the owner on 2026-10-25** (owner delegated all design choices to "the most secure
+> option"). Section 14 lists every point where this spec deliberately goes beyond PLAN.md and why.
+> `core/` implements this document byte-for-byte. Any change requires editing this file first.
+> **An external cryptography audit is required before public launch.**
 
-## 1. Principles
+## 1. Goals
 
-- The server stores and relays ciphertext only. It never sees plaintext content, names, emails, private keys,
-  circle numbers or circle labels.
-- All primitives live in `core/` (Rust) using audited crates. The app and server call the core; they never
-  implement primitives.
-- Every symmetric ciphertext is AEAD with AAD binding **object type, object id(s) and format version**.
-- Every key is used for exactly one purpose. Sub-keys are derived with HKDF and a unique `halqo/v1/...` label.
-- All secrets are zeroized when dropped.
+1. The server stores and relays **ciphertext only**. It never sees plaintext content, media, names, emails,
+   profile fields, passwords, private keys, circle numbers or circle labels.
+2. **A stolen database (and S3 bucket) reveals nothing readable.** No key that decrypts user data is stored on the
+   server. A database dump alone does not even allow offline password guessing (section 5).
+3. Server-side secrets that exist (OPAQUE server setup, handle key, push-token key) live in the deployment secret
+   store / environment, **never in the database or the repo**.
+4. All primitives live in `core/` (Rust) using audited crates. The app and the server call the core; neither implements
+   primitives itself.
+5. Every symmetric ciphertext is AEAD with AAD binding **object type, object id(s) and format version**.
+6. Every key has exactly one purpose; sub-keys are derived with HKDF and a unique `halqo/v1/...` label.
+7. All secrets are zeroized on drop.
 
 ## 2. Primitives
 
 | Purpose | Algorithm | Crate |
 |---|---|---|
-| Symmetric AEAD | XChaCha20-Poly1305 (32-byte key, 24-byte random nonce, 16-byte tag) | `chacha20poly1305` |
-| Streaming file AEAD | STREAM (`StreamBE32`) over XChaCha20-Poly1305 | `chacha20poly1305::aead::stream` |
-| KDF | HKDF-SHA256 (RFC 5869) | `hkdf`, `sha2` |
-| Hash | SHA-256 | `sha2` |
-| Public-key encryption | HPKE (RFC 9180), **mode Auth**, DHKEM(X25519, HKDF-SHA256), HKDF-SHA256, ChaCha20-Poly1305 | `hpke` |
-| Key agreement | X25519 | `x25519-dalek` |
-| Signatures | Ed25519 (RFC 8032, strict verification) | `ed25519-dalek` |
-| Password hashing | Argon2id v1.3 | `argon2` |
-| Recovery phrase | BIP39, English wordlist, 24 words (256-bit entropy) | `bip39` |
-| Messaging | MLS (RFC 9420), ciphersuite `MLS_128_DHKEMX25519_CHACHA20POLY1305_SHA256_Ed25519` (0x0003) | `openmls` |
-| Randomness | OS CSPRNG (`getrandom` / `OsRng`) | `rand_core` |
-
-BLAKE3 is not used; SHA-256 is the single hash everywhere.
+| Symmetric AEAD | XChaCha20-Poly1305 (32-byte key, 24-byte random nonce, 16-byte tag) | `chacha20poly1305` 0.10 |
+| Streaming file AEAD | STREAM (`StreamBE32`) over XChaCha20-Poly1305 | `chacha20poly1305` 0.10 (`stream`) |
+| KDF | HKDF-SHA256 (RFC 5869) | `hkdf` 0.12, `sha2` 0.10 |
+| MAC | HMAC-SHA256 | `hmac` 0.12 |
+| Hash | SHA-256 | `sha2` 0.10 |
+| Public-key encryption | HPKE (RFC 9180) **mode Auth**, DHKEM(X25519, HKDF-SHA256), HKDF-SHA256, ChaCha20-Poly1305 | `hpke` 0.13 |
+| Signatures | Ed25519 (RFC 8032), strict verification | `ed25519-dalek` 2 |
+| Password authentication | **OPAQUE (RFC 9807)**: OPRF ristretto255, 3DH ristretto255 + SHA-512, KSF Argon2id | `opaque-ke` 4 |
+| Password stretching | Argon2id v1.3, m = 64 MiB, t = 3, p = 1 (inside OPAQUE) | `argon2` 0.5 |
+| Recovery phrase | BIP39, English, 24 words (256-bit entropy) | `bip39` 2 |
+| Messaging (Phase 9) | MLS (RFC 9420), ciphersuite 0x0003 `MLS_128_DHKEMX25519_CHACHA20POLY1305_SHA256_Ed25519` | `openmls` |
+| Randomness | OS CSPRNG | `rand_core` `OsRng` / `getrandom` |
 
 ## 3. Encodings and conventions
 
-- `||` is byte concatenation. Integers are big-endian unsigned (`u8`, `u32`, `u64`).
-- IDs (`user_id`, `post_id`, `epoch_id`, `device_id`, `reply_id`, ...) are 16 bytes (UUIDv7 or random), raw bytes.
-- `HKDF(ikm, info, L)` means HKDF-SHA256 Extract with an empty salt, then Expand with `info` to `L` bytes (default 32).
-- Labels are ASCII strings starting with `halqo/v1/`.
-- **AAD encoding:** `AAD(label, f1, f2, ...) = label || 0x00 || f1 || f2 || ...`. Every field is fixed-length
-  (IDs 16 bytes, versions `u8`, kinds `u8`), so no length prefixes are needed. Variable-length fields are not allowed in AAD.
-- **Sealed envelope** (all single-shot XChaCha20-Poly1305 ciphertexts):
+- `||` is concatenation. Integers are big-endian unsigned (`u8`, `u32`, `u64`).
+- IDs (`user_id`, `post_id`, `epoch_id`, `device_id`, `reply_id`, `object_id`) are 16 raw bytes (UUIDv7 or random).
+- `HKDF(ikm, info)` = HKDF-SHA256 Extract with empty salt, then Expand with `info` to 32 bytes unless stated.
+- Labels are ASCII and start with `halqo/v1/`.
+- **AAD:** `AAD(label, f1, ..., fn) = label || 0x00 || f1 || ... || fn`. Every field is fixed-length (IDs 16 bytes,
+  `u8` kinds/versions, 32-byte keys/hashes). Variable-length fields are never put in AAD.
+- **Sealed envelope** (every single-shot XChaCha20-Poly1305 ciphertext):
   ```
-  envelope = version:u8 (=0x01) || nonce:24 || ciphertext_with_tag
+  envelope = version:u8 (=0x01) || nonce:24 || ciphertext || tag:16
   ```
-  The `version` byte is also part of the AAD of every envelope (as the last AAD field), so it cannot be swapped.
-- Plaintext structures inside envelopes are CBOR (RFC 8949) maps with integer keys, then padded (section 4).
+  The envelope `version` byte is always the **last AAD field**, so it cannot be swapped.
+  `Seal(key, plaintext, label, fields...)` means: random nonce; AAD = `AAD(label, fields..., version)`.
+- Structured plaintexts are CBOR (RFC 8949) maps with small integer keys, then padded (section 4).
 
-## 4. Padding
-
-All plaintexts that are stored (headers, replies, profiles, blobs, media streams) are padded before encryption with
-**Padmé** (Nikitin et al., 2019), which leaks at most O(log log M) bits of length:
+## 4. Padding (Padmé)
 
 ```
-padme(L): if L < 2 return L
-          E = floor(log2 L); S = floor(log2 E) + 1
-          z = E - S; mask = (1 << z) - 1
+padme(L): if L < 2: return L
+          E = floor(log2 L); S = floor(log2 E) + 1; z = E - S; mask = (1 << z) - 1
           return (L + mask) & ~mask
 ```
+- **Structured plaintexts:** `padded = u32(len) || plain || zeros`, total length `max(256, padme(4 + len))`.
+  Unpadding rejects a length prefix larger than the buffer and non-zero padding bytes.
+- **Media streams:** `content || zeros` to `padme(content_len)` (minimum 1 chunk); the real `content_len` is stored only
+  inside the encrypted post header.
+- Server column `size_bucket = ceil(log2(ciphertext_size))`.
 
-- Structured plaintexts: `padded = u32(len(plain)) || plain || zeros` to total length `padme(4 + len(plain))`,
-  with a minimum padded size of 256 bytes.
-- Media streams: the plaintext stream is `content || zeros` to `padme(len(content))`; the real content length is
-  stored in the (encrypted) post header.
-- `size_bucket` stored on the server is `ceil(log2(padded_ciphertext_size))`.
+## 5. Accounts and authentication (OPAQUE)
 
-## 5. Identity, device and auth keys
+### 5.1 Handle and lookup key
+- Every account has a **handle** (the login name, chosen by the user, a pseudonym; no email or phone number exists).
+  `normalize(handle) = NFKC(lowercase(trim(handle)))`, 3–30 chars of `[a-z0-9_]` after normalization.
+- The server never stores the handle. It stores
+  `handle_lookup = HMAC-SHA256(HANDLE_KEY, "halqo/v1/handle" || 0x00 || normalize(handle))`, where `HANDLE_KEY` (32 bytes)
+  is a server secret (`HALQO_HANDLE_KEY`) kept outside the database. A DB thief cannot reverse or test handles.
+- Discoverability: handles are **not searchable by default**. A user may opt in to "let people find me by handle";
+  only then does the server answer an exact-match lookup. Otherwise friends connect via invite link/QR (section 11).
 
-### 5.1 Identity keys (per user, random, shared by all of the user's devices)
-- `id_x25519_sk` / `id_x25519_pk`: X25519, random.
-- `id_ed25519_sk` / `id_ed25519_pk`: Ed25519, random.
-- Published as `identity_keys(x25519_pub, ed25519_pub, signature, version)` where
-  `signature = Ed25519_sign(id_ed25519_sk, "halqo/v1/identity" || 0x00 || user_id || version:u8 || id_x25519_pk)`.
-
-### 5.2 Device keys (per device, random, never leave the device)
-- `dev_ed25519_sk` / `dev_ed25519_pk`.
-- Device certificate: `Ed25519_sign(id_ed25519_sk, "halqo/v1/device" || 0x00 || user_id || device_id || dev_ed25519_pk)`.
-  Friends accept a device (e.g. for MLS) only with a valid certificate from the identity key they verified.
-
-### 5.3 Password-derived auth seed
+### 5.2 OPAQUE configuration
 ```
-password_bytes = UTF-8(NFKC(password))
-auth_salt      = 16 random bytes, generated by the client at signup, stored on the server (users.auth_salt)
-authSeed       = Argon2id(password_bytes, auth_salt, m = 65536 KiB, t = 3, p = 1, len = 32)
-auth_sk        = Ed25519 signing key from seed HKDF(authSeed, "halqo/v1/auth-key")
-backup_pw_key  = HKDF(authSeed, "halqo/v1/backup-password")
+CipherSuite: OprfCs = Ristretto255, KeGroup = Ristretto255, KeyExchange = TripleDh<Ristretto255, Sha512>,
+             Ksf = Argon2id(m = 65536 KiB, t = 3, p = 1, output 64)
+credential_identifier = handle_lookup                       (computed by the server)
+client identity       = normalize(handle) (UTF-8)
+server identity       = "halqo-server"
+context               = "halqo/v1/opaque"
 ```
-The server stores only `auth_pk` (`users.auth_pubkey`) and `auth_salt`.
+- `ServerSetup` (OPRF seed + server AKE keypair) is generated once, serialized and stored as `HALQO_OPAQUE_SERVER_SETUP`
+  in the secret store, **never in the database**. Losing it forces every user through recovery (section 6.3), so it is
+  backed up in the secret store.
+- The DB stores only the OPAQUE `registration_record` (`users.opaque_record`). Without `ServerSetup` this record does not
+  allow offline password guessing; even with both, every guess costs one Argon2id at 64 MiB.
+- Unknown handles get a fake login response generated by `opaque-ke` from `ServerSetup` and the identifier, so the
+  server never reveals whether an account exists.
 
-### 5.4 Login (signed challenge)
-1. Client sends its login identifier (see open question Q1 in section 13). Server returns `auth_salt`,
-   `challenge_id` (16 random bytes), `nonce` (32 random bytes) and `expires_at` (u64 unix seconds, TTL `halqo.auth.challenge-ttl`, default 60 s).
-   For unknown identifiers the server returns a deterministic fake salt `HMAC-SHA256(server_secret, identifier)[0..16]`
-   so account existence is not revealed. (Server-side HMAC is a library call, not a custom primitive.)
-2. Client computes `auth_sk` and signs:
-   `sig = Ed25519_sign(auth_sk, "halqo/v1/login" || 0x00 || user_id || challenge_id || nonce || u64(expires_at))`.
-3. Server verifies with `auth_pk` (strict), checks expiry and single use, then issues a short-lived JWT
-   (issuer `halqo-server`, audience `halqo-app`) and a refresh token.
+### 5.3 Flows
+- **Registration:** client `ClientRegistration::start(password)` → server `ServerRegistration::start` → client
+  `finish` (with the identities and KSF above) → upload `registration_record` + the backups (section 6) + public keys.
+- **Login:** client `ClientLogin::start` → server `ServerLogin::start(record or None)` → client `finish` →
+  server `finish`. On success the server issues a short-lived JWT (iss `halqo-server`, aud `halqo-app`) and a refresh token.
+- The server's login state between `start` and `finish` is **secret and stays server-side** (short-lived DB row or
+  cache entry, deleted on use or expiry). It contains the expected client MAC, so it must never be sent to the client.
+- The client's OPAQUE **`export_key`** (64 bytes) never leaves the device. It derives
+  `backup_pw_key = HKDF(export_key, "halqo/v1/backup-password")`.
+- **Password change:** re-register with a new password (requires a valid session), re-encrypt the password backup.
 
 ## 6. Key backup and recovery
 
-### 6.1 Backup plaintext (CBOR, padded)
+### 6.1 Backup plaintext (fixed binary layout, padded)
+Not CBOR: the backup is all secret material, so a fixed layout keeps every byte zeroizable and keeps parsers away from it.
 ```
-{ 1: id_x25519_sk, 2: id_ed25519_sk, 3: profile_key,
-  4: data_key,                       // encrypts the address book and settings blobs
-  5: [ {epoch_id, C1} ... ] }        // chain roots of all epochs the user has created
+version:u8 (=0x01) || id_x25519_sk:32 || id_ed25519_sk:32 || data_key:32 || local_root:32
+|| u16(count) || count × ( epoch_id:16 || C1:32 || profile_key:32 )          // every epoch the user has created
 ```
+Decoding rejects any length other than `131 + 80 × count`, and `count > 10 000`.
+`data_key` encrypts the address book and settings blobs (section 10).
 
-### 6.2 Password copy (`key_backups.kind = 'password'`)
-```
-envelope = Seal(backup_pw_key, padded_backup, AAD("halqo/v1/backup", user_id, kind=0x01, version))
-```
+### 6.2 Password copy (`key_backups.kind = 'password'`, kind byte 0x01)
+`Seal(backup_pw_key, padded_backup, "halqo/v1/backup", user_id, 0x01)`
 
-### 6.3 Recovery copy (`key_backups.kind = 'recovery'`)
+### 6.3 Recovery copy (`key_backups.kind = 'recovery'`, kind byte 0x02)
 ```
-entropy        = 32 random bytes -> BIP39 24-word phrase (shown once at signup)
-recovery_key   = HKDF(entropy, "halqo/v1/backup-recovery")
-recovery_auth  = Ed25519 signing key from seed HKDF(entropy, "halqo/v1/recovery-auth")
-envelope       = Seal(recovery_key, padded_backup, AAD("halqo/v1/backup", user_id, kind=0x02, version))
+entropy       = 32 random bytes  →  BIP39 24-word phrase, shown once at signup (user confirms 3 words)
+recovery_key  = HKDF(entropy, "halqo/v1/backup-recovery")
+recovery_auth = Ed25519 key from seed HKDF(entropy, "halqo/v1/recovery-auth")      → users.recovery_pubkey
+envelope      = Seal(recovery_key, padded_backup, "halqo/v1/backup", user_id, 0x02)
 ```
-Recovery login uses the same challenge flow as 5.4 but signed with `recovery_auth` under label
-`halqo/v1/recovery-login`; after recovery the client sets a new password (new `auth_salt`, `auth_pk`, password copy).
+**Recovery login:** server sends `challenge_id:16 || nonce:32 || expires_at:u64`; client signs
+`"halqo/v1/recovery-login" || 0x00 || user_id || challenge_id || nonce || u64(expires_at)` with `recovery_auth`;
+the server verifies (strict) and releases the recovery copy; the client then re-registers OPAQUE with a new password.
+Recovery requires the handle (to find `user_id`) and the phrase (256 bits: not guessable).
 
-## 7. Circle key chain
+## 7. Identity and device keys
 
-### 7.1 Chain (per epoch)
-```
-C1      = 32 random bytes            (per epoch; never leaves the owner's devices except inside backups)
-C(n+1)  = HKDF(Cn, "halqo/v1/circle-step")      for n = 1..99
-```
-HKDF is one-way: holding `Ck` gives `C(k+1)..C100` but not `C(k-1)`.
+- `id_x25519` and `id_ed25519`: random keypairs per user, shared by the user's devices via the backup.
+  Published with `identity_sig = Ed25519_sign(id_ed25519_sk, "halqo/v1/identity" || 0x00 || user_id || u8(version) || id_x25519_pk)`.
+- `dev_ed25519`: random per device, never leaves it. Device certificate:
+  `Ed25519_sign(id_ed25519_sk, "halqo/v1/device" || 0x00 || user_id || device_id || dev_ed25519_pk)`.
+- Keys are stored in iOS Keychain / Android Keystore under service `com.halqo.app.keys`.
 
-### 7.2 Per-circle sub-keys (never use `Cn` directly as an encryption key)
+## 8. Circle key chain
+
+### 8.1 Chain (per epoch)
+```
+C1     = 32 random bytes                         (never leaves the owner's devices except inside backups)
+C(n+1) = HKDF(Cn, "halqo/v1/circle-step")        n = 1..99
+```
+HKDF is one-way: `Ck` yields `C(k+1)..C100`, never `C(k-1)`.
+
+### 8.2 Per-circle sub-keys (`Cn` is never used directly)
 ```
 wrap_key_n = HKDF(Cn, "halqo/v1/post-wrap")
-key_ref_n  = SHA-256("halqo/v1/post-ref" || Cn)             (32 bytes, stored in posts.key_ref)
+ref_key_n  = HKDF(Cn, "halqo/v1/post-ref")
+key_ref    = HMAC-SHA256(ref_key_n, "halqo/v1/post-ref" || 0x00 || author_id || post_id)     (per post, 32 bytes)
 ```
+Because `key_ref` depends on `post_id`, two posts to the same circle have unrelated tags: the server cannot group posts
+by audience.
 
-### 7.3 Friend payload (`friend_payloads.hpke_ciphertext`)
-Plaintext, **fixed 96 bytes for every friend**:
+### 8.3 Friend payload (`friend_payloads.hpke_ciphertext`)
+Plaintext, **fixed 112 bytes for every friend**:
 ```
-version:u8 (=0x01) || reserved:15 zero bytes || Ck:32 || profile_key:32 || epoch_id:16
+version:u8 (=0x01) || reserved:15 zero bytes || epoch_id:16 || Ck:32 || profile_key:32 || reserved:16 zero bytes
 ```
-HPKE mode Auth, sender `id_x25519_sk`, recipient `id_x25519_pk` of the friend:
+HPKE mode **Auth** (sender authenticates with `id_x25519_sk`), recipient = friend's `id_x25519_pk`:
 ```
-info = "halqo/v1/friend-payload"
-aad  = AAD("halqo/v1/friend-payload", from_user_id, to_user_id, epoch_id, version)
-stored = enc:32 || ciphertext_with_tag
+info   = "halqo/v1/friend-payload"
+aad    = AAD("halqo/v1/friend-payload", from_user_id, to_user_id, epoch_id, 0x01)
+stored = enc:32 || ciphertext:112 || tag:16          (160 bytes for every friend)
 ```
-Every friend's payload therefore has an identical size (32 + 96 + 16 = 144 bytes). No circle number is included.
-The recipient derives forward from `Ck` up to 100 steps and computes `key_ref` for each.
+No circle number is included. The recipient derives forward from `Ck` (100 steps) and matches `key_ref`s.
 
-### 7.4 Epochs
-- Moving a friend inward (k → j, j < k): send a new payload with `Cj` for the same epoch.
-- Moving outward or removing: create a new epoch (`C1'` random), send fresh payloads to every remaining friend,
-  mark the old epoch inactive. New posts use the active epoch. Old posts are unchanged.
+### 8.4 Epochs: **every** circle change rotates
+Any change of any friend's circle (inward, outward, removal, unfriend) creates a new epoch: fresh `C1`, fresh
+`profile_key`, a new payload for **every** remaining friend, profile re-encrypted. Adding a brand-new friend gives
+them a payload for the current epoch. Rationale: if inward moves sent a single extra payload, the server would learn
+who was moved. Old posts keep their old epoch and stay readable to whoever could read them (nothing seen can be revoked).
 
-## 8. Posts
+## 9. Posts, replies, likes
 
-### 8.1 Creating a post to circle n
+### 9.1 Post to circle n (active epoch)
 ```
-post_id    = client-generated UUIDv7 (16 bytes); server rejects duplicates
+post_id    = client-generated UUIDv7 (server rejects duplicates)
 postKey    = 32 random bytes
 header_key = HKDF(postKey, "halqo/v1/post-header")
-```
-Header plaintext (CBOR, padded):
-```
-{ 1: text, 2: created_at_ms, 3: [ media_descriptor ... ], 4: author_sig }
-media_descriptor = { 1: object_key, 2: kind (full|thumb|poster), 3: mime, 4: file_key, 5: content_len, 6: chunk_size, 7: width, 8: height, 9: duration_ms }
-author_sig = Ed25519_sign(id_ed25519_sk, "halqo/v1/post-sig" || 0x00 || author_id || post_id || epoch_id || SHA-256(CBOR(header without field 4)))
-```
-Stored `posts.header_ct`:
-```
-wrapped_key = Seal(wrap_key_n, postKey,        AAD("halqo/v1/post-key",    author_id, post_id, epoch_id, version))
-header      = Seal(header_key, padded_header,  AAD("halqo/v1/post-header", author_id, post_id, version))
-header_ct   = u32(len(wrapped_key)) || wrapped_key || header
-posts.key_ref = key_ref_n
+header     = CBOR { 1: text, 2: created_at_ms:u64, 3: [media_descriptor...], 4: author_sig:64 }
+media_descriptor = { 1: object_id:16, 2: kind (0 full | 1 thumb | 2 poster), 3: mime, 4: file_key:32,
+                     5: content_len:u64, 6: width, 7: height, 8: duration_ms }
+author_sig = Ed25519_sign(id_ed25519_sk, "halqo/v1/post-sig" || 0x00 || author_id || post_id || epoch_id ||
+                          SHA-256(CBOR(header map without key 4)))
+wrapped    = Seal(wrap_key_n, postKey,        "halqo/v1/post-key",    author_id, post_id, epoch_id)
+body       = Seal(header_key, padded(header), "halqo/v1/post-header", author_id, post_id)
+header_ct  = u32(len(wrapped)) || wrapped || body
+server row : posts(id = post_id, author_id, epoch_id, key_ref, header_ct, created_at, size_bucket)
 ```
 
-### 8.2 Reading
-For each author epoch the reader holds `Ck`: derive `Ck..C(k+99)` (stop after 100), build a map
-`key_ref -> wrap_key`. For each post header whose `key_ref` matches, unwrap `postKey`, decrypt the header, and verify
-`author_sig` against the author's verified identity key. A post failing any check is shown as unreadable.
+### 9.2 Read
+For a post in an epoch where the reader holds `Ck`: derive `Ck..C(k+99)`, compute each candidate `key_ref` for this
+`post_id`; on match unwrap `postKey`, open the header, verify `author_sig` with the author's pinned identity key.
+Any failure → shown as unreadable (never partially rendered).
 
-### 8.3 Replies
+### 9.3 Replies
 ```
 reply_key = HKDF(postKey, "halqo/v1/reply")
-plaintext = CBOR { 1: text, 2: created_at_ms, 3: reply_sig }, padded
+reply     = CBOR { 1: text, 2: created_at_ms, 3: reply_sig:64 }
 reply_sig = Ed25519_sign(id_ed25519_sk(replier), "halqo/v1/reply-sig" || 0x00 || post_id || reply_id || replier_id || SHA-256(text))
-post_replies.ciphertext = Seal(reply_key, padded, AAD("halqo/v1/reply", post_id, reply_id, replier_id, version))
+row       = Seal(reply_key, padded(reply), "halqo/v1/reply", post_id, reply_id, replier_id)
 ```
 
-### 8.4 Likes
-Plain rows (`post_likes`). No crypto. The server knows who liked which post (documented leak).
+### 9.4 Likes
+Plain rows (`post_likes`). The server learns who liked which post (documented leak). Counts are shown only by clients
+that can decrypt the post.
 
-## 9. Media: chunked streaming encryption
-
-- Each media object has its own random `file_key` (32 bytes), carried only inside the encrypted post header.
-- Object keys in S3 are 32 random bytes, hex encoded (64 chars). They encode nothing.
-- Plaintext stream = content padded with zeros to `padme(content_len)`, split into 64 KiB (65 536-byte) chunks.
-- STREAM (`StreamBE32<XChaCha20Poly1305>`): 19-byte random nonce prefix, then 4-byte chunk counter and 1-byte
-  last-chunk flag. The final chunk (possibly shorter, possibly empty) uses the last-chunk flag; a stream without a
-  valid final chunk is rejected (truncation), as is any reordered or modified chunk.
-- Per-chunk AAD: `AAD("halqo/v1/media-chunk", object_key_bytes:32, version)`.
-- File layout:
-  ```
-  version:u8 (=0x01) || nonce_prefix:19 || chunk_0 (65 536 + 16) || ... || chunk_last (<= 65 536 + 16)
-  ```
-- Chunk i starts at byte offset `20 + i * 65 552`, so a reader can fetch a byte range and decrypt any chunk
-  independently (progressive video playback and seeking).
-- `post_media.ct_size_padded` and `chunk_size` (65 536) are stored on the server; the real `content_len` is not.
-
-## 10. Profiles, address book and settings
-
+## 10. Blobs: profile, address book, settings, local cache
 ```
-profile_ct      = Seal(HKDF(profile_key, "halqo/v1/profile"),      padded_profile, AAD("halqo/v1/profile", user_id, version))
-address_book_ct = Seal(HKDF(data_key,    "halqo/v1/address-book"), padded_ab,      AAD("halqo/v1/address-book", user_id, version))
-settings_ct     = Seal(HKDF(data_key,    "halqo/v1/settings"),     padded_s,       AAD("halqo/v1/settings", user_id, version))
+profile_ct      = Seal(HKDF(profile_key, "halqo/v1/profile"),      padded, "halqo/v1/profile",      user_id, epoch_id)
+address_book_ct = Seal(HKDF(data_key,    "halqo/v1/address-book"), padded, "halqo/v1/address-book", user_id)
+settings_ct     = Seal(HKDF(data_key,    "halqo/v1/settings"),     padded, "halqo/v1/settings",     user_id)
+local cache     = Seal(local_cache_key,  bytes,  "halqo/v1/local-cache", file_id)   (local_cache_key: random, in Keychain/Keystore)
 ```
-- Profile plaintext: display name, bio, avatar/banner media descriptors (section 9 format, same `file_key` scheme).
-- Address book plaintext: circle labels (1–100), friend → circle assignment, per-epoch bookkeeping.
-- `version` in these AADs is the blob version (monotonic `u8` format version; the server's row version is separate).
+Profile: display name, bio, avatar/banner media descriptors. Address book: circle labels 1–100, friend → circle,
+per-epoch bookkeeping. Avatars/banners use section 11's media format.
 
-## 11. Discovery, invites and safety numbers
+## 11. Media: chunked streaming encryption
 
-- **Handle hash** (only if handles are searchable, open decision 1):
-  `handle_hash = SHA-256("halqo/v1/handle" || NFKC(lowercase(handle)))`. This is *not* secret: anyone can hash a guess.
-- **Invite token:** 32 random bytes. Link: `https://halqo.com/i/<base64url(token)>#<fingerprint>` where the fingerprint
-  (in the fragment, never sent to the server) is the first 16 bytes of
-  `SHA-256("halqo/v1/fingerprint" || id_ed25519_pk || id_x25519_pk)`. Server stores `SHA-256(token)` only.
-- **Safety number** between users A and B:
+- Each media object has a random `file_key` (32 bytes), carried only inside an encrypted header/profile/MLS message.
+- S3 object key = hex of 32 random bytes; `object_id` = first 16 of those bytes. Keys encode nothing.
+- Plaintext stream = content padded to `padme(content_len)`, split into **65 536-byte chunks**.
+- STREAM `StreamBE32<XChaCha20Poly1305>`: 19-byte random nonce prefix, 4-byte chunk counter, 1-byte last flag.
+  The final chunk (may be short or empty) has the last flag; a missing final chunk, reordering, truncation, extension
+  or any modified byte fails.
+- Per-chunk AAD: `AAD("halqo/v1/media-chunk", object_id, 0x01)`.
+- Layout: `version:u8 (=0x01) || nonce_prefix:19 || chunk_0 (65 552) || ... || chunk_last (16..65 552)`.
+  Chunk `i` starts at byte `20 + i * 65 552` → byte-range fetch + independent decryption (progressive video, seeking).
+
+## 12. Invites, safety numbers, identity changes
+
+- **Invite token:** 32 random bytes. Link `https://halqo.com/i/<base64url(token)>#<base64url(fingerprint)>`.
+  The fragment never reaches the server. `fingerprint = SHA-256("halqo/v1/fingerprint" || 0x00 || id_ed25519_pk || id_x25519_pk)[0..16]`.
+  Server stores `SHA-256("halqo/v1/invite" || 0x00 || token)` only. Accepting checks the fingerprint against the inviter's keys.
+- **Safety number** for users A, B:
   ```
-  fp(U) = iterate 5200 times: h = SHA-256(h || id_ed25519_pk(U) || id_x25519_pk(U)),
-          starting from h0 = "halqo/v1/safety-number" || 0x00 || user_id(U)
-  digits(U) = for each of the first 30 bytes taken 5 at a time: u40 mod 100000, zero-padded to 5 digits (6 groups)
-  safety_number = concat(sorted([digits(A), digits(B)]))   (60 digits, 12 groups of 5)
+  h = "halqo/v1/safety-number" || 0x00 || user_id(U); repeat 5200 times: h = SHA-256(h || id_ed25519_pk(U) || id_x25519_pk(U))
+  digits(U) = 6 groups: for i in 0..6: u40(h[5i..5i+5]) mod 100000, zero-padded to 5 digits
+  safety_number = concat(sort([digits(A), digits(B)]))       (60 digits, shown as 12 groups of 5)
+  QR = 0x01 || first 30 bytes of h(first) || first 30 bytes of h(second)   (same order as the digits)
   ```
-  The QR code encodes `0x01 || fp(A)[0..30] || fp(B)[0..30]`, ordered the same way.
-- **Identity change:** clients pin each friend's `id_ed25519_pk`/`id_x25519_pk`. A change shows a blocking warning
-  and resets the verified state.
+- **Pinning:** clients pin each friend's identity keys on first contact (trust on first use). A change triggers a
+  blocking warning and clears the verified state.
 
-## 12. Messaging (MLS)
+## 13. Server-side secrets (outside the DB, via the core)
 
-- OpenMLS, ciphersuite 0x0003. One MLS client per device. 1:1 chats are 2-member groups.
-- Credential: `BasicCredential(identity = user_id || device_id)`; signature key = a per-device MLS signature key,
-  bound to the user by the device certificate (5.2), checked by every member before accepting a member/commit.
-- Group name and avatar live in an MLS group context extension, never on the server.
-- Attachments use section 9; the `file_key`, `object_key` and metadata are sent inside the MLS application message.
-- The server stores key packages, an ordered per-group message queue and welcome messages as opaque bytes.
+| Secret | Env var | Used for | If lost |
+|---|---|---|---|
+| OPAQUE `ServerSetup` | `HALQO_OPAQUE_SERVER_SETUP` | Password login | Users log in via recovery phrase and re-register |
+| Handle key | `HALQO_HANDLE_KEY` | `handle_lookup` | Handles must be re-entered by users at next login |
+| Push-token key | `HALQO_PUSH_TOKEN_KEY` | `devices.push_token_enc = Seal(key, token, "halqo/v1/push-token", device_id)` | Devices re-register push tokens |
+| JWT signing key | `HALQO_JWT_KEY` | Sessions | Everyone logs in again |
 
-## 13. Points beyond PLAN.md (need owner approval)
+None of these can decrypt user content. They only protect metadata and stop offline guessing from a DB-only leak.
+The server calls the core (JNI) for OPAQUE, HMAC and the push-token seal; it implements no primitives.
 
-| # | What | Why |
+## 14. Where this goes beyond PLAN.md (approved)
+
+| # | Change | Why |
 |---|---|---|
-| A1 | **Author signatures** on post headers and replies (8.1, 8.3) | Anyone holding `Cn` could otherwise forge a post "from" the author (a colluding friend + server). |
-| A2 | **HPKE mode Auth** instead of Base for friend payloads (7.3) | Base mode lets the server inject fake circle keys; Auth mode proves the sender. |
-| A3 | **Recovery auth key** + `users.recovery_pubkey` column (6.3) | Without it, a user who forgot their password cannot pass the signed challenge needed to download the recovery backup. Adds a column not in PLAN.md section 3. |
-| A4 | `user_blobs.kind` gains `'profile'` (10) | The encrypted profile needs a home; PLAN.md section 3 has none. |
-| A5 | Fake salts for unknown identifiers (5.4) | Stops account enumeration via the salt endpoint. Needs one server secret (`HALQO_AUTH_SALT_SECRET`). |
-| A6 | Padmé padding (4) | PLAN.md says "pad into buckets" without a scheme; Padmé is a published, well-analysed choice. |
+| A1 | Ed25519 author signatures on posts and replies | Anyone holding `Cn` (a friend) could otherwise forge posts "from" the author with server help |
+| A2 | HPKE **Auth** mode for friend payloads | Base mode would let the server inject fake circle keys |
+| A3 | Recovery auth key, `users.recovery_pubkey` | A user who forgot their password must still authenticate to fetch the recovery copy |
+| A4 | `user_blobs.kind` gains `'profile'`; profile keyed per epoch | The encrypted profile needs a home; ex-friends must lose access to future profile changes |
+| A6 | Padmé padding | Published, analysed bucket scheme |
+| A7 | **OPAQUE replaces Argon2id + Ed25519 challenge** (PLAN.md's own "upgrade path", done now). `users.auth_pubkey`/`auth_salt` become `users.opaque_record` | With the original design a DB dump allowed offline guessing of every password, then decryption of the password backups |
+| A8 | Handle required (login name); stored only as a keyed HMAC; not searchable unless the user opts in | No plaintext handle in the DB; resolves open decision 1 privately |
+| A9 | Per-post `key_ref` (HMAC over `post_id`) | Fixed tags let the server group posts by audience |
+| A10 | Every circle change rotates the epoch | Single inward-move payloads would reveal who was moved |
+| A11 | Push tokens sealed with a server key outside the DB | A DB thief gets no device push tokens |
 
-**Proposed, not adopted (needs a decision):**
-- **P1 — per-post key refs.** With `key_ref = SHA-256(label || Cn)` every post to the same circle in an epoch has the
-  *same* tag, so the server can group posts by audience (not learn *n*, but learn "these 40 posts share an audience",
-  and combine that with who likes what). Alternative: `key_ref = HMAC-SHA256(HKDF(Cn, "halqo/v1/post-ref"), post_id)`.
-  Readers then do up to 100 HMACs per post instead of one table lookup (≈50 000 HMACs for 500 posts, a few ms on
-  a phone). Recommended, but it changes PLAN.md section 1.
+## 15. Known limitations
 
-**Open questions:**
-- **Q1 — login identifier.** PLAN.md makes the handle optional, but login needs something to look up `auth_salt`.
-  Recommended: the handle is required and is the login name; whether it is *searchable* stays open decision 1.
-
-## 14. Known limitations
-
-See `docs/THREAT_MODEL.md`. In short: the server sees the social graph, timestamps, padded sizes and likes;
-friends can see that unreadable posts exist; nothing already decrypted can be revoked; the password-derived
-`auth_pk` allows offline guessing if the database leaks (OPAQUE is the planned upgrade).
+See `docs/THREAT_MODEL.md`. In short: the server sees the (pseudonymous) social graph, timestamps, padded sizes and
+likes; friends can see that unreadable posts exist; nothing already decrypted can be revoked; if the database **and**
+the server secrets are both stolen, weak passwords can be guessed offline (each guess costs Argon2id 64 MiB); a
+compromised unlocked device sees what its user sees.
