@@ -1,0 +1,12 @@
+openapi: 3.1.0
+info:
+  title: Halqo API
+  version: 0.1.0
+  description: >
+    halqo-server API. The server stores and relays ciphertext only. Request and response bodies
+    never contain plaintext content, names, emails, circle numbers or private keys.
+servers:
+  - url: http://localhost:8080
+paths: {}
+components:
+  schemas: {}

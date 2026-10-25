@@ -1,0 +1,33 @@
+spring:
+  application:
+    name: halqo-server
+  datasource:
+    url: ${HALQO_DB_URL:jdbc:mariadb://localhost:3306/halqo}
+    username: ${HALQO_DB_USER:halqo}
+    password: ${HALQO_DB_PASSWORD}
+  flyway:
+    clean-disabled: true
+
+server:
+  port: ${HALQO_SERVER_PORT:8080}
+  # No access log: we never record IPs or request lines.
+  tomcat:
+    accesslog:
+      enabled: false
+
+halqo:
+  s3:
+    bucket: ${HALQO_S3_BUCKET:halqo-media}
+    public-endpoint: ${HALQO_S3_PUBLIC_ENDPOINT}
+    region: ${HALQO_S3_REGION:us-east-1}
+    access-key: ${HALQO_S3_ACCESS_KEY}
+    secret-key: ${HALQO_S3_SECRET_KEY}
+    put-ttl: 15m
+    get-ttl: 5m
+
+logging:
+  level:
+    root: INFO
+    # Never log request bodies, headers or client addresses.
+    org.springframework.web: INFO
+    org.apache.coyote: WARN

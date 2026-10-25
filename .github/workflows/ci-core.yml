@@ -1,0 +1,39 @@
+name: ci-core
+
+on:
+  pull_request:
+    paths: ["core/**", ".github/workflows/ci-core.yml"]
+  push:
+    branches: [main]
+    paths: ["core/**", ".github/workflows/ci-core.yml"]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: core
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - name: Skip until the crate exists
+        id: present
+        working-directory: .
+        run: echo "crate=$([ -f core/Cargo.toml ] && echo yes || echo no)" >> "$GITHUB_OUTPUT"
+      - uses: dtolnay/rust-toolchain@v1
+        if: steps.present.outputs.crate == 'yes'
+        with:
+          toolchain: stable
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2.9.3
+        if: steps.present.outputs.crate == 'yes'
+        with:
+          workspaces: core
+      - if: steps.present.outputs.crate == 'yes'
+        run: cargo fmt --check
+      - if: steps.present.outputs.crate == 'yes'
+        run: cargo clippy --all-targets -- -D warnings
+      - if: steps.present.outputs.crate == 'yes'
+        run: cargo test

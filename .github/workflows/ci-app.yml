@@ -1,0 +1,38 @@
+name: ci-app
+
+on:
+  pull_request:
+    paths: ["app/**", "docs/api/**", ".github/workflows/ci-app.yml"]
+  push:
+    branches: [main]
+    paths: ["app/**", "docs/api/**", ".github/workflows/ci-app.yml"]
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - name: Skip until the app exists
+        id: present
+        working-directory: .
+        run: echo "app=$([ -f app/package.json ] && echo yes || echo no)" >> "$GITHUB_OUTPUT"
+      - uses: actions/setup-node@v7.1.0
+        if: steps.present.outputs.app == 'yes'
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+      - if: steps.present.outputs.app == 'yes'
+        run: npm ci
+      - if: steps.present.outputs.app == 'yes'
+        run: npm run typecheck
+      - if: steps.present.outputs.app == 'yes'
+        run: npm run lint
+      - if: steps.present.outputs.app == 'yes'
+        run: npm test

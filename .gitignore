@@ -1,0 +1,36 @@
+# --- secrets: never commit ---
+.env
+.env.*
+!.env.example
+*.env.local
+*.pem
+*.key
+*.p8
+*.p12
+*.pfx
+*.jks
+*.keystore
+!debug.keystore
+*.mobileprovision
+google-services.json
+GoogleService-Info.plist
+credentials.json
+service-account*.json
+**/secrets/
+infra/data/
+
+# --- build output ---
+node_modules/
+target/
+build/
+dist/
+.gradle/
+.expo/
+.expo-shared/
+app/ios/
+app/android/
+*.log
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json

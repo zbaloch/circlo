@@ -1,0 +1,21 @@
+title = "halqo gitleaks config"
+
+# Keep every default gitleaks rule.
+[extend]
+useDefault = true
+
+# Allow-list ONLY obvious placeholders used in .env.example files and test fixtures.
+# Never add a real-looking value here. Test vectors under core/test_vectors/ are
+# public by design (PLAN.md 0B) and are the only path exempted.
+[allowlist]
+description = "Placeholders and public test vectors"
+regexes = [
+  '''change-me''',
+  '''test-only-not-a-secret''',
+  '''_TEST_ONLY''',
+  # Public crypto domain-separation labels (docs/CRYPTO.md), e.g. "halqo/v1/reply".
+  '''^halqo/v1/[a-z0-9/-]+$''',
+]
+paths = [
+  '''^core/test_vectors/''',
+]
