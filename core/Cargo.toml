@@ -33,6 +33,13 @@ ciborium = "0.2"
 unicode-normalization = "0.1"
 thiserror = "2"
 uniffi = "0.31"
+# Server bridge (halqo-server calls the core through JNI). Off for mobile builds.
+jni = { version = "0.21", optional = true }
+
+[features]
+jni = ["dep:jni"]
+# Client operations over JNI for halqo-server integration tests only (never in production server builds).
+jni-test-client = ["jni"]
 
 [dev-dependencies]
 proptest = "1"
@@ -57,3 +64,8 @@ opt-level = 3
 lto = true
 codegen-units = 1
 panic = "abort"
+
+# For halqo-server's JNI library: a bug must surface as a Java exception, never abort the JVM.
+[profile.server]
+inherits = "release"
+panic = "unwind"

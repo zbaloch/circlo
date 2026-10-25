@@ -11,6 +11,8 @@ pub mod error;
 pub mod ffi;
 pub mod friend;
 pub mod identity;
+#[cfg(feature = "jni")]
+mod jni_bridge;
 pub mod opaque;
 pub mod padding;
 pub mod post;
