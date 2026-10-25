@@ -29,6 +29,7 @@ class NoPayloadLoggingIT extends IntegrationTest {
                 .doesNotContain(Base64.getEncoder().encodeToString(a.ed25519Pub()))
                 .doesNotContain(a.userId.toString())
                 .doesNotContain("127.0.0.1")
-                .doesNotContain("0:0:0:0:0:0:0:1");
+                .doesNotContain("0:0:0:0:0:0:0:1")
+                .doesNotContain("jdbc:"); // no database URLs (hosts, users) either
     }
 }

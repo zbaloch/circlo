@@ -45,3 +45,5 @@ logging:
     # Never log request bodies, headers or client addresses.
     org.springframework.web: INFO
     org.apache.coyote: WARN
+    # Flyway logs the JDBC URL (database host and user) at INFO: keep hostnames and internal IPs out of logs.
+    org.flywaydb.core.FlywayExecutor: WARN
