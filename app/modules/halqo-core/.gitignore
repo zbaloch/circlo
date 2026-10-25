@@ -1,0 +1,4 @@
+# Built native libraries (regenerate with npm run ubrn:android / ubrn:ios)
+android/src/main/jniLibs/
+ios/*.xcframework/
+node_modules/
