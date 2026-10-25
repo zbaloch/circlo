@@ -8,8 +8,9 @@ Memory file for Claude Code sessions. Read this first when resuming. Keep it acc
 |---|---|
 | 0 Repo, spec, local infra | Done (merged PR #2); phone check still manual |
 | 1 Rust crypto core | Done (merged PR #3) |
-| 2 RN binding + app shell | **Android done locally** on `phase-2-app-shell`; iPhone EAS build needs owner's Expo/Apple accounts |
-| 3–12 | Not started |
+| 2 RN binding + app shell | Done on Android (merged PR #4); iPhone EAS build pending owner's Expo/Apple accounts |
+| 3 Server foundations | **Done locally** on `phase-3-server-foundations`; PR pending CI |
+| 4–12 | Not started |
 
 ## Environment (as of 2026-10-25)
 
@@ -70,6 +71,21 @@ Memory file for Claude Code sessions. Read this first when resuming. Keep it acc
 - [x] **200 MB file streamed on the emulator: PASS, app memory flat (PSS 409 MB before, 408 MB peak during)**; 43 s in
       a debug (unoptimised) Rust build
 - [ ] iPhone via EAS dev build (needs owner: Expo account + Apple developer account; see "Waiting on owner")
+- [x] CI green, merged (PR #4)
+
+## Phase 3 (server foundations) — summary
+
+- [x] Spring Boot 4.1.2 (decided: 3.5 OSS support over; Boot 4 modules adopted)
+- [x] Rust core over JNI (`core/src/jni_bridge.rs`, feature `jni`; test client feature `jni-test-client`); Java facade `HalqoCore`
+- [x] Flyway V1: all PLAN.md tables, adjusted per CRYPTO.md §14 (opaque_record, handle_lookup, recovery_pubkey, profile blob)
+      + opaque_login_states, recovery_challenges, refresh_tokens
+- [x] Endpoints: register start/finish, login start/finish (OPAQUE), refresh (rotating), recovery start/finish,
+      password start/finish, backups get/put, devices, identity get/put (docs/api/openapi.yaml)
+- [x] JWT (HS256, iss halqo-server, aud halqo-app, scopes full|recovery), refresh tokens stored as hashes
+- [x] Rate limits: 30 auth requests/min per client address (hashed in memory), 10 login/recovery attempts/min per handle
+- [x] No request-body/IP logging (no access log; error bodies are fixed codes) — `NoPayloadLoggingIT` asserts logs during
+      real traffic contain no handles, passwords, tokens, keys, user ids or IPs
+- [x] 26 server tests pass locally against halqo_test + halqo-media-test; local server smoke-tested against `halqo`
 - [ ] CI green, merge
 
 ## Decisions log
@@ -102,6 +118,12 @@ Memory file for Claude Code sessions. Read this first when resuming. Keep it acc
 | 2026-10-26 | Colour tokens in `app/src/theme/tokens.js`, shared by Tailwind and `usePalette()` | One source of truth for classes and navigation options |
 | 2026-10-26 | Full drawer navigator not rendered in jest (Reanimated 4.7 native init fails under jest-expo); screens/config tested directly, navigation checked on emulator | Upstream incompatibility; avoid fragile hand-written Reanimated mocks |
 | 2026-10-26 | Android build pins CMake 4.1.2 via config plugin; Windows LongPathsEnabled=1 | RN codegen object paths exceed 260 chars; ninja ≥1.12 needed |
+| 2026-10-26 | **Spring Boot 4.1.2** (owner delegated technical choices) | Boot 3.5 OSS support ended; Flyway in 3.5 warned on MariaDB 11.8 |
+| 2026-10-26 | Server crypto via JNI into halqo-core (`jni` 0.21 API), built with profile `server` (panic=unwind) | All crypto in core; a Rust panic becomes a Java exception instead of killing the JVM |
+| 2026-10-26 | Client-side JNI functions only behind `jni-test-client` | Integration tests act as a real app; production server lib excludes them |
+| 2026-10-26 | Server-assigned user id at register/start (pending row, 10 min) | Identity signature and backup AAD bind the user id before registration finishes |
+| 2026-10-26 | Unknown handles: fake OPAQUE response (opaque-ke) and stable fake user id for recovery | No account enumeration |
+| 2026-10-26 | Local-dev server secrets generated into git-ignored server/.env by GenerateSecrets | Needed to run the server locally; production uses the secret store |
 | 2026-10-25 | Only `secret-scan / gitleaks` should be a required check | Path-filtered CI workflows don't run on every PR |
 
 ## Waiting on owner
@@ -109,7 +131,6 @@ Memory file for Claude Code sessions. Read this first when resuming. Keep it acc
 0. iPhone dev build (Phase 2 criterion): needs an Expo account (`npx eas-cli@latest login`) and an Apple Developer
    account for device provisioning. Then `cd app && npx eas-cli@latest build --profile development --platform ios`.
 
-1. Spring Boot 3.5 vs 4.x — needed before Phase 3 (Dependabot PR #1 proposes 4.1.2).
 2. Create the `halqo` MariaDB user (DEV_SETUP §3) and switch `server/.env` off `root`.
 3. GitHub web settings (PLAN.md 0B step 5), incl. required check `secret-scan / gitleaks`.
 4. Phone checks below.

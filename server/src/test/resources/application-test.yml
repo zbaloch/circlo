@@ -9,5 +9,8 @@ spring:
     clean-disabled: false
 
 halqo:
+  auth:
+    # Many auth calls come from localhost in tests; production keeps the default of 30/minute.
+    ip-requests-per-minute: 100000
   s3:
     bucket: halqo-media-test
