@@ -1,0 +1,141 @@
+/**
+ * On-device crypto self-test (Phase 2 dev screen). Exercises the native Rust core end to end; contains no crypto
+ * of its own. Never shipped to users: the dev screen only appears in __DEV__ builds.
+ */
+import * as Core from '@halqo/core';
+import { File, FileMode, Paths } from 'expo-file-system';
+
+export type CheckResult = { name: string; ok: boolean; ms: number; detail?: string };
+
+const enc = new TextEncoder();
+const dec = new TextDecoder();
+
+function bytes(s: string): ArrayBuffer {
+  return enc.encode(s).slice().buffer;
+}
+
+function id16(): ArrayBuffer {
+  return Core.newSymmetricKey().slice(0, 16);
+}
+
+function fails(fn: () => unknown): boolean {
+  try {
+    fn();
+    return false;
+  } catch {
+    return true;
+  }
+}
+
+function plainPath(file: File): string {
+  return decodeURIComponent(file.uri.replace(/^file:\/\//, ''));
+}
+
+async function timed(name: string, fn: () => Promise<string | void> | string | void): Promise<CheckResult> {
+  const start = Date.now();
+  try {
+    const detail = (await fn()) ?? undefined;
+    return { name, ok: true, ms: Date.now() - start, detail };
+  } catch (e) {
+    return { name, ok: false, ms: Date.now() - start, detail: e instanceof Error ? e.message : String(e) };
+  }
+}
+
+function check(cond: boolean, what: string) {
+  if (!cond) throw new Error(what);
+}
+
+export async function runQuickChecks(): Promise<CheckResult[]> {
+  const results: CheckResult[] = [];
+
+  results.push(
+    await timed('Sealed blob round trip + tamper rejected', () => {
+      const key = Core.newSymmetricKey();
+      const [user, epoch] = [id16(), id16()];
+      const ct = Core.sealProfile(key, user, epoch, bytes('{"displayName":"Test"}'));
+      check(dec.decode(Core.openProfile(key, user, epoch, ct)) === '{"displayName":"Test"}', 'round trip');
+      const tampered = new Uint8Array(ct.slice(0));
+      tampered[tampered.length - 1] ^= 1;
+      check(fails(() => Core.openProfile(key, user, epoch, tampered.buffer)), 'tampered blob opened');
+    }),
+  );
+
+  results.push(
+    await timed('Circle 7 friend reads 7 and 9, not 5', () => {
+      const [alice, bob] = [Core.generateIdentity(), Core.generateIdentity()];
+      const [aliceId, bobId, epoch] = [id16(), id16(), id16()];
+      const root = Core.newSymmetricKey();
+      const payload = Core.sealFriendPayload(alice, bob.x25519Pk, aliceId, bobId, epoch, root, 7, Core.newSymmetricKey());
+      const key = Core.openFriendPayload(bob, alice.x25519Pk, aliceId, bobId, epoch, payload);
+      const ring = new Core.ReaderKeyring(key.circleKey);
+      const readable = (circle: number) => {
+        const postId = id16();
+        const content = { text: `to circle ${circle}`, createdAtMs: BigInt(Date.now()), media: [] };
+        const s = Core.sealPost(alice, aliceId, postId, epoch, root, circle, content);
+        return !fails(() => ring.openPost(alice.ed25519Pk, aliceId, postId, epoch, s.keyRef, s.headerCt));
+      };
+      check(readable(7) && readable(9) && !readable(5), 'circle access wrong');
+      return `payload ${payload.byteLength} bytes`;
+    }),
+  );
+
+  results.push(
+    await timed('Recovery phrase round trip', () => {
+      const r = Core.newRecoveryPhrase();
+      check(r.phrase.split(' ').length === 24, '24 words');
+      const back = new Uint8Array(Core.recoveryEntropyFromPhrase(r.phrase.toUpperCase()));
+      check(back.every((b, i) => b === new Uint8Array(r.entropy)[i]), 'entropy mismatch');
+    }),
+  );
+
+  results.push(
+    await timed('OPAQUE register + login (Argon2id 64 MiB)', () => {
+      const setup = Core.opaqueServerSetupNew();
+      const handle = 'selftest_user';
+      const credId = Core.newSymmetricKey();
+      const reg = new Core.OpaqueClientRegistration(bytes('correct horse battery staple'));
+      const regResp = Core.opaqueServerRegistrationStart(setup, credId, reg.request());
+      const regFin = reg.finish(handle, regResp);
+      const record = Core.opaqueServerRegistrationFinish(regFin.message);
+      const login = new Core.OpaqueClientLogin(bytes('correct horse battery staple'));
+      const start = Core.opaqueServerLoginStart(setup, record, credId, handle, login.request());
+      const fin = login.finish(handle, start.response);
+      Core.opaqueServerLoginFinish(start.state, handle, fin.message);
+      check(fin.exportKey.byteLength === 64, 'export key');
+      const wrong = new Core.OpaqueClientLogin(bytes('wrong password'));
+      const wrongStart = Core.opaqueServerLoginStart(setup, record, credId, handle, wrong.request());
+      check(fails(() => wrong.finish(handle, wrongStart.response)), 'wrong password accepted');
+    }),
+  );
+
+  results.push(await streamFile(5));
+  return results;
+}
+
+/** Streams a file of `megabytes` through encrypt + decrypt on disk; JS never holds more than 1 MiB. */
+export async function streamFile(megabytes: number): Promise<CheckResult> {
+  return timed(`Stream ${megabytes} MB file encrypt + decrypt`, async () => {
+    const plain = new File(Paths.cache, 'selftest-plain.bin');
+    const sealed = new File(Paths.cache, 'selftest-sealed.bin');
+    const opened = new File(Paths.cache, 'selftest-opened.bin');
+    try {
+      plain.create({ overwrite: true });
+      const block = new Uint8Array(1 << 20).map((_, i) => i % 251);
+      const handle = plain.open(FileMode.WriteOnly);
+      try {
+        for (let i = 0; i < megabytes; i++) handle.writeBytesSync(block);
+      } finally {
+        handle.close();
+      }
+      const key = Core.newSymmetricKey();
+      const objectId = id16();
+      const started = Date.now();
+      const len = Core.encryptFile(plainPath(plain), plainPath(sealed), key, objectId);
+      Core.decryptFile(plainPath(sealed), plainPath(opened), key, objectId, len);
+      check(opened.size === megabytes * (1 << 20), 'size mismatch after decrypt');
+      return `crypto ${Date.now() - started} ms, ciphertext ${(sealed.size / (1 << 20)).toFixed(1)} MB (padded)`;
+    } finally {
+      for (const f of [plain, sealed, opened]) if (f.exists) f.delete();
+    }
+  });
+}
