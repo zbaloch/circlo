@@ -6,8 +6,8 @@ Memory file for Claude Code sessions. Read this first when resuming. Keep it acc
 
 | Phase | Status |
 |---|---|
-| 0 Repo, spec, local infra | **In progress** — local criteria pass; waiting on: CI green on PR, owner review of CRYPTO.md, phone check |
-| 1 Rust crypto core | Blocked on CRYPTO.md approval (section 13 items) |
+| 0 Repo, spec, local infra | Done (merged PR #2); phone check still manual |
+| 1 Rust crypto core | **Done locally** on branch `phase-1-crypto-core`; PR pending CI |
 | 2–12 | Not started |
 
 ## Environment (as of 2026-10-25)
@@ -43,6 +43,19 @@ Memory file for Claude Code sessions. Read this first when resuming. Keep it acc
 - [ ] Owner: MinIO console + presigned PUT from a phone (see "Needs manual check")
 - [ ] Owner: review/approve CRYPTO.md and THREAT_MODEL.md
 
+## Phase 1 (Rust crypto core) — summary
+
+- [x] CRYPTO.md v1.0 + THREAT_MODEL v1.0 approved (owner delegated: "most secure option")
+- [x] `core/` crate `halqo-core`: AEAD envelope, Padmé, circle chain + per-post key refs, identity/device keys,
+      HPKE Auth friend payloads, posts/replies with author signatures, chunked media STREAM, backups,
+      BIP39 recovery, OPAQUE client and server, encrypted blobs, push-token sealing, handle lookup, invites, safety numbers, uniffi FFI
+- [x] 59 tests: unit, `tests/flows.rs` (signup A → login B same identity; circle 7 reads 7/9 not 5; 7→9 epoch
+      rotation closes new circle-7 posts; replies; media), `tests/tamper.rs` (property tests, every ciphertext type)
+- [x] Test vectors committed (`core/test_vectors/vectors_TEST_ONLY.json`) + published vectors (RFC 5869, BIP39, XChaCha draft)
+- [x] 7 cargo-fuzz targets (CI runs 30 s each on nightly)
+- [x] 200 MB file: encrypt+decrypt in 0.6 s with 8 MB peak working set (release, Windows)
+- [ ] CI green, merge
+
 ## Decisions log
 
 | Date | Decision | Why |
@@ -58,15 +71,22 @@ Memory file for Claude Code sessions. Read this first when resuming. Keep it acc
 | 2026-10-25 | Data access via `spring-boot-starter-jdbc` (no JPA) | Rows are mostly opaque blobs; plain SQL keeps it obvious what's stored |
 | 2026-10-25 | CI gitleaks runs the release binary directly | No license key or third-party action needed |
 | 2026-10-25 | gitleaks allow-list includes exact `halqo/v1/...` label strings | They're public KDF labels; gitleaks flagged `"halqo/v1/reply"` as an API key |
+| 2026-10-25 | Owner delegated crypto choices ("best possible security, no PII on server, DB theft reveals nothing") → adopted A1–A11 in CRYPTO.md §14 | Owner instruction |
+| 2026-10-25 | **OPAQUE (RFC 9807)** replaces Argon2id+Ed25519 challenge login; `ServerSetup` lives in `HALQO_OPAQUE_SERVER_SETUP`, not the DB | Original design let a DB thief guess passwords offline and open password backups |
+| 2026-10-25 | Handle required (login name), stored only as `HMAC(HALQO_HANDLE_KEY, handle)`; not searchable unless the user opts in | No plaintext handles in the DB; resolves open decision 1 |
+| 2026-10-25 | Every circle change rotates the epoch; profile key is per epoch | Single inward-move payloads would reveal who moved; ex-friends must lose future profile access |
+| 2026-10-25 | Backup plaintext is a fixed binary layout, not CBOR | All-secret payload: fully zeroizable, no parser |
+| 2026-10-25 | Core crypto crates pinned to one RustCrypto generation (digest 0.10/rand_core 0.6), matching opaque-ke 4; hpke 0.13 (not 0.15, published the same day) | Consistency, audited versions, avoid brand-new releases |
+| 2026-10-25 | uniffi 0.31 (matches uniffi-bindgen-react-native 0.31) | Phase 2 binding generator compatibility |
+| 2026-10-25 | Server will call halqo-core via JNI for OPAQUE/HMAC/push-token sealing (Phase 3) | "All crypto lives in /core"; no trustworthy Java OPAQUE |
 | 2026-10-25 | Only `secret-scan / gitleaks` should be a required check | Path-filtered CI workflows don't run on every PR |
 
 ## Waiting on owner
 
-1. Review `docs/CRYPTO.md` section 13 (A1–A6, P1, Q1) and THREAT_MODEL.md — blocks Phase 1.
-2. Spring Boot 3.5 vs 4.x — needed before Phase 3.
-3. Create the `halqo` MariaDB user (DEV_SETUP §3) and switch `server/.env` off `root`.
-4. GitHub web settings (PLAN.md 0B step 5), incl. required check `secret-scan / gitleaks`.
-5. Phone checks below.
+1. Spring Boot 3.5 vs 4.x — needed before Phase 3 (Dependabot PR #1 proposes 4.1.2).
+2. Create the `halqo` MariaDB user (DEV_SETUP §3) and switch `server/.env` off `root`.
+3. GitHub web settings (PLAN.md 0B step 5), incl. required check `secret-scan / gitleaks`.
+4. Phone checks below.
 
 ## Needs manual check
 
