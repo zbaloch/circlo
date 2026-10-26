@@ -15,6 +15,7 @@ pub mod identity;
 mod jni_bridge;
 pub mod opaque;
 pub mod padding;
+pub mod playback;
 pub mod post;
 pub mod primitives;
 pub mod recovery;

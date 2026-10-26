@@ -12,8 +12,9 @@ Memory file for Claude Code sessions. Read this first when resuming. Keep it acc
 | 3 Server foundations | Done (merged PR #5) |
 | 4 App onboarding | Done on Android (merged PR #6) |
 | 5 Friends | Done on Android (merged PR #7) |
-| 6 Circles | **Done on Android** on `phase-6-circles`; post-level checks re-run in Phase 7 |
-| 7–12 | Not started |
+| 6 Circles | Done on Android (merged PR #8) |
+| 7 Posts and media | **Done on Android** on `phase-7-posts` (PR pending) |
+| 8–12 | Not started |
 
 ## Environment (as of 2026-10-25)
 
@@ -137,6 +138,35 @@ Memory file for Claude Code sessions. Read this first when resuming. Keep it acc
 - [x] Crypto-level circle semantics already proven in `core/tests/flows.rs` (circle 7 reads 7 and 9 not 5; 7 → 9 closes
       new circle-7 posts). **Re-verify on the emulator with real posts in Phase 7.**
 - [x] app 23 tests, server 33 tests
+- [x] CI green, merged (PR #8)
+
+## Phase 7 (posts and media) — summary
+
+- [x] Server: size-locked upload slots (`POST /v1/media/uploads`, random 64-hex object keys, PUT locked to the padded
+      ciphertext size), posts with encrypted header + per-post key ref (`POST /v1/posts`; epoch must be mine, media
+      owned, unattached, < 23 h old and present at the declared size), friend-only reads and 5-min download URLs,
+      delete; `MediaSweeper` removes deleted posts' media and uploads unattached after 24 h; V3/V4 migrations;
+      `PostsFlowIT` 4 tests, `PresignedUploadIT`
+- [x] Core: `PlaybackSession` loopback server for progressive video (127.0.0.1 only, 256-bit token per video,
+      plaintext only in memory one chunk at a time; downloader follows what the player needs next); 3 tests incl.
+      out-of-order download and tamper rejection
+- [x] App: compose sheet (audience chip + bottom sheet with live "visible to this circle and closer · N people",
+      remembers last circle, starts at "Me only"; counter ring; up to 4 photos or 1 video; remove/reorder),
+      background outbox with inline "Encrypting and uploading… N%" card and retry, basic Home feed with media grid,
+      decrypted-image cache, inline progressive video, author-only audience badge, delete
+- [x] Metadata: JPEG re-encode + APP1/APP13/COM removal; MP4 `udta`/`meta` zero-filled (tested on a real ffmpeg file
+      with a GPS location tag: location and device tags gone, video still decodes); picker copies deleted after
+      posting/cancel; all media caches wiped at sign-out
+- [x] **Emulator (demo_bob → demo_alice):** Bob posted 2 photos to circle 7 (Alice is in his circle 7) and a 10 MB,
+      20 s video to circle 5. Upload progress card shown; feed showed decrypted thumbnails and poster.
+      **Video played progressively** (ExoPlayer PLAYING at 2.9 s with 14.9 s of 20 s buffered; only the
+      10,488,340-byte ciphertext on disk). **Alice sees the circle-7 post and not the circle-5 video**, and no audience
+      label. Decrypted cache files: no EXIF/GPS/camera tags, 480 px thumbnails
+- [x] **Bucket: 5 objects, all random 64-hex keys; no JPEG/JFIF/Exif/ftyp markers or post text in the raw data.**
+      DB: headers are ciphertext (no text/mime hits), `posts` has no circle column
+- [x] Bug found and fixed on the way: readers didn't fetch an author's new epoch keys after a rotation; the feed now
+      refreshes a contact's payloads when it meets an unknown epoch
+- [x] app 35 tests, core 62, server 37
 - [ ] CI green, merge
 
 ## Decisions log
@@ -182,6 +212,10 @@ Memory file for Claude Code sessions. Read this first when resuming. Keep it acc
 | 2026-10-26 | New friends start in circle 100 (widest) until the author places them (Phase 6 UI) | A circle key must be sent at request/accept time; widest is the safe default |
 | 2026-10-26 | Friend requests need a redeemed invite from the target, or a discoverable target | Stops strangers from spamming requests |
 | 2026-10-26 | Profiles readable by connected users in any non-blocked state (incl. incoming requests) | So you can see who is asking before accepting; still ciphertext to the server |
+| 2026-10-26 | Progressive video via a loopback HTTP server in the core (`core/src/playback.rs`), fed ciphertext pieces by the app | Platform players can't read STREAM; keeps all decryption in the core and never writes plaintext video to disk |
+| 2026-10-26 | Metadata stripping is byte-level in TS (`strip-metadata.ts`): JPEG APP1/APP13/COM removed after re-encode; MP4 `udta`/`meta` renamed to `free` and zero-filled | No ffmpeg on device; renaming alone would leave location bytes readable by friends |
+| 2026-10-26 | A post's circle is stored only in my encrypted address book (`postCircles`); composer default is the last circle, else "Me only" | The header must not reveal the audience; nothing is shared by accident |
+| 2026-10-26 | Media of deleted posts and uploads unattached after 24 h are swept from the bucket; posts may attach uploads < 23 h old | No ciphertext retained without a reason; no sweep/attach race |
 | 2026-10-25 | Only `secret-scan / gitleaks` should be a required check | Path-filtered CI workflows don't run on every PR |
 
 ## Waiting on owner
@@ -194,6 +228,10 @@ Memory file for Claude Code sessions. Read this first when resuming. Keep it acc
 4. Phone checks below.
 
 ## Needs manual check
+
+- (Phase 7) On a physical phone over Wi-Fi: post 4 photos and a phone-recorded video (moov usually at the end); the
+  video should start within a few seconds and seek; a friend sees it, a friend outside the circle doesn't. Check that
+  a photo taken with location on shows no location in any exported copy.
 
 - (Phase 4) On a physical phone: sign up, write down the phrase, confirm; log out; log in → Profile fingerprint matches;
   Devices shows 2. Try "Forgot password?" with the 24 words → set a new password → old password no longer works.
@@ -209,6 +247,13 @@ Memory file for Claude Code sessions. Read this first when resuming. Keep it acc
   If it times out, add the firewall rules in DEV_SETUP §2.
 
 ## Known issues
+
+- (Phase 7) File encryption runs synchronously on the JS thread (`Core.encryptFile`); large videos freeze the UI for a
+  few seconds while the progress card shows. Move to an async/worker export in Phase 12 performance work.
+- (Phase 7) The full timeline (FlashList, paging, "New posts" pill, thread view, media viewer) is Phase 8; Home is a
+  basic list for now. The expo dev-menu gear overlaps the Post button in dev builds only.
+- (Phase 7) Account deletion must also delete the user's bucket objects (media_uploads rows cascade with the user);
+  handle when account deletion is built.
 
 - WSL can shut down when the emulator cold-boots (Hyper-V); `infra/dev-up.ps1`'s hidden keep-alive did not survive
   in one session. Workaround: run `wsl -d Debian -- sleep infinity` in a terminal while developing. Symptom: server

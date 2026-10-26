@@ -36,6 +36,15 @@ public class MediaUrlSigner {
                 .url();
     }
 
+    /** PUT locked to an exact Content-Length: the uploader can't store more than the size it declared. */
+    public URL presignPut(String objectKey, long contentLength) {
+        return presigner.presignPutObject(r -> r
+                .signatureDuration(props.putTtl())
+                .putObjectRequest(PutObjectRequest.builder().bucket(props.bucket()).key(objectKey)
+                        .contentLength(contentLength).build()))
+                .url();
+    }
+
     public URL presignGet(String objectKey) {
         return presigner.presignGetObject(r -> r
                 .signatureDuration(props.getTtl())

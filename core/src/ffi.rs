@@ -607,6 +607,75 @@ impl MediaChunkDecryptor {
     }
 }
 
+// ---------------- progressive playback ----------------
+
+#[derive(uniffi::Record)]
+pub struct ByteRange {
+    pub start: u64,
+    /// Exclusive.
+    pub end: u64,
+}
+
+/// Plays one encrypted video through the core's loopback server (see `playback`). The app downloads the ranges from
+/// `next_range` and passes them to `supply`; the player opens `url`. Closing (or dropping) ends the session.
+#[derive(uniffi::Object)]
+pub struct PlaybackSession {
+    session: Arc<crate::playback::Session>,
+    url: String,
+    token: String,
+}
+
+#[uniffi::export]
+impl PlaybackSession {
+    /// `cache_path` receives the ciphertext (never plaintext).
+    #[uniffi::constructor]
+    pub fn new(
+        cache_path: String,
+        file_key: &[u8],
+        object_id: &[u8],
+        content_len: u64,
+        mime: String,
+    ) -> Result<Arc<Self>> {
+        let session = Arc::new(crate::playback::Session::new(
+            cache_path.into(),
+            key32(file_key, "file_key")?,
+            id16(object_id, "object_id")?,
+            content_len,
+            &mime,
+        )?);
+        let (url, token) = crate::playback::Server::shared()?.register(session.clone());
+        Ok(Arc::new(PlaybackSession { session, url, token }))
+    }
+
+    pub fn url(&self) -> String {
+        self.url.clone()
+    }
+
+    pub fn encrypted_len(&self) -> u64 {
+        self.session.encrypted_len()
+    }
+
+    pub fn next_range(&self) -> Option<ByteRange> {
+        self.session.next_range().map(|(start, end)| ByteRange { start, end })
+    }
+
+    pub fn supply(&self, offset: u64, bytes: &[u8]) -> Result<()> {
+        self.session.supply(offset, bytes)
+    }
+
+    pub fn close(&self) {
+        if let Ok(server) = crate::playback::Server::shared() {
+            server.unregister(&self.token);
+        }
+    }
+}
+
+impl Drop for PlaybackSession {
+    fn drop(&mut self) {
+        self.close();
+    }
+}
+
 // ---------------- backups and recovery ----------------
 
 #[uniffi::export]

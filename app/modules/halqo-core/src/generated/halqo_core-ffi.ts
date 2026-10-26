@@ -340,6 +340,16 @@ const DEFINITIONS = {
       ret: FfiType.Void,
       hasRustCallStatus: true,
     },
+    uniffi_halqo_core_fn_clone_playbacksession: {
+      args: [FfiType.Handle],
+      ret: FfiType.Handle,
+      hasRustCallStatus: true,
+    },
+    uniffi_halqo_core_fn_free_playbacksession: {
+      args: [FfiType.Handle],
+      ret: FfiType.Void,
+      hasRustCallStatus: true,
+    },
     uniffi_halqo_core_fn_clone_readerkeyring: {
       args: [FfiType.Handle],
       ret: FfiType.Handle,
@@ -732,6 +742,42 @@ const DEFINITIONS = {
       ret: FfiType.RustBuffer,
       hasRustCallStatus: true,
     },
+    uniffi_halqo_core_fn_constructor_playbacksession_new: {
+      args: [
+        FfiType.RustBuffer,
+        FfiType.RustBuffer,
+        FfiType.RustBuffer,
+        FfiType.UInt64,
+        FfiType.RustBuffer,
+      ],
+      ret: FfiType.Handle,
+      hasRustCallStatus: true,
+    },
+    uniffi_halqo_core_fn_method_playbacksession_close: {
+      args: [FfiType.Handle],
+      ret: FfiType.Void,
+      hasRustCallStatus: true,
+    },
+    uniffi_halqo_core_fn_method_playbacksession_encrypted_len: {
+      args: [FfiType.Handle],
+      ret: FfiType.UInt64,
+      hasRustCallStatus: true,
+    },
+    uniffi_halqo_core_fn_method_playbacksession_next_range: {
+      args: [FfiType.Handle],
+      ret: FfiType.RustBuffer,
+      hasRustCallStatus: true,
+    },
+    uniffi_halqo_core_fn_method_playbacksession_supply: {
+      args: [FfiType.Handle, FfiType.UInt64, FfiType.RustBuffer],
+      ret: FfiType.Void,
+      hasRustCallStatus: true,
+    },
+    uniffi_halqo_core_fn_method_playbacksession_url: {
+      args: [FfiType.Handle],
+      ret: FfiType.RustBuffer,
+      hasRustCallStatus: true,
+    },
     uniffi_halqo_core_fn_constructor_readerkeyring_for_owner: {
       args: [FfiType.RustBuffer],
       ret: FfiType.Handle,
@@ -1025,6 +1071,36 @@ const DEFINITIONS = {
       ret: FfiType.UInt16,
       hasRustCallStatus: false,
     },
+    uniffi_halqo_core_checksum_constructor_playbacksession_new: {
+      args: [],
+      ret: FfiType.UInt16,
+      hasRustCallStatus: false,
+    },
+    uniffi_halqo_core_checksum_method_playbacksession_close: {
+      args: [],
+      ret: FfiType.UInt16,
+      hasRustCallStatus: false,
+    },
+    uniffi_halqo_core_checksum_method_playbacksession_encrypted_len: {
+      args: [],
+      ret: FfiType.UInt16,
+      hasRustCallStatus: false,
+    },
+    uniffi_halqo_core_checksum_method_playbacksession_next_range: {
+      args: [],
+      ret: FfiType.UInt16,
+      hasRustCallStatus: false,
+    },
+    uniffi_halqo_core_checksum_method_playbacksession_supply: {
+      args: [],
+      ret: FfiType.UInt16,
+      hasRustCallStatus: false,
+    },
+    uniffi_halqo_core_checksum_method_playbacksession_url: {
+      args: [],
+      ret: FfiType.UInt16,
+      hasRustCallStatus: false,
+    },
     uniffi_halqo_core_checksum_constructor_readerkeyring_for_owner: {
       args: [],
       ret: FfiType.UInt16,
@@ -1232,6 +1308,14 @@ interface NativeModuleInterface {
     uniffi_out_err: UniffiRustCallStatus,
   ): bigint;
   uniffi_halqo_core_fn_free_opaqueclientregistration(
+    ptr: bigint,
+    uniffi_out_err: UniffiRustCallStatus,
+  ): void;
+  uniffi_halqo_core_fn_clone_playbacksession(
+    ptr: bigint,
+    uniffi_out_err: UniffiRustCallStatus,
+  ): bigint;
+  uniffi_halqo_core_fn_free_playbacksession(
     ptr: bigint,
     uniffi_out_err: UniffiRustCallStatus,
   ): void;
@@ -1560,6 +1644,36 @@ interface NativeModuleInterface {
     uniffiSelf: bigint,
     uniffi_out_err: UniffiRustCallStatus,
   ): Uint8Array;
+  uniffi_halqo_core_fn_constructor_playbacksession_new(
+    cachePath: Uint8Array,
+    fileKey: Uint8Array,
+    objectId: Uint8Array,
+    contentLen: bigint,
+    mime: Uint8Array,
+    uniffi_out_err: UniffiRustCallStatus,
+  ): bigint;
+  uniffi_halqo_core_fn_method_playbacksession_close(
+    uniffiSelf: bigint,
+    uniffi_out_err: UniffiRustCallStatus,
+  ): void;
+  uniffi_halqo_core_fn_method_playbacksession_encrypted_len(
+    uniffiSelf: bigint,
+    uniffi_out_err: UniffiRustCallStatus,
+  ): bigint;
+  uniffi_halqo_core_fn_method_playbacksession_next_range(
+    uniffiSelf: bigint,
+    uniffi_out_err: UniffiRustCallStatus,
+  ): Uint8Array;
+  uniffi_halqo_core_fn_method_playbacksession_supply(
+    uniffiSelf: bigint,
+    offset: bigint,
+    bytes: Uint8Array,
+    uniffi_out_err: UniffiRustCallStatus,
+  ): void;
+  uniffi_halqo_core_fn_method_playbacksession_url(
+    uniffiSelf: bigint,
+    uniffi_out_err: UniffiRustCallStatus,
+  ): Uint8Array;
   uniffi_halqo_core_fn_constructor_readerkeyring_for_owner(
     epochRoot: Uint8Array,
     uniffi_out_err: UniffiRustCallStatus,
@@ -1632,6 +1746,12 @@ interface NativeModuleInterface {
   uniffi_halqo_core_checksum_constructor_opaqueclientregistration_new(): number;
   uniffi_halqo_core_checksum_method_opaqueclientregistration_finish(): number;
   uniffi_halqo_core_checksum_method_opaqueclientregistration_request(): number;
+  uniffi_halqo_core_checksum_constructor_playbacksession_new(): number;
+  uniffi_halqo_core_checksum_method_playbacksession_close(): number;
+  uniffi_halqo_core_checksum_method_playbacksession_encrypted_len(): number;
+  uniffi_halqo_core_checksum_method_playbacksession_next_range(): number;
+  uniffi_halqo_core_checksum_method_playbacksession_supply(): number;
+  uniffi_halqo_core_checksum_method_playbacksession_url(): number;
   uniffi_halqo_core_checksum_constructor_readerkeyring_for_owner(): number;
   uniffi_halqo_core_checksum_constructor_readerkeyring_new(): number;
   uniffi_halqo_core_checksum_method_readerkeyring_open_post(): number;
