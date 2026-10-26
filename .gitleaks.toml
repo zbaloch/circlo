@@ -7,8 +7,8 @@ useDefault = true
 # Allow-list ONLY obvious placeholders used in .env.example files and test fixtures.
 # Never add a real-looking value here. Test vectors under core/test_vectors/ are
 # public by design (PLAN.md 0B) and are the only path exempted.
-[allowlist]
-description = "Placeholders and public test vectors"
+[[allowlists]]
+description = "Placeholders and public crypto labels"
 regexes = [
   '''change-me''',
   '''test-only-not-a-secret''',
@@ -16,6 +16,18 @@ regexes = [
   # Public crypto domain-separation labels (docs/CRYPTO.md), e.g. "halqo/v1/reply".
   '''^halqo/v1/[a-z0-9/-]+$''',
 ]
+
+[[allowlists]]
+description = "Public test vectors"
 paths = [
   '''^core/test_vectors/''',
 ]
+
+# A crates.io package *name* (libcrux-secrets, pulled in by OpenMLS) in Cargo.lock dependency lists trips the
+# generic-api-key rule. Allowed only when the match is that crate name, and only in lockfiles.
+[[allowlists]]
+description = "Crate names in Cargo.lock"
+condition = "AND"
+paths = ['''(^|/)Cargo\.lock$''']
+regexTarget = "match"
+regexes = ['''libcrux-secrets''']

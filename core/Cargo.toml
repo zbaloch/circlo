@@ -26,6 +26,13 @@ rand_core = { version = "0.6", features = ["getrandom"] }
 # hpke 0.13 uses the rand_core 0.9 traits.
 rand_core09 = { package = "rand_core", version = "0.9", features = ["os_rng"] }
 subtle = "2.6"
+# Messaging (docs/CRYPTO.md section 13): MLS RFC 9420, ciphersuite 0x0003, OpenMLS with RustCrypto primitives.
+openmls = "0.9.2"
+openmls_rust_crypto = "0.6"
+openmls_basic_credential = "0.6"
+openmls_memory_storage = "0.6"
+openmls_traits = "0.6"
+tls_codec = "0.4"
 zeroize = { version = "1", features = ["derive"] }
 
 # Encoding / plumbing

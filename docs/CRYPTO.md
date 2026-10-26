@@ -253,6 +253,39 @@ per-epoch bookkeeping. Avatars/banners use section 11's media format.
 - **Pinning:** clients pin each friend's identity keys on first contact (trust on first use). A change triggers a
   blocking warning and clears the verified state.
 
+## 13a. Messaging: MLS (Phase 9)
+
+Protocol: MLS 1.0 (RFC 9420), ciphersuite `0x0003` (MLS_128_DHKEMX25519_CHACHA20POLY1305_SHA256_Ed25519), via
+OpenMLS with RustCrypto primitives. Nothing below changes MLS itself; it defines how Halqo identities, devices and
+storage plug into it.
+
+- **One MLS client per device.** Every device of every member is its own leaf, so messages reach all of a user's
+  devices and a lost device is removed like any member.
+- **MLS signature key:** a fresh Ed25519 key per device (`mls_sig`), never reused for anything else; secret kept in
+  the device keystore.
+- **Credential (Basic):** `identity = user_id:16 || device_id:16 || binding:64` where
+  `binding = Sign(id_ed25519_sk, "halqo/v1/mls-credential" || 0x00 || user_id || device_id || mls_sig_pk)`.
+  Before accepting a Welcome, and after every commit, the app checks every leaf: the binding must verify under the
+  identity key it has pinned for that `user_id` (friends) or, for people it doesn't know, the server-provided
+  identity key (shown as "not verified"). A leaf whose binding fails makes the app refuse to send to the group.
+- **Key packages:** each device uploads up to 20 one-time KeyPackages plus one last-resort package. The server hands
+  out one per device on claim and deletes it (the last-resort one is reused). KeyPackages carry only the credential
+  above (ids and public keys).
+- **Groups:** random 16-byte group ids. A 1:1 chat is a 2-user group. `use_ratchet_tree_extension = true`;
+  handshake messages are encrypted (PrivateMessage) except what MLS requires in the clear (group id, epoch,
+  content type).
+- **Ordering:** the server keeps one ordered log per group and accepts a commit only if it targets the group's current
+  epoch (read from the MLS framing by the core); the loser of a race refetches, processes, and retries. Clients
+  merge their own commit only after the server accepts it.
+- **Application payload:** CBOR `{1: kind (0 text, 1 media), 2: text, 3: [MediaItem], 4: created_at_ms}`, Padmé-padded
+  before MLS encryption. Media reuse section 11: each object has its own random `file_key`, carried only inside the
+  MLS message.
+- **Local state:** the device's OpenMLS storage (group secrets, trees, key package private keys) is serialized and
+  sealed with `local_cache_key` (section 10) after every operation. It never leaves the device; a reinstalled device
+  joins as a new device.
+- **Removal:** removing a member commits Remove proposals for all of their devices; MLS guarantees they can't derive
+  the new epoch's keys, so they can't read anything sent afterwards (tested).
+
 ## 13. Server-side secrets (outside the DB, via the core)
 
 | Secret | Env var | Used for | If lost |
