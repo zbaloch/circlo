@@ -45,6 +45,7 @@ function Navigator() {
         <Drawer.Screen name="friend/[id]" options={{ title: 'Friend' }} />
         <Drawer.Screen name="safety/[id]" options={{ title: 'Safety number' }} />
         <Drawer.Screen name="scan" options={{ title: 'Scan code' }} />
+        <Drawer.Screen name="circle/[n]" options={{ title: 'Circle' }} />
       </Drawer.Protected>
     </Drawer>
   );

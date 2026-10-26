@@ -72,11 +72,13 @@ export async function ensureEpoch(account: StoredAccount): Promise<MyEpoch> {
 }
 
 export async function loadMyProfile(account: StoredAccount): Promise<Profile | null> {
-  const epoch = currentEpoch(await loadAddressBook(account));
-  if (!epoch) return null;
+  const book = await loadAddressBook(account);
   const res = await api.GET('/v1/blobs/{kind}', { params: { path: { kind: 'profile' } } });
   if (res.response.status === 404) return null;
   const blob = ok(res);
+  // The profile may still be sealed under the previous epoch while a rotation is finishing.
+  const epoch = book.myEpochs.find((e) => e.epochId === blob.epochId);
+  if (!epoch) return null;
   return decryptProfile(account.userId, blob.epochId!, blob.ciphertext, epoch.profileKey);
 }
 
@@ -136,7 +138,7 @@ function verifyIdentitySignature(userId: string, id: Identity) {
   Core.verifyIdentity(fromB64(id.ed25519Pub), uuidToBytes(userId), id.version, fromB64(id.x25519Pub), fromB64(id.signature));
 }
 
-function friendPayload(account: StoredAccount, epoch: MyEpoch, toUserId: string, theirX25519: string, circle: number): string {
+export function friendPayload(account: StoredAccount, epoch: MyEpoch, toUserId: string, theirX25519: string, circle: number): string {
   return toB64(
     Core.sealFriendPayload(
       myIdentity(account),

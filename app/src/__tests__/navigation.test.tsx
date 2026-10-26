@@ -1,9 +1,13 @@
 import { render, screen } from '@testing-library/react-native';
 
+
 import { TABS } from '@/app/(tabs)/_layout';
 import HomeScreen from '@/app/(tabs)/index';
 import MessagesScreen from '@/app/(tabs)/messages';
 import { DRAWER_ITEMS } from '@/components/app-drawer';
+
+// Jest hoists this above the imports; Home reads the session.
+jest.mock('@/lib/session', () => ({ useSession: () => ({ status: 'signedOut' }) }));
 
 // The full drawer + tabs navigator needs Reanimated's native runtime, which doesn't load under jest-expo;
 // it is checked on the emulator (docs/PROGRESS.md "Needs manual check").
