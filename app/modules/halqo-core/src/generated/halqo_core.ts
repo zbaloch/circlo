@@ -202,6 +202,39 @@ export function identityFingerprint(
   }
 }
 
+/**
+ * Rebuilds the full identity (public keys included) from the secret keys in a restored backup.
+ */
+export function identityFromSecrets(
+  x25519Sk: ArrayBuffer,
+  ed25519Sk: ArrayBuffer,
+): IdentityKeys /*throws*/ {
+  const __rb: Uint8Array = uniffiCaller.rustCallWithError(
+    /*liftError:*/ FfiConverterTypeCoreError.lift.bind(
+      FfiConverterTypeCoreError,
+    ),
+    /*caller:*/ (callStatus) => {
+      return nativeModule().uniffi_halqo_core_fn_func_identity_from_secrets(
+        FfiConverterArrayBuffer.lower(
+          x25519Sk,
+          nativeModule().rustbuffer_alloc,
+        ),
+        FfiConverterArrayBuffer.lower(
+          ed25519Sk,
+          nativeModule().rustbuffer_alloc,
+        ),
+        callStatus,
+      );
+    },
+    /*liftString:*/ FfiConverterString.lift.bind(FfiConverterString),
+  );
+  try {
+    return FfiConverterTypeIdentityKeys.lift(__rb);
+  } finally {
+    nativeModule().rustbuffer_free(__rb);
+  }
+}
+
 export function inviteTokenHash(token: ArrayBuffer): ArrayBuffer /*throws*/ {
   const __rb: Uint8Array = uniffiCaller.rustCallWithError(
     /*liftError:*/ FfiConverterTypeCoreError.lift.bind(
@@ -3370,6 +3403,14 @@ function uniffiEnsureInitialized() {
   ) {
     throw new UniffiInternalError.ApiChecksumMismatch(
       "uniffi_halqo_core_checksum_func_identity_fingerprint",
+    );
+  }
+  if (
+    nativeModule().uniffi_halqo_core_checksum_func_identity_from_secrets() !==
+    20640
+  ) {
+    throw new UniffiInternalError.ApiChecksumMismatch(
+      "uniffi_halqo_core_checksum_func_identity_from_secrets",
     );
   }
   if (

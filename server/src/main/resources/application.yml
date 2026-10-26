@@ -29,7 +29,8 @@ halqo:
     refresh-ttl: 30d
     recovery-ttl: 15m
     challenge-ttl: 60s
-    pending-registration-ttl: 10m
+    # Time to write down and confirm the 24-word phrase.
+    pending-registration-ttl: 30m
   s3:
     bucket: ${HALQO_S3_BUCKET:halqo-media}
     public-endpoint: ${HALQO_S3_PUBLIC_ENDPOINT}

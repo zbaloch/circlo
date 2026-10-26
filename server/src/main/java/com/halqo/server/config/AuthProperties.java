@@ -18,7 +18,7 @@ public record AuthProperties(
         refreshTtl = refreshTtl == null ? Duration.ofDays(30) : refreshTtl;
         recoveryTtl = recoveryTtl == null ? Duration.ofMinutes(15) : recoveryTtl;
         challengeTtl = challengeTtl == null ? Duration.ofSeconds(60) : challengeTtl;
-        pendingRegistrationTtl = pendingRegistrationTtl == null ? Duration.ofMinutes(10) : pendingRegistrationTtl;
+        pendingRegistrationTtl = pendingRegistrationTtl == null ? Duration.ofMinutes(30) : pendingRegistrationTtl;
         ipRequestsPerMinute = ipRequestsPerMinute == null ? 30 : ipRequestsPerMinute;
     }
 }

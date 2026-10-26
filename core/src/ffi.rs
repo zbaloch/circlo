@@ -250,6 +250,18 @@ pub fn generate_identity() -> IdentityKeys {
     }
 }
 
+/// Rebuilds the full identity (public keys included) from the secret keys in a restored backup.
+#[uniffi::export]
+pub fn identity_from_secrets(x25519_sk: &[u8], ed25519_sk: &[u8]) -> Result<IdentityKeys> {
+    let id = Identity::from_secrets(&key32(x25519_sk, "x25519_sk")?, &key32(ed25519_sk, "ed25519_sk")?)?;
+    Ok(IdentityKeys {
+        x25519_sk: id.x25519_sk_bytes().to_vec(),
+        x25519_pk: id.x25519_pk_bytes().to_vec(),
+        ed25519_sk: id.ed25519_sk_bytes().to_vec(),
+        ed25519_pk: id.ed25519_pk_bytes().to_vec(),
+    })
+}
+
 #[uniffi::export]
 pub fn sign_identity(identity: &IdentityKeys, user_id: &[u8], version: u8) -> Result<Vec<u8>> {
     Ok(identity

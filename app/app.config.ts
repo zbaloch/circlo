@@ -2,6 +2,9 @@ import type { ExpoConfig } from 'expo/config';
 
 // Names and identifiers follow docs/PLAN.md section 0A. Secrets never go here: signing keys, push keys and
 // google-services.json come from EAS credentials / EAS file environment variables.
+// Development builds talk to the local server over plain HTTP (LAN / emulator). Release builds are HTTPS-only.
+const isDev = process.env.APP_VARIANT !== 'production';
+
 const config: ExpoConfig = {
   name: 'Halqo',
   slug: 'halqo',
@@ -13,6 +16,8 @@ const config: ExpoConfig = {
   ios: {
     bundleIdentifier: 'com.halqo.app',
     supportsTablet: false,
+    config: { usesNonExemptEncryption: false },
+    infoPlist: isDev ? { NSAppTransportSecurity: { NSAllowsLocalNetworking: true } } : {},
   },
   android: {
     package: 'com.halqo.app',
@@ -26,6 +31,9 @@ const config: ExpoConfig = {
   plugins: [
     'expo-router',
     './plugins/with-android-cmake',
+    // Keys live in the Android Keystore / iOS Keychain; excluded from Android Auto Backup.
+    ['expo-secure-store', { configureAndroidBackup: true }],
+    ['expo-build-properties', { android: { usesCleartextTraffic: isDev } }],
     [
       'expo-splash-screen',
       {
