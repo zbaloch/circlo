@@ -13,8 +13,9 @@ Memory file for Claude Code sessions. Read this first when resuming. Keep it acc
 | 4 App onboarding | Done on Android (merged PR #6) |
 | 5 Friends | Done on Android (merged PR #7) |
 | 6 Circles | Done on Android (merged PR #8) |
-| 7 Posts and media | **Done on Android** on `phase-7-posts` (PR pending) |
-| 8–12 | Not started |
+| 7 Posts and media | Done on Android (merged PR #9) |
+| 8 Timeline, threads, replies, likes, profiles | **In progress** on `phase-8-timeline` |
+| 9–12 | Not started |
 
 ## Environment (as of 2026-10-25)
 
@@ -167,7 +168,24 @@ Memory file for Claude Code sessions. Read this first when resuming. Keep it acc
 - [x] Bug found and fixed on the way: readers didn't fetch an author's new epoch keys after a rotation; the feed now
       refreshes a contact's payloads when it meets an unknown epoch
 - [x] app 35 tests, core 62, server 37
-- [ ] CI green, merge
+- [x] CI green, merged (PR #9)
+
+## Phase 8 (timeline, threads, replies, likes, profiles) — plan
+
+1. Server (tests first, `ThreadFlowIT`): `POST/GET /v1/posts/{id}/replies` (ciphertext ≤ 8 KiB, readers of the
+   author only; reply author or post author may delete), `PUT/DELETE /v1/posts/{id}/like`, likes list, per-post
+   counts in `PostView` (`replyCount`, `likeCount`, `likedByMe`); identity lookup allowed for repliers on posts I
+   can read (to verify reply signatures)
+2. Core: `ReaderKeyring::for_circle(epoch_root, circle)` for "Preview as…" (the friend's exact key, not a guess)
+3. App: FlashList timeline (paging per author, merged by time; pull-to-refresh; "New posts" pill; header hides on
+   scroll), full post card (links, action row: Reply/Like counts, Share-to-DM placeholder until Phase 9, overflow
+   with Delete/Mute/Block/Report), thread view with docked reply composer, media viewer (swipe, pinch, swipe-down),
+   Profile (banner, avatar, name, handle, bio, friend count; Posts | Media | Likes (own only)), friend profile posts,
+   "Preview as…" on Circles/friend screens
+4. Thumbnails cached sealed with `local_cache_key` (seal_local), shown from memory; plaintext cache only for
+   full-size images/video while viewing
+5. Perf: seed 500 posts across 50 friends (dev script against the local server), measure first render < 2 s
+6. Done when: feed perf, replies + likes in thread view, no circle label in a friend's view, Preview-as matches
 
 ## Decisions log
 

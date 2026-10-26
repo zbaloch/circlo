@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Halqo API
-  version: 0.7.0
+  version: 0.8.0
   description: >
     halqo-server API. The server stores and relays ciphertext only. Request and response bodies never contain
     plaintext content, names, emails, circle numbers or private keys. Byte fields are standard base64 strings;
@@ -600,6 +600,81 @@ paths:
                 items: { $ref: "#/components/schemas/PostView" }
         "404": { $ref: "#/components/responses/Error" }
 
+  /v1/posts/{postId}/replies:
+    parameters:
+      - { name: postId, in: path, required: true, schema: { $ref: "#/components/schemas/Id" } }
+    get:
+      summary: Encrypted replies, oldest first (readers of the author only)
+      parameters:
+        - { name: after, in: query, required: false, schema: { type: string, format: date-time } }
+        - { name: limit, in: query, required: false, schema: { type: integer, maximum: 200 } }
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/ReplyView" }
+        "404": { $ref: "#/components/responses/Error" }
+    post:
+      summary: Add an encrypted reply (sealed under a key derived from the post key)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [replyId, ciphertext]
+              properties:
+                replyId: { $ref: "#/components/schemas/Id" }
+                ciphertext: { $ref: "#/components/schemas/Bytes" }
+      responses:
+        "201": { content: { application/json: { schema: { type: object } } } }
+        "404": { $ref: "#/components/responses/Error" }
+        "409": { $ref: "#/components/responses/Error" }
+
+  /v1/posts/{postId}/replies/{replyId}:
+    parameters:
+      - { name: postId, in: path, required: true, schema: { $ref: "#/components/schemas/Id" } }
+      - { name: replyId, in: path, required: true, schema: { $ref: "#/components/schemas/Id" } }
+    delete:
+      summary: Delete a reply (its author or the post's author)
+      responses:
+        "200": { content: { application/json: { schema: { type: object } } } }
+        "404": { $ref: "#/components/responses/Error" }
+
+  /v1/posts/{postId}/like:
+    parameters:
+      - { name: postId, in: path, required: true, schema: { $ref: "#/components/schemas/Id" } }
+    put:
+      summary: Like (idempotent)
+      responses:
+        "200": { content: { application/json: { schema: { type: object } } } }
+        "404": { $ref: "#/components/responses/Error" }
+    delete:
+      summary: Unlike
+      responses:
+        "200": { content: { application/json: { schema: { type: object } } } }
+        "404": { $ref: "#/components/responses/Error" }
+
+  /v1/posts/{postId}/likes:
+    parameters:
+      - { name: postId, in: path, required: true, schema: { $ref: "#/components/schemas/Id" } }
+    get:
+      summary: Who liked a post (clients show it only if they can decrypt the post)
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    userId: { $ref: "#/components/schemas/Id" }
+                    createdAt: { type: string, format: date-time }
+        "404": { $ref: "#/components/responses/Error" }
+
 components:
   securitySchemes:
     bearer:
@@ -626,6 +701,16 @@ components:
               objectKey: { type: string }
               kind: { type: string, enum: [full, thumb, poster] }
               ctSize: { type: integer, format: int64 }
+        replyCount: { type: integer }
+        likeCount: { type: integer }
+        likedByMe: { type: boolean }
+    ReplyView:
+      type: object
+      properties:
+        replyId: { $ref: "#/components/schemas/Id" }
+        authorId: { $ref: "#/components/schemas/Id" }
+        ciphertext: { $ref: "#/components/schemas/Bytes" }
+        createdAt: { type: string, format: date-time }
     Discoverable:
       type: object
       required: [discoverable]
