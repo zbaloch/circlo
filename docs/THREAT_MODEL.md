@@ -75,6 +75,14 @@ circle numbers, circle labels, group names.
 13. **Video encoder tags:** stripping removes container metadata (location, device, dates in `udta`/`meta`), but the
     video stream itself is not re-encoded, so encoder settings embedded in the bitstream (e.g. the encoder name)
     remain visible to friends who play it. They contain no location.
+14. **Replies and likes are visible as ids to every friend of the author:** the server only checks "is a friend",
+    because it can't know a post's audience. A friend outside the audience can't read the post or its replies, but
+    can see *which user ids* replied or liked it (the app shows nothing for posts it can't open). Proposed fix,
+    pending owner approval because it adds a key derivation: a per-post read token
+    `HKDF(postKey, "halqo/v1/read-token")` whose hash is stored with the post, required to list, add or like.
+15. **Repliers I don't know:** a reply from someone who isn't my friend is verified against the identity key the
+    server returns for them (self-signed, not pinned). The server can't forge reply text (it never holds the post
+    key), but together with an audience member it could attribute a reply to the wrong user id.
 
 ## Out of scope (for now)
 

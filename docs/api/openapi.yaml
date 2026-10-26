@@ -675,6 +675,20 @@ paths:
                     createdAt: { type: string, format: date-time }
         "404": { $ref: "#/components/responses/Error" }
 
+  /v1/feed:
+    get:
+      summary: My posts and my accepted friends' posts, newest first (headers only; readers decrypt locally)
+      parameters:
+        - { name: before, in: query, required: false, schema: { type: string, format: date-time } }
+        - { name: limit, in: query, required: false, schema: { type: integer, maximum: 200 } }
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/PostView" }
+
 components:
   securitySchemes:
     bearer:

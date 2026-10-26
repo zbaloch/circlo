@@ -29,6 +29,8 @@ function Navigator() {
     <Drawer
       key={signedIn ? 'signed-in' : 'signed-out'}
       drawerContent={(props) => <AppDrawer {...props} />}
+      // Back returns to the previous screen (thread → viewer → thread), not always to the first route.
+      backBehavior="history"
       screenOptions={{ headerTintColor: palette.ink, swipeEnabled: signedIn }}>
       <Drawer.Protected guard={!signedIn} redirectTo="/">
         <Drawer.Screen name="(auth)" options={{ headerShown: false }} />
@@ -47,6 +49,9 @@ function Navigator() {
         <Drawer.Screen name="scan" options={{ title: 'Scan code' }} />
         <Drawer.Screen name="circle/[n]" options={{ title: 'Circle' }} />
         <Drawer.Screen name="compose" options={{ headerShown: false, swipeEnabled: false }} />
+        <Drawer.Screen name="post/[id]" options={{ title: 'Post' }} />
+        <Drawer.Screen name="viewer" options={{ headerShown: false, swipeEnabled: false }} />
+        <Drawer.Screen name="preview/[id]" options={{ title: 'Preview' }} />
       </Drawer.Protected>
     </Drawer>
   );

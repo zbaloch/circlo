@@ -1,4 +1,7 @@
+import * as Core from '@halqo/core';
 import * as SecureStore from 'expo-secure-store';
+
+import { fromB64, toB64 } from './bytes';
 
 /**
  * Account secrets in the iOS Keychain / Android Keystore (service com.halqo.app.keys). "This device only": keys are
@@ -43,4 +46,22 @@ export async function updateRefreshToken(refreshToken: string): Promise<void> {
 
 export async function clearAccount(): Promise<void> {
   await SecureStore.deleteItemAsync(KEY, OPTIONS);
+  await SecureStore.deleteItemAsync(CACHE_KEY, OPTIONS);
+  cacheKey = null;
+}
+
+// CRYPTO.md section 10: `local_cache_key` is random, per device, never backed up; it seals cached thumbnails.
+const CACHE_KEY = 'halqo.local-cache-key.v1';
+let cacheKey: ArrayBuffer | null = null;
+
+export async function localCacheKey(): Promise<ArrayBuffer> {
+  if (cacheKey) return cacheKey;
+  const stored = await SecureStore.getItemAsync(CACHE_KEY, OPTIONS);
+  if (stored) {
+    cacheKey = fromB64(stored);
+  } else {
+    cacheKey = Core.newSymmetricKey();
+    await SecureStore.setItemAsync(CACHE_KEY, toB64(cacheKey), OPTIONS);
+  }
+  return cacheKey;
 }

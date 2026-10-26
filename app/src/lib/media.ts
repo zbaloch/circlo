@@ -4,8 +4,8 @@
  * - videos keep their frames but lose location/device metadata boxes, and get a re-encoded poster frame;
  * - every file is encrypted by the core (chunked, Padmé-padded) under its own random key, bound to a random object key;
  * - the ciphertext is uploaded with a PUT URL locked to its exact size.
- * Reading reverses it: download ciphertext, decrypt in the core to a private cache file (images), or stream through
- * the core's loopback player (video). No crypto is implemented here.
+ * Reading reverses it: download ciphertext and decrypt in memory with the core (images; thumbnails also cached sealed
+ * under the device key), or stream through the core's loopback player (video). No crypto is implemented here.
  */
 import * as Core from '@halqo/core';
 import { Directory, File, FileMode, Paths, UploadType } from 'expo-file-system';
@@ -14,7 +14,8 @@ import { getThumbnailAsync } from 'expo-video-thumbnails';
 
 import { api, ok } from '@/api/client';
 
-import { equalBytes } from './bytes';
+import { equalBytes, toB64 } from './bytes';
+import { localCacheKey } from './keystore';
 import { jpegHasMetadata, neutralizeMp4Metadata, stripJpegMetadata, type BoxIO } from './strip-metadata';
 
 export const MAX_IMAGES = 4;
@@ -188,27 +189,108 @@ async function getUrls(objectKeys: string[]): Promise<Map<string, string>> {
   return new Map(res.flatMap((r) => (r.objectKey && r.getUrl ? [[r.objectKey, r.getUrl] as const] : [])));
 }
 
+// Download URLs are requested in batches (≤ 50 keys per call) so a screen of thumbnails costs one request.
+type UrlBatch = { keys: Set<string>; waiters: ((urls: Map<string, string> | Error) => void)[] };
+let batch: UrlBatch | null = null;
+
+function urlFor(objectKey: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    if (!batch) {
+      const current: UrlBatch = { keys: new Set(), waiters: [] };
+      batch = current;
+      setTimeout(async () => {
+        batch = null;
+        const keys = [...current.keys];
+        const merged = new Map<string, string>();
+        try {
+          for (let i = 0; i < keys.length; i += 50) for (const [k, v] of await getUrls(keys.slice(i, i + 50))) merged.set(k, v);
+          current.waiters.forEach((w) => w(merged));
+        } catch (e) {
+          current.waiters.forEach((w) => w(e instanceof Error ? e : new Error('download urls failed')));
+        }
+      }, 30);
+    }
+    batch.keys.add(objectKey);
+    batch.waiters.push((r) => {
+      if (r instanceof Error) return reject(r);
+      const url = r.get(objectKey);
+      if (url) resolve(url);
+      else reject(new Error('no download url'));
+    });
+  });
+}
+
+/** Decrypts a whole (small) object in memory with the core's chunk decryptor: no plaintext file is ever written. */
+function decryptInMemory(media: UploadedMedia, ciphertext: Uint8Array): Uint8Array {
+  const layout = Core.mediaLayout(media.item.contentLen);
+  if (BigInt(ciphertext.length) !== layout.encryptedLen) throw new Error('wrong ciphertext length');
+  const header = ciphertext.slice(0, 20).buffer;
+  const dec = new Core.MediaChunkDecryptor(media.item.fileKey, media.item.objectId, header, media.item.contentLen);
+  const contentLen = Number(media.item.contentLen);
+  const out = new Uint8Array(contentLen);
+  let written = 0;
+  for (let i = 0n; i < layout.chunks; i++) {
+    const start = Number(Core.mediaChunkOffset(i));
+    const end = i + 1n === layout.chunks ? ciphertext.length : Number(Core.mediaChunkOffset(i + 1n));
+    const plain = new Uint8Array(dec.decryptChunk(i, ciphertext.slice(start, end).buffer));
+    const take = Math.min(plain.length, contentLen - written);
+    out.set(plain.subarray(0, take), written);
+    written += take;
+  }
+  return out;
+}
+
+/** Bounded in-memory cache of decrypted images as data URIs (≈ 48 MB of base64). */
+const memory = new Map<string, string>();
+let memoryBytes = 0;
+const MEMORY_LIMIT = 48 * 1024 * 1024;
+
+function rememberUri(key: string, uri: string) {
+  memory.set(key, uri);
+  memoryBytes += uri.length;
+  for (const [k, v] of memory) {
+    if (memoryBytes <= MEMORY_LIMIT) break;
+    memory.delete(k);
+    memoryBytes -= v.length;
+  }
+}
+
 const inflight = new Map<string, Promise<string>>();
 
-/** Downloads and decrypts one image to the private cache; returns a file URI. Cached by (random) object key. */
-export function decryptedUri(media: UploadedMedia): Promise<string> {
-  const ext = media.item.mime === 'image/jpeg' ? 'jpg' : 'bin';
-  const plain = new File(workDir('media'), `${media.objectKey}.${ext}`);
-  if (plain.exists && plain.size === Number(media.item.contentLen)) return Promise.resolve(plain.uri);
+/**
+ * An image as a data URI, decrypted in memory. Thumbnails and posters are also cached on disk sealed with the
+ * device's `local_cache_key` (CRYPTO.md section 10), so scrolling back doesn't re-download them.
+ */
+export function imageUri(media: UploadedMedia): Promise<string> {
+  const hit = memory.get(media.objectKey);
+  if (hit) {
+    memory.delete(media.objectKey); // refresh LRU position
+    memory.set(media.objectKey, hit);
+    return Promise.resolve(hit);
+  }
   const running = inflight.get(media.objectKey);
   if (running) return running;
   const job = (async () => {
-    const url = (await getUrls([media.objectKey])).get(media.objectKey);
-    if (!url) throw new Error('no download url');
-    const enc = new File(workDir('download'), `${media.objectKey}.enc`);
-    if (enc.exists) enc.delete();
-    await File.downloadFileAsync(url, enc, { idempotent: true });
-    try {
-      Core.decryptFile(pathOf(enc), pathOf(plain), media.item.fileKey, media.item.objectId, media.item.contentLen);
-    } finally {
-      enc.delete();
+    const cacheable = media.kind !== 'full';
+    const sealed = new File(workDir('thumbs'), `${media.objectKey}.sealed`);
+    const key = cacheable ? await localCacheKey() : null;
+    let plain: Uint8Array | null = null;
+    if (key && sealed.exists) {
+      try {
+        plain = new Uint8Array(Core.openLocal(key, media.item.objectId, (await sealed.bytes()).buffer));
+      } catch {
+        sealed.delete(); // corrupted or from another device key
+      }
     }
-    return plain.uri;
+    if (!plain) {
+      const res = await fetch(await urlFor(media.objectKey));
+      if (!res.ok) throw new Error(`download failed (${res.status})`);
+      plain = decryptInMemory(media, new Uint8Array(await res.arrayBuffer()));
+      if (key) await sealed.write(new Uint8Array(Core.sealLocal(key, media.item.objectId, plain.slice().buffer)));
+    }
+    const uri = `data:${media.item.mime};base64,${toB64(plain)}`;
+    rememberUri(media.objectKey, uri);
+    return uri;
   })().finally(() => inflight.delete(media.objectKey));
   inflight.set(media.objectKey, job);
   return job;
@@ -225,7 +307,7 @@ export function startPlayback(media: UploadedMedia): { url: string; stop: () => 
   (async () => {
     let url: string | undefined;
     for (let range = session.nextRange(); range && !stopped; range = session.nextRange()) {
-      url ??= (await getUrls([media.objectKey])).get(media.objectKey);
+      url ??= await urlFor(media.objectKey).catch(() => undefined);
       if (!url) return;
       const res = await fetch(url, { headers: { Range: `bytes=${range.start}-${range.end - 1n}` } });
       if (res.status === 403) {
@@ -250,7 +332,9 @@ export function startPlayback(media: UploadedMedia): { url: string; stop: () => 
 
 /** Removes every decrypted, downloaded and picked media file, including the media libraries' own caches (sign-out). */
 export function clearMediaCache() {
-  for (const name of ['media', 'download', 'outbox', 'ImagePicker', 'ImageManipulator', 'VideoThumbnails', 'ExpoVideoCache']) {
+  memory.clear();
+  memoryBytes = 0;
+  for (const name of ['thumbs', 'media', 'download', 'outbox', 'ImagePicker', 'ImageManipulator', 'VideoThumbnails', 'ExpoVideoCache']) {
     const dir = new Directory(Paths.cache, name);
     if (dir.exists) dir.delete();
   }

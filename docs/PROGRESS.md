@@ -14,7 +14,7 @@ Memory file for Claude Code sessions. Read this first when resuming. Keep it acc
 | 5 Friends | Done on Android (merged PR #7) |
 | 6 Circles | Done on Android (merged PR #8) |
 | 7 Posts and media | Done on Android (merged PR #9) |
-| 8 Timeline, threads, replies, likes, profiles | **In progress** on `phase-8-timeline` |
+| 8 Timeline, threads, replies, likes, profiles | **Done on Android** on `phase-8-timeline` (PR pending) |
 | 9–12 | Not started |
 
 ## Environment (as of 2026-10-25)
@@ -170,22 +170,31 @@ Memory file for Claude Code sessions. Read this first when resuming. Keep it acc
 - [x] app 35 tests, core 62, server 37
 - [x] CI green, merged (PR #9)
 
-## Phase 8 (timeline, threads, replies, likes, profiles) — plan
+## Phase 8 (timeline, threads, replies, likes, profiles) — summary
 
-1. Server (tests first, `ThreadFlowIT`): `POST/GET /v1/posts/{id}/replies` (ciphertext ≤ 8 KiB, readers of the
-   author only; reply author or post author may delete), `PUT/DELETE /v1/posts/{id}/like`, likes list, per-post
-   counts in `PostView` (`replyCount`, `likeCount`, `likedByMe`); identity lookup allowed for repliers on posts I
-   can read (to verify reply signatures)
-2. Core: `ReaderKeyring::for_circle(epoch_root, circle)` for "Preview as…" (the friend's exact key, not a guess)
-3. App: FlashList timeline (paging per author, merged by time; pull-to-refresh; "New posts" pill; header hides on
-   scroll), full post card (links, action row: Reply/Like counts, Share-to-DM placeholder until Phase 9, overflow
-   with Delete/Mute/Block/Report), thread view with docked reply composer, media viewer (swipe, pinch, swipe-down),
-   Profile (banner, avatar, name, handle, bio, friend count; Posts | Media | Likes (own only)), friend profile posts,
-   "Preview as…" on Circles/friend screens
-4. Thumbnails cached sealed with `local_cache_key` (seal_local), shown from memory; plaintext cache only for
-   full-size images/video while viewing
-5. Perf: seed 500 posts across 50 friends (dev script against the local server), measure first render < 2 s
-6. Done when: feed perf, replies + likes in thread view, no circle label in a friend's view, Preview-as matches
+- [x] Server: `ThreadController` (encrypted replies ≤ 8 KiB, delete by reply or post author, idempotent likes, likers),
+      counts on `PostView` (`replyCount`, `likeCount`, `likedByMe`), one-call `GET /v1/feed` (me + accepted friends,
+      newest first, cursor paging), V5 index on `friendships(user_b, status)`; `ThreadFlowIT` 4 tests incl. perf
+- [x] Core: `ReaderKeyring::for_circle(epoch_root, circle)`; flow test proves "Preview as" opens exactly what the
+      friend's own keyring opens, circles 1–100
+- [x] App: FlashList timeline with paging, pull-to-refresh, "N new posts" pill (background check each minute), header
+      hides on scroll; post card with links, Reply/Like counts, overflow (Delete own / local Mute); thread view with
+      docked reply composer, "Liked by…" (names only for people I know); full-screen viewer (swipe, pinch, double-tap,
+      swipe down); Profile with banner, bio, friend count, Posts | Media | Likes (own only); friend profiles with
+      posts and "Preview as…"
+- [x] Images decrypt in memory (core chunk decryptor) — no plaintext image files; thumbnails/posters cached on disk
+      sealed with a per-device `local_cache_key` (CRYPTO.md §10, in the keystore, never backed up); batched
+      download URLs; per-epoch `placements` recorded so Preview-as uses the exact circle per epoch
+- [x] **Emulator (demo_alice / demo_bob):** Alice liked and replied to Bob's circle-7 post; Bob's thread shows
+      "Liked by Alice Demo" and her decrypted reply. Alice posted to circle 7 and circle 2; **Preview as Bob showed only
+      the circle-7 post, and Bob's own login showed exactly the same** (not the Spouse or Me-only posts, no labels)
+- [x] **Perf:** server `GET /v1/feed` for 500 posts across 50 friends: first page of 50 in 29 ms, all 500 in 214 ms
+      (`ThreadFlowIT`). Client: opening 500 posts from 50 friends (incl. 200 trial decryptions that fail) 1,014 ms on
+      the emulator with the *debug* core build. First screen (50 posts) ≈ 130 ms
+- [x] Bugs found and fixed: React Compiler memoized module-level store reads (feed now reads only through
+      `useSyncExternalStore` snapshots); Drawer back went to Home instead of the previous screen (`backBehavior="history"`)
+- [x] app 45 tests, core 62, server 41
+- [ ] CI green, merge
 
 ## Decisions log
 
@@ -234,9 +243,17 @@ Memory file for Claude Code sessions. Read this first when resuming. Keep it acc
 | 2026-10-26 | Metadata stripping is byte-level in TS (`strip-metadata.ts`): JPEG APP1/APP13/COM removed after re-encode; MP4 `udta`/`meta` renamed to `free` and zero-filled | No ffmpeg on device; renaming alone would leave location bytes readable by friends |
 | 2026-10-26 | A post's circle is stored only in my encrypted address book (`postCircles`); composer default is the last circle, else "Me only" | The header must not reveal the audience; nothing is shared by accident |
 | 2026-10-26 | Media of deleted posts and uploads unattached after 24 h are swept from the bucket; posts may attach uploads < 23 h old | No ciphertext retained without a reason; no sweep/attach race |
+| 2026-10-27 | One `GET /v1/feed` (me + friends, newest first) instead of 50 per-friend calls | Same headers and metadata as per-author fetches; meets the 2 s budget |
+| 2026-10-27 | Images decrypted in memory to data URIs; thumbnails sealed on disk with a per-device local_cache_key | No plaintext images on disk (PLAN.md Phase 8 "encrypted local storage") |
+| 2026-10-27 | Mute is local (address book); Block/Report wait for Phase 11; Share-to-DM waits for Phase 9 | Don't ship dead buttons; mute needs no server state |
+| 2026-10-27 | Reply/like visibility = any friend of the author (spec: plain likes); read-token fix proposed, not built | Changing it needs a new key derivation → owner decision |
 | 2026-10-25 | Only `secret-scan / gitleaks` should be a required check | Path-filtered CI workflows don't run on every PR |
 
 ## Waiting on owner
+
+- **Decision (Phase 8):** add a per-post read token so only a post's audience can list/add replies and likes
+  (THREAT_MODEL leak 14)? Recommended: yes, in Phase 11 with moderation. Needs a new HKDF label
+  `halqo/v1/read-token` (CRYPTO.md change).
 
 0. iPhone dev build (Phase 2 criterion): needs an Expo account (`npx eas-cli@latest login`) and an Apple Developer
    account for device provisioning. Then `cd app && npx eas-cli@latest build --profile development --platform ios`.
@@ -246,6 +263,9 @@ Memory file for Claude Code sessions. Read this first when resuming. Keep it acc
 4. Phone checks below.
 
 ## Needs manual check
+
+- (Phase 8) On a mid-range Android phone with a release build: Home with ~500 posts from ~50 friends shows the first
+  screen in < 2 s and scrolls smoothly (60 fps); pinch-zoom and swipe-down in the viewer.
 
 - (Phase 7) On a physical phone over Wi-Fi: post 4 photos and a phone-recorded video (moov usually at the end); the
   video should start within a few seconds and seek; a friend sees it, a friend outside the circle doesn't. Check that

@@ -1,6 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { useEffect } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { useEffect, type ComponentProps } from 'react';
+import { Linking, Pressable, Text, View } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 
 import { Avatar } from '@/components/avatar';
@@ -8,6 +8,7 @@ import { MediaGrid } from '@/components/encrypted-media';
 import type { OutboxItem } from '@/lib/outbox';
 import type { FeedPost } from '@/lib/posts';
 import { relativeTime } from '@/lib/time';
+import { linkParts } from '@/lib/view-logic';
 import { usePalette } from '@/theme/use-palette';
 
 type Props = {
@@ -16,14 +17,29 @@ type Props = {
   handle?: string;
   /** Author-only audience label for my own posts, e.g. "Closest friends+". Never passed for other people's posts. */
   audience?: string;
-  onDelete?: () => void;
+  /** Opens the thread. Omitted inside the thread itself. */
+  onOpen?: () => void;
+  onReply?: () => void;
+  onLike?: () => void;
+  onMore?: () => void;
+  onMediaPress?: (index: number) => void;
 };
 
-/** Post card (PLAN.md 2A). Phase 8 adds the reply/like action row, links and the media viewer. */
-export function PostCard({ post, name, handle, audience, onDelete }: Props) {
+function Action({ icon, label, count, active, onPress }: { icon: ComponentProps<typeof Ionicons>['name']; label: string; count?: number; active?: boolean; onPress?: () => void }) {
   const palette = usePalette();
   return (
-    <View className="flex-row gap-3 border-b border-border px-4 py-3 dark:border-border-dark">
+    <Pressable accessibilityRole="button" accessibilityLabel={label} accessibilityState={{ selected: active }} onPress={onPress} hitSlop={8} className="flex-row items-center gap-1">
+      <Ionicons name={icon} size={18} color={active ? palette.danger : palette.muted} />
+      {count ? <Text className={active ? 'text-sm text-danger dark:text-danger-dark' : 'text-sm text-muted dark:text-muted-dark'}>{count}</Text> : null}
+    </Pressable>
+  );
+}
+
+/** Post card (PLAN.md 2A). No repost action, deliberately: resharing would leak a post beyond its circle. */
+export function PostCard({ post, name, handle, audience, onOpen, onReply, onLike, onMore, onMediaPress }: Props) {
+  const palette = usePalette();
+  return (
+    <Pressable onPress={onOpen} disabled={!onOpen} className="flex-row gap-3 border-b border-border px-4 py-3 active:bg-surface-raised dark:border-border-dark dark:active:bg-surface-raised-dark">
       <Avatar name={name} />
       <View className="flex-1 gap-2">
         <View className="flex-row items-center gap-1">
@@ -37,9 +53,9 @@ export function PostCard({ post, name, handle, audience, onDelete }: Props) {
           ) : null}
           <Text className="text-base text-muted dark:text-muted-dark">· {relativeTime(post.createdAtMs)}</Text>
           <View className="flex-1" />
-          {onDelete ? (
-            <Pressable accessibilityRole="button" accessibilityLabel="Delete post" onPress={onDelete} hitSlop={8}>
-              <Ionicons name="trash-outline" size={18} color={palette.muted} />
+          {onMore ? (
+            <Pressable accessibilityRole="button" accessibilityLabel="More options" onPress={onMore} hitSlop={8}>
+              <Ionicons name="ellipsis-horizontal" size={18} color={palette.muted} />
             </Pressable>
           ) : null}
         </View>
@@ -49,10 +65,28 @@ export function PostCard({ post, name, handle, audience, onDelete }: Props) {
             <Text className="text-xs text-muted dark:text-muted-dark">{audience}</Text>
           </View>
         ) : null}
-        {post.text ? <Text className="text-base text-ink dark:text-ink-dark">{post.text}</Text> : null}
-        {post.media.length ? <MediaGrid media={post.media} /> : null}
+        {post.text ? (
+          <Text className="text-base text-ink dark:text-ink-dark">
+            {linkParts(post.text).map((part, i) =>
+              part.url ? (
+                <Text key={i} accessibilityRole="link" onPress={() => Linking.openURL(part.url!)} className="text-primary dark:text-primary-dark">
+                  {part.text}
+                </Text>
+              ) : (
+                part.text
+              ),
+            )}
+          </Text>
+        ) : null}
+        {post.media.length ? <MediaGrid media={post.media} onPress={onMediaPress} /> : null}
+        {onReply || onLike ? (
+          <View className="flex-row items-center gap-10 pt-1">
+            <Action icon="chatbubble-outline" label={`Reply, ${post.replyCount} replies`} count={post.replyCount} onPress={onReply} />
+            <Action icon={post.likedByMe ? 'heart' : 'heart-outline'} label={post.likedByMe ? 'Unlike' : 'Like'} count={post.likeCount} active={post.likedByMe} onPress={onLike} />
+          </View>
+        ) : null}
       </View>
-    </View>
+    </Pressable>
   );
 }
 

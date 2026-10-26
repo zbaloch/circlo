@@ -4,6 +4,7 @@ import { api, ApiError, ok, setAccessToken } from '@/api/client';
 
 import { resetAddressBookCache } from './addressbook';
 import { clearAccount, loadAccount, updateRefreshToken, type StoredAccount } from './keystore';
+import { clearFeed } from './feed-store';
 import { clearMediaCache } from './media';
 import { clearOutbox } from './outbox';
 
@@ -61,6 +62,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     setAccessToken(null);
     resetAddressBookCache();
     clearOutbox();
+    clearFeed();
     try {
       clearMediaCache(); // decrypted photos must not outlive the session
     } catch {

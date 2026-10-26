@@ -1,106 +1,144 @@
+import { FlashList } from '@shopify/flash-list';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Alert, FlatList, RefreshControl } from 'react-native';
+import { ActivityIndicator, Pressable, RefreshControl, Text, View, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native';
+import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 
 import { EmptyState } from '@/components/empty-state';
 import { Fab } from '@/components/fab';
+import { HomeHeader } from '@/components/home-header';
 import { OutboxCard, PostCard } from '@/components/post-card';
+import { usePostActions, visiblePosts } from '@/components/post-actions';
 import { Screen } from '@/components/screen';
 import { loadAddressBook, type AddressBook } from '@/lib/addressbook';
-import { labelOf, resumePendingRotation } from '@/lib/circles';
+import { resumePendingRotation } from '@/lib/circles';
+import { checkForNewPosts, loadMoreFeed, refreshFeed, showPendingPosts, useFeed } from '@/lib/feed-store';
 import { dismissPost, retryPost, useOutbox } from '@/lib/outbox';
-import { deletePost, fetchTimeline, type FeedPost } from '@/lib/posts';
+import type { FeedPost } from '@/lib/posts';
 import { useSession } from '@/lib/session';
 
-/** Home: my posts and friends' readable posts. Phase 8 turns this into the full FlashList timeline. */
+const NEW_POSTS_INTERVAL = 60_000;
+
+/** Home timeline (PLAN.md 2A): FlashList, pull-to-refresh, infinite scroll, "New posts" pill, header hides on scroll. */
 export default function HomeScreen() {
   const session = useSession();
   const account = session.status === 'signedIn' ? session.account : null;
   const outbox = useOutbox();
-  const [posts, setPosts] = useState<FeedPost[]>([]);
+  const feed = useFeed();
   const [book, setBook] = useState<AddressBook | null>(null);
-  const [refreshing, setRefreshing] = useState(false);
+  const actions = usePostActions(account, book);
+  const list = useRef<{ scrollToOffset: (o: { offset: number; animated?: boolean }) => void } | null>(null);
 
   // Finish any key rotation that was interrupted (app closed mid-way, offline): it retries quietly in the background.
   useEffect(() => {
     if (account) resumePendingRotation(account).catch(() => {});
   }, [account]);
 
-  const load = useCallback(async () => {
+  const refresh = useCallback(async () => {
     if (!account) return;
-    setRefreshing(true);
-    try {
-      const [p, b] = await Promise.all([fetchTimeline(account), loadAddressBook(account)]);
-      setPosts(p);
-      setBook(b);
-    } catch {
-      // keep what's on screen; pull to retry
-    } finally {
-      setRefreshing(false);
-    }
+    setBook(await loadAddressBook(account).catch(() => null));
+    await refreshFeed(account);
   }, [account]);
+
+  // Load on focus; while focused, look for new posts every minute (they wait behind the pill).
   useFocusEffect(
     useCallback(() => {
-      load();
-    }, [load]),
+      if (!account) return;
+      refresh();
+      const timer = setInterval(() => checkForNewPosts(account), NEW_POSTS_INTERVAL);
+      return () => clearInterval(timer);
+    }, [account, refresh]),
   );
 
   // Refresh when an upload finishes.
   const finished = outbox.filter((i) => i.status === 'done').length;
   const seen = useRef(finished);
   useEffect(() => {
-    if (finished > seen.current) load();
+    if (finished > seen.current) refresh();
     seen.current = finished;
-  }, [finished, load]);
+  }, [finished, refresh]);
+
+  // Header hides on scroll down and comes back on scroll up.
+  const [headerHeight, setHeaderHeight] = useState(0);
+  const offset = useSharedValue(0);
+  const lastY = useRef(0);
+  const onScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const y = e.nativeEvent.contentOffset.y;
+    const dy = y - lastY.current;
+    if (y <= 0 || dy < -8) offset.value = withTiming(0, { duration: 180 });
+    else if (dy > 8 && y > headerHeight) offset.value = withTiming(-headerHeight, { duration: 180 });
+    lastY.current = y;
+  };
+  const headerStyle = useAnimatedStyle(() => ({ transform: [{ translateY: offset.value }] }));
 
   if (!account) return null;
   const pending = outbox.filter((i) => i.status !== 'done');
 
-  const nameOf = (p: FeedPost) => {
-    if (p.mine) return { name: account.handle, handle: account.handle };
-    const c = book?.contacts[p.authorId];
-    return { name: c?.displayName || (c?.handle ? `@${c.handle}` : 'Friend'), handle: c?.handle };
-  };
-
-  const confirmDelete = (p: FeedPost) =>
-    Alert.alert('Delete post?', 'It will be removed for everyone who could see it.', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: () => deletePost(account, p.postId).then(load, () => {}) },
-    ]);
-
   return (
     <Screen>
-      <FlatList
-        data={posts}
-        keyExtractor={(p) => p.postId}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={load} />}
+      <FlashList
+        ref={(r) => {
+          list.current = r;
+        }}
+        data={visiblePosts(book, feed.posts)}
+        keyExtractor={(p: FeedPost) => p.postId}
+        onScroll={onScroll}
+        scrollEventThrottle={16}
+        refreshControl={<RefreshControl refreshing={feed.refreshing} onRefresh={refresh} progressViewOffset={headerHeight} />}
+        onEndReached={() => loadMoreFeed(account)}
+        onEndReachedThreshold={0.5}
         ListHeaderComponent={
           <>
+            {/* Spacer the size of the floating header (same component, invisible), so the first post isn't covered. */}
+            <View className="opacity-0" importantForAccessibility="no-hide-descendants" accessibilityElementsHidden>
+              <HomeHeader />
+            </View>
             {pending.map((i) => (
               <OutboxCard key={i.id} item={i} onRetry={() => retryPost(account, i.id)} onDismiss={() => dismissPost(i.id)} />
             ))}
+            {feed.error ? <Text className="px-4 py-2 text-center text-sm text-danger dark:text-danger-dark">{feed.error}</Text> : null}
           </>
         }
         ListEmptyComponent={
-          pending.length || refreshing ? undefined : (
-            <EmptyState
-              title="Your timeline is quiet"
-              body="Posts from friends appear here. Only people in the circles you choose can read what you share."
-              actionLabel="Invite your first friend"
-              onAction={() => router.push('/search')}
-            />
+          pending.length || !feed.loaded ? undefined : (
+            <View className="h-[560px]">
+              <EmptyState
+                title="Your timeline is quiet"
+                body="Posts from friends appear here. Only people in the circles you choose can read what you share."
+                actionLabel="Invite your first friend"
+                onAction={() => router.push('/search')}
+              />
+            </View>
           )
         }
-        renderItem={({ item }) => (
-          <PostCard
-            post={item}
-            {...nameOf(item)}
-            audience={item.mine && item.circle && book ? `${labelOf(book, item.circle)}${item.circle > 1 ? '+' : ''}` : undefined}
-            onDelete={item.mine ? () => confirmDelete(item) : undefined}
-          />
-        )}
+        ListFooterComponent={feed.loading ? <ActivityIndicator className="py-6" /> : null}
+        renderItem={({ item }: { item: FeedPost }) => <PostCard post={item} {...actions.cardProps(item)} />}
       />
+
+      <Animated.View
+        className="absolute left-0 right-0 top-0"
+        style={headerStyle}
+        onLayout={(e) => setHeaderHeight(e.nativeEvent.layout.height)}>
+        <HomeHeader />
+        {feed.pending.length ? (
+          <View pointerEvents="box-none" className="absolute left-0 right-0 top-full items-center pt-3">
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => {
+                showPendingPosts();
+                list.current?.scrollToOffset({ offset: 0, animated: true });
+              }}
+              className="rounded-full bg-primary px-4 py-2 shadow-lg active:bg-primary-pressed dark:bg-primary-dark">
+              <Text className="font-bold text-white">
+                ↑ {feed.pending.length} new {feed.pending.length === 1 ? 'post' : 'posts'}
+              </Text>
+            </Pressable>
+          </View>
+        ) : null}
+      </Animated.View>
+
       <Fab accessibilityLabel="Compose post" icon="add" onPress={() => router.push('/compose')} />
+      {actions.sheet}
     </Screen>
   );
 }

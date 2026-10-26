@@ -150,6 +150,30 @@ public class PostController {
     public record PostView(UUID postId, UUID authorId, UUID epochId, byte[] keyRef, byte[] headerCt, Instant createdAt,
             List<Media> media, int replyCount, int likeCount, boolean likedByMe) {}
 
+    private static final String VIEW_SELECT = """
+            SELECT p.id, p.author_id, p.epoch_id, p.key_ref, p.header_ct, p.created_at,
+                   (SELECT COUNT(*) FROM post_replies r WHERE r.post_id = p.id),
+                   (SELECT COUNT(*) FROM post_likes l WHERE l.post_id = p.id),
+                   EXISTS (SELECT 1 FROM post_likes l WHERE l.post_id = p.id AND l.liker_id = ?)
+            FROM posts p
+            """;
+
+    private List<PostView> views(String where, Object... args) {
+        List<PostView> posts = jdbc.query(VIEW_SELECT + where,
+                (rs, i) -> new PostView(Ids.uuid(rs.getBytes(1)), Ids.uuid(rs.getBytes(2)), Ids.uuid(rs.getBytes(3)), rs.getBytes(4),
+                        rs.getBytes(5), rs.getTimestamp(6).toInstant(), new ArrayList<>(), rs.getInt(7), rs.getInt(8), rs.getBoolean(9)),
+                args);
+        for (PostView p : posts) {
+            p.media().addAll(jdbc.query("SELECT object_key, kind, ct_size_padded FROM post_media WHERE post_id = ?",
+                    (rs, i) -> new Media(rs.getString(1), rs.getString(2), rs.getLong(3)), (Object) Ids.bytes(p.postId())));
+        }
+        return posts;
+    }
+
+    private static Timestamp cursor(Instant before) {
+        return Timestamp.from(before == null ? Instant.now().plusSeconds(60) : before);
+    }
+
     /** An author's posts, newest first. Readers try their chain keys locally; the server can't tell who can read what. */
     @GetMapping("/v1/users/{userId}/posts")
     public List<PostView> posts(@AuthenticationPrincipal Jwt jwt, @PathVariable("userId") UUID userId,
@@ -160,22 +184,22 @@ public class PostController {
         if (!canRead(me, author)) {
             throw ApiException.notFound();
         }
-        int n = Math.max(1, Math.min(limit, 100));
-        Timestamp cursor = Timestamp.from(before == null ? Instant.now().plusSeconds(60) : before);
-        List<PostView> posts = jdbc.query("""
-                SELECT p.id, p.epoch_id, p.key_ref, p.header_ct, p.created_at,
-                       (SELECT COUNT(*) FROM post_replies r WHERE r.post_id = p.id),
-                       (SELECT COUNT(*) FROM post_likes l WHERE l.post_id = p.id),
-                       EXISTS (SELECT 1 FROM post_likes l WHERE l.post_id = p.id AND l.liker_id = ?)
-                FROM posts p WHERE p.author_id = ? AND p.created_at < ? ORDER BY p.created_at DESC LIMIT ?""",
-                (rs, i) -> new PostView(Ids.uuid(rs.getBytes(1)), userId, Ids.uuid(rs.getBytes(2)), rs.getBytes(3), rs.getBytes(4),
-                        rs.getTimestamp(5).toInstant(), new ArrayList<>(), rs.getInt(6), rs.getInt(7), rs.getBoolean(8)),
-                me, author, cursor, n);
-        for (PostView p : posts) {
-            p.media().addAll(jdbc.query("SELECT object_key, kind, ct_size_padded FROM post_media WHERE post_id = ?",
-                    (rs, i) -> new Media(rs.getString(1), rs.getString(2), rs.getLong(3)), (Object) Ids.bytes(p.postId())));
-        }
-        return posts;
+        return views("WHERE p.author_id = ? AND p.created_at < ? ORDER BY p.created_at DESC LIMIT ?",
+                me, author, cursor(before), Math.max(1, Math.min(limit, 100)));
+    }
+
+    /** My posts and my accepted friends' posts in one newest-first page (same headers a per-author fetch returns). */
+    @GetMapping("/v1/feed")
+    public List<PostView> feed(@AuthenticationPrincipal Jwt jwt,
+            @RequestParam(value = "before", required = false) Instant before,
+            @RequestParam(value = "limit", defaultValue = "50") int limit) {
+        byte[] me = me(jwt);
+        return views("""
+                WHERE (p.author_id = ? OR p.author_id IN (
+                        SELECT user_b FROM friendships WHERE user_a = ? AND status = 'accepted'
+                        UNION SELECT user_a FROM friendships WHERE user_b = ? AND status = 'accepted'))
+                  AND p.created_at < ? ORDER BY p.created_at DESC LIMIT ?""",
+                me, me, me, me, cursor(before), Math.max(1, Math.min(limit, 200)));
     }
 
     public record DownloadRequest(@NotNull @Size(min = 1, max = 50) List<@Pattern(regexp = "[0-9a-f]{64}") String> objectKeys) {}
