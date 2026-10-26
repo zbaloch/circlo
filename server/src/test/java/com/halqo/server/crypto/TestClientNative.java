@@ -34,4 +34,27 @@ public final class TestClientNative {
 
     /** {finalization, exportKey}; throws CoreException("AuthFailed") for a wrong password. */
     public static native byte[][] loginFinish(byte[] state, byte[] password, String handle, byte[] response);
+
+    // MLS test clients (handles; CRYPTO.md 13a). Tests only.
+    public static native long mlsNew(byte[] identity, byte[] userId, byte[] deviceId);
+
+    public static native byte[][] mlsKeyPackages(long handle, int count, boolean lastResort);
+
+    public static native void mlsCreateGroup(long handle, byte[] groupId);
+
+    /** {@code [commit, welcome]}. */
+    public static native byte[][] mlsAdd(long handle, byte[] groupId, byte[][] keyPackages);
+
+    public static native byte[] mlsRemove(long handle, byte[] groupId, byte[] deviceId);
+
+    public static native void mlsMerge(long handle, byte[] groupId);
+
+    public static native void mlsClear(long handle, byte[] groupId);
+
+    public static native byte[] mlsJoin(long handle, byte[] welcome);
+
+    public static native byte[] mlsEncrypt(long handle, byte[] groupId, byte[] plaintext);
+
+    /** Plaintext of an application message; empty for a commit; throws if unreadable. */
+    public static native byte[] mlsProcess(long handle, byte[] message);
 }

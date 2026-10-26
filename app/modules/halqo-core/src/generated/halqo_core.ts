@@ -19,6 +19,7 @@ import {
   Cursor,
   FfiConverterArray,
   FfiConverterArrayBuffer,
+  FfiConverterBool,
   FfiConverterObject,
   FfiConverterOptional,
   FfiConverterUInt32,
@@ -49,6 +50,29 @@ const uniffiIsDebug =
 // Public interface members begin here.
 
 /**
+ * Inverse of `encode_chat_payload` for a decrypted application message.
+ */
+export function decodeChatPayload(bytes: ArrayBuffer): PostContent /*throws*/ {
+  const __rb: Uint8Array = uniffiCaller.rustCallWithError(
+    /*liftError:*/ FfiConverterTypeCoreError.lift.bind(
+      FfiConverterTypeCoreError,
+    ),
+    /*caller:*/ (callStatus) => {
+      return nativeModule().uniffi_halqo_core_fn_func_decode_chat_payload(
+        FfiConverterArrayBuffer.lower(bytes, nativeModule().rustbuffer_alloc),
+        callStatus,
+      );
+    },
+    /*liftString:*/ FfiConverterString.lift.bind(FfiConverterString),
+  );
+  try {
+    return FfiConverterTypePostContent.lift(__rb);
+  } finally {
+    nativeModule().rustbuffer_free(__rb);
+  }
+}
+
+/**
  * Decrypts to `output_path`; on any failure the partial output file is removed.
  */
 export function decryptFile(
@@ -77,6 +101,34 @@ export function decryptFile(
     },
     /*liftString:*/ FfiConverterString.lift.bind(FfiConverterString),
   );
+}
+
+/**
+ * Encodes and pads a chat message for `MlsClient::encrypt` (text, media keys, timestamp).
+ */
+export function encodeChatPayload(
+  content: PostContent,
+): ArrayBuffer /*throws*/ {
+  const __rb: Uint8Array = uniffiCaller.rustCallWithError(
+    /*liftError:*/ FfiConverterTypeCoreError.lift.bind(
+      FfiConverterTypeCoreError,
+    ),
+    /*caller:*/ (callStatus) => {
+      return nativeModule().uniffi_halqo_core_fn_func_encode_chat_payload(
+        FfiConverterTypePostContent.lower(
+          content,
+          nativeModule().rustbuffer_alloc,
+        ),
+        callStatus,
+      );
+    },
+    /*liftString:*/ FfiConverterString.lift.bind(FfiConverterString),
+  );
+  try {
+    return FfiConverterArrayBuffer.lift(__rb);
+  } finally {
+    nativeModule().rustbuffer_free(__rb);
+  }
 }
 
 /**
@@ -287,6 +339,118 @@ export function mediaLayout(contentLen: bigint): MediaLayout /*throws*/ {
   } finally {
     nativeModule().rustbuffer_free(__rb);
   }
+}
+
+/**
+ * The identity key vouches for a device's MLS signature key (the credential binding).
+ */
+export function mlsBindCredential(
+  identity: IdentityKeys,
+  userId: ArrayBuffer,
+  deviceId: ArrayBuffer,
+  mlsSigPk: ArrayBuffer,
+): ArrayBuffer /*throws*/ {
+  const __rb: Uint8Array = uniffiCaller.rustCallWithError(
+    /*liftError:*/ FfiConverterTypeCoreError.lift.bind(
+      FfiConverterTypeCoreError,
+    ),
+    /*caller:*/ (callStatus) => {
+      return nativeModule().uniffi_halqo_core_fn_func_mls_bind_credential(
+        FfiConverterTypeIdentityKeys.lower(
+          identity,
+          nativeModule().rustbuffer_alloc,
+        ),
+        FfiConverterArrayBuffer.lower(userId, nativeModule().rustbuffer_alloc),
+        FfiConverterArrayBuffer.lower(
+          deviceId,
+          nativeModule().rustbuffer_alloc,
+        ),
+        FfiConverterArrayBuffer.lower(
+          mlsSigPk,
+          nativeModule().rustbuffer_alloc,
+        ),
+        callStatus,
+      );
+    },
+    /*liftString:*/ FfiConverterString.lift.bind(FfiConverterString),
+  );
+  try {
+    return FfiConverterArrayBuffer.lift(__rb);
+  } finally {
+    nativeModule().rustbuffer_free(__rb);
+  }
+}
+
+/**
+ * A fresh Ed25519 key pair for this device's MLS signatures (never used for anything else).
+ */
+export function mlsGenerateSigner(): SigningKeyPair {
+  const __rb: Uint8Array = uniffiCaller.rustCall(
+    /*caller:*/ (callStatus) => {
+      return nativeModule().uniffi_halqo_core_fn_func_mls_generate_signer(
+        callStatus,
+      );
+    },
+    /*liftString:*/ FfiConverterString.lift.bind(FfiConverterString),
+  );
+  try {
+    return FfiConverterTypeSigningKeyPair.lift(__rb);
+  } finally {
+    nativeModule().rustbuffer_free(__rb);
+  }
+}
+
+/**
+ * Group id, epoch and commit flag from an MLS message's clear framing (what the server may see).
+ */
+export function mlsMessageMeta(
+  message: ArrayBuffer,
+): MlsMessageMeta /*throws*/ {
+  const __rb: Uint8Array = uniffiCaller.rustCallWithError(
+    /*liftError:*/ FfiConverterTypeCoreError.lift.bind(
+      FfiConverterTypeCoreError,
+    ),
+    /*caller:*/ (callStatus) => {
+      return nativeModule().uniffi_halqo_core_fn_func_mls_message_meta(
+        FfiConverterArrayBuffer.lower(message, nativeModule().rustbuffer_alloc),
+        callStatus,
+      );
+    },
+    /*liftString:*/ FfiConverterString.lift.bind(FfiConverterString),
+  );
+  try {
+    return FfiConverterTypeMlsMessageMeta.lift(__rb);
+  } finally {
+    nativeModule().rustbuffer_free(__rb);
+  }
+}
+
+/**
+ * Checks a group member's binding against the identity key the app has (pinned) for that user.
+ */
+export function mlsVerifyMember(
+  identityEd25519Pk: ArrayBuffer,
+  member: MlsMember,
+): void /*throws*/ {
+  uniffiCaller.rustCallWithError(
+    /*liftError:*/ FfiConverterTypeCoreError.lift.bind(
+      FfiConverterTypeCoreError,
+    ),
+    /*caller:*/ (callStatus) => {
+      nativeModule().uniffi_halqo_core_fn_func_mls_verify_member(
+        FfiConverterArrayBuffer.lower(
+          identityEd25519Pk,
+          nativeModule().rustbuffer_alloc,
+        ),
+        FfiConverterTypeMlsMember.lower(
+          member,
+          nativeModule().rustbuffer_alloc,
+        ),
+        callStatus,
+      );
+    },
+    /*liftString:*/ FfiConverterString.lift.bind(FfiConverterString),
+  );
 }
 
 export function newRecoveryPhrase(): RecoveryPhrase {
@@ -1769,6 +1933,149 @@ const FfiConverterTypeMediaLayout = (() => {
   return new FFIConverter();
 })();
 
+export type MlsCommit = {
+  commit: ArrayBuffer;
+  welcome?: ArrayBuffer;
+};
+
+/**
+ * Generated factory for {@link MlsCommit} record objects.
+ */
+export const MlsCommit = (() => {
+  const defaults = () => ({});
+  const create = (() => {
+    return uniffiCreateRecord<MlsCommit, ReturnType<typeof defaults>>(defaults);
+  })();
+  return Object.freeze({
+    create,
+    new: create,
+    defaults: () => Object.freeze(defaults()) as Partial<MlsCommit>,
+  });
+})();
+
+const FfiConverterTypeMlsCommit = (() => {
+  type TypeName = MlsCommit;
+  class FFIConverter extends AbstractFfiConverterByteArray<TypeName> {
+    readFromCursor(c: Cursor): TypeName {
+      return {
+        commit: FfiConverterArrayBuffer.readFromCursor(c),
+        welcome: FfiConverterOptionalBytes.readFromCursor(c),
+      };
+    }
+    writeIntoCursor(value: TypeName, c: Cursor): void {
+      FfiConverterArrayBuffer.writeIntoCursor(value.commit, c);
+      FfiConverterOptionalBytes.writeIntoCursor(value.welcome, c);
+    }
+    allocationSize(value: TypeName): number {
+      return (
+        FfiConverterArrayBuffer.allocationSize(value.commit) +
+        FfiConverterOptionalBytes.allocationSize(value.welcome)
+      );
+    }
+  }
+  return new FFIConverter();
+})();
+
+export type MlsMember = {
+  userId: ArrayBuffer;
+  deviceId: ArrayBuffer;
+  binding: ArrayBuffer;
+  signatureKey: ArrayBuffer;
+};
+
+/**
+ * Generated factory for {@link MlsMember} record objects.
+ */
+export const MlsMember = (() => {
+  const defaults = () => ({});
+  const create = (() => {
+    return uniffiCreateRecord<MlsMember, ReturnType<typeof defaults>>(defaults);
+  })();
+  return Object.freeze({
+    create,
+    new: create,
+    defaults: () => Object.freeze(defaults()) as Partial<MlsMember>,
+  });
+})();
+
+const FfiConverterTypeMlsMember = (() => {
+  type TypeName = MlsMember;
+  class FFIConverter extends AbstractFfiConverterByteArray<TypeName> {
+    readFromCursor(c: Cursor): TypeName {
+      return {
+        userId: FfiConverterArrayBuffer.readFromCursor(c),
+        deviceId: FfiConverterArrayBuffer.readFromCursor(c),
+        binding: FfiConverterArrayBuffer.readFromCursor(c),
+        signatureKey: FfiConverterArrayBuffer.readFromCursor(c),
+      };
+    }
+    writeIntoCursor(value: TypeName, c: Cursor): void {
+      FfiConverterArrayBuffer.writeIntoCursor(value.userId, c);
+      FfiConverterArrayBuffer.writeIntoCursor(value.deviceId, c);
+      FfiConverterArrayBuffer.writeIntoCursor(value.binding, c);
+      FfiConverterArrayBuffer.writeIntoCursor(value.signatureKey, c);
+    }
+    allocationSize(value: TypeName): number {
+      return (
+        FfiConverterArrayBuffer.allocationSize(value.userId) +
+        FfiConverterArrayBuffer.allocationSize(value.deviceId) +
+        FfiConverterArrayBuffer.allocationSize(value.binding) +
+        FfiConverterArrayBuffer.allocationSize(value.signatureKey)
+      );
+    }
+  }
+  return new FFIConverter();
+})();
+
+export type MlsMessageMeta = {
+  groupId: ArrayBuffer;
+  epoch: bigint;
+  isCommit: boolean;
+};
+
+/**
+ * Generated factory for {@link MlsMessageMeta} record objects.
+ */
+export const MlsMessageMeta = (() => {
+  const defaults = () => ({});
+  const create = (() => {
+    return uniffiCreateRecord<MlsMessageMeta, ReturnType<typeof defaults>>(
+      defaults,
+    );
+  })();
+  return Object.freeze({
+    create,
+    new: create,
+    defaults: () => Object.freeze(defaults()) as Partial<MlsMessageMeta>,
+  });
+})();
+
+const FfiConverterTypeMlsMessageMeta = (() => {
+  type TypeName = MlsMessageMeta;
+  class FFIConverter extends AbstractFfiConverterByteArray<TypeName> {
+    readFromCursor(c: Cursor): TypeName {
+      return {
+        groupId: FfiConverterArrayBuffer.readFromCursor(c),
+        epoch: FfiConverterUInt64.readFromCursor(c),
+        isCommit: FfiConverterBool.readFromCursor(c),
+      };
+    }
+    writeIntoCursor(value: TypeName, c: Cursor): void {
+      FfiConverterArrayBuffer.writeIntoCursor(value.groupId, c);
+      FfiConverterUInt64.writeIntoCursor(value.epoch, c);
+      FfiConverterBool.writeIntoCursor(value.isCommit, c);
+    }
+    allocationSize(value: TypeName): number {
+      return (
+        FfiConverterArrayBuffer.allocationSize(value.groupId) +
+        FfiConverterUInt64.allocationSize(value.epoch) +
+        FfiConverterBool.allocationSize(value.isCommit)
+      );
+    }
+  }
+  return new FFIConverter();
+})();
+
 export type OpaqueClientResult = {
   /**
    * Send to the server.
@@ -2624,6 +2931,180 @@ const FfiConverterTypeCoreError = (() => {
   return new FFIConverter();
 })();
 
+// Enum: MlsReceived
+export enum MlsReceived_Tags {
+  Application = "Application",
+  Commit = "Commit",
+  Proposal = "Proposal",
+}
+export const MlsReceived = (() => {
+  type Application__interface = {
+    tag: MlsReceived_Tags.Application;
+    inner: Readonly<{ sender: MlsMember; plaintext: ArrayBuffer }>;
+  };
+  class Application_ extends UniffiEnum implements Application__interface {
+    /**
+     * @private
+     * This field is private and should not be used, use `tag` instead.
+     */
+    readonly [uniffiTypeNameSymbol] = "MlsReceived";
+    readonly tag = MlsReceived_Tags.Application;
+    readonly inner: Readonly<{ sender: MlsMember; plaintext: ArrayBuffer }>;
+    constructor(inner: { sender: MlsMember; plaintext: ArrayBuffer }) {
+      super("MlsReceived", "Application");
+
+      this.inner = Object.freeze(inner);
+    }
+    static new(inner: {
+      sender: MlsMember;
+      plaintext: ArrayBuffer;
+    }): Application_ {
+      return new Application_(inner);
+    }
+
+    static instanceOf(obj: any): obj is Application_ {
+      return obj.tag === MlsReceived_Tags.Application;
+    }
+  }
+
+  type Commit__interface = {
+    tag: MlsReceived_Tags.Commit;
+    inner: Readonly<{ epoch: bigint; removedSelf: boolean }>;
+  };
+  class Commit_ extends UniffiEnum implements Commit__interface {
+    /**
+     * @private
+     * This field is private and should not be used, use `tag` instead.
+     */
+    readonly [uniffiTypeNameSymbol] = "MlsReceived";
+    readonly tag = MlsReceived_Tags.Commit;
+    readonly inner: Readonly<{ epoch: bigint; removedSelf: boolean }>;
+    constructor(inner: { epoch: bigint; removedSelf: boolean }) {
+      super("MlsReceived", "Commit");
+
+      this.inner = Object.freeze(inner);
+    }
+    static new(inner: { epoch: bigint; removedSelf: boolean }): Commit_ {
+      return new Commit_(inner);
+    }
+
+    static instanceOf(obj: any): obj is Commit_ {
+      return obj.tag === MlsReceived_Tags.Commit;
+    }
+  }
+
+  type Proposal__interface = {
+    tag: MlsReceived_Tags.Proposal;
+  };
+  class Proposal_ extends UniffiEnum implements Proposal__interface {
+    /**
+     * @private
+     * This field is private and should not be used, use `tag` instead.
+     */
+    readonly [uniffiTypeNameSymbol] = "MlsReceived";
+    readonly tag = MlsReceived_Tags.Proposal;
+    constructor() {
+      super("MlsReceived", "Proposal");
+    }
+
+    static new(): Proposal_ {
+      return new Proposal_();
+    }
+
+    static instanceOf(obj: any): obj is Proposal_ {
+      return obj.tag === MlsReceived_Tags.Proposal;
+    }
+  }
+
+  function instanceOf(obj: any): obj is MlsReceived {
+    return obj[uniffiTypeNameSymbol] === "MlsReceived";
+  }
+
+  return Object.freeze({
+    instanceOf,
+    Application: Application_,
+    Commit: Commit_,
+    Proposal: Proposal_,
+  });
+})();
+export type MlsReceived = InstanceType<
+  (typeof MlsReceived)["Application" | "Commit" | "Proposal"]
+>;
+
+// FfiConverter for enum MlsReceived
+const FfiConverterTypeMlsReceived = (() => {
+  type TypeName = MlsReceived;
+  class FFIConverter extends AbstractFfiConverterByteArray<TypeName> {
+    readFromCursor(c: Cursor): TypeName {
+      switch (c.readI32()) {
+        case 1:
+          return new MlsReceived.Application({
+            sender: FfiConverterTypeMlsMember.readFromCursor(c),
+            plaintext: FfiConverterArrayBuffer.readFromCursor(c),
+          });
+        case 2:
+          return new MlsReceived.Commit({
+            epoch: FfiConverterUInt64.readFromCursor(c),
+            removedSelf: FfiConverterBool.readFromCursor(c),
+          });
+        case 3:
+          return new MlsReceived.Proposal();
+        default:
+          throw new UniffiInternalError.UnexpectedEnumCase();
+      }
+    }
+    writeIntoCursor(value: TypeName, c: Cursor): void {
+      switch (value.tag) {
+        case MlsReceived_Tags.Application: {
+          c.writeI32(1);
+          const inner = value.inner;
+          FfiConverterTypeMlsMember.writeIntoCursor(inner.sender, c);
+          FfiConverterArrayBuffer.writeIntoCursor(inner.plaintext, c);
+          return;
+        }
+        case MlsReceived_Tags.Commit: {
+          c.writeI32(2);
+          const inner = value.inner;
+          FfiConverterUInt64.writeIntoCursor(inner.epoch, c);
+          FfiConverterBool.writeIntoCursor(inner.removedSelf, c);
+          return;
+        }
+        case MlsReceived_Tags.Proposal: {
+          c.writeI32(3);
+          return;
+        }
+        default:
+          // Throwing from here means that MlsReceived_Tags hasn't matched an ordinal.
+          throw new UniffiInternalError.UnexpectedEnumCase();
+      }
+    }
+    allocationSize(value: TypeName): number {
+      switch (value.tag) {
+        case MlsReceived_Tags.Application: {
+          const inner = value.inner;
+          let size = 4;
+          size += FfiConverterTypeMlsMember.allocationSize(inner.sender);
+          size += FfiConverterArrayBuffer.allocationSize(inner.plaintext);
+          return size;
+        }
+        case MlsReceived_Tags.Commit: {
+          const inner = value.inner;
+          let size = 4;
+          size += FfiConverterUInt64.allocationSize(inner.epoch);
+          size += FfiConverterBool.allocationSize(inner.removedSelf);
+          return size;
+        }
+        case MlsReceived_Tags.Proposal: {
+          return 4;
+        }
+        default:
+          throw new UniffiInternalError.UnexpectedEnumCase();
+      }
+    }
+  }
+  return new FFIConverter();
+})();
+
 /**
  * Random-access chunk decryption for progressive video playback.
  */
@@ -2800,6 +3281,504 @@ const uniffiTypeMediaChunkDecryptorObjectFactory: UniffiObjectFactory<MediaChunk
   })();
 const FfiConverterTypeMediaChunkDecryptor = new FfiConverterObject(
   uniffiTypeMediaChunkDecryptorObjectFactory,
+);
+
+/**
+ * This device's MLS client. State is restored from, and should be saved back to, a blob sealed with the
+ * device's `local_cache_key` (`export_state`) after every call that changes it.
+ */
+export interface MlsClientLike {
+  addMembers(
+    groupId: ArrayBuffer,
+    keyPackages: Array<ArrayBuffer>,
+  ) /*throws*/ : MlsCommit;
+  clearPendingCommit(groupId: ArrayBuffer) /*throws*/ : void;
+  createGroup(groupId: ArrayBuffer) /*throws*/ : void;
+  encrypt(
+    groupId: ArrayBuffer,
+    plaintext: ArrayBuffer,
+  ) /*throws*/ : ArrayBuffer;
+  epoch(groupId: ArrayBuffer) /*throws*/ : bigint;
+  exportState(localCacheKey: ArrayBuffer) /*throws*/ : ArrayBuffer;
+  isActive(groupId: ArrayBuffer) /*throws*/ : boolean;
+  join(welcome: ArrayBuffer) /*throws*/ : ArrayBuffer;
+  keyPackages(
+    count: number,
+    lastResort: boolean,
+  ) /*throws*/ : Array<ArrayBuffer>;
+  members(groupId: ArrayBuffer) /*throws*/ : Array<MlsMember>;
+  mergePendingCommit(groupId: ArrayBuffer) /*throws*/ : void;
+  process(message: ArrayBuffer) /*throws*/ : MlsReceived;
+  removeDevices(
+    groupId: ArrayBuffer,
+    deviceIds: Array<ArrayBuffer>,
+  ) /*throws*/ : MlsCommit;
+}
+/**
+ * @deprecated Use `MlsClientLike` instead.
+ */
+export type MlsClientInterface = MlsClientLike;
+
+/**
+ * This device's MLS client. State is restored from, and should be saved back to, a blob sealed with the
+ * device's `local_cache_key` (`export_state`) after every call that changes it.
+ */
+export class MlsClient extends UniffiAbstractObject implements MlsClientLike {
+  readonly [uniffiTypeNameSymbol] = "MlsClient";
+  readonly [destructorGuardSymbol]: UniffiGcObject;
+  readonly [pointerLiteralSymbol]: UniffiHandle;
+  constructor(
+    userId: ArrayBuffer,
+    deviceId: ArrayBuffer,
+    sigSk: ArrayBuffer,
+    sigPk: ArrayBuffer,
+    binding: ArrayBuffer,
+    localCacheKey: ArrayBuffer,
+    sealedState: ArrayBuffer | undefined,
+  ) /*throws*/ {
+    super();
+    const pointer = uniffiCaller.rustCallWithError(
+      /*liftError:*/ FfiConverterTypeCoreError.lift.bind(
+        FfiConverterTypeCoreError,
+      ),
+      /*caller:*/ (callStatus) => {
+        return nativeModule().uniffi_halqo_core_fn_constructor_mlsclient_new(
+          FfiConverterArrayBuffer.lower(
+            userId,
+            nativeModule().rustbuffer_alloc,
+          ),
+          FfiConverterArrayBuffer.lower(
+            deviceId,
+            nativeModule().rustbuffer_alloc,
+          ),
+          FfiConverterArrayBuffer.lower(sigSk, nativeModule().rustbuffer_alloc),
+          FfiConverterArrayBuffer.lower(sigPk, nativeModule().rustbuffer_alloc),
+          FfiConverterArrayBuffer.lower(
+            binding,
+            nativeModule().rustbuffer_alloc,
+          ),
+          FfiConverterArrayBuffer.lower(
+            localCacheKey,
+            nativeModule().rustbuffer_alloc,
+          ),
+          FfiConverterOptionalBytes.lower(
+            sealedState,
+            nativeModule().rustbuffer_alloc,
+          ),
+          callStatus,
+        );
+      },
+      /*liftString:*/ FfiConverterString.lift.bind(FfiConverterString),
+    );
+    this[pointerLiteralSymbol] = pointer;
+    this[destructorGuardSymbol] =
+      uniffiTypeMlsClientObjectFactory.bless(pointer);
+  }
+
+  addMembers(
+    groupId: ArrayBuffer,
+    keyPackages: Array<ArrayBuffer>,
+  ): MlsCommit /*throws*/ {
+    const __rb: Uint8Array = uniffiCaller.rustCallWithError(
+      /*liftError:*/ FfiConverterTypeCoreError.lift.bind(
+        FfiConverterTypeCoreError,
+      ),
+      /*caller:*/ (callStatus) => {
+        return nativeModule().uniffi_halqo_core_fn_method_mlsclient_add_members(
+          uniffiTypeMlsClientObjectFactory.clonePointer(this),
+          FfiConverterArrayBuffer.lower(
+            groupId,
+            nativeModule().rustbuffer_alloc,
+          ),
+          FfiConverterSequenceBytes.lower(
+            keyPackages,
+            nativeModule().rustbuffer_alloc,
+          ),
+          callStatus,
+        );
+      },
+      /*liftString:*/ FfiConverterString.lift.bind(FfiConverterString),
+    );
+    try {
+      return FfiConverterTypeMlsCommit.lift(__rb);
+    } finally {
+      nativeModule().rustbuffer_free(__rb);
+    }
+  }
+
+  clearPendingCommit(groupId: ArrayBuffer): void /*throws*/ {
+    uniffiCaller.rustCallWithError(
+      /*liftError:*/ FfiConverterTypeCoreError.lift.bind(
+        FfiConverterTypeCoreError,
+      ),
+      /*caller:*/ (callStatus) => {
+        nativeModule().uniffi_halqo_core_fn_method_mlsclient_clear_pending_commit(
+          uniffiTypeMlsClientObjectFactory.clonePointer(this),
+          FfiConverterArrayBuffer.lower(
+            groupId,
+            nativeModule().rustbuffer_alloc,
+          ),
+          callStatus,
+        );
+      },
+      /*liftString:*/ FfiConverterString.lift.bind(FfiConverterString),
+    );
+  }
+
+  createGroup(groupId: ArrayBuffer): void /*throws*/ {
+    uniffiCaller.rustCallWithError(
+      /*liftError:*/ FfiConverterTypeCoreError.lift.bind(
+        FfiConverterTypeCoreError,
+      ),
+      /*caller:*/ (callStatus) => {
+        nativeModule().uniffi_halqo_core_fn_method_mlsclient_create_group(
+          uniffiTypeMlsClientObjectFactory.clonePointer(this),
+          FfiConverterArrayBuffer.lower(
+            groupId,
+            nativeModule().rustbuffer_alloc,
+          ),
+          callStatus,
+        );
+      },
+      /*liftString:*/ FfiConverterString.lift.bind(FfiConverterString),
+    );
+  }
+
+  encrypt(
+    groupId: ArrayBuffer,
+    plaintext: ArrayBuffer,
+  ): ArrayBuffer /*throws*/ {
+    const __rb: Uint8Array = uniffiCaller.rustCallWithError(
+      /*liftError:*/ FfiConverterTypeCoreError.lift.bind(
+        FfiConverterTypeCoreError,
+      ),
+      /*caller:*/ (callStatus) => {
+        return nativeModule().uniffi_halqo_core_fn_method_mlsclient_encrypt(
+          uniffiTypeMlsClientObjectFactory.clonePointer(this),
+          FfiConverterArrayBuffer.lower(
+            groupId,
+            nativeModule().rustbuffer_alloc,
+          ),
+          FfiConverterArrayBuffer.lower(
+            plaintext,
+            nativeModule().rustbuffer_alloc,
+          ),
+          callStatus,
+        );
+      },
+      /*liftString:*/ FfiConverterString.lift.bind(FfiConverterString),
+    );
+    try {
+      return FfiConverterArrayBuffer.lift(__rb);
+    } finally {
+      nativeModule().rustbuffer_free(__rb);
+    }
+  }
+
+  epoch(groupId: ArrayBuffer): bigint /*throws*/ {
+    return FfiConverterUInt64.lift(
+      uniffiCaller.rustCallWithError(
+        /*liftError:*/ FfiConverterTypeCoreError.lift.bind(
+          FfiConverterTypeCoreError,
+        ),
+        /*caller:*/ (callStatus) => {
+          return nativeModule().uniffi_halqo_core_fn_method_mlsclient_epoch(
+            uniffiTypeMlsClientObjectFactory.clonePointer(this),
+            FfiConverterArrayBuffer.lower(
+              groupId,
+              nativeModule().rustbuffer_alloc,
+            ),
+            callStatus,
+          );
+        },
+        /*liftString:*/ FfiConverterString.lift.bind(FfiConverterString),
+      ),
+    );
+  }
+
+  exportState(localCacheKey: ArrayBuffer): ArrayBuffer /*throws*/ {
+    const __rb: Uint8Array = uniffiCaller.rustCallWithError(
+      /*liftError:*/ FfiConverterTypeCoreError.lift.bind(
+        FfiConverterTypeCoreError,
+      ),
+      /*caller:*/ (callStatus) => {
+        return nativeModule().uniffi_halqo_core_fn_method_mlsclient_export_state(
+          uniffiTypeMlsClientObjectFactory.clonePointer(this),
+          FfiConverterArrayBuffer.lower(
+            localCacheKey,
+            nativeModule().rustbuffer_alloc,
+          ),
+          callStatus,
+        );
+      },
+      /*liftString:*/ FfiConverterString.lift.bind(FfiConverterString),
+    );
+    try {
+      return FfiConverterArrayBuffer.lift(__rb);
+    } finally {
+      nativeModule().rustbuffer_free(__rb);
+    }
+  }
+
+  isActive(groupId: ArrayBuffer): boolean /*throws*/ {
+    return FfiConverterBool.lift(
+      uniffiCaller.rustCallWithError(
+        /*liftError:*/ FfiConverterTypeCoreError.lift.bind(
+          FfiConverterTypeCoreError,
+        ),
+        /*caller:*/ (callStatus) => {
+          return nativeModule().uniffi_halqo_core_fn_method_mlsclient_is_active(
+            uniffiTypeMlsClientObjectFactory.clonePointer(this),
+            FfiConverterArrayBuffer.lower(
+              groupId,
+              nativeModule().rustbuffer_alloc,
+            ),
+            callStatus,
+          );
+        },
+        /*liftString:*/ FfiConverterString.lift.bind(FfiConverterString),
+      ),
+    );
+  }
+
+  join(welcome: ArrayBuffer): ArrayBuffer /*throws*/ {
+    const __rb: Uint8Array = uniffiCaller.rustCallWithError(
+      /*liftError:*/ FfiConverterTypeCoreError.lift.bind(
+        FfiConverterTypeCoreError,
+      ),
+      /*caller:*/ (callStatus) => {
+        return nativeModule().uniffi_halqo_core_fn_method_mlsclient_join(
+          uniffiTypeMlsClientObjectFactory.clonePointer(this),
+          FfiConverterArrayBuffer.lower(
+            welcome,
+            nativeModule().rustbuffer_alloc,
+          ),
+          callStatus,
+        );
+      },
+      /*liftString:*/ FfiConverterString.lift.bind(FfiConverterString),
+    );
+    try {
+      return FfiConverterArrayBuffer.lift(__rb);
+    } finally {
+      nativeModule().rustbuffer_free(__rb);
+    }
+  }
+
+  keyPackages(
+    count: number,
+    lastResort: boolean,
+  ): Array<ArrayBuffer> /*throws*/ {
+    const __rb: Uint8Array = uniffiCaller.rustCallWithError(
+      /*liftError:*/ FfiConverterTypeCoreError.lift.bind(
+        FfiConverterTypeCoreError,
+      ),
+      /*caller:*/ (callStatus) => {
+        return nativeModule().uniffi_halqo_core_fn_method_mlsclient_key_packages(
+          uniffiTypeMlsClientObjectFactory.clonePointer(this),
+          FfiConverterUInt32.lower(count, nativeModule().rustbuffer_alloc),
+          FfiConverterBool.lower(lastResort, nativeModule().rustbuffer_alloc),
+          callStatus,
+        );
+      },
+      /*liftString:*/ FfiConverterString.lift.bind(FfiConverterString),
+    );
+    try {
+      return FfiConverterSequenceBytes.lift(__rb);
+    } finally {
+      nativeModule().rustbuffer_free(__rb);
+    }
+  }
+
+  members(groupId: ArrayBuffer): Array<MlsMember> /*throws*/ {
+    const __rb: Uint8Array = uniffiCaller.rustCallWithError(
+      /*liftError:*/ FfiConverterTypeCoreError.lift.bind(
+        FfiConverterTypeCoreError,
+      ),
+      /*caller:*/ (callStatus) => {
+        return nativeModule().uniffi_halqo_core_fn_method_mlsclient_members(
+          uniffiTypeMlsClientObjectFactory.clonePointer(this),
+          FfiConverterArrayBuffer.lower(
+            groupId,
+            nativeModule().rustbuffer_alloc,
+          ),
+          callStatus,
+        );
+      },
+      /*liftString:*/ FfiConverterString.lift.bind(FfiConverterString),
+    );
+    try {
+      return FfiConverterSequenceTypeMlsMember.lift(__rb);
+    } finally {
+      nativeModule().rustbuffer_free(__rb);
+    }
+  }
+
+  mergePendingCommit(groupId: ArrayBuffer): void /*throws*/ {
+    uniffiCaller.rustCallWithError(
+      /*liftError:*/ FfiConverterTypeCoreError.lift.bind(
+        FfiConverterTypeCoreError,
+      ),
+      /*caller:*/ (callStatus) => {
+        nativeModule().uniffi_halqo_core_fn_method_mlsclient_merge_pending_commit(
+          uniffiTypeMlsClientObjectFactory.clonePointer(this),
+          FfiConverterArrayBuffer.lower(
+            groupId,
+            nativeModule().rustbuffer_alloc,
+          ),
+          callStatus,
+        );
+      },
+      /*liftString:*/ FfiConverterString.lift.bind(FfiConverterString),
+    );
+  }
+
+  process(message: ArrayBuffer): MlsReceived /*throws*/ {
+    const __rb: Uint8Array = uniffiCaller.rustCallWithError(
+      /*liftError:*/ FfiConverterTypeCoreError.lift.bind(
+        FfiConverterTypeCoreError,
+      ),
+      /*caller:*/ (callStatus) => {
+        return nativeModule().uniffi_halqo_core_fn_method_mlsclient_process(
+          uniffiTypeMlsClientObjectFactory.clonePointer(this),
+          FfiConverterArrayBuffer.lower(
+            message,
+            nativeModule().rustbuffer_alloc,
+          ),
+          callStatus,
+        );
+      },
+      /*liftString:*/ FfiConverterString.lift.bind(FfiConverterString),
+    );
+    try {
+      return FfiConverterTypeMlsReceived.lift(__rb);
+    } finally {
+      nativeModule().rustbuffer_free(__rb);
+    }
+  }
+
+  removeDevices(
+    groupId: ArrayBuffer,
+    deviceIds: Array<ArrayBuffer>,
+  ): MlsCommit /*throws*/ {
+    const __rb: Uint8Array = uniffiCaller.rustCallWithError(
+      /*liftError:*/ FfiConverterTypeCoreError.lift.bind(
+        FfiConverterTypeCoreError,
+      ),
+      /*caller:*/ (callStatus) => {
+        return nativeModule().uniffi_halqo_core_fn_method_mlsclient_remove_devices(
+          uniffiTypeMlsClientObjectFactory.clonePointer(this),
+          FfiConverterArrayBuffer.lower(
+            groupId,
+            nativeModule().rustbuffer_alloc,
+          ),
+          FfiConverterSequenceBytes.lower(
+            deviceIds,
+            nativeModule().rustbuffer_alloc,
+          ),
+          callStatus,
+        );
+      },
+      /*liftString:*/ FfiConverterString.lift.bind(FfiConverterString),
+    );
+    try {
+      return FfiConverterTypeMlsCommit.lift(__rb);
+    } finally {
+      nativeModule().rustbuffer_free(__rb);
+    }
+  }
+
+  uniffiDestroy(): void {
+    const ptr = (this as any)[destructorGuardSymbol];
+    if (ptr !== undefined) {
+      const pointer = uniffiTypeMlsClientObjectFactory.pointer(this);
+      uniffiTypeMlsClientObjectFactory.freePointer(pointer);
+      uniffiTypeMlsClientObjectFactory.unbless(ptr);
+      delete (this as any)[destructorGuardSymbol];
+    }
+  }
+
+  static instanceOf(obj_: any): obj_ is MlsClient {
+    return uniffiTypeMlsClientObjectFactory.isConcreteType(obj_);
+  }
+}
+
+const uniffiTypeMlsClientObjectFactory: UniffiObjectFactory<MlsClientLike> =
+  (() => {
+    /// <reference lib="es2021" />
+    const registry =
+      typeof FinalizationRegistry !== "undefined"
+        ? new FinalizationRegistry<UniffiHandle>((heldValue: UniffiHandle) => {
+            uniffiTypeMlsClientObjectFactory.freePointer(heldValue);
+          })
+        : null;
+
+    return {
+      create(pointer: UniffiHandle): MlsClientLike {
+        const instance = Object.create(MlsClient.prototype);
+        instance[pointerLiteralSymbol] = pointer;
+        instance[destructorGuardSymbol] = this.bless(pointer);
+        instance[uniffiTypeNameSymbol] = "MlsClient";
+        return instance;
+      },
+
+      bless(p: UniffiHandle): UniffiGcObject {
+        const ptr = {
+          p, // make sure this object doesn't get optimized away.
+          markDestroyed: () => undefined,
+        };
+        if (registry) {
+          registry.register(ptr, p, ptr);
+        }
+        return ptr;
+      },
+
+      unbless(ptr_: UniffiGcObject) {
+        if (registry) {
+          registry.unregister(ptr_);
+        }
+      },
+
+      pointer(obj_: MlsClientLike): UniffiHandle {
+        if ((obj_ as any)[destructorGuardSymbol] === undefined) {
+          throw new UniffiInternalError.UnexpectedNullPointer();
+        }
+        return (obj_ as any)[pointerLiteralSymbol];
+      },
+
+      clonePointer(obj_: MlsClientLike): UniffiHandle {
+        const pointer = this.pointer(obj_);
+        return uniffiCaller.rustCall(
+          /*caller:*/ (callStatus) =>
+            nativeModule().uniffi_halqo_core_fn_clone_mlsclient(
+              pointer,
+              callStatus,
+            ),
+          /*liftString:*/ FfiConverterString.lift,
+        );
+      },
+
+      freePointer(pointer: UniffiHandle): void {
+        uniffiCaller.rustCall(
+          /*caller:*/ (callStatus) =>
+            nativeModule().uniffi_halqo_core_fn_free_mlsclient(
+              pointer,
+              callStatus,
+            ),
+          /*liftString:*/ FfiConverterString.lift,
+        );
+      },
+
+      isConcreteType(obj_: any): obj_ is MlsClientLike {
+        return (
+          obj_[destructorGuardSymbol] &&
+          obj_[uniffiTypeNameSymbol] === "MlsClient"
+        );
+      },
+    };
+  })();
+const FfiConverterTypeMlsClient = new FfiConverterObject(
+  uniffiTypeMlsClientObjectFactory,
 );
 
 export interface OpaqueClientLoginLike {
@@ -3641,19 +4620,29 @@ const FfiConverterSequenceTypeEpochKeys = new FfiConverterArray(
   FfiConverterTypeEpochKeys,
 );
 
+// FfiConverter for ArrayBuffer | undefined
+const FfiConverterOptionalBytes = new FfiConverterOptional(
+  FfiConverterArrayBuffer,
+);
+
 // FfiConverter for Array<MediaItem>
 const FfiConverterSequenceTypeMediaItem = new FfiConverterArray(
   FfiConverterTypeMediaItem,
 );
 
+// FfiConverter for Array<ArrayBuffer>
+const FfiConverterSequenceBytes = new FfiConverterArray(
+  FfiConverterArrayBuffer,
+);
+
+// FfiConverter for Array<MlsMember>
+const FfiConverterSequenceTypeMlsMember = new FfiConverterArray(
+  FfiConverterTypeMlsMember,
+);
+
 // FfiConverter for ByteRange | undefined
 const FfiConverterOptionalTypeByteRange = new FfiConverterOptional(
   FfiConverterTypeByteRange,
-);
-
-// FfiConverter for ArrayBuffer | undefined
-const FfiConverterOptionalBytes = new FfiConverterOptional(
-  FfiConverterArrayBuffer,
 );
 
 /**
@@ -3678,9 +4667,25 @@ function uniffiEnsureInitialized() {
       bindingsContractVersion,
     );
   }
+  if (
+    nativeModule().uniffi_halqo_core_checksum_func_decode_chat_payload() !==
+    58165
+  ) {
+    throw new UniffiInternalError.ApiChecksumMismatch(
+      "uniffi_halqo_core_checksum_func_decode_chat_payload",
+    );
+  }
   if (nativeModule().uniffi_halqo_core_checksum_func_decrypt_file() !== 35451) {
     throw new UniffiInternalError.ApiChecksumMismatch(
       "uniffi_halqo_core_checksum_func_decrypt_file",
+    );
+  }
+  if (
+    nativeModule().uniffi_halqo_core_checksum_func_encode_chat_payload() !==
+    56194
+  ) {
+    throw new UniffiInternalError.ApiChecksumMismatch(
+      "uniffi_halqo_core_checksum_func_encode_chat_payload",
     );
   }
   if (nativeModule().uniffi_halqo_core_checksum_func_encrypt_file() !== 23896) {
@@ -3743,6 +4748,36 @@ function uniffiEnsureInitialized() {
   if (nativeModule().uniffi_halqo_core_checksum_func_media_layout() !== 46492) {
     throw new UniffiInternalError.ApiChecksumMismatch(
       "uniffi_halqo_core_checksum_func_media_layout",
+    );
+  }
+  if (
+    nativeModule().uniffi_halqo_core_checksum_func_mls_bind_credential() !==
+    29414
+  ) {
+    throw new UniffiInternalError.ApiChecksumMismatch(
+      "uniffi_halqo_core_checksum_func_mls_bind_credential",
+    );
+  }
+  if (
+    nativeModule().uniffi_halqo_core_checksum_func_mls_generate_signer() !==
+    59053
+  ) {
+    throw new UniffiInternalError.ApiChecksumMismatch(
+      "uniffi_halqo_core_checksum_func_mls_generate_signer",
+    );
+  }
+  if (
+    nativeModule().uniffi_halqo_core_checksum_func_mls_message_meta() !== 1569
+  ) {
+    throw new UniffiInternalError.ApiChecksumMismatch(
+      "uniffi_halqo_core_checksum_func_mls_message_meta",
+    );
+  }
+  if (
+    nativeModule().uniffi_halqo_core_checksum_func_mls_verify_member() !== 42538
+  ) {
+    throw new UniffiInternalError.ApiChecksumMismatch(
+      "uniffi_halqo_core_checksum_func_mls_verify_member",
     );
   }
   if (
@@ -4012,6 +5047,116 @@ function uniffiEnsureInitialized() {
     );
   }
   if (
+    nativeModule().uniffi_halqo_core_checksum_constructor_mlsclient_new() !==
+    58314
+  ) {
+    throw new UniffiInternalError.ApiChecksumMismatch(
+      "uniffi_halqo_core_checksum_constructor_mlsclient_new",
+    );
+  }
+  if (
+    nativeModule().uniffi_halqo_core_checksum_method_mlsclient_add_members() !==
+    60222
+  ) {
+    throw new UniffiInternalError.ApiChecksumMismatch(
+      "uniffi_halqo_core_checksum_method_mlsclient_add_members",
+    );
+  }
+  if (
+    nativeModule().uniffi_halqo_core_checksum_method_mlsclient_clear_pending_commit() !==
+    42134
+  ) {
+    throw new UniffiInternalError.ApiChecksumMismatch(
+      "uniffi_halqo_core_checksum_method_mlsclient_clear_pending_commit",
+    );
+  }
+  if (
+    nativeModule().uniffi_halqo_core_checksum_method_mlsclient_create_group() !==
+    58441
+  ) {
+    throw new UniffiInternalError.ApiChecksumMismatch(
+      "uniffi_halqo_core_checksum_method_mlsclient_create_group",
+    );
+  }
+  if (
+    nativeModule().uniffi_halqo_core_checksum_method_mlsclient_encrypt() !==
+    38424
+  ) {
+    throw new UniffiInternalError.ApiChecksumMismatch(
+      "uniffi_halqo_core_checksum_method_mlsclient_encrypt",
+    );
+  }
+  if (
+    nativeModule().uniffi_halqo_core_checksum_method_mlsclient_epoch() !== 5677
+  ) {
+    throw new UniffiInternalError.ApiChecksumMismatch(
+      "uniffi_halqo_core_checksum_method_mlsclient_epoch",
+    );
+  }
+  if (
+    nativeModule().uniffi_halqo_core_checksum_method_mlsclient_export_state() !==
+    4684
+  ) {
+    throw new UniffiInternalError.ApiChecksumMismatch(
+      "uniffi_halqo_core_checksum_method_mlsclient_export_state",
+    );
+  }
+  if (
+    nativeModule().uniffi_halqo_core_checksum_method_mlsclient_is_active() !==
+    19931
+  ) {
+    throw new UniffiInternalError.ApiChecksumMismatch(
+      "uniffi_halqo_core_checksum_method_mlsclient_is_active",
+    );
+  }
+  if (
+    nativeModule().uniffi_halqo_core_checksum_method_mlsclient_join() !== 31036
+  ) {
+    throw new UniffiInternalError.ApiChecksumMismatch(
+      "uniffi_halqo_core_checksum_method_mlsclient_join",
+    );
+  }
+  if (
+    nativeModule().uniffi_halqo_core_checksum_method_mlsclient_key_packages() !==
+    54395
+  ) {
+    throw new UniffiInternalError.ApiChecksumMismatch(
+      "uniffi_halqo_core_checksum_method_mlsclient_key_packages",
+    );
+  }
+  if (
+    nativeModule().uniffi_halqo_core_checksum_method_mlsclient_members() !==
+    3449
+  ) {
+    throw new UniffiInternalError.ApiChecksumMismatch(
+      "uniffi_halqo_core_checksum_method_mlsclient_members",
+    );
+  }
+  if (
+    nativeModule().uniffi_halqo_core_checksum_method_mlsclient_merge_pending_commit() !==
+    45896
+  ) {
+    throw new UniffiInternalError.ApiChecksumMismatch(
+      "uniffi_halqo_core_checksum_method_mlsclient_merge_pending_commit",
+    );
+  }
+  if (
+    nativeModule().uniffi_halqo_core_checksum_method_mlsclient_process() !==
+    58499
+  ) {
+    throw new UniffiInternalError.ApiChecksumMismatch(
+      "uniffi_halqo_core_checksum_method_mlsclient_process",
+    );
+  }
+  if (
+    nativeModule().uniffi_halqo_core_checksum_method_mlsclient_remove_devices() !==
+    47290
+  ) {
+    throw new UniffiInternalError.ApiChecksumMismatch(
+      "uniffi_halqo_core_checksum_method_mlsclient_remove_devices",
+    );
+  }
+  if (
     nativeModule().uniffi_halqo_core_checksum_constructor_opaqueclientlogin_new() !==
     37728
   ) {
@@ -4153,6 +5298,11 @@ export default Object.freeze({
     FfiConverterTypeMediaChunkDecryptor,
     FfiConverterTypeMediaItem,
     FfiConverterTypeMediaLayout,
+    FfiConverterTypeMlsClient,
+    FfiConverterTypeMlsCommit,
+    FfiConverterTypeMlsMember,
+    FfiConverterTypeMlsMessageMeta,
+    FfiConverterTypeMlsReceived,
     FfiConverterTypeOpaqueClientLogin,
     FfiConverterTypeOpaqueClientRegistration,
     FfiConverterTypeOpaqueClientResult,

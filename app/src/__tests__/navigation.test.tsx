@@ -20,6 +20,7 @@ jest.mock('@/lib/circles', () => ({ resumePendingRotation: async () => false, la
 jest.mock('@/components/post-card', () => ({ PostCard: () => null, OutboxCard: () => null }));
 jest.mock('@/lib/posts', () => ({}));
 jest.mock('@/lib/outbox', () => ({ useOutbox: () => [] }));
+jest.mock('@/lib/messaging', () => ({ useConversations: () => [], syncMessaging: async () => {}, unreadCount: () => 0 }));
 jest.mock('react-native-reanimated', () => ({
   __esModule: true,
   default: { View: jest.requireActual('react-native').View },

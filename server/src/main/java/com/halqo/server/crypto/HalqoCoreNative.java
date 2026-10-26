@@ -26,6 +26,8 @@ final class HalqoCoreNative {
 
     static native byte[] inviteTokenHash(byte[] token);
 
+    static native byte[] mlsMessageMeta(byte[] message);
+
     static native boolean verifyRecoveryLogin(
             byte[] pubkey, byte[] userId, byte[] challengeId, byte[] nonce, long expiresAt, byte[] signature);
 

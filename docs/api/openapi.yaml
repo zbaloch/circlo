@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Halqo API
-  version: 0.8.0
+  version: 0.9.0
   description: >
     halqo-server API. The server stores and relays ciphertext only. Request and response bodies never contain
     plaintext content, names, emails, circle numbers or private keys. Byte fields are standard base64 strings;
@@ -689,7 +689,166 @@ paths:
                 type: array
                 items: { $ref: "#/components/schemas/PostView" }
 
+  /v1/mls/key-packages:
+    put:
+      summary: Upload one-time key packages for my device and replace its last-resort package
+      parameters:
+      - { $ref: "#/components/parameters/Device" }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [keyPackages]
+              properties:
+                keyPackages: { type: array, maxItems: 50, items: { $ref: "#/components/schemas/Bytes" } }
+                lastResort: { $ref: "#/components/schemas/Bytes" }
+      responses:
+        "200": { content: { application/json: { schema: { type: object, properties: { available: { type: integer } } } } } }
+
+  /v1/mls/key-packages/claim:
+    post:
+      summary: One key package per device of each user (me or accepted friends)
+      parameters:
+      - { $ref: "#/components/parameters/Device" }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [userIds]
+              properties:
+                userIds: { type: array, maxItems: 50, items: { $ref: "#/components/schemas/Id" } }
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  keyPackages:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        userId: { $ref: "#/components/schemas/Id" }
+                        deviceId: { $ref: "#/components/schemas/Id" }
+                        keyPackage: { $ref: "#/components/schemas/Bytes" }
+        "404": { $ref: "#/components/responses/Error" }
+
+  /v1/mls/groups:
+    get:
+      summary: Groups this device belongs to
+      parameters:
+      - { $ref: "#/components/parameters/Device" }
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    groupId: { $ref: "#/components/schemas/Id" }
+                    epoch: { type: integer, format: int64 }
+                    lastSeq: { type: integer, format: int64 }
+    post:
+      summary: Register a new group (this device is its first member)
+      parameters:
+      - { $ref: "#/components/parameters/Device" }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [groupId]
+              properties:
+                groupId: { $ref: "#/components/schemas/Id" }
+      responses:
+        "201": { content: { application/json: { schema: { type: object } } } }
+
+  /v1/mls/groups/{groupId}/messages:
+    parameters:
+      - { name: groupId, in: path, required: true, schema: { $ref: "#/components/schemas/Id" } }
+      - { $ref: "#/components/parameters/Device" }
+    get:
+      summary: The group's log after a sequence number (members only)
+      parameters:
+        - { name: after, in: query, required: false, schema: { type: integer, format: int64 } }
+        - { name: limit, in: query, required: false, schema: { type: integer, maximum: 500 } }
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    seq: { type: integer, format: int64 }
+                    message: { $ref: "#/components/schemas/Bytes" }
+                    createdAt: { type: string, format: date-time }
+        "404": { $ref: "#/components/responses/Error" }
+    post:
+      summary: Append an MLS message; commits must target the current epoch and list their membership changes
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [message]
+              properties:
+                message: { $ref: "#/components/schemas/Bytes" }
+                addDevices: { type: array, items: { $ref: "#/components/schemas/Id" } }
+                removeDevices: { type: array, items: { $ref: "#/components/schemas/Id" } }
+                welcome: { $ref: "#/components/schemas/Bytes" }
+      responses:
+        "201": { content: { application/json: { schema: { type: object, properties: { seq: { type: integer, format: int64 } } } } } }
+        "400": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+        "409": { $ref: "#/components/responses/Error" }
+
+  /v1/mls/welcomes:
+    get:
+      summary: Welcomes waiting for this device
+      parameters:
+      - { $ref: "#/components/parameters/Device" }
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    welcomeId: { $ref: "#/components/schemas/Id" }
+                    groupId: { $ref: "#/components/schemas/Id" }
+                    welcome: { $ref: "#/components/schemas/Bytes" }
+                    afterSeq: { type: integer, format: int64 }
+
+  /v1/mls/welcomes/{welcomeId}:
+    parameters:
+      - { name: welcomeId, in: path, required: true, schema: { $ref: "#/components/schemas/Id" } }
+      - { $ref: "#/components/parameters/Device" }
+    delete:
+      summary: Drop a processed welcome
+      responses:
+        "200": { content: { application/json: { schema: { type: object } } } }
+
 components:
+  parameters:
+    Device:
+      name: X-Halqo-Device
+      in: header
+      required: true
+      description: The calling device (must be one of the caller's registered devices)
+      schema: { $ref: "#/components/schemas/Id" }
   securitySchemes:
     bearer:
       type: http

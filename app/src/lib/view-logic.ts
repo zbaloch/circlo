@@ -34,3 +34,20 @@ export function postsForTab(tab: ProfileTab, authored: FeedPost[], timeline: Fee
   if (tab === 'likes') return timeline.filter((p) => p.likedByMe);
   return authored;
 }
+
+/** Chat title from member names: "Bob", "Bob and Carol", "Bob, Carol and 2 others". */
+export function chatTitle(names: string[]): string {
+  if (names.length === 0) return 'Just you';
+  if (names.length <= 2) return names.join(' and ');
+  return `${names.slice(0, 2).join(', ')} and ${names.length - 2} ${names.length - 2 === 1 ? 'other' : 'others'}`;
+}
+
+/** Date separator label: "Today", "Yesterday", or a short date. */
+export function dayLabel(ms: number, now = Date.now()): string {
+  const day = (t: number) => new Date(t).toDateString();
+  if (day(ms) === day(now)) return 'Today';
+  if (day(ms) === day(now - 86_400_000)) return 'Yesterday';
+  const d = new Date(ms);
+  const sameYear = d.getFullYear() === new Date(now).getFullYear();
+  return d.toLocaleDateString('en', { month: 'short', day: 'numeric', ...(sameYear ? {} : { year: 'numeric' }) });
+}

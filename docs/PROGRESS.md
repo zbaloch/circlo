@@ -14,8 +14,9 @@ Memory file for Claude Code sessions. Read this first when resuming. Keep it acc
 | 5 Friends | Done on Android (merged PR #7) |
 | 6 Circles | Done on Android (merged PR #8) |
 | 7 Posts and media | Done on Android (merged PR #9) |
-| 8 Timeline, threads, replies, likes, profiles | **Done on Android** on `phase-8-timeline` (PR pending) |
-| 9–12 | Not started |
+| 8 Timeline, threads, replies, likes, profiles | Done on Android (merged PR #10) |
+| 9 Messaging (MLS) | **Done (text) on Android** on `phase-9-messaging`; attachments carried to Phase 10 |
+| 10–12 | Not started |
 
 ## Environment (as of 2026-10-25)
 
@@ -194,6 +195,32 @@ Memory file for Claude Code sessions. Read this first when resuming. Keep it acc
 - [x] Bugs found and fixed: React Compiler memoized module-level store reads (feed now reads only through
       `useSyncExternalStore` snapshots); Drawer back went to Home instead of the previous screen (`backBehavior="history"`)
 - [x] app 45 tests, core 62, server 41
+- [x] CI green, merged (PR #10)
+
+## Phase 9 (messaging, MLS) — summary
+
+- [x] Core: `mls.rs` on OpenMLS 0.9 (RFC 9420, ciphersuite 0x0003). One MLS client per device; Basic credential
+      `user_id || device_id || binding` where the identity key signs the device's MLS key (CRYPTO.md 13a); key
+      packages incl. last resort; create/add/remove/merge/clear; join from Welcome; Padmé-padded CBOR chat payload;
+      state exported and sealed with the device's `local_cache_key`. 5 tests (3 people on 4 devices, removal,
+      restore, payload, garbage)
+- [x] Server: MLS delivery service (`MessagingController`, V6): device-scoped key packages with friend-only claims,
+      groups with a device ACL, one ordered log per group (commits must target the current epoch — first wins,
+      loser gets 409), welcomes per added device, 30-day retention; reads only clear MLS framing via JNI
+      `mlsMessageMeta`. `MessagingFlowIT` drives real MLS clients through the real endpoints
+- [x] **Done-criteria (MessagingFlowIT):** a 3-person group works; Alice's second device receives everything;
+      **a removed member can't fetch (404) and can't decrypt new messages** even with the bytes; a stale commit is
+      rejected; strangers can't claim key packages or be added
+- [x] App: Messages inbox (unread counts kept on device), new chat / add people picker (friends only), chat screen
+      (bubbles, date separators, composer, members sheet with add/remove, delete-for-me), members' credential
+      bindings verified against pinned identity keys (sending blocked if one fails), local history sealed on device
+- [x] **Emulator, two separate devices (Halqo_Phone_2 = demo_alice, Halqo_Phone_3 = demo_bob):** Alice started a
+      chat, Bob's device joined from the Welcome, messages went both ways and decrypted on each phone. DB: 3 MLS
+      messages, 0 plaintext hits; two texts of different lengths both stored as 446 bytes (padding)
+- [x] app 48 tests, core 66, server 43
+- [ ] **Not done yet (carried to Phase 10):** image/video attachments in chats (needs group-scoped media download
+      authorization on the server); adding a member's *new* device to existing chats automatically; sign-out should
+      revoke the device server-side so stale devices stop being claimed
 - [ ] CI green, merge
 
 ## Decisions log
@@ -247,6 +274,10 @@ Memory file for Claude Code sessions. Read this first when resuming. Keep it acc
 | 2026-10-27 | Images decrypted in memory to data URIs; thumbnails sealed on disk with a per-device local_cache_key | No plaintext images on disk (PLAN.md Phase 8 "encrypted local storage") |
 | 2026-10-27 | Mute is local (address book); Block/Report wait for Phase 11; Share-to-DM waits for Phase 9 | Don't ship dead buttons; mute needs no server state |
 | 2026-10-27 | Reply/like visibility = any friend of the author (spec: plain likes); read-token fix proposed, not built | Changing it needs a new key derivation → owner decision |
+| 2026-10-27 | MLS via OpenMLS 0.9 with our own exportable storage provider, state sealed with local_cache_key | All MLS crypto in the core; state never leaves the device |
+| 2026-10-27 | Calling device named by `X-Halqo-Device` header and checked against my devices (tokens have no device claim) | Smallest change to auth; a user can only act as their own devices |
+| 2026-10-27 | Server orders commits by epoch from the clear MLS framing (first wins, 409 for the loser) | Prevents forks without reading content |
+| 2026-10-27 | gitleaks allowlist moved to `[[allowlists]]`; crate name `libcrux-secrets` allowed only in Cargo.lock | False positive from OpenMLS's dependency list; every rule still applies elsewhere |
 | 2026-10-25 | Only `secret-scan / gitleaks` should be a required check | Path-filtered CI workflows don't run on every PR |
 
 ## Waiting on owner
@@ -263,6 +294,9 @@ Memory file for Claude Code sessions. Read this first when resuming. Keep it acc
 4. Phone checks below.
 
 ## Needs manual check
+
+- (Phase 9) Two physical phones: start a chat, message both ways, add a third person, remove them, and confirm the
+  removed person stops receiving. Log in on a second phone as the same user and check new chats arrive there too.
 
 - (Phase 8) On a mid-range Android phone with a release build: Home with ~500 posts from ~50 friends shows the first
   screen in < 2 s and scrolls smoothly (60 fps); pinch-zoom and swipe-down in the viewer.
