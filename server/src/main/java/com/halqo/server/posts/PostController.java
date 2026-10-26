@@ -117,7 +117,7 @@ public class PostController {
                 throw ApiException.badRequest("duplicate_media");
             }
             List<Long> declared = jdbc.query(
-                    "SELECT ct_size FROM media_uploads WHERE object_key = ? AND owner_id = ? AND post_id IS NULL AND created_at > ? FOR UPDATE",
+                    "SELECT ct_size FROM media_uploads WHERE object_key = ? AND owner_id = ? AND post_id IS NULL AND group_id IS NULL AND created_at > ? FOR UPDATE",
                     (rs, i) -> rs.getLong(1), m.objectKey(), me, Timestamp.from(Instant.now().minus(MediaSweeper.ATTACH_WINDOW)));
             if (declared.isEmpty()) {
                 throw ApiException.badRequest("unknown_media");
@@ -206,7 +206,7 @@ public class PostController {
 
     public record DownloadUrl(String objectKey, String getUrl) {}
 
-    /** 5-minute GET URLs, only for media attached to posts I may read. */
+    /** 5-minute GET URLs, only for media attached to posts I may read or to chats I'm in. */
     @PostMapping("/v1/media/download-urls")
     public List<DownloadUrl> downloadUrls(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody DownloadRequest r) {
         byte[] me = me(jwt);
@@ -215,7 +215,12 @@ public class PostController {
             List<byte[]> author = jdbc.query(
                     "SELECT p.author_id FROM post_media m JOIN posts p ON p.id = m.post_id WHERE m.object_key = ?",
                     (rs, i) -> rs.getBytes(1), key);
-            if (author.isEmpty() || !canRead(me, author.get(0))) {
+            boolean readable = !author.isEmpty() && canRead(me, author.get(0));
+            // Chat media: readable by users with an active device in the chat.
+            readable = readable || !jdbc.queryForList("""
+                    SELECT 1 FROM media_uploads u JOIN mls_group_members gm ON gm.group_id = u.group_id
+                    WHERE u.object_key = ? AND gm.user_id = ?""", key, me).isEmpty();
+            if (!readable) {
                 throw ApiException.notFound();
             }
             out.add(new DownloadUrl(key, signer.presignGet(key).toString()));

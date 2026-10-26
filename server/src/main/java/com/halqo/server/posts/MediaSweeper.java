@@ -19,7 +19,7 @@ import org.springframework.stereotype.Component;
 public class MediaSweeper {
 
     static final Duration GRACE = Duration.ofHours(24);
-    static final Duration ATTACH_WINDOW = Duration.ofHours(23);
+    public static final Duration ATTACH_WINDOW = Duration.ofHours(23);
     private static final int BATCH = 500;
 
     private final JdbcTemplate jdbc;
@@ -42,11 +42,11 @@ public class MediaSweeper {
     /** Returns how many objects were removed. */
     public int sweep() {
         List<String> keys = jdbc.queryForList(
-                "SELECT object_key FROM media_uploads WHERE post_id IS NULL AND created_at < ? LIMIT " + BATCH, String.class,
+                "SELECT object_key FROM media_uploads WHERE post_id IS NULL AND group_id IS NULL AND created_at < ? LIMIT " + BATCH, String.class,
                 Timestamp.from(Instant.now().minus(GRACE)));
         for (String key : keys) {
             store.delete(key);
-            jdbc.update("DELETE FROM media_uploads WHERE object_key = ? AND post_id IS NULL", key);
+            jdbc.update("DELETE FROM media_uploads WHERE object_key = ? AND post_id IS NULL AND group_id IS NULL", key);
         }
         return keys.size();
     }

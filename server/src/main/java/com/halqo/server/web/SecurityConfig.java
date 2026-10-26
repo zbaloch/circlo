@@ -44,6 +44,8 @@ public class SecurityConfig {
                                 "/v1/auth/login/start", "/v1/auth/login/finish",
                                 "/v1/auth/refresh",
                                 "/v1/auth/recovery/start", "/v1/auth/recovery/finish").permitAll()
+                        // The new device picks up its sealed link hand-off before it has a session (single use, 10 min).
+                        .requestMatchers(HttpMethod.GET, "/v1/device-links/*").permitAll()
                         .requestMatchers("/dev/**").permitAll() // only exists in profile 'local'
                         .requestMatchers("/error").permitAll()
                         .requestMatchers(HttpMethod.GET, "/v1/backups/recovery").hasAnyAuthority("SCOPE_full", "SCOPE_recovery")
