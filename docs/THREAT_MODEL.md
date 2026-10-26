@@ -83,3 +83,28 @@ circle numbers, circle labels, group names.
 - Buckets are private; presigned URLs only (PUT 15 min, GET 5 min). Object keys are random.
 - Leaked-DB drill in Phase 12: dump MySQL and S3, confirm nothing readable.
 - External cryptography audit before any public launch.
+
+## Comparison with Threema (owner's benchmark)
+
+Threema is a widely respected privacy messenger: anonymous random IDs (no phone number or email required), NaCl
+end-to-end encryption, the Ibex protocol for forward secrecy in one-to-one chats, QR-code contact verification,
+password-encrypted "Threema Safe" backups, open-source apps, and independent audits plus academic analysis.
+Halqo's design aims at the same bar. Where it stands today (design level; Halqo is unaudited):
+
+| Property | Threema | Halqo |
+|---|---|---|
+| Account without phone/email | Yes (random ID) | Yes (pseudonymous handle; the server stores only a keyed hash of it) |
+| Content end-to-end encrypted | Yes | Yes (posts, media, replies, profiles, address book, backups; messages via MLS in Phase 9) |
+| Profile name/photo hidden from the server | Profile pictures are shared end-to-end; the optional public nickname travels with messages | Yes: profiles are encrypted with a per-epoch key only friends receive |
+| Forward secrecy in chats | Ibex (one-to-one chats) | MLS (RFC 9420): forward secrecy **and** post-compromise security, one-to-one and groups (Phase 9) |
+| Contact verification | QR scan, three verification levels | Safety numbers + QR, pinned identity keys, blocking warning on any key change |
+| Backup protection | Key derived from the backup password | OPAQUE: a stolen database alone doesn't allow password guessing; the OPAQUE server secret is kept outside the DB |
+| Who-talks-to-whom metadata | The server relays messages and sees sender/recipient IDs; contact lists aren't stored on the server | **Weaker today**: the server stores the friendship graph (needed to deliver key payloads). Documented leak; candidate mitigations: no `friendships` table, sealed-sender-style delivery |
+| Audience secrecy (who can see a post) | Not applicable | Server can't tell which circle anyone is in or which posts share an audience |
+| Independent security audit | Yes | **Not yet: required before any public launch** |
+| Maturity | Years in production | Early development |
+
+**Bottom line:** at design level Halqo matches or exceeds Threema on content secrecy, backup protection and chat
+security, and adds audience secrecy that Threema doesn't need. It is weaker on social-graph metadata (the server
+knows friendships), and it has none of Threema's track record or audits yet. "As secure as Threema" can only be
+claimed after an external audit.

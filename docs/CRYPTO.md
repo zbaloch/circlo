@@ -1,6 +1,6 @@
 # Halqo cryptography specification
 
-> **Status: v1.0 — approved by the owner on 2026-10-25** (owner delegated all design choices to "the most secure
+> **Status: v1.1 — approved by the owner on 2026-10-25** (v1.1: where epoch secrets are stored, section 6.1; no change to primitives or formats) (owner delegated all design choices to "the most secure
 > option"). Section 14 lists every point where this spec deliberately goes beyond PLAN.md and why.
 > `core/` implements this document byte-for-byte. Any change requires editing this file first.
 > **An external cryptography audit is required before public launch.**
@@ -114,6 +114,12 @@ version:u8 (=0x01) || id_x25519_sk:32 || id_ed25519_sk:32 || data_key:32 || loca
 ```
 Decoding rejects any length other than `131 + 80 × count`, and `count > 10 000`.
 `data_key` encrypts the address book and settings blobs (section 10).
+
+**Where epoch secrets live (v1.1 note, no primitive change):** the epoch list in this layout stays empty in practice.
+Epoch roots `C1`, per-epoch `profile_key`s, friends' received `Ck`/`profile_key`s and pinned identity keys are kept in
+the **address book** blob, sealed with `data_key` (section 10). `data_key` is in both backup copies and never changes,
+so this state syncs across devices and survives recovery without re-sealing the recovery copy, which would need the
+24-word phrase the device does not keep.
 
 ### 6.2 Password copy (`key_backups.kind = 'password'`, kind byte 0x01)
 `Seal(backup_pw_key, padded_backup, "halqo/v1/backup", user_id, 0x01)`

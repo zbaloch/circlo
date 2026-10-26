@@ -10,8 +10,9 @@ Memory file for Claude Code sessions. Read this first when resuming. Keep it acc
 | 1 Rust crypto core | Done (merged PR #3) |
 | 2 RN binding + app shell | Done on Android (merged PR #4); iPhone EAS build pending owner's Expo/Apple accounts |
 | 3 Server foundations | Done (merged PR #5) |
-| 4 App onboarding | **Done on Android** on `phase-4-onboarding`; PR pending CI |
-| 5–12 | Not started |
+| 4 App onboarding | Done on Android (merged PR #6) |
+| 5 Friends | **Done on Android** on `phase-5-friends` (PR #7) |
+| 6–12 | Not started |
 
 ## Environment (as of 2026-10-25)
 
@@ -102,7 +103,24 @@ Memory file for Claude Code sessions. Read this first when resuming. Keep it acc
 - [x] **Emulator check: signup as demo_alice, log out, log in again → identical identity fingerprint
       (18ba 3d73 6df8 d6d9 2bdf 00b5 d4e5 9801); Devices lists both devices**
 - [x] app typecheck/lint/15 tests; server 27 tests
-- [ ] iPhone check (needs EAS/Apple accounts), CI green, merge
+- [x] CI green, merged (PR #6); iPhone check still pending accounts
+
+## Phase 5 (friends) — summary
+
+- [x] Server: invites (hash only, single use, 7 days), opt-in handle search, requests (only after redeeming the target's
+      invite or if the target is discoverable), accept/decline, 160-byte payload relay, encrypted profile + address
+      book blobs (versioned), V2 migration (invites.redeemed_by); `SocialFlowIT` 4 tests
+- [x] App: invite QR + link (fingerprint in the URL fragment), paste/scan to redeem with fingerprint + signature check,
+      Notifications with Accept/Decline, friends list, friend profile, safety number (60 digits + QR, scan to verify),
+      identity-change warning, Edit profile (encrypted), Settings: "Let people find me" (off by default)
+- [x] **Emulator end to end (demo_alice + demo_bob):** Alice set an encrypted profile and made an invite; Bob signed up,
+      pasted the link (keys checked against the fingerprint) and sent a request; Alice saw "Bob Demo · @demo_bob wants
+      to be friends" decrypted on her phone and accepted; each sees the other's decrypted name and bio;
+      **safety numbers identical on both sides** (18662 41244 68215 34172 46366 84690 87695 03189 65010 09040 41676 91708)
+- [x] **DB dump after the test: no display names, bios, handles or passwords, as text or hex** (profiles, address books,
+      payloads all ciphertext)
+- [x] THREAT_MODEL.md: comparison with Threema; CRYPTO.md v1.1 (epoch secrets in the address book)
+- [ ] CI green, merge
 
 ## Decisions log
 
@@ -144,6 +162,9 @@ Memory file for Claude Code sessions. Read this first when resuming. Keep it acc
 | 2026-10-26 | Access tokens in memory only; refresh token + keys in SecureStore (WHEN_UNLOCKED_THIS_DEVICE_ONLY) | Keys never migrate via OS backups; new devices log in or link |
 | 2026-10-26 | Unfinished signups are replaced by a new register/start (only active accounts block a handle) | Owner hit a dead end after abandoning signup; a pending row holds no keys |
 | 2026-10-26 | Dev builds allow cleartext HTTP (APP_VARIANT != production); release builds HTTPS only | Local server on the LAN/emulator |
+| 2026-10-26 | New friends start in circle 100 (widest) until the author places them (Phase 6 UI) | A circle key must be sent at request/accept time; widest is the safe default |
+| 2026-10-26 | Friend requests need a redeemed invite from the target, or a discoverable target | Stops strangers from spamming requests |
+| 2026-10-26 | Profiles readable by connected users in any non-blocked state (incl. incoming requests) | So you can see who is asking before accepting; still ciphertext to the server |
 | 2026-10-25 | Only `secret-scan / gitleaks` should be a required check | Path-filtered CI workflows don't run on every PR |
 
 ## Waiting on owner
@@ -171,6 +192,10 @@ Memory file for Claude Code sessions. Read this first when resuming. Keep it acc
   If it times out, add the firewall rules in DEV_SETUP §2.
 
 ## Known issues
+
+- WSL can shut down when the emulator cold-boots (Hyper-V); `infra/dev-up.ps1`'s hidden keep-alive did not survive
+  in one session. Workaround: run `wsl -d Debian -- sleep infinity` in a terminal while developing. Symptom: server
+  logs "Connection refused" to localhost:3306 and the app shows "Something went wrong".
 
 - Android `libhalqo_core.so` is currently a debug build (~21 MB, slow); release builds need `--release` in ubrn cargo extras (Phase 12).
 - `npm audit` reports advisories in app dev dependencies (Expo toolchain); review in Phase 12 dependency audit.

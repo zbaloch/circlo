@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Halqo API
-  version: 0.3.0
+  version: 0.5.0
   description: >
     halqo-server API. The server stores and relays ciphertext only. Request and response bodies never contain
     plaintext content, names, emails, circle numbers or private keys. Byte fields are standard base64 strings;
@@ -279,6 +279,191 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/Identity" }
 
+  /v1/me/discoverable:
+    get:
+      summary: Whether others can find me by exact handle (off by default)
+      responses:
+        "200": { content: { application/json: { schema: { $ref: "#/components/schemas/Discoverable" } } } }
+    put:
+      summary: Opt in or out of handle search
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/Discoverable" } } } }
+      responses:
+        "200": { content: { application/json: { schema: { $ref: "#/components/schemas/Discoverable" } } } }
+
+  /v1/users/search:
+    get:
+      summary: Exact-match handle lookup; finds only users who opted in (others 404)
+      parameters:
+        - { name: handle, in: query, required: true, schema: { type: string } }
+      responses:
+        "200": { content: { application/json: { schema: { $ref: "#/components/schemas/UserWithIdentity" } } } }
+        "404": { $ref: "#/components/responses/Error" }
+
+  /v1/invites:
+    post:
+      summary: Register an invite by the hash of a client-generated token (7 days, single use)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [tokenHash]
+              properties:
+                tokenHash: { $ref: "#/components/schemas/Bytes" }
+      responses:
+        "201": { content: { application/json: { schema: { type: object, properties: { expiresAt: { type: string, format: date-time } } } } } }
+
+  /v1/invites/redeem:
+    post:
+      summary: Redeem an invite token; returns the inviter's identity (check it against the link's fingerprint)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token]
+              properties:
+                token: { $ref: "#/components/schemas/Bytes" }
+      responses:
+        "200": { content: { application/json: { schema: { $ref: "#/components/schemas/UserWithIdentity" } } } }
+        "404": { $ref: "#/components/responses/Error" }
+
+  /v1/epochs:
+    post:
+      summary: Register a new active epoch for me
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [epochId]
+              properties:
+                epochId: { $ref: "#/components/schemas/Id" }
+      responses:
+        "201": { content: { application/json: { schema: { type: object, properties: { epochId: { $ref: "#/components/schemas/Id" } } } } } }
+
+  /v1/friends:
+    get:
+      summary: My connections (incoming/outgoing requests and accepted friends)
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    userId: { $ref: "#/components/schemas/Id" }
+                    status: { type: string, enum: [incoming, outgoing, accepted] }
+                    since: { type: string, format: date-time }
+
+  /v1/friends/requests:
+    post:
+      summary: Send a friend request with my friend payload (after redeeming their invite, or if they are discoverable)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [toUserId, epochId, payload]
+              properties:
+                toUserId: { $ref: "#/components/schemas/Id" }
+                epochId: { $ref: "#/components/schemas/Id" }
+                payload: { $ref: "#/components/schemas/Bytes" }
+      responses:
+        "201": { content: { application/json: { schema: { type: object } } } }
+        "403": { $ref: "#/components/responses/Error" }
+        "409": { $ref: "#/components/responses/Error" }
+
+  /v1/friends/{userId}/accept:
+    parameters:
+      - { name: userId, in: path, required: true, schema: { $ref: "#/components/schemas/Id" } }
+    post:
+      summary: Accept an incoming request with my friend payload
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [epochId, payload]
+              properties:
+                epochId: { $ref: "#/components/schemas/Id" }
+                payload: { $ref: "#/components/schemas/Bytes" }
+      responses:
+        "200": { content: { application/json: { schema: { type: object } } } }
+
+  /v1/friends/{userId}/decline:
+    parameters:
+      - { name: userId, in: path, required: true, schema: { $ref: "#/components/schemas/Id" } }
+    post:
+      summary: Decline an incoming request
+      responses:
+        "200": { content: { application/json: { schema: { type: object } } } }
+
+  /v1/friend-payloads:
+    get:
+      summary: Friend payloads addressed to me from one connected user
+      parameters:
+        - { name: from, in: query, required: true, schema: { $ref: "#/components/schemas/Id" } }
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    fromUserId: { $ref: "#/components/schemas/Id" }
+                    epochId: { $ref: "#/components/schemas/Id" }
+                    ciphertext: { $ref: "#/components/schemas/Bytes" }
+                    createdAt: { type: string, format: date-time }
+    put:
+      summary: Send a (re-)wrapped friend payload to an accepted friend
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [toUserId, epochId, ciphertext]
+              properties:
+                toUserId: { $ref: "#/components/schemas/Id" }
+                epochId: { $ref: "#/components/schemas/Id" }
+                ciphertext: { $ref: "#/components/schemas/Bytes" }
+      responses:
+        "200": { content: { application/json: { schema: { type: object } } } }
+
+  /v1/blobs/{kind}:
+    parameters:
+      - { name: kind, in: path, required: true, schema: { type: string, enum: [address_book, settings, profile] } }
+    get:
+      summary: My encrypted blob
+      responses:
+        "200": { content: { application/json: { schema: { $ref: "#/components/schemas/Blob" } } } }
+        "404": { $ref: "#/components/responses/Error" }
+    put:
+      summary: Write my encrypted blob (version 1 creates; then stored version + 1; profile needs epochId)
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/Blob" } } } }
+      responses:
+        "200": { content: { application/json: { schema: { $ref: "#/components/schemas/Blob" } } } }
+        "409": { $ref: "#/components/responses/Error" }
+
+  /v1/users/{userId}/profile:
+    parameters:
+      - { name: userId, in: path, required: true, schema: { $ref: "#/components/schemas/Id" } }
+    get:
+      summary: A connected user's encrypted profile
+      responses:
+        "200": { content: { application/json: { schema: { $ref: "#/components/schemas/Blob" } } } }
+        "404": { $ref: "#/components/responses/Error" }
+
 components:
   securitySchemes:
     bearer:
@@ -288,6 +473,23 @@ components:
       description: HS256, iss halqo-server, aud halqo-app, scope full|recovery, 15 minutes
 
   schemas:
+    Discoverable:
+      type: object
+      required: [discoverable]
+      properties:
+        discoverable: { type: boolean }
+    UserWithIdentity:
+      type: object
+      properties:
+        userId: { $ref: "#/components/schemas/Id" }
+        identity: { $ref: "#/components/schemas/Identity" }
+    Blob:
+      type: object
+      required: [ciphertext, version]
+      properties:
+        epochId: { $ref: "#/components/schemas/Id" }
+        ciphertext: { $ref: "#/components/schemas/Bytes" }
+        version: { type: integer, minimum: 1 }
     Id: { type: string, format: uuid }
     Bytes: { type: string, contentEncoding: base64 }
     Identity:
