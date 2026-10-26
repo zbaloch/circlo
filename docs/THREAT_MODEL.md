@@ -83,6 +83,9 @@ circle numbers, circle labels, group names.
 15. **Repliers I don't know:** a reply from someone who isn't my friend is verified against the identity key the
     server returns for them (self-signed, not pinned). The server can't forge reply text (it never holds the post
     key), but together with an audience member it could attribute a reply to the wrong user id.
+16. **Messaging metadata:** the delivery service sees which devices are in which group, when messages are sent, and
+    their padded sizes (MLS framing also shows epoch and whether a message is a commit). It never sees names,
+    membership plaintext beyond device ids, or content.
 
 ## Out of scope (for now)
 

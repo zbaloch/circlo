@@ -88,6 +88,50 @@ fn parse_credential(credential: &Credential, signature_key: &[u8]) -> Result<Lea
     })
 }
 
+// ---------------- chat payload ----------------
+
+/// The plaintext inside an MLS application message (CRYPTO.md 13a): CBOR `{1: kind, 2: text, 3: [media], 4: ts}`,
+/// Padmé-padded so message sizes reveal little. Media descriptors carry each object's own `file_key`.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ChatPayload {
+    pub text: String,
+    pub media: Vec<crate::post::MediaDescriptor>,
+    pub created_at_ms: u64,
+}
+
+const MAX_CHAT_TEXT_BYTES: usize = 4000 * 4;
+
+pub fn encode_chat(p: &ChatPayload) -> Result<Vec<u8>> {
+    if p.text.len() > MAX_CHAT_TEXT_BYTES || p.media.len() > crate::post::MAX_MEDIA {
+        return Err(invalid("message too large"));
+    }
+    let kind = u64::from(!p.media.is_empty());
+    let v = crate::cbor::map(vec![
+        (1, crate::cbor::uint(kind)),
+        (2, Value::Text(p.text.clone())),
+        (3, Value::Array(p.media.iter().map(|m| m.to_value()).collect())),
+        (4, crate::cbor::uint(p.created_at_ms)),
+    ]);
+    crate::padding::pad(&crate::cbor::encode(&v))
+}
+
+pub fn decode_chat(bytes: &[u8]) -> Result<ChatPayload> {
+    let plain = crate::padding::unpad(bytes)?;
+    let mut f = crate::cbor::Fields::parse(crate::cbor::decode(&plain)?, &[1, 2, 3, 4])?;
+    let _kind = f.uint(1)?;
+    let text = f.text(2, MAX_CHAT_TEXT_BYTES)?;
+    let media = f
+        .array(3, crate::post::MAX_MEDIA)?
+        .into_iter()
+        .map(crate::post::MediaDescriptor::from_value)
+        .collect::<Result<Vec<_>>>()?;
+    Ok(ChatPayload {
+        text,
+        media,
+        created_at_ms: f.uint(4)?,
+    })
+}
+
 // ---------------- provider with exportable storage ----------------
 
 #[derive(Default)]
@@ -586,6 +630,27 @@ mod tests {
         assert!(
             matches!(b2.process(&m).unwrap(), Received::Application { plaintext, .. } if plaintext == b"after restart")
         );
+    }
+
+    #[test]
+    fn chat_payload_round_trips_padded() {
+        let p = ChatPayload {
+            text: "hi 👋".into(),
+            media: vec![],
+            created_at_ms: 42,
+        };
+        let enc = encode_chat(&p).unwrap();
+        assert!(enc.len() >= 256, "padded to the minimum bucket");
+        assert_eq!(decode_chat(&enc).unwrap(), p);
+        let mut bad = enc.clone();
+        bad[..4].copy_from_slice(&u32::MAX.to_be_bytes()); // length prefix beyond the buffer
+        assert!(decode_chat(&bad).is_err());
+        assert!(encode_chat(&ChatPayload {
+            text: "x".repeat(MAX_CHAT_TEXT_BYTES + 1),
+            media: vec![],
+            created_at_ms: 0
+        })
+        .is_err());
     }
 
     #[test]

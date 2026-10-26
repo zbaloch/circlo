@@ -1722,6 +1722,359 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/mls/key-packages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Upload one-time key packages for my device and replace its last-resort package */
+        put: {
+            parameters: {
+                query?: never;
+                header: {
+                    /** @description The calling device (must be one of the caller's registered devices) */
+                    "X-Halqo-Device": components["parameters"]["Device"];
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        keyPackages: components["schemas"]["Bytes"][];
+                        lastResort?: components["schemas"]["Bytes"];
+                    };
+                };
+            };
+            responses: {
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            available?: number;
+                        };
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/mls/key-packages/claim": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** One key package per device of each user (me or accepted friends) */
+        post: {
+            parameters: {
+                query?: never;
+                header: {
+                    /** @description The calling device (must be one of the caller's registered devices) */
+                    "X-Halqo-Device": components["parameters"]["Device"];
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        userIds: components["schemas"]["Id"][];
+                    };
+                };
+            };
+            responses: {
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            keyPackages?: {
+                                userId?: components["schemas"]["Id"];
+                                deviceId?: components["schemas"]["Id"];
+                                keyPackage?: components["schemas"]["Bytes"];
+                            }[];
+                        };
+                    };
+                };
+                404: components["responses"]["Error"];
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/mls/groups": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Groups this device belongs to */
+        get: {
+            parameters: {
+                query?: never;
+                header: {
+                    /** @description The calling device (must be one of the caller's registered devices) */
+                    "X-Halqo-Device": components["parameters"]["Device"];
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            groupId?: components["schemas"]["Id"];
+                            /** Format: int64 */
+                            epoch?: number;
+                            /** Format: int64 */
+                            lastSeq?: number;
+                        }[];
+                    };
+                };
+            };
+        };
+        put?: never;
+        /** Register a new group (this device is its first member) */
+        post: {
+            parameters: {
+                query?: never;
+                header: {
+                    /** @description The calling device (must be one of the caller's registered devices) */
+                    "X-Halqo-Device": components["parameters"]["Device"];
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        groupId: components["schemas"]["Id"];
+                    };
+                };
+            };
+            responses: {
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": Record<string, never>;
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/mls/groups/{groupId}/messages": {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The calling device (must be one of the caller's registered devices) */
+                "X-Halqo-Device": components["parameters"]["Device"];
+            };
+            path: {
+                groupId: components["schemas"]["Id"];
+            };
+            cookie?: never;
+        };
+        /** The group's log after a sequence number (members only) */
+        get: {
+            parameters: {
+                query?: {
+                    after?: number;
+                    limit?: number;
+                };
+                header: {
+                    /** @description The calling device (must be one of the caller's registered devices) */
+                    "X-Halqo-Device": components["parameters"]["Device"];
+                };
+                path: {
+                    groupId: components["schemas"]["Id"];
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** Format: int64 */
+                            seq?: number;
+                            message?: components["schemas"]["Bytes"];
+                            /** Format: date-time */
+                            createdAt?: string;
+                        }[];
+                    };
+                };
+                404: components["responses"]["Error"];
+            };
+        };
+        put?: never;
+        /** Append an MLS message; commits must target the current epoch and list their membership changes */
+        post: {
+            parameters: {
+                query?: never;
+                header: {
+                    /** @description The calling device (must be one of the caller's registered devices) */
+                    "X-Halqo-Device": components["parameters"]["Device"];
+                };
+                path: {
+                    groupId: components["schemas"]["Id"];
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        message: components["schemas"]["Bytes"];
+                        addDevices?: components["schemas"]["Id"][];
+                        removeDevices?: components["schemas"]["Id"][];
+                        welcome?: components["schemas"]["Bytes"];
+                    };
+                };
+            };
+            responses: {
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** Format: int64 */
+                            seq?: number;
+                        };
+                    };
+                };
+                400: components["responses"]["Error"];
+                404: components["responses"]["Error"];
+                409: components["responses"]["Error"];
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/mls/welcomes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Welcomes waiting for this device */
+        get: {
+            parameters: {
+                query?: never;
+                header: {
+                    /** @description The calling device (must be one of the caller's registered devices) */
+                    "X-Halqo-Device": components["parameters"]["Device"];
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            welcomeId?: components["schemas"]["Id"];
+                            groupId?: components["schemas"]["Id"];
+                            welcome?: components["schemas"]["Bytes"];
+                            /** Format: int64 */
+                            afterSeq?: number;
+                        }[];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/mls/welcomes/{welcomeId}": {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The calling device (must be one of the caller's registered devices) */
+                "X-Halqo-Device": components["parameters"]["Device"];
+            };
+            path: {
+                welcomeId: components["schemas"]["Id"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Drop a processed welcome */
+        delete: {
+            parameters: {
+                query?: never;
+                header: {
+                    /** @description The calling device (must be one of the caller's registered devices) */
+                    "X-Halqo-Device": components["parameters"]["Device"];
+                };
+                path: {
+                    welcomeId: components["schemas"]["Id"];
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": Record<string, never>;
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1820,7 +2173,10 @@ export interface components {
             };
         };
     };
-    parameters: never;
+    parameters: {
+        /** @description The calling device (must be one of the caller's registered devices) */
+        Device: components["schemas"]["Id"];
+    };
     requestBodies: never;
     headers: never;
     pathItems: never;

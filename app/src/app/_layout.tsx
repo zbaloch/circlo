@@ -52,6 +52,8 @@ function Navigator() {
         <Drawer.Screen name="post/[id]" options={{ title: 'Post' }} />
         <Drawer.Screen name="viewer" options={{ headerShown: false, swipeEnabled: false }} />
         <Drawer.Screen name="preview/[id]" options={{ title: 'Preview' }} />
+        <Drawer.Screen name="chat/[id]" options={{ title: 'Chat' }} />
+        <Drawer.Screen name="new-message" options={{ title: 'New message' }} />
       </Drawer.Protected>
     </Drawer>
   );

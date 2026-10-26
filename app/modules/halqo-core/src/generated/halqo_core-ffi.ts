@@ -320,6 +320,16 @@ const DEFINITIONS = {
       ret: FfiType.Void,
       hasRustCallStatus: true,
     },
+    uniffi_halqo_core_fn_clone_mlsclient: {
+      args: [FfiType.Handle],
+      ret: FfiType.Handle,
+      hasRustCallStatus: true,
+    },
+    uniffi_halqo_core_fn_free_mlsclient: {
+      args: [FfiType.Handle],
+      ret: FfiType.Void,
+      hasRustCallStatus: true,
+    },
     uniffi_halqo_core_fn_clone_opaqueclientlogin: {
       args: [FfiType.Handle],
       ret: FfiType.Handle,
@@ -360,6 +370,11 @@ const DEFINITIONS = {
       ret: FfiType.Void,
       hasRustCallStatus: true,
     },
+    uniffi_halqo_core_fn_func_decode_chat_payload: {
+      args: [FfiType.RustBuffer],
+      ret: FfiType.RustBuffer,
+      hasRustCallStatus: true,
+    },
     uniffi_halqo_core_fn_func_decrypt_file: {
       args: [
         FfiType.RustBuffer,
@@ -369,6 +384,11 @@ const DEFINITIONS = {
         FfiType.UInt64,
       ],
       ret: FfiType.Void,
+      hasRustCallStatus: true,
+    },
+    uniffi_halqo_core_fn_func_encode_chat_payload: {
+      args: [FfiType.RustBuffer],
+      ret: FfiType.RustBuffer,
       hasRustCallStatus: true,
     },
     uniffi_halqo_core_fn_func_encrypt_file: {
@@ -419,6 +439,31 @@ const DEFINITIONS = {
     uniffi_halqo_core_fn_func_media_layout: {
       args: [FfiType.UInt64],
       ret: FfiType.RustBuffer,
+      hasRustCallStatus: true,
+    },
+    uniffi_halqo_core_fn_func_mls_bind_credential: {
+      args: [
+        FfiType.RustBuffer,
+        FfiType.RustBuffer,
+        FfiType.RustBuffer,
+        FfiType.RustBuffer,
+      ],
+      ret: FfiType.RustBuffer,
+      hasRustCallStatus: true,
+    },
+    uniffi_halqo_core_fn_func_mls_generate_signer: {
+      args: [],
+      ret: FfiType.RustBuffer,
+      hasRustCallStatus: true,
+    },
+    uniffi_halqo_core_fn_func_mls_message_meta: {
+      args: [FfiType.RustBuffer],
+      ret: FfiType.RustBuffer,
+      hasRustCallStatus: true,
+    },
+    uniffi_halqo_core_fn_func_mls_verify_member: {
+      args: [FfiType.RustBuffer, FfiType.RustBuffer],
+      ret: FfiType.Void,
       hasRustCallStatus: true,
     },
     uniffi_halqo_core_fn_func_new_recovery_phrase: {
@@ -712,6 +757,84 @@ const DEFINITIONS = {
       ret: FfiType.RustBuffer,
       hasRustCallStatus: true,
     },
+    uniffi_halqo_core_fn_constructor_mlsclient_new: {
+      args: [
+        FfiType.RustBuffer,
+        FfiType.RustBuffer,
+        FfiType.RustBuffer,
+        FfiType.RustBuffer,
+        FfiType.RustBuffer,
+        FfiType.RustBuffer,
+        FfiType.RustBuffer,
+      ],
+      ret: FfiType.Handle,
+      hasRustCallStatus: true,
+    },
+    uniffi_halqo_core_fn_method_mlsclient_add_members: {
+      args: [FfiType.Handle, FfiType.RustBuffer, FfiType.RustBuffer],
+      ret: FfiType.RustBuffer,
+      hasRustCallStatus: true,
+    },
+    uniffi_halqo_core_fn_method_mlsclient_clear_pending_commit: {
+      args: [FfiType.Handle, FfiType.RustBuffer],
+      ret: FfiType.Void,
+      hasRustCallStatus: true,
+    },
+    uniffi_halqo_core_fn_method_mlsclient_create_group: {
+      args: [FfiType.Handle, FfiType.RustBuffer],
+      ret: FfiType.Void,
+      hasRustCallStatus: true,
+    },
+    uniffi_halqo_core_fn_method_mlsclient_encrypt: {
+      args: [FfiType.Handle, FfiType.RustBuffer, FfiType.RustBuffer],
+      ret: FfiType.RustBuffer,
+      hasRustCallStatus: true,
+    },
+    uniffi_halqo_core_fn_method_mlsclient_epoch: {
+      args: [FfiType.Handle, FfiType.RustBuffer],
+      ret: FfiType.UInt64,
+      hasRustCallStatus: true,
+    },
+    uniffi_halqo_core_fn_method_mlsclient_export_state: {
+      args: [FfiType.Handle, FfiType.RustBuffer],
+      ret: FfiType.RustBuffer,
+      hasRustCallStatus: true,
+    },
+    uniffi_halqo_core_fn_method_mlsclient_is_active: {
+      args: [FfiType.Handle, FfiType.RustBuffer],
+      ret: FfiType.Int8,
+      hasRustCallStatus: true,
+    },
+    uniffi_halqo_core_fn_method_mlsclient_join: {
+      args: [FfiType.Handle, FfiType.RustBuffer],
+      ret: FfiType.RustBuffer,
+      hasRustCallStatus: true,
+    },
+    uniffi_halqo_core_fn_method_mlsclient_key_packages: {
+      args: [FfiType.Handle, FfiType.UInt32, FfiType.Int8],
+      ret: FfiType.RustBuffer,
+      hasRustCallStatus: true,
+    },
+    uniffi_halqo_core_fn_method_mlsclient_members: {
+      args: [FfiType.Handle, FfiType.RustBuffer],
+      ret: FfiType.RustBuffer,
+      hasRustCallStatus: true,
+    },
+    uniffi_halqo_core_fn_method_mlsclient_merge_pending_commit: {
+      args: [FfiType.Handle, FfiType.RustBuffer],
+      ret: FfiType.Void,
+      hasRustCallStatus: true,
+    },
+    uniffi_halqo_core_fn_method_mlsclient_process: {
+      args: [FfiType.Handle, FfiType.RustBuffer],
+      ret: FfiType.RustBuffer,
+      hasRustCallStatus: true,
+    },
+    uniffi_halqo_core_fn_method_mlsclient_remove_devices: {
+      args: [FfiType.Handle, FfiType.RustBuffer, FfiType.RustBuffer],
+      ret: FfiType.RustBuffer,
+      hasRustCallStatus: true,
+    },
     uniffi_halqo_core_fn_constructor_opaqueclientlogin_new: {
       args: [FfiType.RustBuffer],
       ret: FfiType.Handle,
@@ -811,7 +934,17 @@ const DEFINITIONS = {
       ret: FfiType.UInt32,
       hasRustCallStatus: false,
     },
+    uniffi_halqo_core_checksum_func_decode_chat_payload: {
+      args: [],
+      ret: FfiType.UInt16,
+      hasRustCallStatus: false,
+    },
     uniffi_halqo_core_checksum_func_decrypt_file: {
+      args: [],
+      ret: FfiType.UInt16,
+      hasRustCallStatus: false,
+    },
+    uniffi_halqo_core_checksum_func_encode_chat_payload: {
       args: [],
       ret: FfiType.UInt16,
       hasRustCallStatus: false,
@@ -857,6 +990,26 @@ const DEFINITIONS = {
       hasRustCallStatus: false,
     },
     uniffi_halqo_core_checksum_func_media_layout: {
+      args: [],
+      ret: FfiType.UInt16,
+      hasRustCallStatus: false,
+    },
+    uniffi_halqo_core_checksum_func_mls_bind_credential: {
+      args: [],
+      ret: FfiType.UInt16,
+      hasRustCallStatus: false,
+    },
+    uniffi_halqo_core_checksum_func_mls_generate_signer: {
+      args: [],
+      ret: FfiType.UInt16,
+      hasRustCallStatus: false,
+    },
+    uniffi_halqo_core_checksum_func_mls_message_meta: {
+      args: [],
+      ret: FfiType.UInt16,
+      hasRustCallStatus: false,
+    },
+    uniffi_halqo_core_checksum_func_mls_verify_member: {
       args: [],
       ret: FfiType.UInt16,
       hasRustCallStatus: false,
@@ -1042,6 +1195,76 @@ const DEFINITIONS = {
       hasRustCallStatus: false,
     },
     uniffi_halqo_core_checksum_method_mediachunkdecryptor_decrypt_chunk: {
+      args: [],
+      ret: FfiType.UInt16,
+      hasRustCallStatus: false,
+    },
+    uniffi_halqo_core_checksum_constructor_mlsclient_new: {
+      args: [],
+      ret: FfiType.UInt16,
+      hasRustCallStatus: false,
+    },
+    uniffi_halqo_core_checksum_method_mlsclient_add_members: {
+      args: [],
+      ret: FfiType.UInt16,
+      hasRustCallStatus: false,
+    },
+    uniffi_halqo_core_checksum_method_mlsclient_clear_pending_commit: {
+      args: [],
+      ret: FfiType.UInt16,
+      hasRustCallStatus: false,
+    },
+    uniffi_halqo_core_checksum_method_mlsclient_create_group: {
+      args: [],
+      ret: FfiType.UInt16,
+      hasRustCallStatus: false,
+    },
+    uniffi_halqo_core_checksum_method_mlsclient_encrypt: {
+      args: [],
+      ret: FfiType.UInt16,
+      hasRustCallStatus: false,
+    },
+    uniffi_halqo_core_checksum_method_mlsclient_epoch: {
+      args: [],
+      ret: FfiType.UInt16,
+      hasRustCallStatus: false,
+    },
+    uniffi_halqo_core_checksum_method_mlsclient_export_state: {
+      args: [],
+      ret: FfiType.UInt16,
+      hasRustCallStatus: false,
+    },
+    uniffi_halqo_core_checksum_method_mlsclient_is_active: {
+      args: [],
+      ret: FfiType.UInt16,
+      hasRustCallStatus: false,
+    },
+    uniffi_halqo_core_checksum_method_mlsclient_join: {
+      args: [],
+      ret: FfiType.UInt16,
+      hasRustCallStatus: false,
+    },
+    uniffi_halqo_core_checksum_method_mlsclient_key_packages: {
+      args: [],
+      ret: FfiType.UInt16,
+      hasRustCallStatus: false,
+    },
+    uniffi_halqo_core_checksum_method_mlsclient_members: {
+      args: [],
+      ret: FfiType.UInt16,
+      hasRustCallStatus: false,
+    },
+    uniffi_halqo_core_checksum_method_mlsclient_merge_pending_commit: {
+      args: [],
+      ret: FfiType.UInt16,
+      hasRustCallStatus: false,
+    },
+    uniffi_halqo_core_checksum_method_mlsclient_process: {
+      args: [],
+      ret: FfiType.UInt16,
+      hasRustCallStatus: false,
+    },
+    uniffi_halqo_core_checksum_method_mlsclient_remove_devices: {
       args: [],
       ret: FfiType.UInt16,
       hasRustCallStatus: false,
@@ -1305,6 +1528,14 @@ interface NativeModuleInterface {
     ptr: bigint,
     uniffi_out_err: UniffiRustCallStatus,
   ): void;
+  uniffi_halqo_core_fn_clone_mlsclient(
+    ptr: bigint,
+    uniffi_out_err: UniffiRustCallStatus,
+  ): bigint;
+  uniffi_halqo_core_fn_free_mlsclient(
+    ptr: bigint,
+    uniffi_out_err: UniffiRustCallStatus,
+  ): void;
   uniffi_halqo_core_fn_clone_opaqueclientlogin(
     ptr: bigint,
     uniffi_out_err: UniffiRustCallStatus,
@@ -1337,6 +1568,10 @@ interface NativeModuleInterface {
     ptr: bigint,
     uniffi_out_err: UniffiRustCallStatus,
   ): void;
+  uniffi_halqo_core_fn_func_decode_chat_payload(
+    bytes: Uint8Array,
+    uniffi_out_err: UniffiRustCallStatus,
+  ): Uint8Array;
   uniffi_halqo_core_fn_func_decrypt_file(
     inputPath: Uint8Array,
     outputPath: Uint8Array,
@@ -1345,6 +1580,10 @@ interface NativeModuleInterface {
     contentLen: bigint,
     uniffi_out_err: UniffiRustCallStatus,
   ): void;
+  uniffi_halqo_core_fn_func_encode_chat_payload(
+    content: Uint8Array,
+    uniffi_out_err: UniffiRustCallStatus,
+  ): Uint8Array;
   uniffi_halqo_core_fn_func_encrypt_file(
     inputPath: Uint8Array,
     outputPath: Uint8Array,
@@ -1385,6 +1624,25 @@ interface NativeModuleInterface {
     contentLen: bigint,
     uniffi_out_err: UniffiRustCallStatus,
   ): Uint8Array;
+  uniffi_halqo_core_fn_func_mls_bind_credential(
+    identity: Uint8Array,
+    userId: Uint8Array,
+    deviceId: Uint8Array,
+    mlsSigPk: Uint8Array,
+    uniffi_out_err: UniffiRustCallStatus,
+  ): Uint8Array;
+  uniffi_halqo_core_fn_func_mls_generate_signer(
+    uniffi_out_err: UniffiRustCallStatus,
+  ): Uint8Array;
+  uniffi_halqo_core_fn_func_mls_message_meta(
+    message: Uint8Array,
+    uniffi_out_err: UniffiRustCallStatus,
+  ): Uint8Array;
+  uniffi_halqo_core_fn_func_mls_verify_member(
+    identityEd25519Pk: Uint8Array,
+    member: Uint8Array,
+    uniffi_out_err: UniffiRustCallStatus,
+  ): void;
   uniffi_halqo_core_fn_func_new_recovery_phrase(
     uniffi_out_err: UniffiRustCallStatus,
   ): Uint8Array;
@@ -1626,6 +1884,85 @@ interface NativeModuleInterface {
     ciphertext: Uint8Array,
     uniffi_out_err: UniffiRustCallStatus,
   ): Uint8Array;
+  uniffi_halqo_core_fn_constructor_mlsclient_new(
+    userId: Uint8Array,
+    deviceId: Uint8Array,
+    sigSk: Uint8Array,
+    sigPk: Uint8Array,
+    binding: Uint8Array,
+    localCacheKey: Uint8Array,
+    sealedState: Uint8Array,
+    uniffi_out_err: UniffiRustCallStatus,
+  ): bigint;
+  uniffi_halqo_core_fn_method_mlsclient_add_members(
+    uniffiSelf: bigint,
+    groupId: Uint8Array,
+    keyPackages: Uint8Array,
+    uniffi_out_err: UniffiRustCallStatus,
+  ): Uint8Array;
+  uniffi_halqo_core_fn_method_mlsclient_clear_pending_commit(
+    uniffiSelf: bigint,
+    groupId: Uint8Array,
+    uniffi_out_err: UniffiRustCallStatus,
+  ): void;
+  uniffi_halqo_core_fn_method_mlsclient_create_group(
+    uniffiSelf: bigint,
+    groupId: Uint8Array,
+    uniffi_out_err: UniffiRustCallStatus,
+  ): void;
+  uniffi_halqo_core_fn_method_mlsclient_encrypt(
+    uniffiSelf: bigint,
+    groupId: Uint8Array,
+    plaintext: Uint8Array,
+    uniffi_out_err: UniffiRustCallStatus,
+  ): Uint8Array;
+  uniffi_halqo_core_fn_method_mlsclient_epoch(
+    uniffiSelf: bigint,
+    groupId: Uint8Array,
+    uniffi_out_err: UniffiRustCallStatus,
+  ): bigint;
+  uniffi_halqo_core_fn_method_mlsclient_export_state(
+    uniffiSelf: bigint,
+    localCacheKey: Uint8Array,
+    uniffi_out_err: UniffiRustCallStatus,
+  ): Uint8Array;
+  uniffi_halqo_core_fn_method_mlsclient_is_active(
+    uniffiSelf: bigint,
+    groupId: Uint8Array,
+    uniffi_out_err: UniffiRustCallStatus,
+  ): number;
+  uniffi_halqo_core_fn_method_mlsclient_join(
+    uniffiSelf: bigint,
+    welcome: Uint8Array,
+    uniffi_out_err: UniffiRustCallStatus,
+  ): Uint8Array;
+  uniffi_halqo_core_fn_method_mlsclient_key_packages(
+    uniffiSelf: bigint,
+    count: number,
+    lastResort: number,
+    uniffi_out_err: UniffiRustCallStatus,
+  ): Uint8Array;
+  uniffi_halqo_core_fn_method_mlsclient_members(
+    uniffiSelf: bigint,
+    groupId: Uint8Array,
+    uniffi_out_err: UniffiRustCallStatus,
+  ): Uint8Array;
+  uniffi_halqo_core_fn_method_mlsclient_merge_pending_commit(
+    uniffiSelf: bigint,
+    groupId: Uint8Array,
+    uniffi_out_err: UniffiRustCallStatus,
+  ): void;
+  uniffi_halqo_core_fn_method_mlsclient_process(
+    uniffiSelf: bigint,
+    message: Uint8Array,
+    uniffi_out_err: UniffiRustCallStatus,
+  ): Uint8Array;
+  uniffi_halqo_core_fn_method_mlsclient_remove_devices(
+    uniffiSelf: bigint,
+    groupId: Uint8Array,
+    deviceIds: Uint8Array,
+    uniffi_out_err: UniffiRustCallStatus,
+  ): Uint8Array;
   uniffi_halqo_core_fn_constructor_opaqueclientlogin_new(
     password: Uint8Array,
     uniffi_out_err: UniffiRustCallStatus,
@@ -1708,7 +2045,9 @@ interface NativeModuleInterface {
     uniffi_out_err: UniffiRustCallStatus,
   ): Uint8Array;
   ffi_halqo_core_uniffi_contract_version(): number;
+  uniffi_halqo_core_checksum_func_decode_chat_payload(): number;
   uniffi_halqo_core_checksum_func_decrypt_file(): number;
+  uniffi_halqo_core_checksum_func_encode_chat_payload(): number;
   uniffi_halqo_core_checksum_func_encrypt_file(): number;
   uniffi_halqo_core_checksum_func_generate_device_keys(): number;
   uniffi_halqo_core_checksum_func_generate_identity(): number;
@@ -1718,6 +2057,10 @@ interface NativeModuleInterface {
   uniffi_halqo_core_checksum_func_invite_token_hash(): number;
   uniffi_halqo_core_checksum_func_media_chunk_offset(): number;
   uniffi_halqo_core_checksum_func_media_layout(): number;
+  uniffi_halqo_core_checksum_func_mls_bind_credential(): number;
+  uniffi_halqo_core_checksum_func_mls_generate_signer(): number;
+  uniffi_halqo_core_checksum_func_mls_message_meta(): number;
+  uniffi_halqo_core_checksum_func_mls_verify_member(): number;
   uniffi_halqo_core_checksum_func_new_recovery_phrase(): number;
   uniffi_halqo_core_checksum_func_new_symmetric_key(): number;
   uniffi_halqo_core_checksum_func_normalize_handle(): number;
@@ -1755,6 +2098,20 @@ interface NativeModuleInterface {
   uniffi_halqo_core_checksum_func_verify_recovery_login(): number;
   uniffi_halqo_core_checksum_constructor_mediachunkdecryptor_new(): number;
   uniffi_halqo_core_checksum_method_mediachunkdecryptor_decrypt_chunk(): number;
+  uniffi_halqo_core_checksum_constructor_mlsclient_new(): number;
+  uniffi_halqo_core_checksum_method_mlsclient_add_members(): number;
+  uniffi_halqo_core_checksum_method_mlsclient_clear_pending_commit(): number;
+  uniffi_halqo_core_checksum_method_mlsclient_create_group(): number;
+  uniffi_halqo_core_checksum_method_mlsclient_encrypt(): number;
+  uniffi_halqo_core_checksum_method_mlsclient_epoch(): number;
+  uniffi_halqo_core_checksum_method_mlsclient_export_state(): number;
+  uniffi_halqo_core_checksum_method_mlsclient_is_active(): number;
+  uniffi_halqo_core_checksum_method_mlsclient_join(): number;
+  uniffi_halqo_core_checksum_method_mlsclient_key_packages(): number;
+  uniffi_halqo_core_checksum_method_mlsclient_members(): number;
+  uniffi_halqo_core_checksum_method_mlsclient_merge_pending_commit(): number;
+  uniffi_halqo_core_checksum_method_mlsclient_process(): number;
+  uniffi_halqo_core_checksum_method_mlsclient_remove_devices(): number;
   uniffi_halqo_core_checksum_constructor_opaqueclientlogin_new(): number;
   uniffi_halqo_core_checksum_method_opaqueclientlogin_finish(): number;
   uniffi_halqo_core_checksum_method_opaqueclientlogin_request(): number;

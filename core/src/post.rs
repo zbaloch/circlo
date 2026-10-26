@@ -31,7 +31,7 @@ pub struct MediaDescriptor {
 }
 
 impl MediaDescriptor {
-    fn to_value(&self) -> Value {
+    pub(crate) fn to_value(&self) -> Value {
         cbor::map(vec![
             (1, cbor::bytes(&self.object_id)),
             (2, cbor::uint(self.kind.into())),
@@ -44,7 +44,7 @@ impl MediaDescriptor {
         ])
     }
 
-    fn from_value(v: Value) -> Result<Self> {
+    pub(crate) fn from_value(v: Value) -> Result<Self> {
         let mut f = Fields::parse(v, &[1, 2, 3, 4, 5, 6, 7, 8])?;
         let small = |n: u64| u32::try_from(n).map_err(|_| CoreError::Malformed);
         let d = MediaDescriptor {

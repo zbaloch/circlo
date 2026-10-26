@@ -1067,6 +1067,28 @@ pub struct MlsMessageMeta {
     pub is_commit: bool,
 }
 
+/// Encodes and pads a chat message for `MlsClient::encrypt` (text, media keys, timestamp).
+#[uniffi::export]
+pub fn encode_chat_payload(content: &PostContent) -> Result<Vec<u8>> {
+    let h = content.to_header()?;
+    crate::mls::encode_chat(&crate::mls::ChatPayload {
+        text: h.text,
+        media: h.media,
+        created_at_ms: h.created_at_ms,
+    })
+}
+
+/// Inverse of `encode_chat_payload` for a decrypted application message.
+#[uniffi::export]
+pub fn decode_chat_payload(bytes: &[u8]) -> Result<PostContent> {
+    let p = crate::mls::decode_chat(bytes)?;
+    Ok(PostContent::from_header(PostHeader {
+        text: p.text,
+        media: p.media,
+        created_at_ms: p.created_at_ms,
+    }))
+}
+
 /// A fresh Ed25519 key pair for this device's MLS signatures (never used for anything else).
 #[uniffi::export]
 pub fn mls_generate_signer() -> SigningKeyPair {

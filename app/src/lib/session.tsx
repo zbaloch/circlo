@@ -6,6 +6,7 @@ import { resetAddressBookCache } from './addressbook';
 import { clearAccount, loadAccount, updateRefreshToken, type StoredAccount } from './keystore';
 import { clearFeed } from './feed-store';
 import { clearMediaCache } from './media';
+import { clearMessaging } from './messaging';
 import { clearOutbox } from './outbox';
 
 type State = { status: 'loading' } | { status: 'signedOut' } | { status: 'signedIn'; account: StoredAccount };
@@ -63,6 +64,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     resetAddressBookCache();
     clearOutbox();
     clearFeed();
+    await clearMessaging().catch(() => {});
     try {
       clearMediaCache(); // decrypted photos must not outlive the session
     } catch {
