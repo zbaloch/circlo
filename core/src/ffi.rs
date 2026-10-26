@@ -1025,3 +1025,206 @@ pub fn opaque_server_login_start(
 pub fn opaque_server_login_finish(state: &[u8], handle: &str, finalization: &[u8]) -> Result<()> {
     opaque::server_login_finish(state, &social::normalize_handle(handle)?, finalization)
 }
+
+// ---------------- messaging (MLS, CRYPTO.md section 13a) ----------------
+
+#[derive(uniffi::Record)]
+pub struct MlsMember {
+    pub user_id: Vec<u8>,
+    pub device_id: Vec<u8>,
+    pub binding: Vec<u8>,
+    pub signature_key: Vec<u8>,
+}
+
+impl From<crate::mls::LeafIdentity> for MlsMember {
+    fn from(l: crate::mls::LeafIdentity) -> Self {
+        MlsMember {
+            user_id: l.user_id.to_vec(),
+            device_id: l.device_id.to_vec(),
+            binding: l.binding.to_vec(),
+            signature_key: l.signature_key,
+        }
+    }
+}
+
+#[derive(uniffi::Record)]
+pub struct MlsCommit {
+    pub commit: Vec<u8>,
+    pub welcome: Option<Vec<u8>>,
+}
+
+#[derive(uniffi::Enum)]
+pub enum MlsReceived {
+    Application { sender: MlsMember, plaintext: Vec<u8> },
+    Commit { epoch: u64, removed_self: bool },
+    Proposal,
+}
+
+#[derive(uniffi::Record)]
+pub struct MlsMessageMeta {
+    pub group_id: Vec<u8>,
+    pub epoch: u64,
+    pub is_commit: bool,
+}
+
+/// A fresh Ed25519 key pair for this device's MLS signatures (never used for anything else).
+#[uniffi::export]
+pub fn mls_generate_signer() -> SigningKeyPair {
+    let sk = ed25519_dalek::SigningKey::from_bytes(&random_secret::<32>());
+    SigningKeyPair {
+        public_key: sk.verifying_key().to_bytes().to_vec(),
+        secret_key: sk.to_bytes().to_vec(),
+    }
+}
+
+/// The identity key vouches for a device's MLS signature key (the credential binding).
+#[uniffi::export]
+pub fn mls_bind_credential(
+    identity: &IdentityKeys,
+    user_id: &[u8],
+    device_id: &[u8],
+    mls_sig_pk: &[u8],
+) -> Result<Vec<u8>> {
+    Ok(crate::mls::sign_binding(
+        &identity.load()?.ed25519,
+        &id16(user_id, "user_id")?,
+        &id16(device_id, "device_id")?,
+        &key32(mls_sig_pk, "mls_sig_pk")?,
+    )
+    .to_vec())
+}
+
+/// Checks a group member's binding against the identity key the app has (pinned) for that user.
+#[uniffi::export]
+pub fn mls_verify_member(identity_ed25519_pk: &[u8], member: &MlsMember) -> Result<()> {
+    crate::mls::verify_binding(
+        &key32(identity_ed25519_pk, "identity_ed25519_pk")?,
+        &id16(&member.user_id, "user_id")?,
+        &id16(&member.device_id, "device_id")?,
+        &member.signature_key,
+        &fixed::<64>(&member.binding, "binding")?,
+    )
+}
+
+/// Group id, epoch and commit flag from an MLS message's clear framing (what the server may see).
+#[uniffi::export]
+pub fn mls_message_meta(message: &[u8]) -> Result<MlsMessageMeta> {
+    let m = crate::mls::message_meta(message)?;
+    Ok(MlsMessageMeta {
+        group_id: m.group_id,
+        epoch: m.epoch,
+        is_commit: m.is_commit,
+    })
+}
+
+/// This device's MLS client. State is restored from, and should be saved back to, a blob sealed with the
+/// device's `local_cache_key` (`export_state`) after every call that changes it.
+#[derive(uniffi::Object)]
+pub struct MlsClient {
+    inner: Mutex<crate::mls::Client>,
+}
+
+#[uniffi::export]
+impl MlsClient {
+    #[uniffi::constructor]
+    pub fn new(
+        user_id: &[u8],
+        device_id: &[u8],
+        sig_sk: &[u8],
+        sig_pk: &[u8],
+        binding: &[u8],
+        local_cache_key: &[u8],
+        sealed_state: Option<Vec<u8>>,
+    ) -> Result<Arc<Self>> {
+        let key = key32(local_cache_key, "local_cache_key")?;
+        let sk = Zeroizing::new(key32(sig_sk, "sig_sk")?);
+        let client = crate::mls::Client::new(
+            id16(user_id, "user_id")?,
+            id16(device_id, "device_id")?,
+            &sk,
+            &key32(sig_pk, "sig_pk")?,
+            fixed::<64>(binding, "binding")?,
+            sealed_state.as_deref().map(|s| (&key, s)),
+        )?;
+        Ok(Arc::new(MlsClient {
+            inner: Mutex::new(client),
+        }))
+    }
+
+    pub fn export_state(&self, local_cache_key: &[u8]) -> Result<Vec<u8>> {
+        self.lock()?.export_state(&key32(local_cache_key, "local_cache_key")?)
+    }
+
+    pub fn key_packages(&self, count: u32, last_resort: bool) -> Result<Vec<Vec<u8>>> {
+        self.lock()?.key_packages(count.min(100) as usize, last_resort)
+    }
+
+    pub fn create_group(&self, group_id: &[u8]) -> Result<()> {
+        self.lock()?.create_group(&id16(group_id, "group_id")?)
+    }
+
+    pub fn add_members(&self, group_id: &[u8], key_packages: Vec<Vec<u8>>) -> Result<MlsCommit> {
+        let out = self.lock()?.add_members(group_id, &key_packages)?;
+        Ok(MlsCommit {
+            commit: out.commit,
+            welcome: out.welcome,
+        })
+    }
+
+    pub fn remove_devices(&self, group_id: &[u8], device_ids: Vec<Vec<u8>>) -> Result<MlsCommit> {
+        let ids = device_ids
+            .iter()
+            .map(|d| id16(d, "device_id"))
+            .collect::<Result<Vec<_>>>()?;
+        let out = self.lock()?.remove_devices(group_id, &ids)?;
+        Ok(MlsCommit {
+            commit: out.commit,
+            welcome: out.welcome,
+        })
+    }
+
+    pub fn merge_pending_commit(&self, group_id: &[u8]) -> Result<()> {
+        self.lock()?.merge_pending_commit(group_id)
+    }
+
+    pub fn clear_pending_commit(&self, group_id: &[u8]) -> Result<()> {
+        self.lock()?.clear_pending_commit(group_id)
+    }
+
+    pub fn join(&self, welcome: &[u8]) -> Result<Vec<u8>> {
+        self.lock()?.join(welcome)
+    }
+
+    pub fn encrypt(&self, group_id: &[u8], plaintext: &[u8]) -> Result<Vec<u8>> {
+        self.lock()?.encrypt(group_id, plaintext)
+    }
+
+    pub fn process(&self, message: &[u8]) -> Result<MlsReceived> {
+        Ok(match self.lock()?.process(message)? {
+            crate::mls::Received::Application { sender, plaintext } => MlsReceived::Application {
+                sender: sender.into(),
+                plaintext,
+            },
+            crate::mls::Received::Commit { epoch, removed_self } => MlsReceived::Commit { epoch, removed_self },
+            crate::mls::Received::Proposal => MlsReceived::Proposal,
+        })
+    }
+
+    pub fn members(&self, group_id: &[u8]) -> Result<Vec<MlsMember>> {
+        Ok(self.lock()?.members(group_id)?.into_iter().map(Into::into).collect())
+    }
+
+    pub fn epoch(&self, group_id: &[u8]) -> Result<u64> {
+        self.lock()?.epoch(group_id)
+    }
+
+    pub fn is_active(&self, group_id: &[u8]) -> Result<bool> {
+        self.lock()?.is_active(group_id)
+    }
+}
+
+impl MlsClient {
+    fn lock(&self) -> Result<std::sync::MutexGuard<'_, crate::mls::Client>> {
+        self.inner.lock().map_err(|_| invalid("mls client poisoned"))
+    }
+}

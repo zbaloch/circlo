@@ -1,12 +1,12 @@
 //! JNI surface for halqo-server (`com.halqo.server.crypto.HalqoCoreNative`). Server-side operations only:
-//! OPAQUE server, keyed handle lookup, signature checks, push-token sealing, invite hashing.
+//! OPAQUE server, keyed handle lookup, signature checks, push-token sealing, invite hashing, MLS framing metadata.
 //!
 //! Errors and panics become `com.halqo.server.crypto.CoreException` carrying only the error kind — never key
 //! material or plaintext. Built with `--features jni --profile server` (panic = unwind, so a bug can't abort the JVM).
 
 use std::panic::{catch_unwind, AssertUnwindSafe};
 
-use jni::objects::{JByteArray, JClass, JObject, JString};
+use jni::objects::{JByteArray, JClass, JObject, JObjectArray, JString};
 use jni::sys::{jboolean, jbyteArray, jint, jlong, jobjectArray, jstring, JNI_FALSE, JNI_TRUE};
 use jni::JNIEnv;
 
@@ -214,6 +214,22 @@ pub extern "system" fn Java_com_halqo_server_crypto_HalqoCoreNative_inviteTokenH
     guard(&mut env, std::ptr::null_mut(), |env| {
         let t: [u8; 32] = fixed(&bytes(env, &token)?, "token")?;
         out(env, &social::invite_token_hash(&t))
+    })
+}
+
+/// MLS framing the delivery service may read: `group_id || epoch:u64 BE || is_commit:u8` (CRYPTO.md 13a).
+#[no_mangle]
+pub extern "system" fn Java_com_halqo_server_crypto_HalqoCoreNative_mlsMessageMeta(
+    mut env: JNIEnv,
+    _c: JClass,
+    message: JByteArray,
+) -> jbyteArray {
+    guard(&mut env, std::ptr::null_mut(), |env| {
+        let m = crate::mls::message_meta(&bytes(env, &message)?)?;
+        let mut b = m.group_id;
+        b.extend_from_slice(&m.epoch.to_be_bytes());
+        b.push(u8::from(m.is_commit));
+        out(env, &b)
     })
 }
 
@@ -513,5 +529,207 @@ mod test_client {
             let (fin, ek) = opaque::client_login_finish(st, &bytes(env, &password)?, &handle, &bytes(env, &response)?)?;
             pair(env, &fin, &*ek)
         })
+    }
+
+    // ---------- MLS test clients (handles into a registry; tests only) ----------
+
+    use std::collections::HashMap;
+    use std::sync::Mutex;
+
+    static MLS: Mutex<Option<HashMap<i64, crate::mls::Client>>> = Mutex::new(None);
+    static NEXT: std::sync::atomic::AtomicI64 = std::sync::atomic::AtomicI64::new(1);
+
+    fn with_client<T>(handle: jlong, f: impl FnOnce(&crate::mls::Client) -> crate::error::Result<T>) -> R<T> {
+        let guard = MLS.lock().map_err(|_| Fail::Jni)?;
+        let client = guard
+            .as_ref()
+            .and_then(|m| m.get(&handle))
+            .ok_or(Fail::Core(CoreError::Malformed))?;
+        Ok(f(client)?)
+    }
+
+    fn byte_arrays_in(env: &mut JNIEnv, arr: &JObjectArray) -> R<Vec<Vec<u8>>> {
+        let n = env.get_array_length(arr)?;
+        let mut out = Vec::with_capacity(n as usize);
+        for i in 0..n {
+            let el: JByteArray = env.get_object_array_element(arr, i)?.into();
+            out.push(env.convert_byte_array(el)?);
+        }
+        Ok(out)
+    }
+
+    fn byte_arrays_out(env: &mut JNIEnv, items: &[Vec<u8>]) -> R<jobjectArray> {
+        let arr = env.new_object_array(items.len() as i32, "[B", JObject::null())?;
+        for (i, b) in items.iter().enumerate() {
+            let a = env.byte_array_from_slice(b)?;
+            env.set_object_array_element(&arr, i as i32, a)?;
+        }
+        Ok(arr.into_raw())
+    }
+
+    /// A fresh MLS client for (user, device), with its credential bound by `identity` (128-byte test identity).
+    #[no_mangle]
+    pub extern "system" fn Java_com_halqo_server_crypto_TestClientNative_mlsNew(
+        mut env: JNIEnv,
+        _c: JClass,
+        identity: JByteArray,
+        user_id: JByteArray,
+        device_id: JByteArray,
+    ) -> jlong {
+        guard(&mut env, 0, |env| {
+            let id = identity_of(&bytes(env, &identity)?)?;
+            let (user, device): ([u8; 16], [u8; 16]) = (
+                fixed(&bytes(env, &user_id)?, "user_id")?,
+                fixed(&bytes(env, &device_id)?, "device_id")?,
+            );
+            let sk = generate_signing_key();
+            let pk = sk.verifying_key().to_bytes();
+            let binding = crate::mls::sign_binding(&id.ed25519, &user, &device, &pk);
+            let client = crate::mls::Client::new(user, device, &sk.to_bytes(), &pk, binding, None)?;
+            let handle = NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            MLS.lock()
+                .map_err(|_| Fail::Jni)?
+                .get_or_insert_with(HashMap::new)
+                .insert(handle, client);
+            Ok(handle)
+        })
+    }
+
+    #[no_mangle]
+    pub extern "system" fn Java_com_halqo_server_crypto_TestClientNative_mlsKeyPackages(
+        mut env: JNIEnv,
+        _c: JClass,
+        handle: jlong,
+        count: jint,
+        last_resort: jboolean,
+    ) -> jobjectArray {
+        guard(&mut env, std::ptr::null_mut(), |env| {
+            let kps = with_client(handle, |c| c.key_packages(count as usize, last_resort == JNI_TRUE))?;
+            byte_arrays_out(env, &kps)
+        })
+    }
+
+    #[no_mangle]
+    pub extern "system" fn Java_com_halqo_server_crypto_TestClientNative_mlsCreateGroup(
+        mut env: JNIEnv,
+        _c: JClass,
+        handle: jlong,
+        group_id: JByteArray,
+    ) {
+        guard(&mut env, (), |env| {
+            let g: [u8; 16] = fixed(&bytes(env, &group_id)?, "group_id")?;
+            with_client(handle, |c| c.create_group(&g))
+        })
+    }
+
+    /// `[commit, welcome]`; the commit stays pending until mlsMerge.
+    #[no_mangle]
+    pub extern "system" fn Java_com_halqo_server_crypto_TestClientNative_mlsAdd(
+        mut env: JNIEnv,
+        _c: JClass,
+        handle: jlong,
+        group_id: JByteArray,
+        key_packages: JObjectArray,
+    ) -> jobjectArray {
+        guard(&mut env, std::ptr::null_mut(), |env| {
+            let g = bytes(env, &group_id)?;
+            let kps = byte_arrays_in(env, &key_packages)?;
+            let out = with_client(handle, |c| c.add_members(&g, &kps))?;
+            byte_arrays_out(env, &[out.commit, out.welcome.unwrap_or_default()])
+        })
+    }
+
+    #[no_mangle]
+    pub extern "system" fn Java_com_halqo_server_crypto_TestClientNative_mlsRemove(
+        mut env: JNIEnv,
+        _c: JClass,
+        handle: jlong,
+        group_id: JByteArray,
+        device_id: JByteArray,
+    ) -> jbyteArray {
+        guard(&mut env, std::ptr::null_mut(), |env| {
+            let g = bytes(env, &group_id)?;
+            let d: [u8; 16] = fixed(&bytes(env, &device_id)?, "device_id")?;
+            let out = with_client(handle, |c| c.remove_devices(&g, &[d]))?;
+            out_bytes(env, &out.commit)
+        })
+    }
+
+    #[no_mangle]
+    pub extern "system" fn Java_com_halqo_server_crypto_TestClientNative_mlsMerge(
+        mut env: JNIEnv,
+        _c: JClass,
+        handle: jlong,
+        group_id: JByteArray,
+    ) {
+        guard(&mut env, (), |env| {
+            let g = bytes(env, &group_id)?;
+            with_client(handle, |c| c.merge_pending_commit(&g))
+        })
+    }
+
+    #[no_mangle]
+    pub extern "system" fn Java_com_halqo_server_crypto_TestClientNative_mlsClear(
+        mut env: JNIEnv,
+        _c: JClass,
+        handle: jlong,
+        group_id: JByteArray,
+    ) {
+        guard(&mut env, (), |env| {
+            let g = bytes(env, &group_id)?;
+            with_client(handle, |c| c.clear_pending_commit(&g))
+        })
+    }
+
+    #[no_mangle]
+    pub extern "system" fn Java_com_halqo_server_crypto_TestClientNative_mlsJoin(
+        mut env: JNIEnv,
+        _c: JClass,
+        handle: jlong,
+        welcome: JByteArray,
+    ) -> jbyteArray {
+        guard(&mut env, std::ptr::null_mut(), |env| {
+            let w = bytes(env, &welcome)?;
+            let g = with_client(handle, |c| c.join(&w))?;
+            out_bytes(env, &g)
+        })
+    }
+
+    #[no_mangle]
+    pub extern "system" fn Java_com_halqo_server_crypto_TestClientNative_mlsEncrypt(
+        mut env: JNIEnv,
+        _c: JClass,
+        handle: jlong,
+        group_id: JByteArray,
+        plaintext: JByteArray,
+    ) -> jbyteArray {
+        guard(&mut env, std::ptr::null_mut(), |env| {
+            let (g, p) = (bytes(env, &group_id)?, bytes(env, &plaintext)?);
+            let m = with_client(handle, |c| c.encrypt(&g, &p))?;
+            out_bytes(env, &m)
+        })
+    }
+
+    /// Plaintext for an application message, an empty array for a commit/proposal; throws if it can't be read.
+    #[no_mangle]
+    pub extern "system" fn Java_com_halqo_server_crypto_TestClientNative_mlsProcess(
+        mut env: JNIEnv,
+        _c: JClass,
+        handle: jlong,
+        message: JByteArray,
+    ) -> jbyteArray {
+        guard(&mut env, std::ptr::null_mut(), |env| {
+            let m = bytes(env, &message)?;
+            let r = with_client(handle, |c| c.process(&m))?;
+            let plain = match r {
+                crate::mls::Received::Application { plaintext, .. } => plaintext,
+                _ => Vec::new(),
+            };
+            out_bytes(env, &plain)
+        })
+    }
+
+    fn out_bytes(env: &JNIEnv, b: &[u8]) -> R<jbyteArray> {
+        out(env, b)
     }
 }

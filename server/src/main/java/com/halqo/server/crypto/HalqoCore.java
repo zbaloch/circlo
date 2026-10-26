@@ -73,6 +73,19 @@ public class HalqoCore {
         return HalqoCoreNative.inviteTokenHash(token);
     }
 
+    /** What the delivery service may read from an MLS message: its group, epoch, and whether it is a commit. */
+    public record MlsMeta(byte[] groupId, long epoch, boolean commit) {}
+
+    /** Parses only the clear MLS framing; throws {@link CoreException} for anything that isn't an MLS message. */
+    public MlsMeta mlsMessageMeta(byte[] message) {
+        byte[] b = HalqoCoreNative.mlsMessageMeta(message);
+        int n = b.length - 9;
+        if (n < 1) {
+            throw new CoreException("Malformed");
+        }
+        return new MlsMeta(java.util.Arrays.copyOf(b, n), java.nio.ByteBuffer.wrap(b, n, 8).getLong(), b[b.length - 1] == 1);
+    }
+
     public boolean verifyRecoveryLogin(
             byte[] pubkey, byte[] userId, byte[] challengeId, byte[] nonce, long expiresAt, byte[] signature) {
         return safe(() -> HalqoCoreNative.verifyRecoveryLogin(pubkey, userId, challengeId, nonce, expiresAt, signature));
