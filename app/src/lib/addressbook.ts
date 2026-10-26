@@ -29,7 +29,15 @@ export type Contact = {
   handle?: string;
 };
 
-export type AddressBook = { v: 1; myEpochs: MyEpoch[]; contacts: Record<string, Contact> };
+export type AddressBook = {
+  v: 1;
+  myEpochs: MyEpoch[];
+  contacts: Record<string, Contact>;
+  /** Author-only circle names (1–100). Missing entries fall back to DEFAULT_LABELS. Never leaves this device unencrypted. */
+  labels?: Record<string, string>;
+  /** A rotation that started but hasn't finished re-wrapping for everyone; resumed automatically. */
+  pendingRotation?: { epochId: string; startedAt: string };
+};
 
 /** New friends start in the widest circle until the author places them (Phase 6). */
 export const DEFAULT_CIRCLE = 100;

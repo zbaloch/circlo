@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Halqo API
-  version: 0.5.0
+  version: 0.6.0
   description: >
     halqo-server API. The server stores and relays ciphertext only. Request and response bodies never contain
     plaintext content, names, emails, circle numbers or private keys. Byte fields are standard base64 strings;
@@ -439,6 +439,40 @@ paths:
                 ciphertext: { $ref: "#/components/schemas/Bytes" }
       responses:
         "200": { content: { application/json: { schema: { type: object } } } }
+
+  /v1/friend-payloads/batch:
+    put:
+      summary: Re-wrap for many friends at once after an epoch rotation (all-or-nothing, up to 500)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [payloads]
+              properties:
+                payloads:
+                  type: array
+                  maxItems: 500
+                  items:
+                    type: object
+                    required: [toUserId, epochId, ciphertext]
+                    properties:
+                      toUserId: { $ref: "#/components/schemas/Id" }
+                      epochId: { $ref: "#/components/schemas/Id" }
+                      ciphertext: { $ref: "#/components/schemas/Bytes" }
+      responses:
+        "200": { content: { application/json: { schema: { type: object } } } }
+        "403": { $ref: "#/components/responses/Error" }
+
+  /v1/friends/{userId}:
+    parameters:
+      - { name: userId, in: path, required: true, schema: { $ref: "#/components/schemas/Id" } }
+    delete:
+      summary: Unfriend (removes the friendship and all payloads between us; the client then rotates its epoch)
+      responses:
+        "200": { content: { application/json: { schema: { type: object } } } }
+        "404": { $ref: "#/components/responses/Error" }
 
   /v1/blobs/{kind}:
     parameters:

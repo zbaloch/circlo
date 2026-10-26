@@ -11,8 +11,9 @@ Memory file for Claude Code sessions. Read this first when resuming. Keep it acc
 | 2 RN binding + app shell | Done on Android (merged PR #4); iPhone EAS build pending owner's Expo/Apple accounts |
 | 3 Server foundations | Done (merged PR #5) |
 | 4 App onboarding | Done on Android (merged PR #6) |
-| 5 Friends | **Done on Android** on `phase-5-friends` (PR #7) |
-| 6–12 | Not started |
+| 5 Friends | Done on Android (merged PR #7) |
+| 6 Circles | **Done on Android** on `phase-6-circles`; post-level checks re-run in Phase 7 |
+| 7–12 | Not started |
 
 ## Environment (as of 2026-10-25)
 
@@ -120,6 +121,22 @@ Memory file for Claude Code sessions. Read this first when resuming. Keep it acc
 - [x] **DB dump after the test: no display names, bios, handles or passwords, as text or hex** (profiles, address books,
       payloads all ciphertext)
 - [x] THREAT_MODEL.md: comparison with Threema; CRYPTO.md v1.1 (epoch secrets in the address book)
+- [x] CI green, merged (PR #7)
+
+## Phase 6 (circles) — summary
+
+- [x] Server: batch payload re-wrap (`PUT /v1/friend-payloads/batch`, all-or-nothing, ≤500; accepted friends + my pending
+      requests), unfriend (`DELETE /v1/friends/{id}` removes friendship + all payloads both ways); `CircleRotationIT`
+- [x] App: Circles screen (defaults 1 Me only … 10 Faded contacts, custom 11–100, member + audience counts), circle
+      detail (rename, add/remove), friend profile "In circle" (author-only) + Move + Unfriend
+- [x] Every placement change and unfriend rotates the epoch (CRYPTO.md 8.4): new epoch saved to the encrypted address
+      book first, registered, re-wrapped for everyone at their circle, profile re-encrypted; resumable with retry
+- [x] **Emulator: Alice moved Bob 100 → 7.** Server before: Alice 1 epoch, 1 payload → Bob. After: Alice 2 epochs
+      (1 active), 2 payloads → Bob, all 160 bytes. Bob still decrypts Alice's (re-encrypted) profile; Bob sees nothing
+      about Alice's circles
+- [x] Crypto-level circle semantics already proven in `core/tests/flows.rs` (circle 7 reads 7 and 9 not 5; 7 → 9 closes
+      new circle-7 posts). **Re-verify on the emulator with real posts in Phase 7.**
+- [x] app 23 tests, server 33 tests
 - [ ] CI green, merge
 
 ## Decisions log
