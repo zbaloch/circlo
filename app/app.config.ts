@@ -34,6 +34,7 @@ const config: ExpoConfig = {
     // Keys live in the Android Keystore / iOS Keychain; excluded from Android Auto Backup.
     ['expo-secure-store', { configureAndroidBackup: true }],
     ['expo-build-properties', { android: { usesCleartextTraffic: isDev } }],
+    ['expo-camera', { cameraPermission: 'Halqo uses the camera only to scan friend invites and safety-number QR codes.', microphonePermission: false, recordAudioAndroid: false }],
     [
       'expo-splash-screen',
       {

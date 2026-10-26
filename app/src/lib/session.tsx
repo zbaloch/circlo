@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 
 import { api, ApiError, ok, setAccessToken } from '@/api/client';
 
+import { resetAddressBookCache } from './addressbook';
 import { clearAccount, loadAccount, updateRefreshToken, type StoredAccount } from './keystore';
 
 type State = { status: 'loading' } | { status: 'signedOut' } | { status: 'signedIn'; account: StoredAccount };
@@ -56,6 +57,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const signOut = useCallback(async () => {
     await clearAccount();
     setAccessToken(null);
+    resetAddressBookCache();
     setState({ status: 'signedOut' });
   }, []);
 

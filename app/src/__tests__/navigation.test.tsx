@@ -3,7 +3,6 @@ import { render, screen } from '@testing-library/react-native';
 import { TABS } from '@/app/(tabs)/_layout';
 import HomeScreen from '@/app/(tabs)/index';
 import MessagesScreen from '@/app/(tabs)/messages';
-import SearchScreen from '@/app/(tabs)/search';
 import { DRAWER_ITEMS } from '@/components/app-drawer';
 
 // The full drawer + tabs navigator needs Reanimated's native runtime, which doesn't load under jest-expo;
@@ -34,7 +33,7 @@ describe('app shell', () => {
   });
 
   it('never shows a circle number to readers', async () => {
-    await render(<SearchScreen />);
+    await render(<MessagesScreen />);
     expect(screen.queryByText(/circle \d+/i)).toBeNull();
   });
 });
