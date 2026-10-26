@@ -1,20 +1,21 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Image } from 'expo-image';
 import { useVideoPlayer, VideoView } from 'expo-video';
+import type React from 'react';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, View } from 'react-native';
 
-import { decryptedUri, startPlayback, type UploadedMedia } from '@/lib/media';
+import { imageUri, startPlayback, type UploadedMedia } from '@/lib/media';
 import { usePalette } from '@/theme/use-palette';
 
-/** An image decrypted on the device into the private cache. Shimmer while decrypting; lock icon if it can't be opened. */
-export function EncryptedImage({ media, className }: { media: UploadedMedia; className: string }) {
+/** An image decrypted in memory on the device. Placeholder while decrypting; lock icon if it can't be opened. */
+export function EncryptedImage({ media, className, fit = 'cover' }: { media: UploadedMedia; className: string; fit?: 'cover' | 'contain' }) {
   const palette = usePalette();
   const [uri, setUri] = useState<string>();
   const [failed, setFailed] = useState(false);
   useEffect(() => {
     let live = true;
-    decryptedUri(media).then(
+    imageUri(media).then(
       (u) => live && setUri(u),
       () => live && setFailed(true),
     );
@@ -22,7 +23,7 @@ export function EncryptedImage({ media, className }: { media: UploadedMedia; cla
       live = false;
     };
   }, [media]);
-  if (uri) return <Image source={{ uri }} className={className} contentFit="cover" accessibilityIgnoresInvertColors />;
+  if (uri) return <Image source={{ uri }} className={className} contentFit={fit} accessibilityIgnoresInvertColors />;
   return (
     <View className={`items-center justify-center bg-surface-raised dark:bg-surface-raised-dark ${className}`}>
       {failed ? <Ionicons name="lock-closed" size={22} color={palette.muted} accessibilityLabel="Couldn't decrypt" /> : <ActivityIndicator />}
@@ -60,7 +61,7 @@ export function EncryptedVideo({ video, poster, className }: { video: UploadedMe
 }
 
 /** PLAN.md 2A media grid: 1 full width, 2 side by side, 3 as one large plus two stacked, 4 as 2×2. */
-export function MediaGrid({ media }: { media: UploadedMedia[] }) {
+export function MediaGrid({ media, onPress }: { media: UploadedMedia[]; onPress?: (index: number) => void }) {
   const video = media.find((m) => m.kind === 'full' && m.item.mime.startsWith('video/'));
   if (video) {
     return <EncryptedVideo video={video} poster={media.find((m) => m.kind === 'poster')} className="aspect-video w-full rounded-2xl" />;
@@ -68,24 +69,29 @@ export function MediaGrid({ media }: { media: UploadedMedia[] }) {
   const thumbs = media.filter((m) => m.kind === 'thumb');
   const tiles = thumbs.length ? thumbs : media.filter((m) => m.kind === 'full');
   if (tiles.length === 0) return null;
-  if (tiles.length === 1) return <EncryptedImage media={media.find((m) => m.kind === 'full') ?? tiles[0]} className="aspect-[4/3] w-full rounded-2xl" />;
-  const cell = (m: UploadedMedia, extra = '') => <EncryptedImage key={m.objectKey} media={m} className={`flex-1 ${extra}`} />;
+  const tap = (i: number, child: React.ReactNode, extra = '') => (
+    <Pressable key={tiles[i].objectKey} accessibilityRole="imagebutton" accessibilityLabel={`Photo ${i + 1} of ${tiles.length}`} onPress={() => onPress?.(i)} className={extra}>
+      {child}
+    </Pressable>
+  );
+  if (tiles.length === 1) return tap(0, <EncryptedImage media={media.find((m) => m.kind === 'full') ?? tiles[0]} className="aspect-[4/3] w-full rounded-2xl" />);
+  const cell = (i: number) => tap(i, <EncryptedImage media={tiles[i]} className="h-full w-full" />, 'flex-1');
   return (
     <View className="aspect-[16/9] w-full flex-row gap-0.5 overflow-hidden rounded-2xl">
       {tiles.length === 2 ? (
         <>
-          {cell(tiles[0])}
-          {cell(tiles[1])}
+          {cell(0)}
+          {cell(1)}
         </>
       ) : (
         <>
           <View className="flex-1 gap-0.5">
-            {cell(tiles[0])}
-            {tiles.length === 4 ? cell(tiles[2]) : null}
+            {cell(0)}
+            {tiles.length === 4 ? cell(2) : null}
           </View>
           <View className="flex-1 gap-0.5">
-            {cell(tiles[1])}
-            {cell(tiles.length === 4 ? tiles[3] : tiles[2])}
+            {cell(1)}
+            {cell(tiles.length === 4 ? 3 : 2)}
           </View>
         </>
       )}

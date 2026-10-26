@@ -435,6 +435,15 @@ impl ReaderKeyring {
         Self::new(epoch_root)
     }
 
+    /// The owner's view as a friend in `circle` sees it ("Preview as…"): the same `Cn` that friend was given.
+    #[uniffi::constructor]
+    pub fn for_circle(epoch_root: &[u8], circle: u8) -> Result<Arc<Self>> {
+        let root = CircleKey::from_bytes(key32(epoch_root, "epoch_root")?);
+        Ok(Arc::new(ReaderKeyring {
+            keys: forward_keys(&circle_key(&root, circle)?),
+        }))
+    }
+
     pub fn open_post(
         &self,
         author_ed25519_pk: &[u8],

@@ -11,6 +11,7 @@ import {
   currentEpoch,
   DEFAULT_CIRCLE,
   loadAddressBook,
+  recordPlacement,
   updateAddressBook,
   type AddressBook,
   type Contact,
@@ -23,7 +24,7 @@ export const INVITE_HOST = 'https://halqo.com/i/';
 
 export type Profile = { displayName: string; bio: string; handle: string };
 
-type Identity = { x25519Pub: string; ed25519Pub: string; signature: string; version: number };
+export type Identity = { x25519Pub: string; ed25519Pub: string; signature: string; version: number };
 
 function myIdentity(a: StoredAccount): Core.IdentityKeys {
   return { x25519Sk: fromB64(a.x25519Sk), x25519Pk: fromB64(a.x25519Pk), ed25519Sk: fromB64(a.ed25519Sk), ed25519Pk: fromB64(a.ed25519Pk) };
@@ -134,7 +135,7 @@ export async function acceptInvite(account: StoredAccount, link: string): Promis
   return inviter.userId!;
 }
 
-function verifyIdentitySignature(userId: string, id: Identity) {
+export function verifyIdentitySignature(userId: string, id: Identity) {
   Core.verifyIdentity(fromB64(id.ed25519Pub), uuidToBytes(userId), id.version, fromB64(id.x25519Pub), fromB64(id.signature));
 }
 
@@ -169,6 +170,7 @@ async function sendRequest(account: StoredAccount, toUserId: string, identity: I
       body: { toUserId, epochId: epoch.epochId, payload: friendPayload(account, epoch, toUserId, identity.x25519Pub, DEFAULT_CIRCLE) },
     }),
   );
+  await updateAddressBook(account, (b) => recordPlacement(b, epoch.epochId, toUserId, DEFAULT_CIRCLE));
 }
 
 /** Finds someone who opted into handle search and sends them a request. */
@@ -273,6 +275,7 @@ export async function acceptRequest(account: StoredAccount, userId: string): Pro
       body: { epochId: epoch.epochId, payload: friendPayload(account, epoch, userId, contact.x25519, contact.circle) },
     }),
   );
+  await updateAddressBook(account, (b) => recordPlacement(b, epoch.epochId, userId, contact.circle));
 }
 
 export async function declineRequest(userId: string): Promise<void> {

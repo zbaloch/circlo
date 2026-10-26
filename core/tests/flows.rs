@@ -152,6 +152,18 @@ fn friends_circles_and_epoch_rotation() {
         let p = post(&epoch1, &root1, circle, circle);
         assert_eq!(read(&bob_ring, &epoch1, &p).is_ok(), readable, "circle {circle}");
     }
+    // "Preview as Bob": Alice's keyring for circle 7 opens exactly what Bob's own keyring opens.
+    let preview = ReaderKeyring::for_circle(&root1, 7).unwrap();
+    for circle in [1u8, 2, 6, 7, 8, 100] {
+        let p = post(&epoch1, &root1, circle, 100 + circle);
+        assert_eq!(
+            read(&preview, &epoch1, &p).is_ok(),
+            read(&bob_ring, &epoch1, &p).is_ok(),
+            "circle {circle}"
+        );
+    }
+    assert!(ReaderKeyring::for_circle(&root1, 0).is_err());
+    assert!(ReaderKeyring::for_circle(&root1, 101).is_err());
     // Alice reads all her own posts.
     let owner = ReaderKeyring::for_owner(&root1).unwrap();
     assert!(read(&owner, &epoch1, &post(&epoch1, &root1, 1, 50)).is_ok());

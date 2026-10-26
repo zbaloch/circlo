@@ -1463,6 +1463,265 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/posts/{postId}/replies": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                postId: components["schemas"]["Id"];
+            };
+            cookie?: never;
+        };
+        /** Encrypted replies, oldest first (readers of the author only) */
+        get: {
+            parameters: {
+                query?: {
+                    after?: string;
+                    limit?: number;
+                };
+                header?: never;
+                path: {
+                    postId: components["schemas"]["Id"];
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ReplyView"][];
+                    };
+                };
+                404: components["responses"]["Error"];
+            };
+        };
+        put?: never;
+        /** Add an encrypted reply (sealed under a key derived from the post key) */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    postId: components["schemas"]["Id"];
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        replyId: components["schemas"]["Id"];
+                        ciphertext: components["schemas"]["Bytes"];
+                    };
+                };
+            };
+            responses: {
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": Record<string, never>;
+                    };
+                };
+                404: components["responses"]["Error"];
+                409: components["responses"]["Error"];
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/posts/{postId}/replies/{replyId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                postId: components["schemas"]["Id"];
+                replyId: components["schemas"]["Id"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete a reply (its author or the post's author) */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    postId: components["schemas"]["Id"];
+                    replyId: components["schemas"]["Id"];
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": Record<string, never>;
+                    };
+                };
+                404: components["responses"]["Error"];
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/posts/{postId}/like": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                postId: components["schemas"]["Id"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /** Like (idempotent) */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    postId: components["schemas"]["Id"];
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": Record<string, never>;
+                    };
+                };
+                404: components["responses"]["Error"];
+            };
+        };
+        post?: never;
+        /** Unlike */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    postId: components["schemas"]["Id"];
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": Record<string, never>;
+                    };
+                };
+                404: components["responses"]["Error"];
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/posts/{postId}/likes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                postId: components["schemas"]["Id"];
+            };
+            cookie?: never;
+        };
+        /** Who liked a post (clients show it only if they can decrypt the post) */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    postId: components["schemas"]["Id"];
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            userId?: components["schemas"]["Id"];
+                            /** Format: date-time */
+                            createdAt?: string;
+                        }[];
+                    };
+                };
+                404: components["responses"]["Error"];
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/feed": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** My posts and my accepted friends' posts, newest first (headers only; readers decrypt locally) */
+        get: {
+            parameters: {
+                query?: {
+                    before?: string;
+                    limit?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["PostView"][];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1482,6 +1741,16 @@ export interface components {
                 /** Format: int64 */
                 ctSize?: number;
             }[];
+            replyCount?: number;
+            likeCount?: number;
+            likedByMe?: boolean;
+        };
+        ReplyView: {
+            replyId?: components["schemas"]["Id"];
+            authorId?: components["schemas"]["Id"];
+            ciphertext?: components["schemas"]["Bytes"];
+            /** Format: date-time */
+            createdAt?: string;
         };
         Discoverable: {
             discoverable: boolean;

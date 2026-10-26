@@ -7,7 +7,7 @@ import * as Core from '@halqo/core';
 
 import { api, ApiError, ok } from '@/api/client';
 
-import { loadAddressBook, updateAddressBook, type AddressBook, type MyEpoch } from './addressbook';
+import { DEFAULT_CIRCLE, loadAddressBook, recordPlacement, updateAddressBook, type AddressBook, type MyEpoch } from './addressbook';
 import { toB64, uuidFromRandom } from './bytes';
 import { friendPayload, loadMyProfile, saveMyProfile } from './friends';
 import type { StoredAccount } from './keystore';
@@ -156,6 +156,7 @@ async function finishRotation(account: StoredAccount): Promise<void> {
   if (profile) await saveMyProfile(account, profile);
 
   await updateAddressBook(account, (b) => {
+    for (const p of payloads) recordPlacement(b, epoch.epochId, p.toUserId, b.contacts[p.toUserId]?.circle ?? DEFAULT_CIRCLE);
     if (b.pendingRotation?.epochId === epoch.epochId) delete b.pendingRotation;
   });
 }

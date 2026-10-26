@@ -2,7 +2,6 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { Tabs } from 'expo-router';
 import type { ComponentProps } from 'react';
 
-import { HomeHeader } from '@/components/home-header';
 import { usePalette } from '@/theme/use-palette';
 
 type IconName = ComponentProps<typeof Ionicons>['name'];
@@ -36,7 +35,8 @@ export default function TabLayout() {
             tabBarIcon: ({ focused, color }) => (
               <Ionicons name={focused ? t.iconActive : t.icon} size={26} color={String(color)} />
             ),
-            ...(t.name === 'index' ? { header: () => <HomeHeader /> } : {}),
+            // Home draws its own header so it can hide on scroll (PLAN.md 2A).
+            ...(t.name === 'index' ? { headerShown: false } : {}),
           }}
         />
       ))}

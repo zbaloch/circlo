@@ -9,7 +9,14 @@ import { api, ApiError, ok } from '@/api/client';
 import { fromB64, toB64, utf8, uuidToBytes } from './bytes';
 import type { StoredAccount } from './keystore';
 
-export type MyEpoch = { epochId: string; root: string; profileKey: string; createdAt: string };
+export type MyEpoch = {
+  epochId: string;
+  root: string;
+  profileKey: string;
+  createdAt: string;
+  /** Author-only: the circle each friend was given keys for in this epoch (fixed: every move rotates the epoch). */
+  placements?: Record<string, number>;
+};
 
 export type FriendKey = { epochId: string; circleKey: string; profileKey: string };
 
@@ -41,6 +48,8 @@ export type AddressBook = {
   postCircles?: Record<string, number>;
   /** The composer's remembered audience. */
   lastCircle?: number;
+  /** Authors whose posts I hide from my timeline (local preference; the server never learns it). */
+  muted?: string[];
 };
 
 /** New friends start in the widest circle until the author places them (Phase 6). */
@@ -100,4 +109,10 @@ export function compareIdentity(
 ): 'new' | 'same' | 'changed' {
   if (!contact) return 'new';
   return contact.ed25519 === fetched.ed25519 && contact.x25519 === fetched.x25519 ? 'same' : 'changed';
+}
+
+/** Notes which circle a friend was given in an epoch (used by "Preview as…"). Call inside `updateAddressBook`. */
+export function recordPlacement(book: AddressBook, epochId: string, userId: string, circle: number) {
+  const epoch = book.myEpochs.find((e) => e.epochId === epochId);
+  if (epoch) epoch.placements = { ...epoch.placements, [userId]: circle };
 }

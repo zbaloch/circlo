@@ -7,6 +7,7 @@
 import * as Core from '@halqo/core';
 
 import { api, ok } from '@/api/client';
+import type { components } from '@/api/schema';
 
 import { loadAddressBook, updateAddressBook, type AddressBook } from './addressbook';
 import { fromB64, toB64, uuidFromRandom, uuidToBytes } from './bytes';
@@ -27,7 +28,15 @@ export type FeedPost = {
   mine: boolean;
   /** Author-only: the circle my own post went to. Never set for other people's posts. */
   circle?: number;
+  epochId: string;
+  /** Memory only: opens this post's replies. Never stored or sent anywhere. */
+  postKey: ArrayBuffer;
+  replyCount: number;
+  likeCount: number;
+  likedByMe: boolean;
 };
+
+type PostRow = components['schemas']['PostView'];
 
 function identity(a: StoredAccount): Core.IdentityKeys {
   return { x25519Sk: fromB64(a.x25519Sk), x25519Pk: fromB64(a.x25519Pk), ed25519Sk: fromB64(a.ed25519Sk), ed25519Pk: fromB64(a.ed25519Pk) };
@@ -91,8 +100,10 @@ export async function deletePost(account: StoredAccount, postId: string): Promis
   });
 }
 
+type Keyring = Core.ReaderKeyringLike | null;
+
 /** The keys I hold for an author's epoch: my own chain root, or the circle key a friend gave me. */
-function keyringFor(account: StoredAccount, book: AddressBook, authorId: string, epochId: string): Core.ReaderKeyringLike | null {
+function keyringFor(account: StoredAccount, book: AddressBook, authorId: string, epochId: string): Keyring {
   if (authorId === account.userId) {
     const mine = book.myEpochs.find((e) => e.epochId === epochId);
     return mine ? Core.ReaderKeyring.forOwner(fromB64(mine.root)) : null;
@@ -102,31 +113,24 @@ function keyringFor(account: StoredAccount, book: AddressBook, authorId: string,
 }
 
 /**
- * An author's posts that I can read, newest first. Posts for circles I'm not in (or from epochs I was never given)
- * fail to open and are silently skipped; the server can't tell which ones I could read.
+ * Opens server rows with the given keyrings. Rows for circles the keyring doesn't reach (or from epochs it doesn't
+ * cover) fail to open and are skipped; the server can't tell which ones opened.
  */
-export async function fetchAuthorPosts(account: StoredAccount, authorId: string, opts: { before?: string; limit?: number } = {}) {
-  let book = await loadAddressBook(account);
-  const mine = authorId === account.userId;
-  const authorKey = mine ? account.ed25519Pk : book.contacts[authorId]?.ed25519;
-  if (!authorKey) return { posts: [] as FeedPost[], cursor: undefined };
-  const rows = ok(await api.GET('/v1/users/{userId}/posts', { params: { path: { userId: authorId }, query: { before: opts.before, limit: opts.limit ?? 30 } } }));
-  // A post from an epoch I hold no key for: the author may have rotated (CRYPTO.md 8.4) and sent me a new payload.
-  const known = (epochId: string) => (mine ? book.myEpochs.some((e) => e.epochId === epochId) : book.contacts[authorId]?.keys.some((k) => k.epochId === epochId));
-  if (!mine && rows.some((r) => r.epochId && !known(r.epochId))) {
-    await refreshContact(account, authorId).catch(() => undefined);
-    book = await loadAddressBook(account);
-  }
-  const keyrings = new Map<string, Core.ReaderKeyringLike | null>();
+function openRows(account: StoredAccount, book: AddressBook, rows: PostRow[], keyring: (authorId: string, epochId: string) => Keyring): FeedPost[] {
+  const cache = new Map<string, Keyring>();
   const posts: FeedPost[] = [];
   for (const row of rows) {
-    if (!row.postId || !row.epochId || !row.keyRef || !row.headerCt) continue;
-    if (!keyrings.has(row.epochId)) keyrings.set(row.epochId, keyringFor(account, book, authorId, row.epochId));
-    const kr = keyrings.get(row.epochId);
+    if (!row.postId || !row.epochId || !row.keyRef || !row.headerCt || !row.authorId) continue;
+    const mine = row.authorId === account.userId;
+    const authorKey = mine ? account.ed25519Pk : book.contacts[row.authorId]?.ed25519;
+    if (!authorKey) continue;
+    const ck = `${row.authorId}/${row.epochId}`;
+    if (!cache.has(ck)) cache.set(ck, keyring(row.authorId, row.epochId));
+    const kr = cache.get(ck);
     if (!kr) continue;
     let opened: Core.OpenedPost;
     try {
-      opened = kr.openPost(fromB64(authorKey), uuidToBytes(authorId), uuidToBytes(row.postId), uuidToBytes(row.epochId), fromB64(row.keyRef), fromB64(row.headerCt));
+      opened = kr.openPost(fromB64(authorKey), uuidToBytes(row.authorId), uuidToBytes(row.postId), uuidToBytes(row.epochId), fromB64(row.keyRef), fromB64(row.headerCt));
     } catch {
       continue; // not in this post's audience (or tampered)
     }
@@ -134,23 +138,70 @@ export async function fetchAuthorPosts(account: StoredAccount, authorId: string,
     if (!media) continue; // server's media list doesn't match the signed header
     posts.push({
       postId: row.postId,
-      authorId,
+      authorId: row.authorId,
+      epochId: row.epochId,
       createdAtMs: Number(opened.content.createdAtMs),
       text: opened.content.text,
       media,
       mine,
       circle: mine ? book.postCircles?.[row.postId] : undefined,
+      postKey: opened.postKey,
+      replyCount: row.replyCount ?? 0,
+      likeCount: row.likeCount ?? 0,
+      likedByMe: !!row.likedByMe,
     });
   }
-  return { posts, cursor: rows.length ? rows[rows.length - 1].createdAt : undefined };
+  return posts;
 }
 
-/** Basic timeline: my posts and every friend's readable posts, newest first. (Phase 8 adds paging and FlashList.) */
-export async function fetchTimeline(account: StoredAccount): Promise<FeedPost[]> {
+/** Picks up keys from rotations I haven't seen yet (CRYPTO.md 8.4) for any author whose rows use an unknown epoch. */
+async function refreshUnknownEpochs(account: StoredAccount, book: AddressBook, rows: PostRow[]): Promise<AddressBook> {
+  const stale = new Set<string>();
+  for (const r of rows) {
+    if (!r.authorId || !r.epochId || r.authorId === account.userId) continue;
+    const c = book.contacts[r.authorId];
+    if (c && !c.keys.some((k) => k.epochId === r.epochId)) stale.add(r.authorId);
+  }
+  if (stale.size === 0) return book;
+  await Promise.all([...stale].map((id) => refreshContact(account, id).catch(() => undefined)));
+  return loadAddressBook(account);
+}
+
+export type Page = { posts: FeedPost[]; cursor?: string; hasMore: boolean };
+
+async function readPage(account: StoredAccount, rows: PostRow[], limit: number): Promise<Page> {
+  const book = await refreshUnknownEpochs(account, await loadAddressBook(account), rows);
+  const posts = openRows(account, book, rows, (author, epoch) => keyringFor(account, book, author, epoch));
+  return { posts, cursor: rows.length ? rows[rows.length - 1].createdAt : undefined, hasMore: rows.length === limit };
+}
+
+/** One page of the timeline (me + friends), newest first. Unreadable rows are dropped, so a page may be short. */
+export async function fetchFeedPage(account: StoredAccount, before?: string, limit = 50): Promise<Page> {
+  const rows = ok(await api.GET('/v1/feed', { params: { query: { before, limit } } }));
+  return readPage(account, rows, limit);
+}
+
+/** One page of a single author's posts that I can read. */
+export async function fetchAuthorPosts(account: StoredAccount, authorId: string, opts: { before?: string; limit?: number } = {}): Promise<Page> {
+  const limit = opts.limit ?? 30;
+  const rows = ok(await api.GET('/v1/users/{userId}/posts', { params: { path: { userId: authorId }, query: { before: opts.before, limit } } }));
+  return readPage(account, rows, limit);
+}
+
+/**
+ * "Preview as…": my posts exactly as `friendId` can open them, using the circle key they were given in each epoch
+ * (ReaderKeyring.forCircle). Epochs where they got no keys (before we were friends) open nothing, just as for them.
+ */
+export async function previewAs(account: StoredAccount, friendId: string, before?: string, limit = 50): Promise<Page> {
   const book = await loadAddressBook(account);
-  const authors = [account.userId, ...Object.keys(book.contacts)];
-  const results = await Promise.all(authors.map((id) => fetchAuthorPosts(account, id).then((r) => r.posts, () => [] as FeedPost[])));
-  return results.flat().sort((a, b) => b.createdAtMs - a.createdAtMs);
+  const current = book.myEpochs[book.myEpochs.length - 1]?.epochId;
+  const rows = ok(await api.GET('/v1/users/{userId}/posts', { params: { path: { userId: account.userId }, query: { before, limit } } }));
+  const posts = openRows(account, book, rows, (_author, epochId) => {
+    const epoch = book.myEpochs.find((e) => e.epochId === epochId);
+    const circle = epoch?.placements?.[friendId] ?? (epochId === current ? book.contacts[friendId]?.circle : undefined);
+    return epoch && circle ? Core.ReaderKeyring.forCircle(fromB64(epoch.root), circle) : null;
+  }).map((p) => ({ ...p, mine: false, circle: undefined }));
+  return { posts, cursor: rows.length ? rows[rows.length - 1].createdAt : undefined, hasMore: rows.length === limit };
 }
 
 /** Default audience for the composer: the last circle I posted to; before my first post, "Me only" (nothing is shared by accident). */

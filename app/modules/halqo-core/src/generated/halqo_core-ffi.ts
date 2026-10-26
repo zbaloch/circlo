@@ -778,6 +778,11 @@ const DEFINITIONS = {
       ret: FfiType.RustBuffer,
       hasRustCallStatus: true,
     },
+    uniffi_halqo_core_fn_constructor_readerkeyring_for_circle: {
+      args: [FfiType.RustBuffer, FfiType.UInt8],
+      ret: FfiType.Handle,
+      hasRustCallStatus: true,
+    },
     uniffi_halqo_core_fn_constructor_readerkeyring_for_owner: {
       args: [FfiType.RustBuffer],
       ret: FfiType.Handle,
@@ -1097,6 +1102,11 @@ const DEFINITIONS = {
       hasRustCallStatus: false,
     },
     uniffi_halqo_core_checksum_method_playbacksession_url: {
+      args: [],
+      ret: FfiType.UInt16,
+      hasRustCallStatus: false,
+    },
+    uniffi_halqo_core_checksum_constructor_readerkeyring_for_circle: {
       args: [],
       ret: FfiType.UInt16,
       hasRustCallStatus: false,
@@ -1674,6 +1684,11 @@ interface NativeModuleInterface {
     uniffiSelf: bigint,
     uniffi_out_err: UniffiRustCallStatus,
   ): Uint8Array;
+  uniffi_halqo_core_fn_constructor_readerkeyring_for_circle(
+    epochRoot: Uint8Array,
+    circle: number,
+    uniffi_out_err: UniffiRustCallStatus,
+  ): bigint;
   uniffi_halqo_core_fn_constructor_readerkeyring_for_owner(
     epochRoot: Uint8Array,
     uniffi_out_err: UniffiRustCallStatus,
@@ -1752,6 +1767,7 @@ interface NativeModuleInterface {
   uniffi_halqo_core_checksum_method_playbacksession_next_range(): number;
   uniffi_halqo_core_checksum_method_playbacksession_supply(): number;
   uniffi_halqo_core_checksum_method_playbacksession_url(): number;
+  uniffi_halqo_core_checksum_constructor_readerkeyring_for_circle(): number;
   uniffi_halqo_core_checksum_constructor_readerkeyring_for_owner(): number;
   uniffi_halqo_core_checksum_constructor_readerkeyring_new(): number;
   uniffi_halqo_core_checksum_method_readerkeyring_open_post(): number;

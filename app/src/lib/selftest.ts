@@ -139,3 +139,39 @@ export async function streamFile(megabytes: number): Promise<CheckResult> {
     }
   });
 }
+
+/**
+ * Phase 8 feed benchmark: 50 authors × 10 posts sealed at circles 5–12, opened with the keyring a friend in circle 7
+ * holds (exactly what the timeline does per row, including the failed trial decryptions for posts not meant for them).
+ */
+export async function feedBenchmark(authors = 50, perAuthor = 10): Promise<CheckResult> {
+  const sealed: { pk: ArrayBuffer; author: ArrayBuffer; post: ArrayBuffer; epoch: ArrayBuffer; keyRef: ArrayBuffer; headerCt: ArrayBuffer; ring: Core.ReaderKeyringLike }[] = [];
+  for (let a = 0; a < authors; a++) {
+    const id = Core.generateIdentity();
+    const authorId = Core.newSymmetricKey().slice(0, 16);
+    const epochId = Core.newSymmetricKey().slice(0, 16);
+    const root = Core.newSymmetricKey();
+    const ring = Core.ReaderKeyring.forCircle(root, 7);
+    for (let i = 0; i < perAuthor; i++) {
+      const postId = Core.newSymmetricKey().slice(0, 16);
+      const s = Core.sealPost(id, authorId, postId, epochId, root, 5 + (i % 8), { text: `post ${a}/${i} `.repeat(8), createdAtMs: BigInt(Date.now()), media: [] });
+      sealed.push({ pk: id.ed25519Pk, author: authorId, post: postId, epoch: epochId, keyRef: s.keyRef, headerCt: s.headerCt, ring });
+    }
+  }
+  return timed(`Open ${authors * perAuthor} posts from ${authors} friends`, () => {
+    const start = Date.now();
+    let opened = 0;
+    for (const s of sealed) {
+      try {
+        s.ring.openPost(s.pk, s.author, s.post, s.epoch, s.keyRef, s.headerCt);
+        opened++;
+      } catch {
+        // not for circle 7
+      }
+    }
+    const ms = Date.now() - start;
+    const expected = authors * Array.from({ length: perAuthor }, (_, i) => 5 + (i % 8)).filter((c) => c >= 7).length;
+    check(opened === expected, `opened ${opened}, expected ${expected}`);
+    return `${opened} readable, ${sealed.length - opened} skipped, ${ms} ms total (${(ms / sealed.length).toFixed(2)} ms/post)`;
+  });
+}

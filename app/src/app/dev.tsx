@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
 
 import { Screen } from '@/components/screen';
-import { runQuickChecks, streamFile, type CheckResult } from '@/lib/selftest';
+import { feedBenchmark, runQuickChecks, streamFile, type CheckResult } from '@/lib/selftest';
 
 /** Dev-only screen: runs the native crypto core on this device (Phase 2 done-criteria). */
 export default function DevScreen() {
@@ -45,6 +45,13 @@ export default function DevScreen() {
             <Text className="font-bold text-primary dark:text-primary-dark">Stream 200 MB</Text>
           </Pressable>
         </View>
+        <Pressable
+          accessibilityRole="button"
+          disabled={running}
+          onPress={() => run(async () => [await feedBenchmark()])}
+          className="items-center rounded-full border border-primary py-3 active:opacity-60 dark:border-primary-dark">
+          <Text className="font-bold text-primary dark:text-primary-dark">Feed benchmark (500 posts)</Text>
+        </Pressable>
         {running ? <ActivityIndicator /> : null}
         {results.map((r) => (
           <View key={r.name} className="rounded-xl border border-border p-3 dark:border-border-dark">

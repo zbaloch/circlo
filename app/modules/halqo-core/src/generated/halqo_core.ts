@@ -3443,6 +3443,33 @@ export class ReaderKeyring
   }
 
   /**
+   * The owner's view as a friend in `circle` sees it ("Preview as…"): the same `Cn` that friend was given.
+   */
+  static forCircle(
+    epochRoot: ArrayBuffer,
+    circle: number,
+  ): ReaderKeyringLike /*throws*/ {
+    return FfiConverterTypeReaderKeyring.lift(
+      uniffiCaller.rustCallWithError(
+        /*liftError:*/ FfiConverterTypeCoreError.lift.bind(
+          FfiConverterTypeCoreError,
+        ),
+        /*caller:*/ (callStatus) => {
+          return nativeModule().uniffi_halqo_core_fn_constructor_readerkeyring_for_circle(
+            FfiConverterArrayBuffer.lower(
+              epochRoot,
+              nativeModule().rustbuffer_alloc,
+            ),
+            FfiConverterUInt8.lower(circle, nativeModule().rustbuffer_alloc),
+            callStatus,
+          );
+        },
+        /*liftString:*/ FfiConverterString.lift.bind(FfiConverterString),
+      ),
+    );
+  }
+
+  /**
    * Owner's own keyring: from the epoch root (C1), so they can read all their own posts.
    */
   static forOwner(epochRoot: ArrayBuffer): ReaderKeyringLike /*throws*/ {
@@ -4078,6 +4105,14 @@ function uniffiEnsureInitialized() {
   ) {
     throw new UniffiInternalError.ApiChecksumMismatch(
       "uniffi_halqo_core_checksum_method_playbacksession_url",
+    );
+  }
+  if (
+    nativeModule().uniffi_halqo_core_checksum_constructor_readerkeyring_for_circle() !==
+    21975
+  ) {
+    throw new UniffiInternalError.ApiChecksumMismatch(
+      "uniffi_halqo_core_checksum_constructor_readerkeyring_for_circle",
     );
   }
   if (
