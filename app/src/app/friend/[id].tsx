@@ -25,6 +25,7 @@ export default function FriendScreen() {
   const [error, setError] = useState<string>();
 
   const reloadBook = useCallback(() => {
+    setPicking(false); // the screen stays mounted between visits: always reopen with the picker closed
     if (account) void loadAddressBook(account).then(setBook);
   }, [account]);
   useFocusEffect(reloadBook);
