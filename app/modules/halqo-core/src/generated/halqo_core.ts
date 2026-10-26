@@ -1387,6 +1387,52 @@ export function verifyRecoveryLogin(
   );
 }
 
+export type ByteRange = {
+  start: bigint;
+  /**
+   * Exclusive.
+   */
+  end: bigint;
+};
+
+/**
+ * Generated factory for {@link ByteRange} record objects.
+ */
+export const ByteRange = (() => {
+  const defaults = () => ({});
+  const create = (() => {
+    return uniffiCreateRecord<ByteRange, ReturnType<typeof defaults>>(defaults);
+  })();
+  return Object.freeze({
+    create,
+    new: create,
+    defaults: () => Object.freeze(defaults()) as Partial<ByteRange>,
+  });
+})();
+
+const FfiConverterTypeByteRange = (() => {
+  type TypeName = ByteRange;
+  class FFIConverter extends AbstractFfiConverterByteArray<TypeName> {
+    readFromCursor(c: Cursor): TypeName {
+      return {
+        start: FfiConverterUInt64.readFromCursor(c),
+        end: FfiConverterUInt64.readFromCursor(c),
+      };
+    }
+    writeIntoCursor(value: TypeName, c: Cursor): void {
+      FfiConverterUInt64.writeIntoCursor(value.start, c);
+      FfiConverterUInt64.writeIntoCursor(value.end, c);
+    }
+    allocationSize(value: TypeName): number {
+      return (
+        FfiConverterUInt64.allocationSize(value.start) +
+        FfiConverterUInt64.allocationSize(value.end)
+      );
+    }
+  }
+  return new FFIConverter();
+})();
+
 export type EpochKeys = {
   epochId: ArrayBuffer;
   root: ArrayBuffer;
@@ -3112,6 +3158,241 @@ const FfiConverterTypeOpaqueClientRegistration = new FfiConverterObject(
 );
 
 /**
+ * Plays one encrypted video through the core's loopback server (see `playback`). The app downloads the ranges from
+ * `next_range` and passes them to `supply`; the player opens `url`. Closing (or dropping) ends the session.
+ */
+export interface PlaybackSessionLike {
+  close(): void;
+  encryptedLen(): bigint;
+  nextRange(): ByteRange | undefined;
+  supply(offset: bigint, bytes: ArrayBuffer) /*throws*/ : void;
+  url(): string;
+}
+/**
+ * @deprecated Use `PlaybackSessionLike` instead.
+ */
+export type PlaybackSessionInterface = PlaybackSessionLike;
+
+/**
+ * Plays one encrypted video through the core's loopback server (see `playback`). The app downloads the ranges from
+ * `next_range` and passes them to `supply`; the player opens `url`. Closing (or dropping) ends the session.
+ */
+export class PlaybackSession
+  extends UniffiAbstractObject
+  implements PlaybackSessionLike
+{
+  readonly [uniffiTypeNameSymbol] = "PlaybackSession";
+  readonly [destructorGuardSymbol]: UniffiGcObject;
+  readonly [pointerLiteralSymbol]: UniffiHandle;
+  /**
+   * `cache_path` receives the ciphertext (never plaintext).
+   */
+  constructor(
+    cachePath: string,
+    fileKey: ArrayBuffer,
+    objectId: ArrayBuffer,
+    contentLen: bigint,
+    mime: string,
+  ) /*throws*/ {
+    super();
+    const pointer = uniffiCaller.rustCallWithError(
+      /*liftError:*/ FfiConverterTypeCoreError.lift.bind(
+        FfiConverterTypeCoreError,
+      ),
+      /*caller:*/ (callStatus) => {
+        return nativeModule().uniffi_halqo_core_fn_constructor_playbacksession_new(
+          FfiConverterString.lower(cachePath, nativeModule().rustbuffer_alloc),
+          FfiConverterArrayBuffer.lower(
+            fileKey,
+            nativeModule().rustbuffer_alloc,
+          ),
+          FfiConverterArrayBuffer.lower(
+            objectId,
+            nativeModule().rustbuffer_alloc,
+          ),
+          FfiConverterUInt64.lower(contentLen, nativeModule().rustbuffer_alloc),
+          FfiConverterString.lower(mime, nativeModule().rustbuffer_alloc),
+          callStatus,
+        );
+      },
+      /*liftString:*/ FfiConverterString.lift.bind(FfiConverterString),
+    );
+    this[pointerLiteralSymbol] = pointer;
+    this[destructorGuardSymbol] =
+      uniffiTypePlaybackSessionObjectFactory.bless(pointer);
+  }
+
+  close(): void {
+    uniffiCaller.rustCall(
+      /*caller:*/ (callStatus) => {
+        nativeModule().uniffi_halqo_core_fn_method_playbacksession_close(
+          uniffiTypePlaybackSessionObjectFactory.clonePointer(this),
+          callStatus,
+        );
+      },
+      /*liftString:*/ FfiConverterString.lift.bind(FfiConverterString),
+    );
+  }
+
+  encryptedLen(): bigint {
+    return FfiConverterUInt64.lift(
+      uniffiCaller.rustCall(
+        /*caller:*/ (callStatus) => {
+          return nativeModule().uniffi_halqo_core_fn_method_playbacksession_encrypted_len(
+            uniffiTypePlaybackSessionObjectFactory.clonePointer(this),
+            callStatus,
+          );
+        },
+        /*liftString:*/ FfiConverterString.lift.bind(FfiConverterString),
+      ),
+    );
+  }
+
+  nextRange(): ByteRange | undefined {
+    const __rb: Uint8Array = uniffiCaller.rustCall(
+      /*caller:*/ (callStatus) => {
+        return nativeModule().uniffi_halqo_core_fn_method_playbacksession_next_range(
+          uniffiTypePlaybackSessionObjectFactory.clonePointer(this),
+          callStatus,
+        );
+      },
+      /*liftString:*/ FfiConverterString.lift.bind(FfiConverterString),
+    );
+    try {
+      return FfiConverterOptionalTypeByteRange.lift(__rb);
+    } finally {
+      nativeModule().rustbuffer_free(__rb);
+    }
+  }
+
+  supply(offset: bigint, bytes: ArrayBuffer): void /*throws*/ {
+    uniffiCaller.rustCallWithError(
+      /*liftError:*/ FfiConverterTypeCoreError.lift.bind(
+        FfiConverterTypeCoreError,
+      ),
+      /*caller:*/ (callStatus) => {
+        nativeModule().uniffi_halqo_core_fn_method_playbacksession_supply(
+          uniffiTypePlaybackSessionObjectFactory.clonePointer(this),
+          FfiConverterUInt64.lower(offset, nativeModule().rustbuffer_alloc),
+          FfiConverterArrayBuffer.lower(bytes, nativeModule().rustbuffer_alloc),
+          callStatus,
+        );
+      },
+      /*liftString:*/ FfiConverterString.lift.bind(FfiConverterString),
+    );
+  }
+
+  url(): string {
+    const __rb: Uint8Array = uniffiCaller.rustCall(
+      /*caller:*/ (callStatus) => {
+        return nativeModule().uniffi_halqo_core_fn_method_playbacksession_url(
+          uniffiTypePlaybackSessionObjectFactory.clonePointer(this),
+          callStatus,
+        );
+      },
+      /*liftString:*/ FfiConverterString.lift.bind(FfiConverterString),
+    );
+    try {
+      return FfiConverterString.lift(__rb);
+    } finally {
+      nativeModule().rustbuffer_free(__rb);
+    }
+  }
+
+  uniffiDestroy(): void {
+    const ptr = (this as any)[destructorGuardSymbol];
+    if (ptr !== undefined) {
+      const pointer = uniffiTypePlaybackSessionObjectFactory.pointer(this);
+      uniffiTypePlaybackSessionObjectFactory.freePointer(pointer);
+      uniffiTypePlaybackSessionObjectFactory.unbless(ptr);
+      delete (this as any)[destructorGuardSymbol];
+    }
+  }
+
+  static instanceOf(obj_: any): obj_ is PlaybackSession {
+    return uniffiTypePlaybackSessionObjectFactory.isConcreteType(obj_);
+  }
+}
+
+const uniffiTypePlaybackSessionObjectFactory: UniffiObjectFactory<PlaybackSessionLike> =
+  (() => {
+    /// <reference lib="es2021" />
+    const registry =
+      typeof FinalizationRegistry !== "undefined"
+        ? new FinalizationRegistry<UniffiHandle>((heldValue: UniffiHandle) => {
+            uniffiTypePlaybackSessionObjectFactory.freePointer(heldValue);
+          })
+        : null;
+
+    return {
+      create(pointer: UniffiHandle): PlaybackSessionLike {
+        const instance = Object.create(PlaybackSession.prototype);
+        instance[pointerLiteralSymbol] = pointer;
+        instance[destructorGuardSymbol] = this.bless(pointer);
+        instance[uniffiTypeNameSymbol] = "PlaybackSession";
+        return instance;
+      },
+
+      bless(p: UniffiHandle): UniffiGcObject {
+        const ptr = {
+          p, // make sure this object doesn't get optimized away.
+          markDestroyed: () => undefined,
+        };
+        if (registry) {
+          registry.register(ptr, p, ptr);
+        }
+        return ptr;
+      },
+
+      unbless(ptr_: UniffiGcObject) {
+        if (registry) {
+          registry.unregister(ptr_);
+        }
+      },
+
+      pointer(obj_: PlaybackSessionLike): UniffiHandle {
+        if ((obj_ as any)[destructorGuardSymbol] === undefined) {
+          throw new UniffiInternalError.UnexpectedNullPointer();
+        }
+        return (obj_ as any)[pointerLiteralSymbol];
+      },
+
+      clonePointer(obj_: PlaybackSessionLike): UniffiHandle {
+        const pointer = this.pointer(obj_);
+        return uniffiCaller.rustCall(
+          /*caller:*/ (callStatus) =>
+            nativeModule().uniffi_halqo_core_fn_clone_playbacksession(
+              pointer,
+              callStatus,
+            ),
+          /*liftString:*/ FfiConverterString.lift,
+        );
+      },
+
+      freePointer(pointer: UniffiHandle): void {
+        uniffiCaller.rustCall(
+          /*caller:*/ (callStatus) =>
+            nativeModule().uniffi_halqo_core_fn_free_playbacksession(
+              pointer,
+              callStatus,
+            ),
+          /*liftString:*/ FfiConverterString.lift,
+        );
+      },
+
+      isConcreteType(obj_: any): obj_ is PlaybackSessionLike {
+        return (
+          obj_[destructorGuardSymbol] &&
+          obj_[uniffiTypeNameSymbol] === "PlaybackSession"
+        );
+      },
+    };
+  })();
+const FfiConverterTypePlaybackSession = new FfiConverterObject(
+  uniffiTypePlaybackSessionObjectFactory,
+);
+
+/**
  * Holds the forward keys a reader derives from one author-epoch `Ck`; build once, open many posts.
  */
 export interface ReaderKeyringLike {
@@ -3336,6 +3617,11 @@ const FfiConverterSequenceTypeEpochKeys = new FfiConverterArray(
 // FfiConverter for Array<MediaItem>
 const FfiConverterSequenceTypeMediaItem = new FfiConverterArray(
   FfiConverterTypeMediaItem,
+);
+
+// FfiConverter for ByteRange | undefined
+const FfiConverterOptionalTypeByteRange = new FfiConverterOptional(
+  FfiConverterTypeByteRange,
 );
 
 // FfiConverter for ArrayBuffer | undefined
@@ -3747,6 +4033,54 @@ function uniffiEnsureInitialized() {
     );
   }
   if (
+    nativeModule().uniffi_halqo_core_checksum_constructor_playbacksession_new() !==
+    8185
+  ) {
+    throw new UniffiInternalError.ApiChecksumMismatch(
+      "uniffi_halqo_core_checksum_constructor_playbacksession_new",
+    );
+  }
+  if (
+    nativeModule().uniffi_halqo_core_checksum_method_playbacksession_close() !==
+    42067
+  ) {
+    throw new UniffiInternalError.ApiChecksumMismatch(
+      "uniffi_halqo_core_checksum_method_playbacksession_close",
+    );
+  }
+  if (
+    nativeModule().uniffi_halqo_core_checksum_method_playbacksession_encrypted_len() !==
+    36203
+  ) {
+    throw new UniffiInternalError.ApiChecksumMismatch(
+      "uniffi_halqo_core_checksum_method_playbacksession_encrypted_len",
+    );
+  }
+  if (
+    nativeModule().uniffi_halqo_core_checksum_method_playbacksession_next_range() !==
+    15484
+  ) {
+    throw new UniffiInternalError.ApiChecksumMismatch(
+      "uniffi_halqo_core_checksum_method_playbacksession_next_range",
+    );
+  }
+  if (
+    nativeModule().uniffi_halqo_core_checksum_method_playbacksession_supply() !==
+    5806
+  ) {
+    throw new UniffiInternalError.ApiChecksumMismatch(
+      "uniffi_halqo_core_checksum_method_playbacksession_supply",
+    );
+  }
+  if (
+    nativeModule().uniffi_halqo_core_checksum_method_playbacksession_url() !==
+    50499
+  ) {
+    throw new UniffiInternalError.ApiChecksumMismatch(
+      "uniffi_halqo_core_checksum_method_playbacksession_url",
+    );
+  }
+  if (
     nativeModule().uniffi_halqo_core_checksum_constructor_readerkeyring_for_owner() !==
     12184
   ) {
@@ -3776,6 +4110,7 @@ export default Object.freeze({
   initialize: uniffiEnsureInitialized,
   converters: {
     FfiConverterTypeBlobKind,
+    FfiConverterTypeByteRange,
     FfiConverterTypeCoreError,
     FfiConverterTypeEpochKeys,
     FfiConverterTypeIdentityKeys,
@@ -3788,6 +4123,7 @@ export default Object.freeze({
     FfiConverterTypeOpaqueClientResult,
     FfiConverterTypeOpaqueServerLoginStart,
     FfiConverterTypeOpenedPost,
+    FfiConverterTypePlaybackSession,
     FfiConverterTypePostContent,
     FfiConverterTypeReaderKeyring,
     FfiConverterTypeReceivedFriendKey,

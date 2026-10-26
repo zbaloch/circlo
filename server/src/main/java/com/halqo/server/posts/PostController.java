@@ -118,8 +118,8 @@ public class PostController {
                 throw ApiException.badRequest("duplicate_media");
             }
             List<Long> declared = jdbc.query(
-                    "SELECT ct_size FROM media_uploads WHERE object_key = ? AND owner_id = ? AND post_id IS NULL FOR UPDATE",
-                    (rs, i) -> rs.getLong(1), m.objectKey(), me);
+                    "SELECT ct_size FROM media_uploads WHERE object_key = ? AND owner_id = ? AND post_id IS NULL AND created_at > ? FOR UPDATE",
+                    (rs, i) -> rs.getLong(1), m.objectKey(), me, Timestamp.from(Instant.now().minus(MediaSweeper.ATTACH_WINDOW)));
             if (declared.isEmpty()) {
                 throw ApiException.badRequest("unknown_media");
             }
@@ -198,13 +198,16 @@ public class PostController {
 
     // ---------- delete ----------
 
+    /** Deletes my post. Its media objects are handed to {@link MediaSweeper}, which removes them from the bucket. */
     @org.springframework.web.bind.annotation.DeleteMapping("/v1/posts/{postId}")
     @Transactional
     public Map<String, String> delete(@AuthenticationPrincipal Jwt jwt, @PathVariable("postId") UUID postId) {
-        int n = jdbc.update("DELETE FROM posts WHERE id = ? AND author_id = ?", Ids.bytes(postId), me(jwt));
+        byte[] id = Ids.bytes(postId);
+        int n = jdbc.update("DELETE FROM posts WHERE id = ? AND author_id = ?", id, me(jwt));
         if (n != 1) {
             throw ApiException.notFound();
         }
+        jdbc.update("UPDATE media_uploads SET post_id = NULL, created_at = ? WHERE post_id = ?", Timestamp.from(Instant.EPOCH), id);
         return Map.of("status", "deleted");
     }
 }

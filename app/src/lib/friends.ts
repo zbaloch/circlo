@@ -234,7 +234,7 @@ export async function syncConnections(account: StoredAccount): Promise<Connectio
 }
 
 /** Re-checks a connection's identity against the pin and stores any keys they've sent me. */
-async function refreshContact(account: StoredAccount, userId: string): Promise<Contact | undefined> {
+export async function refreshContact(account: StoredAccount, userId: string): Promise<Contact | undefined> {
   const id = ok(await api.GET('/v1/users/{userId}/identity', { params: { path: { userId } } })) as Identity;
   verifyIdentitySignature(userId, id);
   const payloads = ok(await api.GET('/v1/friend-payloads', { params: { query: { from: userId } } }));

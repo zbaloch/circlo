@@ -48,6 +48,8 @@ circle numbers, circle labels, group names.
 | Audience hiding over time | Per-post `key_ref`; every circle change rotates the epoch for all friends |
 | Messaging FS / PCS | MLS (RFC 9420) |
 | Key-substitution detection | Safety numbers; pinned identity keys with change warnings |
+| No location/device leaks in media (to friends) | Photos re-encoded and EXIF/XMP/IPTC/comment segments removed; video `udta`/`meta` boxes zero-filled; checked before encryption |
+| Media bound to its post | Each object has its own random file key; AAD binds the random object id; the signed header lists ids, kinds and lengths |
 
 ## Known and accepted leaks
 
@@ -68,6 +70,11 @@ circle numbers, circle labels, group names.
 10. **Live server compromise:** an attacker running the server sees plaintext handles at login/lookup time and the
     request metadata above; still no content or keys.
 11. **Push delivery:** APNs/FCM see that a device got "new activity" pings; pushes carry no content.
+12. **Media shape:** the server sees how many objects a post has, their kinds (full/thumb/poster) and padded sizes, so
+    it can tell a photo post from a video post and roughly how long a video is.
+13. **Video encoder tags:** stripping removes container metadata (location, device, dates in `udta`/`meta`), but the
+    video stream itself is not re-encoded, so encoder settings embedded in the bitstream (e.g. the encoder name)
+    remain visible to friends who play it. They contain no location.
 
 ## Out of scope (for now)
 
@@ -82,6 +89,10 @@ circle numbers, circle labels, group names.
 - No logging of request bodies, IPs or decrypted data; no access log.
 - Buckets are private; presigned URLs only (PUT 15 min, GET 5 min). Object keys are random.
 - Leaked-DB drill in Phase 12: dump MySQL and S3, confirm nothing readable.
+- Video playback goes through the core's loopback HTTP server (`core/src/playback.rs`): bound to 127.0.0.1 only, one
+  unguessable 256-bit token per video, plaintext only in memory one 64 KiB chunk at a time; the ciphertext cache file
+  is never decrypted to disk. Another app on the same device would need the token to read a stream.
+- Decrypted photos are cached in the app's private cache directory and deleted at sign-out.
 - External cryptography audit before any public launch.
 
 ## Comparison with Threema (owner's benchmark)

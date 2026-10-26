@@ -3,6 +3,7 @@ package com.halqo.server;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.halqo.server.crypto.HalqoCore;
+import com.halqo.server.posts.MediaSweeper;
 import com.halqo.server.storage.S3Properties;
 import com.halqo.server.web.Ids;
 import java.net.URI;
@@ -27,6 +28,16 @@ class PostsFlowIT extends IntegrationTest {
 
     @Autowired
     private S3Properties s3Props;
+
+    @Autowired
+    private MediaSweeper sweeper;
+
+    @Autowired
+    private org.springframework.jdbc.core.JdbcTemplate jdbc;
+
+    private boolean exists(String key) {
+        return s3.listObjectsV2(b -> b.bucket(s3Props.bucket()).prefix(key)).keyCount() > 0;
+    }
 
     private final HttpClient httpClient = HttpClient.newHttpClient();
 
@@ -119,6 +130,37 @@ class PostsFlowIT extends IntegrationTest {
         // Authors delete their own posts only.
         assertThat(call("DELETE", "/v1/posts/" + post.get("postId"), null, bob.accessToken).getStatusCode().value()).isEqualTo(404);
         assertThat(call("DELETE", "/v1/posts/" + post.get("postId"), null, alice.accessToken).getStatusCode().value()).isEqualTo(200);
+
+        // A deleted post's ciphertext leaves the bucket on the next sweep, and its download URLs stop working.
+        assertThat(exists(fullKey)).isTrue();
+        sweeper.sweep();
+        assertThat(exists(fullKey)).isFalse();
+        assertThat(exists(thumbKey)).isFalse();
+        assertThat(call("POST", "/v1/media/download-urls", Map.of("objectKeys", List.of(fullKey)), bob.accessToken).getStatusCode().value())
+                .isEqualTo(404);
+    }
+
+    @Test
+    void abandonedUploadsAreSweptAndCanNoLongerBeAttached() throws Exception {
+        TestApp a = new TestApp(this, "post_dora", "pw").register();
+        UUID e = epoch(a);
+        byte[] body = Ids.random(1000);
+        var s = slots(a, body.length, body.length);
+        String fresh = (String) s.get(0).get("objectKey");
+        String stale = (String) s.get(1).get("objectKey");
+        assertThat(put((String) s.get(0).get("putUrl"), body)).isEqualTo(200);
+        assertThat(put((String) s.get(1).get("putUrl"), body)).isEqualTo(200);
+        jdbc.update("UPDATE media_uploads SET created_at = ? WHERE object_key = ?",
+                java.sql.Timestamp.from(java.time.Instant.now().minus(java.time.Duration.ofHours(25))), stale);
+
+        // Too old to attach (the sweeper may be about to delete it).
+        assertThat(call("POST", "/v1/posts", newPost(e, List.of(Map.of("objectKey", stale, "kind", "full"))), a.accessToken).getBody())
+                .isEqualTo(Map.of("error", "unknown_media"));
+        sweeper.sweep();
+        assertThat(exists(stale)).isFalse();
+        assertThat(exists(fresh)).isTrue(); // still inside its window
+        assertThat(call("POST", "/v1/posts", newPost(e, List.of(Map.of("objectKey", fresh, "kind", "full"))), a.accessToken)
+                .getStatusCode().value()).isEqualTo(201);
     }
 
     @Test

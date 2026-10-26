@@ -17,7 +17,8 @@ const config: ExpoConfig = {
     bundleIdentifier: 'com.halqo.app',
     supportsTablet: false,
     config: { usesNonExemptEncryption: false },
-    infoPlist: isDev ? { NSAppTransportSecurity: { NSAllowsLocalNetworking: true } } : {},
+    // Loopback is needed in every build: encrypted video plays through the core's 127.0.0.1 server.
+    infoPlist: { NSAppTransportSecurity: { NSAllowsLocalNetworking: true } },
   },
   android: {
     package: 'com.halqo.app',
@@ -33,8 +34,17 @@ const config: ExpoConfig = {
     './plugins/with-android-cmake',
     // Keys live in the Android Keystore / iOS Keychain; excluded from Android Auto Backup.
     ['expo-secure-store', { configureAndroidBackup: true }],
-    ['expo-build-properties', { android: { usesCleartextTraffic: isDev } }],
-    ['expo-camera', { cameraPermission: 'Halqo uses the camera only to scan friend invites and safety-number QR codes.', microphonePermission: false, recordAudioAndroid: false }],
+    ['./plugins/with-network-security', { allowAllCleartext: isDev }],
+    ['expo-camera', { cameraPermission: 'Halqo uses the camera to scan friend invites and safety numbers, and to take photos you share.', microphonePermission: false, recordAudioAndroid: false }],
+    [
+      'expo-image-picker',
+      {
+        photosPermission: 'Halqo lets you pick photos and videos to share. They are encrypted on your phone before upload.',
+        cameraPermission: 'Halqo uses the camera to scan friend invites and safety numbers, and to take photos you share.',
+        microphonePermission: false,
+      },
+    ],
+    ['expo-video', { supportsPictureInPicture: false, supportsBackgroundPlayback: false }],
     [
       'expo-splash-screen',
       {

@@ -3,11 +3,12 @@ package com.halqo.server.storage;
 import java.util.OptionalLong;
 import org.springframework.stereotype.Component;
 import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
 import software.amazon.awssdk.services.s3.model.HeadObjectRequest;
 import software.amazon.awssdk.services.s3.model.NoSuchKeyException;
 import software.amazon.awssdk.services.s3.model.S3Exception;
 
-/** Object metadata checks. The server never downloads or inspects media bodies (they're ciphertext anyway). */
+/** Object metadata checks and deletion. The server never downloads or inspects media bodies (they're ciphertext anyway). */
 @Component
 public class MediaStore {
 
@@ -32,5 +33,10 @@ public class MediaStore {
             }
             throw e;
         }
+    }
+
+    /** Deletes an object; deleting a missing object succeeds. */
+    public void delete(String objectKey) {
+        s3.deleteObject(DeleteObjectRequest.builder().bucket(props.bucket()).key(objectKey).build());
     }
 }

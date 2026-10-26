@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Halqo API
-  version: 0.6.0
+  version: 0.7.0
   description: >
     halqo-server API. The server stores and relays ciphertext only. Request and response bodies never contain
     plaintext content, names, emails, circle numbers or private keys. Byte fields are standard base64 strings;
@@ -498,6 +498,108 @@ paths:
         "200": { content: { application/json: { schema: { $ref: "#/components/schemas/Blob" } } } }
         "404": { $ref: "#/components/responses/Error" }
 
+  /v1/media/uploads:
+    post:
+      summary: Upload slots - random object keys with PUT URLs locked to each declared padded ciphertext size (15 min)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [sizes]
+              properties:
+                sizes: { type: array, maxItems: 12, items: { type: integer, format: int64, minimum: 1 } }
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    objectKey: { type: string }
+                    putUrl: { type: string }
+                    ctSize: { type: integer, format: int64 }
+
+  /v1/media/download-urls:
+    post:
+      summary: 5-minute GET URLs for media attached to posts I may read
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [objectKeys]
+              properties:
+                objectKeys: { type: array, maxItems: 50, items: { type: string } }
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    objectKey: { type: string }
+                    getUrl: { type: string }
+        "404": { $ref: "#/components/responses/Error" }
+
+  /v1/posts:
+    post:
+      summary: Create a post (encrypted header + key ref + uploaded media objects)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [postId, epochId, keyRef, headerCt, media]
+              properties:
+                postId: { $ref: "#/components/schemas/Id" }
+                epochId: { $ref: "#/components/schemas/Id" }
+                keyRef: { $ref: "#/components/schemas/Bytes" }
+                headerCt: { $ref: "#/components/schemas/Bytes" }
+                media:
+                  type: array
+                  items:
+                    type: object
+                    required: [objectKey, kind]
+                    properties:
+                      objectKey: { type: string }
+                      kind: { type: string, enum: [full, thumb, poster] }
+      responses:
+        "201": { content: { application/json: { schema: { type: object } } } }
+        "400": { $ref: "#/components/responses/Error" }
+
+  /v1/posts/{postId}:
+    parameters:
+      - { name: postId, in: path, required: true, schema: { $ref: "#/components/schemas/Id" } }
+    delete:
+      summary: Delete my post
+      responses:
+        "200": { content: { application/json: { schema: { type: object } } } }
+
+  /v1/users/{userId}/posts:
+    parameters:
+      - { name: userId, in: path, required: true, schema: { $ref: "#/components/schemas/Id" } }
+    get:
+      summary: An author's posts, newest first (author and accepted friends only)
+      parameters:
+        - { name: before, in: query, required: false, schema: { type: string, format: date-time } }
+        - { name: limit, in: query, required: false, schema: { type: integer, maximum: 100 } }
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/PostView" }
+        "404": { $ref: "#/components/responses/Error" }
+
 components:
   securitySchemes:
     bearer:
@@ -507,6 +609,23 @@ components:
       description: HS256, iss halqo-server, aud halqo-app, scope full|recovery, 15 minutes
 
   schemas:
+    PostView:
+      type: object
+      properties:
+        postId: { $ref: "#/components/schemas/Id" }
+        authorId: { $ref: "#/components/schemas/Id" }
+        epochId: { $ref: "#/components/schemas/Id" }
+        keyRef: { $ref: "#/components/schemas/Bytes" }
+        headerCt: { $ref: "#/components/schemas/Bytes" }
+        createdAt: { type: string, format: date-time }
+        media:
+          type: array
+          items:
+            type: object
+            properties:
+              objectKey: { type: string }
+              kind: { type: string, enum: [full, thumb, poster] }
+              ctSize: { type: integer, format: int64 }
     Discoverable:
       type: object
       required: [discoverable]

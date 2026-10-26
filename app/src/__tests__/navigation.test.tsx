@@ -1,5 +1,5 @@
 import { render, screen } from '@testing-library/react-native';
-
+import { useEffect as mockUseEffect } from 'react';
 
 import { TABS } from '@/app/(tabs)/_layout';
 import HomeScreen from '@/app/(tabs)/index';
@@ -7,7 +7,18 @@ import MessagesScreen from '@/app/(tabs)/messages';
 import { DRAWER_ITEMS } from '@/components/app-drawer';
 
 // Jest hoists this above the imports; Home reads the session.
-jest.mock('@/lib/session', () => ({ useSession: () => ({ status: 'signedOut' }) }));
+const mockSession = { status: 'signedIn', account: { userId: 'u', handle: 'me' } };
+jest.mock('@/lib/session', () => ({ useSession: () => mockSession }));
+jest.mock('expo-router', () => ({
+  router: { push: jest.fn() },
+  useFocusEffect: (cb: () => void) => mockUseEffect(cb, [cb]),
+}));
+jest.mock('@/lib/addressbook', () => ({ loadAddressBook: async () => ({ v: 1, myEpochs: [], contacts: {} }) }));
+jest.mock('@/lib/circles', () => ({ resumePendingRotation: async () => false, labelOf: () => '' }));
+// Post cards use Reanimated and the media pipeline uses native modules; neither loads under jest-expo.
+jest.mock('@/components/post-card', () => ({ PostCard: () => null, OutboxCard: () => null }));
+jest.mock('@/lib/posts', () => ({ fetchTimeline: async () => [] }));
+jest.mock('@/lib/outbox', () => ({ useOutbox: () => [] }));
 
 // The full drawer + tabs navigator needs Reanimated's native runtime, which doesn't load under jest-expo;
 // it is checked on the emulator (docs/PROGRESS.md "Needs manual check").
@@ -26,7 +37,7 @@ describe('app shell', () => {
 
   it('Home shows the empty state and a labelled compose button', async () => {
     await render(<HomeScreen />);
-    expect(screen.getByText('Your timeline is quiet')).toBeTruthy();
+    expect(await screen.findByText('Your timeline is quiet')).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Invite your first friend' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Compose post' })).toBeTruthy();
   });

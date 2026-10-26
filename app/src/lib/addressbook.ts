@@ -37,6 +37,10 @@ export type AddressBook = {
   labels?: Record<string, string>;
   /** A rotation that started but hasn't finished re-wrapping for everyone; resumed automatically. */
   pendingRotation?: { epochId: string; startedAt: string };
+  /** Author-only: which circle each of my posts went to (the post header deliberately doesn't say). */
+  postCircles?: Record<string, number>;
+  /** The composer's remembered audience. */
+  lastCircle?: number;
 };
 
 /** New friends start in the widest circle until the author places them (Phase 6). */
