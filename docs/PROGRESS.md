@@ -10,7 +10,7 @@ Memory file for Claude Code sessions. Read this first when resuming. Keep it acc
 | 1 Rust crypto core | Done (merged PR #3) |
 | 2 RN binding + app shell | Done on Android (merged PR #4); iPhone EAS build pending owner's Expo/Apple accounts |
 | 3 Server foundations | Done (merged PR #5) |
-| 4 App onboarding | **In progress** on `phase-4-onboarding` |
+| 4 App onboarding | **Done on Android** on `phase-4-onboarding`; PR pending CI |
 | 5–12 | Not started |
 
 ## Environment (as of 2026-10-25)
@@ -89,6 +89,21 @@ Memory file for Claude Code sessions. Read this first when resuming. Keep it acc
 - [x] 26 server tests pass locally against halqo_test + halqo-media-test; local server smoke-tested against `halqo`
 - [x] CI green, merged (PR #5; CI caught Flyway logging the JDBC URL — silenced)
 
+## Phase 4 (app onboarding) — summary
+
+- [x] Signup: handle + password → OPAQUE → keys + 24-word phrase → confirm 3 words → keys and both encrypted backups uploaded
+- [x] Login on a new device: OPAQUE → download + decrypt password backup on the device → rebuild identity locally
+      (`identity_from_secrets`) and **refuse if it doesn't match the published keys** → register this device
+- [x] Recovery: 24 words → signed challenge → decrypt recovery backup → new password (other sessions revoked)
+- [x] Keys in Android Keystore / iOS Keychain via expo-secure-store (`com.halqo.app.keys`, this device only, excluded from backups)
+- [x] Navigation resets on sign-in/out (finished onboarding screens incl. the phrase can't be revisited)
+- [x] Screenshots/recordings blocked on the three recovery-word screens (expo-screen-capture; verified: capture is all black)
+- [x] Abandoned signup no longer blocks the handle (found by the owner); 30 minutes to finish
+- [x] **Emulator check: signup as demo_alice, log out, log in again → identical identity fingerprint
+      (18ba 3d73 6df8 d6d9 2bdf 00b5 d4e5 9801); Devices lists both devices**
+- [x] app typecheck/lint/15 tests; server 27 tests
+- [ ] iPhone check (needs EAS/Apple accounts), CI green, merge
+
 ## Decisions log
 
 | Date | Decision | Why |
@@ -125,6 +140,10 @@ Memory file for Claude Code sessions. Read this first when resuming. Keep it acc
 | 2026-10-26 | Server-assigned user id at register/start (pending row, 10 min) | Identity signature and backup AAD bind the user id before registration finishes |
 | 2026-10-26 | Unknown handles: fake OPAQUE response (opaque-ke) and stable fake user id for recovery | No account enumeration |
 | 2026-10-26 | Local-dev server secrets generated into git-ignored server/.env by GenerateSecrets | Needed to run the server locally; production uses the secret store |
+| 2026-10-26 | API client generated from docs/api/openapi.yaml with openapi-typescript (run via pinned npx; peer-dep on TS 5) + openapi-fetch | One contract for server and app |
+| 2026-10-26 | Access tokens in memory only; refresh token + keys in SecureStore (WHEN_UNLOCKED_THIS_DEVICE_ONLY) | Keys never migrate via OS backups; new devices log in or link |
+| 2026-10-26 | Unfinished signups are replaced by a new register/start (only active accounts block a handle) | Owner hit a dead end after abandoning signup; a pending row holds no keys |
+| 2026-10-26 | Dev builds allow cleartext HTTP (APP_VARIANT != production); release builds HTTPS only | Local server on the LAN/emulator |
 | 2026-10-25 | Only `secret-scan / gitleaks` should be a required check | Path-filtered CI workflows don't run on every PR |
 
 ## Waiting on owner
@@ -137,6 +156,9 @@ Memory file for Claude Code sessions. Read this first when resuming. Keep it acc
 4. Phone checks below.
 
 ## Needs manual check
+
+- (Phase 4) On a physical phone: sign up, write down the phrase, confirm; log out; log in → Profile fingerprint matches;
+  Devices shows 2. Try "Forgot password?" with the 24 words → set a new password → old password no longer works.
 
 - (Phase 2) On a physical Android phone and an iPhone dev build: open drawer → "Crypto self-test" → Run checks (all PASS)
   and "Stream 200 MB" (PASS, app stays responsive). Also toggle system dark mode and confirm colours switch.

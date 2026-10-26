@@ -1,5 +1,7 @@
 import { useState } from 'react';
 
+import { usePreventScreenCapture } from 'expo-screen-capture';
+
 import { AuthScreen } from '@/components/auth-screen';
 import { Button, ErrorText, TextField, Title } from '@/components/form';
 import { describeError, MIN_PASSWORD, recover } from '@/lib/account';
@@ -7,6 +9,8 @@ import { useSession } from '@/lib/session';
 
 /** Recover with the 24-word phrase and choose a new password. */
 export default function RecoverScreen() {
+  // Recovery words must never end up in screenshots, recordings or the recent-apps preview.
+  usePreventScreenCapture('recover');
   const { signIn } = useSession();
   const [handle, setHandle] = useState('');
   const [phrase, setPhrase] = useState('');

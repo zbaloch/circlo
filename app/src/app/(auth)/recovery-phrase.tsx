@@ -1,12 +1,16 @@
 import { Redirect, router } from 'expo-router';
 import { Text, View } from 'react-native';
 
+import { usePreventScreenCapture } from 'expo-screen-capture';
+
 import { AuthScreen } from '@/components/auth-screen';
 import { Button, Title } from '@/components/form';
 import { pendingSignup } from '@/lib/signup-store';
 
 /** Shows the 24-word recovery phrase once. It is the only way back in if the password is forgotten. */
 export default function RecoveryPhraseScreen() {
+  // Recovery words must never end up in screenshots, recordings or the recent-apps preview.
+  usePreventScreenCapture('recovery-phrase');
   const signup = pendingSignup();
   if (!signup) return <Redirect href="/signup" />;
 

@@ -1,6 +1,8 @@
 import { Redirect, router } from 'expo-router';
 import { useMemo, useState } from 'react';
 
+import { usePreventScreenCapture } from 'expo-screen-capture';
+
 import { AuthScreen } from '@/components/auth-screen';
 import { Button, ErrorText, TextField, Title } from '@/components/form';
 import { describeError, pickConfirmPositions, wordsMatch } from '@/lib/account';
@@ -9,6 +11,8 @@ import { pendingSignup, setPendingSignup } from '@/lib/signup-store';
 
 /** Confirms three words of the phrase, then finishes signup (uploads keys and encrypted backups). */
 export default function ConfirmPhraseScreen() {
+  // Recovery words must never end up in screenshots, recordings or the recent-apps preview.
+  usePreventScreenCapture('confirm-phrase');
   const signup = pendingSignup();
   const { signIn } = useSession();
   const positions = useMemo(() => pickConfirmPositions(), []);
