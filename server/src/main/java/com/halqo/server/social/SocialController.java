@@ -281,18 +281,53 @@ public class SocialController {
     public record SendPayload(@NotNull UUID toUserId, @NotNull UUID epochId,
             @NotNull @Size(min = PAYLOAD_LEN, max = PAYLOAD_LEN) byte[] ciphertext) {}
 
-    /** Re-wraps for an accepted friend (epoch rotations, Phase 6). */
+    /**
+     * Re-wraps after an epoch rotation (Phase 6): allowed for accepted friends and for my own pending requests (so a
+     * request accepted after a rotation still carries the current epoch's key).
+     */
     @PutMapping("/v1/friend-payloads")
     @Transactional
     public Map<String, String> sendPayload(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody SendPayload p) {
         byte[] me = me(jwt);
+        rewrap(me, p);
+        return Map.of("status", "ok");
+    }
+
+    private void rewrap(byte[] me, SendPayload p) {
         byte[] to = Ids.bytes(p.toUserId());
-        if (!"accepted".equals(relation(me, to))) {
+        String rel = relation(me, to);
+        if (!"accepted".equals(rel) && !"outgoing".equals(rel)) {
             throw ApiException.forbidden();
         }
         requireMyEpoch(me, p.epochId());
         upsertPayload(me, to, p.epochId(), p.ciphertext());
-        return Map.of("status", "ok");
+    }
+
+    public record PayloadBatch(@NotNull @Size(min = 1, max = 500) List<@Valid SendPayload> payloads) {}
+
+    /** All-or-nothing re-wrap for many friends at once (an epoch rotation re-wraps for everyone). */
+    @PutMapping("/v1/friend-payloads/batch")
+    @Transactional
+    public Map<String, Object> sendPayloads(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody PayloadBatch batch) {
+        byte[] me = me(jwt);
+        batch.payloads().forEach(p -> rewrap(me, p));
+        return Map.of("status", "ok", "count", batch.payloads().size());
+    }
+
+    /** Removes the friendship (either direction) and every payload between us. The client then rotates its epoch. */
+    @org.springframework.web.bind.annotation.DeleteMapping("/v1/friends/{userId}")
+    @Transactional
+    public Map<String, String> unfriend(@AuthenticationPrincipal Jwt jwt, @PathVariable("userId") UUID userId) {
+        byte[] me = me(jwt);
+        byte[] other = Ids.bytes(userId);
+        String rel = relation(me, other);
+        if (rel == null || rel.equals("blocked")) {
+            throw ApiException.notFound();
+        }
+        jdbc.update("DELETE FROM friendships WHERE (user_a = ? AND user_b = ?) OR (user_a = ? AND user_b = ?)", me, other, other, me);
+        jdbc.update("DELETE FROM friend_payloads WHERE (from_user = ? AND to_user = ?) OR (from_user = ? AND to_user = ?)",
+                me, other, other, me);
+        return Map.of("status", "removed");
     }
 
     public record Payload(UUID fromUserId, UUID epochId, byte[] ciphertext, Instant createdAt) {}
