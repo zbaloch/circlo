@@ -18,7 +18,7 @@ Memory file for Claude Code sessions. Read this first when resuming. Keep it acc
 | 9 Messaging (MLS) | Done on Android (merged PR #11; attachments finished in Phase 10) |
 | 10 Multi-device and push | Done on Android (merged PR #12) |
 | 11 Safety, abuse, legal | Done on Android (merged PR #13) |
-| 12 Hardening | Done (PR pending); external crypto audit still required before launch |
+| 12 Hardening | Done (merged PR #14); external crypto audit still required before launch |
 
 ## Final summary (all phases, 2026-10-27)
 
