@@ -9,6 +9,7 @@ import { ProfileFeed } from '@/components/profile-feed';
 import { describeError } from '@/lib/account';
 import { loadAddressBook, type AddressBook } from '@/lib/addressbook';
 import { labelOf, listedCircles, placeFriend, unfriend } from '@/lib/circles';
+import { blockUser } from '@/lib/safety';
 import { displayName, useConnections } from '@/lib/use-connections';
 import { usePalette } from '@/theme/use-palette';
 
@@ -135,6 +136,29 @@ export default function FriendScreen() {
             </Pressable>
           </View>
         ) : null}
+        <View className="flex-row justify-center gap-8">
+          <Pressable
+            accessibilityRole="button"
+            disabled={busy}
+            onPress={() =>
+              Alert.alert(`Block ${displayName(c)}?`, 'You’ll stop being friends and they can’t send you requests or see anything new you post. They aren’t told.', [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                  text: 'Block',
+                  style: 'destructive',
+                  onPress: () =>
+                    run(async () => {
+                      await blockUser(account, c.userId);
+                      await refresh();
+                      router.back();
+                    }),
+                },
+              ])
+            }
+            className="py-2 active:opacity-60">
+            <Text className="font-semibold text-danger dark:text-danger-dark">Block</Text>
+          </Pressable>
+        </View>
       <ErrorText>{error}</ErrorText>
     </View>
   );

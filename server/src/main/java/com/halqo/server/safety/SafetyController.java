@@ -6,7 +6,6 @@ import com.halqo.server.crypto.HalqoCore;
 import com.halqo.server.storage.MediaStore;
 import com.halqo.server.web.ApiException;
 import com.halqo.server.web.Ids;
-import com.halqo.server.web.RateLimiter;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
@@ -16,7 +15,6 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -30,7 +28,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
-/** Phase 11: blocking, sealed reports, and account deletion (everything the user left behind is removed). */
+/** Phase 11: blocking and account deletion (everything the user left behind is removed). */
 @RestController
 public class SafetyController {
 
@@ -38,17 +36,12 @@ public class SafetyController {
     private final HalqoCore core;
     private final ServerSecrets secrets;
     private final MediaStore store;
-    private final RateLimiter limiter;
-    private final String moderationPublicKey;
 
-    public SafetyController(JdbcTemplate jdbc, HalqoCore core, ServerSecrets secrets, MediaStore store, RateLimiter limiter,
-            @Value("${halqo.moderation.public-key:}") String moderationPublicKey) {
+    public SafetyController(JdbcTemplate jdbc, HalqoCore core, ServerSecrets secrets, MediaStore store) {
         this.jdbc = jdbc;
         this.core = core;
         this.secrets = secrets;
         this.store = store;
-        this.limiter = limiter;
-        this.moderationPublicKey = moderationPublicKey;
     }
 
     private static byte[] me(Jwt jwt) {
@@ -90,29 +83,6 @@ public class SafetyController {
     public List<BlockView> blocks(@AuthenticationPrincipal Jwt jwt) {
         return jdbc.query("SELECT blocked_id, created_at FROM user_blocks WHERE blocker_id = ? ORDER BY created_at DESC",
                 (rs, i) -> new BlockView(Ids.uuid(rs.getBytes(1)), rs.getTimestamp(2).toInstant()), (Object) me(jwt));
-    }
-
-    // ---------- reports ----------
-
-    public record NewReport(@NotNull @Size(min = 64, max = 4 << 20) byte[] sealed) {}
-
-    /** Stores a report sealed on the reporter's phone to the moderation key; the server can't read it. */
-    @PostMapping("/v1/reports")
-    @ResponseStatus(HttpStatus.CREATED)
-    public Map<String, String> report(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody NewReport r) {
-        byte[] me = me(jwt);
-        if (!limiter.tryAcquire("reports", me, 20, 3_600_000)) {
-            throw new ApiException(HttpStatus.TOO_MANY_REQUESTS, "rate_limited");
-        }
-        jdbc.update("INSERT INTO reports (id, reporter_id, sealed, created_at) VALUES (?, ?, ?, ?)",
-                Ids.bytes(Ids.newId()), me, r.sealed(), Timestamp.from(Instant.now()));
-        return Map.of("status", "received");
-    }
-
-    /** Public client configuration: the operator's moderation public key (empty if reporting isn't set up). */
-    @GetMapping("/v1/config")
-    public Map<String, String> config() {
-        return Map.of("moderationPublicKey", moderationPublicKey);
     }
 
     // ---------- account deletion ----------

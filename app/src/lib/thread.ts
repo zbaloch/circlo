@@ -47,8 +47,11 @@ async function signingKey(account: StoredAccount, userId: string): Promise<{ key
 }
 
 /** Replies I can open, oldest first. Replies that fail to open (tampered, wrong signer) are dropped. */
+/** The read-token header that proves I'm in the post's audience. */
+const audience = (post: Pick<FeedPost, 'readToken'>) => ({ header: { 'X-Halqo-Read-Token': toB64(post.readToken) } });
+
 export async function fetchReplies(account: StoredAccount, post: FeedPost): Promise<Reply[]> {
-  const rows = ok(await api.GET('/v1/posts/{postId}/replies', { params: { path: { postId: post.postId } } }));
+  const rows = ok(await api.GET('/v1/posts/{postId}/replies', { params: { path: { postId: post.postId }, ...audience(post) } }));
   const out: Reply[] = [];
   for (const r of rows) {
     if (!r.replyId || !r.authorId || !r.ciphertext) continue;
@@ -86,21 +89,23 @@ export async function sendReply(account: StoredAccount, post: FeedPost, text: st
     text: text.trim(),
     createdAtMs: BigInt(createdAtMs),
   });
-  ok(await api.POST('/v1/posts/{postId}/replies', { params: { path: { postId: post.postId } }, body: { replyId, ciphertext: toB64(ct) } }));
+  ok(await api.POST('/v1/posts/{postId}/replies', { params: { path: { postId: post.postId }, ...audience(post) }, body: { replyId, ciphertext: toB64(ct) } }));
   return { replyId, authorId: account.userId, text: text.trim(), createdAtMs, mine: true, pinned: true };
 }
 
-export async function deleteReply(postId: string, replyId: string): Promise<void> {
-  ok(await api.DELETE('/v1/posts/{postId}/replies/{replyId}', { params: { path: { postId, replyId } } }));
+export async function deleteReply(post: FeedPost, replyId: string): Promise<void> {
+  ok(await api.DELETE('/v1/posts/{postId}/replies/{replyId}', { params: { path: { postId: post.postId, replyId }, ...audience(post) } }));
 }
 
-export async function setLiked(postId: string, liked: boolean): Promise<void> {
-  const params = { params: { path: { postId } } };
+export async function setLiked(post: FeedPost, liked: boolean): Promise<void> {
+  const params = { params: { path: { postId: post.postId }, ...audience(post) } };
   ok(liked ? await api.PUT('/v1/posts/{postId}/like', params) : await api.DELETE('/v1/posts/{postId}/like', params));
 }
 
-export async function fetchLikers(postId: string): Promise<string[]> {
-  return ok(await api.GET('/v1/posts/{postId}/likes', { params: { path: { postId } } })).flatMap((l) => (l.userId ? [l.userId] : []));
+export async function fetchLikers(post: FeedPost): Promise<string[]> {
+  return ok(await api.GET('/v1/posts/{postId}/likes', { params: { path: { postId: post.postId }, ...audience(post) } })).flatMap((l) =>
+    l.userId ? [l.userId] : [],
+  );
 }
 
 /** Optimistic like toggle on a post object (pure). */

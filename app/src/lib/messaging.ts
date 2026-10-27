@@ -422,6 +422,11 @@ export function unreadCount(c: Pick<Conversation, 'messages' | 'readSeq'>): numb
   return c.messages.filter((m) => !m.mine && m.seq > c.readSeq).length;
 }
 
+/** The current conversations, outside React (e.g. for data export). */
+export function conversationsSnapshot(): Conversation[] {
+  return snapshot;
+}
+
 export function useConversations(): Conversation[] {
   return useSyncExternalStore(
     (l) => {

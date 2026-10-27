@@ -41,7 +41,7 @@ export default function ThreadScreen() {
       },
       () => setReplies([]),
     );
-    fetchLikers(post.postId).then(setLikers, () => setLikers([]));
+    fetchLikers(post).then(setLikers, () => setLikers([]));
     // eslint-disable-next-line react-hooks/exhaustive-deps -- reload when the post changes identity, not on like toggles
   }, [account, post?.postId]);
   useFocusEffect(load);
@@ -85,7 +85,7 @@ export default function ThreadScreen() {
         text: 'Delete',
         style: 'destructive',
         onPress: () =>
-          deleteReply(post.postId, r.replyId).then(() => {
+          deleteReply(post, r.replyId).then(() => {
             setReplies((prev) => (prev ?? []).filter((x) => x.replyId !== r.replyId));
             putPost({ ...post, replyCount: Math.max(0, post.replyCount - 1) });
           }, () => {}),
@@ -146,6 +146,7 @@ export default function ThreadScreen() {
           </Pressable>
         </View>
       </KeyboardAvoidingView>
+      {actions.sheet}
     </SafeAreaView>
   );
 }

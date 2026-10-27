@@ -1355,6 +1355,7 @@ export interface paths {
                         epochId: components["schemas"]["Id"];
                         keyRef: components["schemas"]["Bytes"];
                         headerCt: components["schemas"]["Bytes"];
+                        readTokenHash: components["schemas"]["Bytes"];
                         media: {
                             objectKey: string;
                             /** @enum {string} */
@@ -1466,7 +1467,10 @@ export interface paths {
     "/v1/posts/{postId}/replies": {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description The post's read token (base64); only its audience can derive it */
+                "X-Halqo-Read-Token"?: components["parameters"]["ReadToken"];
+            };
             path: {
                 postId: components["schemas"]["Id"];
             };
@@ -1479,7 +1483,10 @@ export interface paths {
                     after?: string;
                     limit?: number;
                 };
-                header?: never;
+                header?: {
+                    /** @description The post's read token (base64); only its audience can derive it */
+                    "X-Halqo-Read-Token"?: components["parameters"]["ReadToken"];
+                };
                 path: {
                     postId: components["schemas"]["Id"];
                 };
@@ -1503,7 +1510,10 @@ export interface paths {
         post: {
             parameters: {
                 query?: never;
-                header?: never;
+                header?: {
+                    /** @description The post's read token (base64); only its audience can derive it */
+                    "X-Halqo-Read-Token"?: components["parameters"]["ReadToken"];
+                };
                 path: {
                     postId: components["schemas"]["Id"];
                 };
@@ -1539,7 +1549,10 @@ export interface paths {
     "/v1/posts/{postId}/replies/{replyId}": {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description The post's read token (base64); only its audience can derive it */
+                "X-Halqo-Read-Token"?: components["parameters"]["ReadToken"];
+            };
             path: {
                 postId: components["schemas"]["Id"];
                 replyId: components["schemas"]["Id"];
@@ -1553,7 +1566,10 @@ export interface paths {
         delete: {
             parameters: {
                 query?: never;
-                header?: never;
+                header?: {
+                    /** @description The post's read token (base64); only its audience can derive it */
+                    "X-Halqo-Read-Token"?: components["parameters"]["ReadToken"];
+                };
                 path: {
                     postId: components["schemas"]["Id"];
                     replyId: components["schemas"]["Id"];
@@ -1581,7 +1597,10 @@ export interface paths {
     "/v1/posts/{postId}/like": {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description The post's read token (base64); only its audience can derive it */
+                "X-Halqo-Read-Token"?: components["parameters"]["ReadToken"];
+            };
             path: {
                 postId: components["schemas"]["Id"];
             };
@@ -1592,7 +1611,10 @@ export interface paths {
         put: {
             parameters: {
                 query?: never;
-                header?: never;
+                header?: {
+                    /** @description The post's read token (base64); only its audience can derive it */
+                    "X-Halqo-Read-Token"?: components["parameters"]["ReadToken"];
+                };
                 path: {
                     postId: components["schemas"]["Id"];
                 };
@@ -1616,7 +1638,10 @@ export interface paths {
         delete: {
             parameters: {
                 query?: never;
-                header?: never;
+                header?: {
+                    /** @description The post's read token (base64); only its audience can derive it */
+                    "X-Halqo-Read-Token"?: components["parameters"]["ReadToken"];
+                };
                 path: {
                     postId: components["schemas"]["Id"];
                 };
@@ -1643,7 +1668,10 @@ export interface paths {
     "/v1/posts/{postId}/likes": {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description The post's read token (base64); only its audience can derive it */
+                "X-Halqo-Read-Token"?: components["parameters"]["ReadToken"];
+            };
             path: {
                 postId: components["schemas"]["Id"];
             };
@@ -1653,7 +1681,10 @@ export interface paths {
         get: {
             parameters: {
                 query?: never;
-                header?: never;
+                header?: {
+                    /** @description The post's read token (base64); only its audience can derive it */
+                    "X-Halqo-Read-Token"?: components["parameters"]["ReadToken"];
+                };
                 path: {
                     postId: components["schemas"]["Id"];
                 };
@@ -2351,6 +2382,197 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/posts/stats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Reply/like counts for posts I can prove I can read (one read token each) */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        items: {
+                            postId: components["schemas"]["Id"];
+                            readToken: components["schemas"]["Bytes"];
+                        }[];
+                    };
+                };
+            };
+            responses: {
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            postId?: components["schemas"]["Id"];
+                            replyCount?: number;
+                            likeCount?: number;
+                            likedByMe?: boolean;
+                        }[];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/blocks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** People I blocked */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            userId?: components["schemas"]["Id"];
+                            /** Format: date-time */
+                            createdAt?: string;
+                        }[];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/blocks/{userId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                userId: components["schemas"]["Id"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Block (removes any friendship; no requests or invites either way) */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    userId: components["schemas"]["Id"];
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": Record<string, never>;
+                    };
+                };
+                404: components["responses"]["Error"];
+            };
+        };
+        /** Unblock */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    userId: components["schemas"]["Id"];
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": Record<string, never>;
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/account": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete my account and everything I left behind (retype the handle to confirm) */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        handle: string;
+                    };
+                };
+            };
+            responses: {
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": Record<string, never>;
+                    };
+                };
+                400: components["responses"]["Error"];
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -2370,9 +2592,6 @@ export interface components {
                 /** Format: int64 */
                 ctSize?: number;
             }[];
-            replyCount?: number;
-            likeCount?: number;
-            likedByMe?: boolean;
         };
         ReplyView: {
             replyId?: components["schemas"]["Id"];
@@ -2450,6 +2669,8 @@ export interface components {
         };
     };
     parameters: {
+        /** @description The post's read token (base64); only its audience can derive it */
+        ReadToken: string;
         /** @description The calling device (must be one of the caller's registered devices) */
         Device: components["schemas"]["Id"];
     };

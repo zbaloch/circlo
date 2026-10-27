@@ -302,6 +302,17 @@ storage plug into it.
 - Revoking a device removes it from every chat's server-side ACL, deletes its key packages, welcomes and push token;
   members' apps remove its MLS leaves.
 
+## 13c. Read tokens (Phase 11)
+
+- **Read token:** `read_token = HKDF(post_key, "halqo/v1/read-token")`. At creation the author sends only
+  `H = SHA-256("halqo/v1/read-token-hash" || 0x00 || read_token)`. Listing or adding replies and likes, and fetching
+  their counts, requires presenting `read_token` (header `X-Halqo-Read-Token`, or per item in `/v1/posts/stats`);
+  the server hashes and compares in constant time. Only people who can open the post can derive the token, so
+  friends outside the audience learn nothing about who interacted. A database copy holds only hashes. (Owner
+  approved, 2026-10-27; closes THREAT_MODEL leak 14.)
+- **No operator reports:** reporting content to the operator was removed (owner decision, 2026-10-27). Nothing a
+  user posts or sends is ever made readable to the operator; abuse is handled between people by blocking and muting.
+
 ## 13. Server-side secrets (outside the DB, via the core)
 
 | Secret | Env var | Used for | If lost |

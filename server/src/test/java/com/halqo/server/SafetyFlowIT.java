@@ -20,7 +20,7 @@ import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import software.amazon.awssdk.services.s3.S3Client;
 
-/** Phase 11: read tokens gate replies/likes/counts; blocks; sealed reports; account deletion leaves no trace. */
+/** Phase 11: read tokens gate replies/likes/counts; blocks; account deletion leaves no trace. */
 class SafetyFlowIT extends IntegrationTest {
 
     @Autowired
@@ -140,18 +140,6 @@ class SafetyFlowIT extends IntegrationTest {
         assertThat(call("DELETE", "/v1/blocks/" + mallory.userId, null, alice.accessToken).getStatusCode().value()).isEqualTo(200);
     }
 
-    @Test
-    void reportsAreStoredSealed() {
-        TestApp alice = new TestApp(this, "rp_alice", "pw").register();
-        byte[] sealed = Ids.random(500); // sealed on the phone to the moderation key; opaque to the server
-        assertThat(call("POST", "/v1/reports", Map.of("sealed", sealed), alice.accessToken).getStatusCode().value()).isEqualTo(201);
-        byte[] stored = jdbc.queryForObject("SELECT sealed FROM reports WHERE reporter_id = ?", byte[].class, (Object) Ids.bytes(alice.userId));
-        assertThat(stored).isEqualTo(sealed);
-        var cfg = call("GET", "/v1/config", null, alice.accessToken);
-        assertThat(cfg.getStatusCode().value()).isEqualTo(200);
-        assertThat(cfg.getBody()).containsKey("moderationPublicKey");
-    }
-
     @SuppressWarnings("unchecked")
     @Test
     void accountDeletionLeavesNoTrace() throws Exception {
@@ -160,7 +148,7 @@ class SafetyFlowIT extends IntegrationTest {
         befriend(alice, bob);
         byte[] uid = Ids.bytes(alice.userId);
 
-        // Alice leaves a footprint: a post with media, a like, a report, a block.
+        // Alice leaves a footprint: a post with media, a like, a block.
         byte[] photo = Ids.random(3000);
         var slots = (List<Map<String, Object>>) (Object) http().post().uri("/v1/media/uploads").header("Authorization", "Bearer " + alice.accessToken)
                 .contentType(MediaType.APPLICATION_JSON).body(Map.of("sizes", List.of(photo.length))).retrieve().body(List.class);
@@ -174,7 +162,6 @@ class SafetyFlowIT extends IntegrationTest {
         body.put("readTokenHash", core.readTokenHash(readToken));
         assertThat(call("POST", "/v1/posts", body, alice.accessToken).getStatusCode().value()).isEqualTo(201);
         withToken("PUT", "/v1/posts/" + postId + "/like", null, bob.accessToken, readToken);
-        call("POST", "/v1/reports", Map.of("sealed", Ids.random(100)), alice.accessToken);
 
         // Wrong confirmation is refused; the right one deletes everything.
         assertThat(call("DELETE", "/v1/account", Map.of("handle", "someone_else"), alice.accessToken).getStatusCode().value()).isEqualTo(400);

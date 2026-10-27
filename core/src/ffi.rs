@@ -1335,7 +1335,7 @@ impl MlsClient {
     }
 }
 
-// ---------------- read tokens and reports (CRYPTO.md 13c) ----------------
+// ---------------- read tokens (CRYPTO.md 13c) ----------------
 
 /// The post's read token (proves to the server that I can open the post, without revealing anything else).
 #[uniffi::export]
@@ -1347,20 +1347,4 @@ pub fn post_read_token(post_key: &[u8]) -> Result<Vec<u8>> {
 #[uniffi::export]
 pub fn post_read_token_hash(read_token: &[u8]) -> Result<Vec<u8>> {
     Ok(post::read_token_hash(&key32(read_token, "read_token")?).to_vec())
-}
-
-/// Signs and seals a report for the operator's moderation key; the server only ever stores the ciphertext.
-#[uniffi::export]
-pub fn seal_report(
-    moderation_public_key: &[u8],
-    reporter: &IdentityKeys,
-    reporter_id: &[u8],
-    content: &[u8],
-) -> Result<Vec<u8>> {
-    crate::report::seal(
-        &key32(moderation_public_key, "moderation_public_key")?,
-        &reporter.load()?,
-        &id16(reporter_id, "reporter_id")?,
-        content,
-    )
 }
