@@ -26,7 +26,9 @@ public class AuthRateLimitFilter extends OncePerRequestFilter {
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
-        return !request.getRequestURI().startsWith("/v1/auth/");
+        // Unauthenticated endpoints: login/recovery and the one-time device-link pickup.
+        String uri = request.getRequestURI();
+        return !uri.startsWith("/v1/auth/") && !uri.startsWith("/v1/device-links/");
     }
 
     @Override

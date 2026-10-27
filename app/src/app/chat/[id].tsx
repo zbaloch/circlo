@@ -1,12 +1,16 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
+import * as ImagePicker from 'expo-image-picker';
 import { router, useFocusEffect, useLocalSearchParams, useNavigation } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, FlatList, KeyboardAvoidingView, Modal, Platform, Pressable, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Avatar } from '@/components/avatar';
+import { MediaGrid } from '@/components/encrypted-media';
 import { authorName } from '@/components/post-actions';
 import { loadAddressBook, type AddressBook } from '@/lib/addressbook';
+import { openViewer } from '@/lib/feed-store';
+import { discardPicked, discardPrepared, encryptAndUpload, MAX_IMAGES, prepare, type PickedMedia } from '@/lib/media';
 import { markRead, removePerson, sendMessage, syncMessaging, useConversations, type ChatMessage } from '@/lib/messaging';
 import { useSession } from '@/lib/session';
 import { chatTitle, dayLabel } from '@/lib/view-logic';
@@ -80,19 +84,40 @@ export default function ChatScreen() {
     lastSender = m.senderUser;
   }
 
-  const send = async () => {
+  const send = async (picked: PickedMedia[] = []) => {
     const t = text.trim();
-    if (!t || sending) return;
+    if ((!t && picked.length === 0) || sending) return;
     setSending(true);
+    const prepared = [];
     try {
-      await sendMessage(account, conv.groupId, t);
+      // Same pipeline as posts: strip metadata, encrypt per file, size-locked upload; keys travel inside MLS.
+      for (const m of picked) prepared.push(...(await prepare(m)));
+      const uploaded = prepared.length ? await encryptAndUpload(prepared) : [];
+      await sendMessage(account, conv.groupId, t, uploaded);
+      discardPicked(picked);
       setText('');
       list.current?.scrollToEnd({ animated: true });
     } catch (e) {
       Alert.alert('Couldn’t send', e instanceof Error ? e.message : 'Check your connection and try again.');
     } finally {
+      discardPrepared(prepared);
       setSending(false);
     }
+  };
+
+  const attach = async () => {
+    const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images', 'videos'], allowsMultipleSelection: true, selectionLimit: MAX_IMAGES, exif: false, quality: 1 });
+    if (res.canceled) return;
+    const picked: PickedMedia[] = res.assets.map((a) => ({
+      uri: a.uri,
+      type: a.type === 'video' ? 'video' : 'image',
+      width: a.width,
+      height: a.height,
+      durationMs: a.duration ?? undefined,
+      mimeType: a.mimeType ?? undefined,
+    }));
+    const video = picked.find((p) => p.type === 'video');
+    await send(video ? [video] : picked.slice(0, MAX_IMAGES));
   };
 
   const canSend = conv.active && !conv.unverified;
@@ -125,14 +150,30 @@ export default function ChatScreen() {
                 }
                 className={`max-w-[80%] ${item.msg.mine ? 'self-end' : 'self-start'}`}>
                 {item.showName ? <Text className="px-2 pb-0.5 text-xs text-muted dark:text-muted-dark">{authorName(account, book, item.msg.senderUser).name}</Text> : null}
-                <View className={`rounded-2xl px-4 py-2 ${item.msg.mine ? 'rounded-br-md bg-primary dark:bg-primary-dark' : 'rounded-bl-md bg-surface-raised dark:bg-surface-raised-dark'}`}>
-                  <Text className={item.msg.mine ? 'text-base text-white' : 'text-base text-ink dark:text-ink-dark'}>{item.msg.text}</Text>
-                </View>
+                {item.msg.media.length ? (
+                  <View className="mb-1 w-64">
+                    <MediaGrid
+                      media={item.msg.media}
+                      onPress={(i) => {
+                        openViewer(item.msg.media.filter((m) => m.kind === 'full'), i);
+                        router.push('/viewer');
+                      }}
+                    />
+                  </View>
+                ) : null}
+                {item.msg.text ? (
+                  <View className={`rounded-2xl px-4 py-2 ${item.msg.mine ? 'rounded-br-md bg-primary dark:bg-primary-dark' : 'rounded-bl-md bg-surface-raised dark:bg-surface-raised-dark'}`}>
+                    <Text className={item.msg.mine ? 'text-base text-white' : 'text-base text-ink dark:text-ink-dark'}>{item.msg.text}</Text>
+                  </View>
+                ) : null}
               </Pressable>
             )
           }
         />
         <View className="flex-row items-end gap-2 border-t border-border px-3 py-2 dark:border-border-dark">
+          <Pressable accessibilityRole="button" accessibilityLabel="Attach photos or video" disabled={!canSend || sending} onPress={attach} className={`h-10 w-10 items-center justify-center ${!canSend || sending ? 'opacity-40' : ''}`}>
+            <Ionicons name="image-outline" size={24} color={palette.primary} />
+          </Pressable>
           <TextInput
             accessibilityLabel="Message"
             editable={canSend}
@@ -148,7 +189,7 @@ export default function ChatScreen() {
             accessibilityRole="button"
             accessibilityLabel="Send message"
             disabled={!canSend || !text.trim() || sending}
-            onPress={send}
+            onPress={() => send()}
             className={`h-10 w-10 items-center justify-center rounded-full bg-primary dark:bg-primary-dark ${!canSend || !text.trim() || sending ? 'opacity-50' : ''}`}>
             {sending ? <ActivityIndicator color="#FFFFFF" /> : <Ionicons name="arrow-up" size={20} color="#FFFFFF" />}
           </Pressable>

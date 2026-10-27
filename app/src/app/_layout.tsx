@@ -54,6 +54,7 @@ function Navigator() {
         <Drawer.Screen name="preview/[id]" options={{ title: 'Preview' }} />
         <Drawer.Screen name="chat/[id]" options={{ title: 'Chat' }} />
         <Drawer.Screen name="new-message" options={{ title: 'New message' }} />
+        <Drawer.Screen name="link-confirm" options={{ title: 'Link a device' }} />
       </Drawer.Protected>
     </Drawer>
   );

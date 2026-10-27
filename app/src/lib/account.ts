@@ -190,7 +190,7 @@ export async function recover(rawHandle: string, phrase: string, newPassword: st
 // ---------------- shared ----------------
 
 /** Rebuilds the identity locally, checks it against the published keys, and registers this device. */
-async function finishOnThisDevice(handle: string, tokens: Tokens, backup: Core.KeyBackup): Promise<StoredAccount> {
+export async function finishOnThisDevice(handle: string, tokens: Tokens, backup: Core.KeyBackup): Promise<StoredAccount> {
   const identity = Core.identityFromSecrets(backup.x25519Sk, backup.ed25519Sk);
   const auth = withToken(tokens.accessToken);
   const published = ok(await api.GET('/v1/users/{userId}/identity', { params: { path: { userId: tokens.userId } }, ...auth }));

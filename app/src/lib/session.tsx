@@ -1,12 +1,13 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 
-import { api, ApiError, ok, setAccessToken } from '@/api/client';
+import { api, ApiError, ok, setAccessToken, setRefresher } from '@/api/client';
 
 import { resetAddressBookCache } from './addressbook';
 import { clearAccount, loadAccount, updateRefreshToken, type StoredAccount } from './keystore';
 import { clearFeed } from './feed-store';
 import { clearMediaCache } from './media';
 import { clearMessaging } from './messaging';
+import { resetPush } from './push';
 import { clearOutbox } from './outbox';
 
 type State = { status: 'loading' } | { status: 'signedOut' } | { status: 'signedIn'; account: StoredAccount };
@@ -58,12 +59,46 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   const signIn = useCallback((account: StoredAccount) => setState({ status: 'signedIn', account }), []);
 
+  // While signed in, expired access tokens are renewed transparently (api/client retries the failed call once).
+  const signedIn = state.status === 'signedIn';
+  useEffect(() => {
+    if (!signedIn) {
+      setRefresher(null);
+      return;
+    }
+    setRefresher(async () => {
+      const account = await loadAccount();
+      if (!account) return null;
+      try {
+        const tokens = ok(await api.POST('/v1/auth/refresh', { body: { refreshToken: account.refreshToken } }));
+        setAccessToken(tokens.accessToken!);
+        await updateRefreshToken(tokens.refreshToken!);
+        return tokens.accessToken!;
+      } catch (e) {
+        if (e instanceof ApiError && e.status === 401) {
+          // The session was revoked elsewhere: sign in again (keys come back from the backup).
+          await clearAccount();
+          setAccessToken(null);
+          setState({ status: 'signedOut' });
+        }
+        return null;
+      }
+    });
+    return () => setRefresher(null);
+  }, [signedIn]);
+
   const signOut = useCallback(async () => {
+    // Tell the server to forget this device (no more pushes, removed from chats). Best effort: still sign out offline.
+    const current = await loadAccount();
+    if (current) {
+      await api.DELETE('/v1/devices/{deviceId}', { params: { path: { deviceId: current.deviceId } } }).catch(() => undefined);
+    }
     await clearAccount();
     setAccessToken(null);
     resetAddressBookCache();
     clearOutbox();
     clearFeed();
+    resetPush();
     await clearMessaging().catch(() => {});
     try {
       clearMediaCache(); // decrypted photos must not outlive the session

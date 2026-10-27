@@ -13,6 +13,7 @@ pub mod friend;
 pub mod identity;
 #[cfg(feature = "jni")]
 mod jni_bridge;
+pub mod link;
 pub mod mls;
 pub mod opaque;
 pub mod padding;

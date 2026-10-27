@@ -52,7 +52,7 @@ const uniffiIsDebug =
 /**
  * Inverse of `encode_chat_payload` for a decrypted application message.
  */
-export function decodeChatPayload(bytes: ArrayBuffer): PostContent /*throws*/ {
+export function decodeChatPayload(bytes: ArrayBuffer): ChatContent /*throws*/ {
   const __rb: Uint8Array = uniffiCaller.rustCallWithError(
     /*liftError:*/ FfiConverterTypeCoreError.lift.bind(
       FfiConverterTypeCoreError,
@@ -66,7 +66,7 @@ export function decodeChatPayload(bytes: ArrayBuffer): PostContent /*throws*/ {
     /*liftString:*/ FfiConverterString.lift.bind(FfiConverterString),
   );
   try {
-    return FfiConverterTypePostContent.lift(__rb);
+    return FfiConverterTypeChatContent.lift(__rb);
   } finally {
     nativeModule().rustbuffer_free(__rb);
   }
@@ -104,10 +104,10 @@ export function decryptFile(
 }
 
 /**
- * Encodes and pads a chat message for `MlsClient::encrypt` (text, media keys, timestamp).
+ * Encodes and pads a chat message for `MlsClient::encrypt`.
  */
 export function encodeChatPayload(
-  content: PostContent,
+  content: ChatContent,
 ): ArrayBuffer /*throws*/ {
   const __rb: Uint8Array = uniffiCaller.rustCallWithError(
     /*liftError:*/ FfiConverterTypeCoreError.lift.bind(
@@ -115,7 +115,7 @@ export function encodeChatPayload(
     ),
     /*caller:*/ (callStatus) => {
       return nativeModule().uniffi_halqo_core_fn_func_encode_chat_payload(
-        FfiConverterTypePostContent.lower(
+        FfiConverterTypeChatContent.lower(
           content,
           nativeModule().rustbuffer_alloc,
         ),
@@ -295,6 +295,123 @@ export function inviteTokenHash(token: ArrayBuffer): ArrayBuffer /*throws*/ {
     /*caller:*/ (callStatus) => {
       return nativeModule().uniffi_halqo_core_fn_func_invite_token_hash(
         FfiConverterArrayBuffer.lower(token, nativeModule().rustbuffer_alloc),
+        callStatus,
+      );
+    },
+    /*liftString:*/ FfiConverterString.lift.bind(FfiConverterString),
+  );
+  try {
+    return FfiConverterArrayBuffer.lift(__rb);
+  } finally {
+    nativeModule().rustbuffer_free(__rb);
+  }
+}
+
+/**
+ * Six digits shown on both screens so the user can check they scanned their own new phone.
+ */
+export function linkConfirmationCode(
+  linkPublicKey: ArrayBuffer,
+): string /*throws*/ {
+  const __rb: Uint8Array = uniffiCaller.rustCallWithError(
+    /*liftError:*/ FfiConverterTypeCoreError.lift.bind(
+      FfiConverterTypeCoreError,
+    ),
+    /*caller:*/ (callStatus) => {
+      return nativeModule().uniffi_halqo_core_fn_func_link_confirmation_code(
+        FfiConverterArrayBuffer.lower(
+          linkPublicKey,
+          nativeModule().rustbuffer_alloc,
+        ),
+        callStatus,
+      );
+    },
+    /*liftString:*/ FfiConverterString.lift.bind(FfiConverterString),
+  );
+  try {
+    return FfiConverterString.lift(__rb);
+  } finally {
+    nativeModule().rustbuffer_free(__rb);
+  }
+}
+
+/**
+ * The new device's one-time key for receiving the hand-off (its public half goes in the QR code).
+ */
+export function linkGenerateKeys(): LinkKeyPair {
+  const __rb: Uint8Array = uniffiCaller.rustCall(
+    /*caller:*/ (callStatus) => {
+      return nativeModule().uniffi_halqo_core_fn_func_link_generate_keys(
+        callStatus,
+      );
+    },
+    /*liftString:*/ FfiConverterString.lift.bind(FfiConverterString),
+  );
+  try {
+    return FfiConverterTypeLinkKeyPair.lift(__rb);
+  } finally {
+    nativeModule().rustbuffer_free(__rb);
+  }
+}
+
+export function linkOpen(
+  linkSecretKey: ArrayBuffer,
+  linkId: ArrayBuffer,
+  userId: ArrayBuffer,
+  sealed: ArrayBuffer,
+): LinkHandoff /*throws*/ {
+  const __rb: Uint8Array = uniffiCaller.rustCallWithError(
+    /*liftError:*/ FfiConverterTypeCoreError.lift.bind(
+      FfiConverterTypeCoreError,
+    ),
+    /*caller:*/ (callStatus) => {
+      return nativeModule().uniffi_halqo_core_fn_func_link_open(
+        FfiConverterArrayBuffer.lower(
+          linkSecretKey,
+          nativeModule().rustbuffer_alloc,
+        ),
+        FfiConverterArrayBuffer.lower(linkId, nativeModule().rustbuffer_alloc),
+        FfiConverterArrayBuffer.lower(userId, nativeModule().rustbuffer_alloc),
+        FfiConverterArrayBuffer.lower(sealed, nativeModule().rustbuffer_alloc),
+        callStatus,
+      );
+    },
+    /*liftString:*/ FfiConverterString.lift.bind(FfiConverterString),
+  );
+  try {
+    return FfiConverterTypeLinkHandoff.lift(__rb);
+  } finally {
+    nativeModule().rustbuffer_free(__rb);
+  }
+}
+
+/**
+ * The signed-in device seals the account secrets to the new device's link key.
+ */
+export function linkSeal(
+  linkPublicKey: ArrayBuffer,
+  linkId: ArrayBuffer,
+  userId: ArrayBuffer,
+  backup: KeyBackup,
+  handle: string,
+): ArrayBuffer /*throws*/ {
+  const __rb: Uint8Array = uniffiCaller.rustCallWithError(
+    /*liftError:*/ FfiConverterTypeCoreError.lift.bind(
+      FfiConverterTypeCoreError,
+    ),
+    /*caller:*/ (callStatus) => {
+      return nativeModule().uniffi_halqo_core_fn_func_link_seal(
+        FfiConverterArrayBuffer.lower(
+          linkPublicKey,
+          nativeModule().rustbuffer_alloc,
+        ),
+        FfiConverterArrayBuffer.lower(linkId, nativeModule().rustbuffer_alloc),
+        FfiConverterArrayBuffer.lower(userId, nativeModule().rustbuffer_alloc),
+        FfiConverterTypeKeyBackup.lower(
+          backup,
+          nativeModule().rustbuffer_alloc,
+        ),
+        FfiConverterString.lower(handle, nativeModule().rustbuffer_alloc),
         callStatus,
       );
     },
@@ -1597,6 +1714,194 @@ const FfiConverterTypeByteRange = (() => {
   return new FFIConverter();
 })();
 
+// Hermes (React Native ≥ 0.74) ships TextEncoder and encodeInto, but not
+// TextDecoder. For single-string decode (bytesToString), we polyfill via the
+// C++ string_from_buffer helper using a duck-typed object matching the
+// standard TextDecoder.decode signature. Once Hermes ships a real
+// TextDecoder, the `typeof` check will pick it up automatically.
+//
+// For array-of-strings decode (readStringFromBuffer), we keep a dedicated C++
+// helper: the polyfill path (new Uint8Array view + decode) measured ~40%
+// slower on getStringArray benchmarks than a direct (buf, offset, length)
+// call, due to the per-read view allocation and extra property lookups in
+// string_from_buffer.
+const stringConverter = (() => {
+  const encoder = new TextEncoder();
+  const decoder: { decode(input: UniffiByteArray): string } =
+    typeof TextDecoder !== "undefined"
+      ? new TextDecoder()
+      : {
+          decode: (bytes: UniffiByteArray) =>
+            nativeModule().ubrn_uniffi_internal_fn_func_ffi__string_from_buffer(
+              bytes,
+              undefined as any,
+            ) as string,
+        };
+  return {
+    // Single-string lower() uses the C++ helper — TextEncoder.encode
+    // measured ~43% slower on takeString benchmarks.
+    stringToBytes: (s: string) =>
+      nativeModule().ubrn_uniffi_internal_fn_func_ffi__string_to_buffer(
+        s,
+        undefined as any,
+      ),
+    bytesToString: (ab: UniffiByteArray) => decoder.decode(ab),
+    // Direct C++ call — bypasses uniffiCaller.rustCall() overhead.
+    // Matters for N-element arrays.
+    stringByteLength: (s: string) =>
+      nativeModule().ubrn_uniffi_internal_fn_func_ffi__string_to_byte_length(
+        s,
+        undefined as any,
+      ) as number,
+    // Encode directly into the RustBuffer backing store via
+    // TextEncoder.encodeInto — zero intermediate allocation. Replaces
+    // the old C++ write_string_into_buffer helper.
+    writeStringIntoBuffer: (s: string, buf: any, offset: number): number => {
+      const view = new Uint8Array(
+        buf.arrayBuffer,
+        offset,
+        buf.arrayBuffer.byteLength - offset,
+      );
+      return encoder.encodeInto(s, view).written;
+    },
+    // Dedicated C++ helper — avoids per-read Uint8Array allocation and
+    // the double property-lookup in string_from_buffer.
+    readStringFromBuffer: (buf: any, offset: number, length: number): string =>
+      nativeModule().ubrn_uniffi_internal_fn_func_ffi__read_string_from_buffer(
+        buf,
+        offset,
+        length,
+      ) as string,
+  };
+})();
+const FfiConverterString = uniffiCreateFfiConverterString(stringConverter);
+
+export type MediaItem = {
+  objectId: ArrayBuffer;
+  /**
+   * 0 = full, 1 = thumb, 2 = poster.
+   */
+  kind: number;
+  mime: string;
+  fileKey: ArrayBuffer;
+  contentLen: bigint;
+  width: number;
+  height: number;
+  durationMs: bigint;
+};
+
+/**
+ * Generated factory for {@link MediaItem} record objects.
+ */
+export const MediaItem = (() => {
+  const defaults = () => ({});
+  const create = (() => {
+    return uniffiCreateRecord<MediaItem, ReturnType<typeof defaults>>(defaults);
+  })();
+  return Object.freeze({
+    create,
+    new: create,
+    defaults: () => Object.freeze(defaults()) as Partial<MediaItem>,
+  });
+})();
+
+const FfiConverterTypeMediaItem = (() => {
+  type TypeName = MediaItem;
+  class FFIConverter extends AbstractFfiConverterByteArray<TypeName> {
+    readFromCursor(c: Cursor): TypeName {
+      return {
+        objectId: FfiConverterArrayBuffer.readFromCursor(c),
+        kind: FfiConverterUInt8.readFromCursor(c),
+        mime: FfiConverterString.readFromCursor(c),
+        fileKey: FfiConverterArrayBuffer.readFromCursor(c),
+        contentLen: FfiConverterUInt64.readFromCursor(c),
+        width: FfiConverterUInt32.readFromCursor(c),
+        height: FfiConverterUInt32.readFromCursor(c),
+        durationMs: FfiConverterUInt64.readFromCursor(c),
+      };
+    }
+    writeIntoCursor(value: TypeName, c: Cursor): void {
+      FfiConverterArrayBuffer.writeIntoCursor(value.objectId, c);
+      FfiConverterUInt8.writeIntoCursor(value.kind, c);
+      FfiConverterString.writeIntoCursor(value.mime, c);
+      FfiConverterArrayBuffer.writeIntoCursor(value.fileKey, c);
+      FfiConverterUInt64.writeIntoCursor(value.contentLen, c);
+      FfiConverterUInt32.writeIntoCursor(value.width, c);
+      FfiConverterUInt32.writeIntoCursor(value.height, c);
+      FfiConverterUInt64.writeIntoCursor(value.durationMs, c);
+    }
+    allocationSize(value: TypeName): number {
+      return (
+        FfiConverterArrayBuffer.allocationSize(value.objectId) +
+        FfiConverterUInt8.allocationSize(value.kind) +
+        FfiConverterString.allocationSize(value.mime) +
+        FfiConverterArrayBuffer.allocationSize(value.fileKey) +
+        FfiConverterUInt64.allocationSize(value.contentLen) +
+        FfiConverterUInt32.allocationSize(value.width) +
+        FfiConverterUInt32.allocationSize(value.height) +
+        FfiConverterUInt64.allocationSize(value.durationMs)
+      );
+    }
+  }
+  return new FFIConverter();
+})();
+
+/**
+ * A chat message: text, media descriptors (with their keys) and the matching object keys.
+ */
+export type ChatContent = {
+  text: string;
+  createdAtMs: bigint;
+  media: Array<MediaItem>;
+  objectKeys: Array<string>;
+};
+
+/**
+ * Generated factory for {@link ChatContent} record objects.
+ */
+export const ChatContent = (() => {
+  const defaults = () => ({});
+  const create = (() => {
+    return uniffiCreateRecord<ChatContent, ReturnType<typeof defaults>>(
+      defaults,
+    );
+  })();
+  return Object.freeze({
+    create,
+    new: create,
+    defaults: () => Object.freeze(defaults()) as Partial<ChatContent>,
+  });
+})();
+
+const FfiConverterTypeChatContent = (() => {
+  type TypeName = ChatContent;
+  class FFIConverter extends AbstractFfiConverterByteArray<TypeName> {
+    readFromCursor(c: Cursor): TypeName {
+      return {
+        text: FfiConverterString.readFromCursor(c),
+        createdAtMs: FfiConverterUInt64.readFromCursor(c),
+        media: FfiConverterSequenceTypeMediaItem.readFromCursor(c),
+        objectKeys: FfiConverterSequenceString.readFromCursor(c),
+      };
+    }
+    writeIntoCursor(value: TypeName, c: Cursor): void {
+      FfiConverterString.writeIntoCursor(value.text, c);
+      FfiConverterUInt64.writeIntoCursor(value.createdAtMs, c);
+      FfiConverterSequenceTypeMediaItem.writeIntoCursor(value.media, c);
+      FfiConverterSequenceString.writeIntoCursor(value.objectKeys, c);
+    }
+    allocationSize(value: TypeName): number {
+      return (
+        FfiConverterString.allocationSize(value.text) +
+        FfiConverterUInt64.allocationSize(value.createdAtMs) +
+        FfiConverterSequenceTypeMediaItem.allocationSize(value.media) +
+        FfiConverterSequenceString.allocationSize(value.objectKeys)
+      );
+    }
+  }
+  return new FFIConverter();
+})();
+
 export type EpochKeys = {
   epochId: ArrayBuffer;
   root: ArrayBuffer;
@@ -1752,132 +2057,90 @@ const FfiConverterTypeKeyBackup = (() => {
   return new FFIConverter();
 })();
 
-// Hermes (React Native ≥ 0.74) ships TextEncoder and encodeInto, but not
-// TextDecoder. For single-string decode (bytesToString), we polyfill via the
-// C++ string_from_buffer helper using a duck-typed object matching the
-// standard TextDecoder.decode signature. Once Hermes ships a real
-// TextDecoder, the `typeof` check will pick it up automatically.
-//
-// For array-of-strings decode (readStringFromBuffer), we keep a dedicated C++
-// helper: the polyfill path (new Uint8Array view + decode) measured ~40%
-// slower on getStringArray benchmarks than a direct (buf, offset, length)
-// call, due to the per-read view allocation and extra property lookups in
-// string_from_buffer.
-const stringConverter = (() => {
-  const encoder = new TextEncoder();
-  const decoder: { decode(input: UniffiByteArray): string } =
-    typeof TextDecoder !== "undefined"
-      ? new TextDecoder()
-      : {
-          decode: (bytes: UniffiByteArray) =>
-            nativeModule().ubrn_uniffi_internal_fn_func_ffi__string_from_buffer(
-              bytes,
-              undefined as any,
-            ) as string,
-        };
-  return {
-    // Single-string lower() uses the C++ helper — TextEncoder.encode
-    // measured ~43% slower on takeString benchmarks.
-    stringToBytes: (s: string) =>
-      nativeModule().ubrn_uniffi_internal_fn_func_ffi__string_to_buffer(
-        s,
-        undefined as any,
-      ),
-    bytesToString: (ab: UniffiByteArray) => decoder.decode(ab),
-    // Direct C++ call — bypasses uniffiCaller.rustCall() overhead.
-    // Matters for N-element arrays.
-    stringByteLength: (s: string) =>
-      nativeModule().ubrn_uniffi_internal_fn_func_ffi__string_to_byte_length(
-        s,
-        undefined as any,
-      ) as number,
-    // Encode directly into the RustBuffer backing store via
-    // TextEncoder.encodeInto — zero intermediate allocation. Replaces
-    // the old C++ write_string_into_buffer helper.
-    writeStringIntoBuffer: (s: string, buf: any, offset: number): number => {
-      const view = new Uint8Array(
-        buf.arrayBuffer,
-        offset,
-        buf.arrayBuffer.byteLength - offset,
-      );
-      return encoder.encodeInto(s, view).written;
-    },
-    // Dedicated C++ helper — avoids per-read Uint8Array allocation and
-    // the double property-lookup in string_from_buffer.
-    readStringFromBuffer: (buf: any, offset: number, length: number): string =>
-      nativeModule().ubrn_uniffi_internal_fn_func_ffi__read_string_from_buffer(
-        buf,
-        offset,
-        length,
-      ) as string,
-  };
-})();
-const FfiConverterString = uniffiCreateFfiConverterString(stringConverter);
-
-export type MediaItem = {
-  objectId: ArrayBuffer;
-  /**
-   * 0 = full, 1 = thumb, 2 = poster.
-   */
-  kind: number;
-  mime: string;
-  fileKey: ArrayBuffer;
-  contentLen: bigint;
-  width: number;
-  height: number;
-  durationMs: bigint;
+export type LinkHandoff = {
+  backup: KeyBackup;
+  handle: string;
 };
 
 /**
- * Generated factory for {@link MediaItem} record objects.
+ * Generated factory for {@link LinkHandoff} record objects.
  */
-export const MediaItem = (() => {
+export const LinkHandoff = (() => {
   const defaults = () => ({});
   const create = (() => {
-    return uniffiCreateRecord<MediaItem, ReturnType<typeof defaults>>(defaults);
+    return uniffiCreateRecord<LinkHandoff, ReturnType<typeof defaults>>(
+      defaults,
+    );
   })();
   return Object.freeze({
     create,
     new: create,
-    defaults: () => Object.freeze(defaults()) as Partial<MediaItem>,
+    defaults: () => Object.freeze(defaults()) as Partial<LinkHandoff>,
   });
 })();
 
-const FfiConverterTypeMediaItem = (() => {
-  type TypeName = MediaItem;
+const FfiConverterTypeLinkHandoff = (() => {
+  type TypeName = LinkHandoff;
   class FFIConverter extends AbstractFfiConverterByteArray<TypeName> {
     readFromCursor(c: Cursor): TypeName {
       return {
-        objectId: FfiConverterArrayBuffer.readFromCursor(c),
-        kind: FfiConverterUInt8.readFromCursor(c),
-        mime: FfiConverterString.readFromCursor(c),
-        fileKey: FfiConverterArrayBuffer.readFromCursor(c),
-        contentLen: FfiConverterUInt64.readFromCursor(c),
-        width: FfiConverterUInt32.readFromCursor(c),
-        height: FfiConverterUInt32.readFromCursor(c),
-        durationMs: FfiConverterUInt64.readFromCursor(c),
+        backup: FfiConverterTypeKeyBackup.readFromCursor(c),
+        handle: FfiConverterString.readFromCursor(c),
       };
     }
     writeIntoCursor(value: TypeName, c: Cursor): void {
-      FfiConverterArrayBuffer.writeIntoCursor(value.objectId, c);
-      FfiConverterUInt8.writeIntoCursor(value.kind, c);
-      FfiConverterString.writeIntoCursor(value.mime, c);
-      FfiConverterArrayBuffer.writeIntoCursor(value.fileKey, c);
-      FfiConverterUInt64.writeIntoCursor(value.contentLen, c);
-      FfiConverterUInt32.writeIntoCursor(value.width, c);
-      FfiConverterUInt32.writeIntoCursor(value.height, c);
-      FfiConverterUInt64.writeIntoCursor(value.durationMs, c);
+      FfiConverterTypeKeyBackup.writeIntoCursor(value.backup, c);
+      FfiConverterString.writeIntoCursor(value.handle, c);
     }
     allocationSize(value: TypeName): number {
       return (
-        FfiConverterArrayBuffer.allocationSize(value.objectId) +
-        FfiConverterUInt8.allocationSize(value.kind) +
-        FfiConverterString.allocationSize(value.mime) +
-        FfiConverterArrayBuffer.allocationSize(value.fileKey) +
-        FfiConverterUInt64.allocationSize(value.contentLen) +
-        FfiConverterUInt32.allocationSize(value.width) +
-        FfiConverterUInt32.allocationSize(value.height) +
-        FfiConverterUInt64.allocationSize(value.durationMs)
+        FfiConverterTypeKeyBackup.allocationSize(value.backup) +
+        FfiConverterString.allocationSize(value.handle)
+      );
+    }
+  }
+  return new FFIConverter();
+})();
+
+export type LinkKeyPair = {
+  secretKey: ArrayBuffer;
+  publicKey: ArrayBuffer;
+};
+
+/**
+ * Generated factory for {@link LinkKeyPair} record objects.
+ */
+export const LinkKeyPair = (() => {
+  const defaults = () => ({});
+  const create = (() => {
+    return uniffiCreateRecord<LinkKeyPair, ReturnType<typeof defaults>>(
+      defaults,
+    );
+  })();
+  return Object.freeze({
+    create,
+    new: create,
+    defaults: () => Object.freeze(defaults()) as Partial<LinkKeyPair>,
+  });
+})();
+
+const FfiConverterTypeLinkKeyPair = (() => {
+  type TypeName = LinkKeyPair;
+  class FFIConverter extends AbstractFfiConverterByteArray<TypeName> {
+    readFromCursor(c: Cursor): TypeName {
+      return {
+        secretKey: FfiConverterArrayBuffer.readFromCursor(c),
+        publicKey: FfiConverterArrayBuffer.readFromCursor(c),
+      };
+    }
+    writeIntoCursor(value: TypeName, c: Cursor): void {
+      FfiConverterArrayBuffer.writeIntoCursor(value.secretKey, c);
+      FfiConverterArrayBuffer.writeIntoCursor(value.publicKey, c);
+    }
+    allocationSize(value: TypeName): number {
+      return (
+        FfiConverterArrayBuffer.allocationSize(value.secretKey) +
+        FfiConverterArrayBuffer.allocationSize(value.publicKey)
       );
     }
   }
@@ -4615,6 +4878,14 @@ const FfiConverterTypeReaderKeyring = new FfiConverterObject(
   uniffiTypeReaderKeyringObjectFactory,
 );
 
+// FfiConverter for Array<MediaItem>
+const FfiConverterSequenceTypeMediaItem = new FfiConverterArray(
+  FfiConverterTypeMediaItem,
+);
+
+// FfiConverter for Array<string>
+const FfiConverterSequenceString = new FfiConverterArray(FfiConverterString);
+
 // FfiConverter for Array<EpochKeys>
 const FfiConverterSequenceTypeEpochKeys = new FfiConverterArray(
   FfiConverterTypeEpochKeys,
@@ -4623,11 +4894,6 @@ const FfiConverterSequenceTypeEpochKeys = new FfiConverterArray(
 // FfiConverter for ArrayBuffer | undefined
 const FfiConverterOptionalBytes = new FfiConverterOptional(
   FfiConverterArrayBuffer,
-);
-
-// FfiConverter for Array<MediaItem>
-const FfiConverterSequenceTypeMediaItem = new FfiConverterArray(
-  FfiConverterTypeMediaItem,
 );
 
 // FfiConverter for Array<ArrayBuffer>
@@ -4669,7 +4935,7 @@ function uniffiEnsureInitialized() {
   }
   if (
     nativeModule().uniffi_halqo_core_checksum_func_decode_chat_payload() !==
-    58165
+    53624
   ) {
     throw new UniffiInternalError.ApiChecksumMismatch(
       "uniffi_halqo_core_checksum_func_decode_chat_payload",
@@ -4682,7 +4948,7 @@ function uniffiEnsureInitialized() {
   }
   if (
     nativeModule().uniffi_halqo_core_checksum_func_encode_chat_payload() !==
-    56194
+    45260
   ) {
     throw new UniffiInternalError.ApiChecksumMismatch(
       "uniffi_halqo_core_checksum_func_encode_chat_payload",
@@ -4736,6 +5002,32 @@ function uniffiEnsureInitialized() {
   ) {
     throw new UniffiInternalError.ApiChecksumMismatch(
       "uniffi_halqo_core_checksum_func_invite_token_hash",
+    );
+  }
+  if (
+    nativeModule().uniffi_halqo_core_checksum_func_link_confirmation_code() !==
+    13496
+  ) {
+    throw new UniffiInternalError.ApiChecksumMismatch(
+      "uniffi_halqo_core_checksum_func_link_confirmation_code",
+    );
+  }
+  if (
+    nativeModule().uniffi_halqo_core_checksum_func_link_generate_keys() !==
+    35555
+  ) {
+    throw new UniffiInternalError.ApiChecksumMismatch(
+      "uniffi_halqo_core_checksum_func_link_generate_keys",
+    );
+  }
+  if (nativeModule().uniffi_halqo_core_checksum_func_link_open() !== 59203) {
+    throw new UniffiInternalError.ApiChecksumMismatch(
+      "uniffi_halqo_core_checksum_func_link_open",
+    );
+  }
+  if (nativeModule().uniffi_halqo_core_checksum_func_link_seal() !== 8682) {
+    throw new UniffiInternalError.ApiChecksumMismatch(
+      "uniffi_halqo_core_checksum_func_link_seal",
     );
   }
   if (
@@ -5291,10 +5583,13 @@ export default Object.freeze({
   converters: {
     FfiConverterTypeBlobKind,
     FfiConverterTypeByteRange,
+    FfiConverterTypeChatContent,
     FfiConverterTypeCoreError,
     FfiConverterTypeEpochKeys,
     FfiConverterTypeIdentityKeys,
     FfiConverterTypeKeyBackup,
+    FfiConverterTypeLinkHandoff,
+    FfiConverterTypeLinkKeyPair,
     FfiConverterTypeMediaChunkDecryptor,
     FfiConverterTypeMediaItem,
     FfiConverterTypeMediaLayout,

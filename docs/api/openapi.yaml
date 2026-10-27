@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Halqo API
-  version: 0.9.0
+  version: 0.10.0
   description: >
     halqo-server API. The server stores and relays ciphertext only. Request and response bodies never contain
     plaintext content, names, emails, circle numbers or private keys. Byte fields are standard base64 strings;
@@ -721,6 +721,7 @@ paths:
               required: [userIds]
               properties:
                 userIds: { type: array, maxItems: 50, items: { $ref: "#/components/schemas/Id" } }
+                deviceIds: { type: array, maxItems: 200, items: { $ref: "#/components/schemas/Id" } }
       responses:
         "200":
           content:
@@ -840,6 +841,106 @@ paths:
       summary: Drop a processed welcome
       responses:
         "200": { content: { application/json: { schema: { type: object } } } }
+
+  /v1/devices/{deviceId}:
+    parameters:
+      - { name: deviceId, in: path, required: true, schema: { $ref: "#/components/schemas/Id" } }
+    delete:
+      summary: Revoke one of my devices (removed from chats, no more pushes, key packages deleted)
+      responses:
+        "200": { content: { application/json: { schema: { type: object } } } }
+        "404": { $ref: "#/components/responses/Error" }
+
+  /v1/devices/{deviceId}/push-token:
+    parameters:
+      - { name: deviceId, in: path, required: true, schema: { $ref: "#/components/schemas/Id" } }
+    put:
+      summary: Register this device's push token (stored sealed; pushes carry no content)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token, platform]
+              properties:
+                token: { type: string }
+                platform: { type: string, enum: [android, ios] }
+      responses:
+        "200": { content: { application/json: { schema: { type: object } } } }
+        "404": { $ref: "#/components/responses/Error" }
+
+  /v1/device-links:
+    post:
+      summary: Hand off account secrets sealed to a new device's QR key (single use, 10 minutes)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [linkId, sealed]
+              properties:
+                linkId: { $ref: "#/components/schemas/Bytes" }
+                sealed: { $ref: "#/components/schemas/Bytes" }
+      responses:
+        "201": { content: { application/json: { schema: { type: object } } } }
+
+  /v1/device-links/{linkId}:
+    parameters:
+      - { name: linkId, in: path, required: true, schema: { type: string } }
+    get:
+      summary: The new device picks up its hand-off once, with a session (no auth; rate-limited)
+      security: []
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  userId: { $ref: "#/components/schemas/Id" }
+                  sealed: { $ref: "#/components/schemas/Bytes" }
+                  accessToken: { type: string }
+                  refreshToken: { type: string }
+        "404": { $ref: "#/components/responses/Error" }
+
+  /v1/mls/groups/{groupId}/missing-devices:
+    parameters:
+      - { name: groupId, in: path, required: true, schema: { $ref: "#/components/schemas/Id" } }
+      - { $ref: "#/components/parameters/Device" }
+    get:
+      summary: Members' active devices that aren't in the group yet (e.g. a new phone)
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    userId: { $ref: "#/components/schemas/Id" }
+                    deviceId: { $ref: "#/components/schemas/Id" }
+
+  /v1/mls/groups/{groupId}/media:
+    parameters:
+      - { name: groupId, in: path, required: true, schema: { $ref: "#/components/schemas/Id" } }
+      - { $ref: "#/components/parameters/Device" }
+    post:
+      summary: Attach my uploaded objects to a chat (members-only downloads)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [objectKeys]
+              properties:
+                objectKeys: { type: array, maxItems: 12, items: { type: string } }
+      responses:
+        "200": { content: { application/json: { schema: { type: object } } } }
+        "400": { $ref: "#/components/responses/Error" }
 
 components:
   parameters:

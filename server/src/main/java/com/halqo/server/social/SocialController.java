@@ -47,11 +47,14 @@ public class SocialController {
     private final ServerSecrets secrets;
     private final RateLimiter limiter;
 
-    public SocialController(JdbcTemplate jdbc, HalqoCore core, ServerSecrets secrets, RateLimiter limiter) {
+    private final com.halqo.server.push.PushService push;
+
+    public SocialController(JdbcTemplate jdbc, HalqoCore core, ServerSecrets secrets, RateLimiter limiter, com.halqo.server.push.PushService push) {
         this.jdbc = jdbc;
         this.core = core;
         this.secrets = secrets;
         this.limiter = limiter;
+        this.push = push;
     }
 
     private static byte[] me(Jwt jwt) {
@@ -219,6 +222,7 @@ public class SocialController {
         jdbc.update("INSERT INTO friendships (id, user_a, user_b, status, created_at) VALUES (?, ?, ?, 'pending', ?)",
                 Ids.bytes(Ids.newId()), me, to, now());
         upsertPayload(me, to, r.epochId(), r.payload());
+        push.notifyUser(to); // content-free: "new activity"
         return Map.of("status", "outgoing");
     }
 

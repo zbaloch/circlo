@@ -1067,26 +1067,110 @@ pub struct MlsMessageMeta {
     pub is_commit: bool,
 }
 
-/// Encodes and pads a chat message for `MlsClient::encrypt` (text, media keys, timestamp).
+/// A chat message: text, media descriptors (with their keys) and the matching object keys.
+#[derive(uniffi::Record)]
+pub struct ChatContent {
+    pub text: String,
+    pub created_at_ms: u64,
+    pub media: Vec<MediaItem>,
+    pub object_keys: Vec<String>,
+}
+
+/// Encodes and pads a chat message for `MlsClient::encrypt`.
 #[uniffi::export]
-pub fn encode_chat_payload(content: &PostContent) -> Result<Vec<u8>> {
-    let h = content.to_header()?;
+pub fn encode_chat_payload(content: &ChatContent) -> Result<Vec<u8>> {
+    let h = PostContent {
+        text: content.text.clone(),
+        created_at_ms: content.created_at_ms,
+        media: content.media.clone(),
+    }
+    .to_header()?;
     crate::mls::encode_chat(&crate::mls::ChatPayload {
         text: h.text,
         media: h.media,
+        object_keys: content.object_keys.clone(),
         created_at_ms: h.created_at_ms,
     })
 }
 
 /// Inverse of `encode_chat_payload` for a decrypted application message.
 #[uniffi::export]
-pub fn decode_chat_payload(bytes: &[u8]) -> Result<PostContent> {
+pub fn decode_chat_payload(bytes: &[u8]) -> Result<ChatContent> {
     let p = crate::mls::decode_chat(bytes)?;
-    Ok(PostContent::from_header(PostHeader {
+    let c = PostContent::from_header(PostHeader {
         text: p.text,
         media: p.media,
         created_at_ms: p.created_at_ms,
-    }))
+    });
+    Ok(ChatContent {
+        text: c.text,
+        created_at_ms: c.created_at_ms,
+        media: c.media,
+        object_keys: p.object_keys,
+    })
+}
+
+// ---------------- device linking (CRYPTO.md 13b) ----------------
+
+#[derive(uniffi::Record)]
+pub struct LinkKeyPair {
+    pub secret_key: Vec<u8>,
+    pub public_key: Vec<u8>,
+}
+
+#[derive(uniffi::Record)]
+pub struct LinkHandoff {
+    pub backup: KeyBackup,
+    pub handle: String,
+}
+
+/// The new device's one-time key for receiving the hand-off (its public half goes in the QR code).
+#[uniffi::export]
+pub fn link_generate_keys() -> LinkKeyPair {
+    let k = crate::link::generate();
+    LinkKeyPair {
+        secret_key: k.secret.to_vec(),
+        public_key: k.public.to_vec(),
+    }
+}
+
+/// Six digits shown on both screens so the user can check they scanned their own new phone.
+#[uniffi::export]
+pub fn link_confirmation_code(link_public_key: &[u8]) -> Result<String> {
+    Ok(crate::link::confirmation_code(&key32(
+        link_public_key,
+        "link_public_key",
+    )?))
+}
+
+/// The signed-in device seals the account secrets to the new device's link key.
+#[uniffi::export]
+pub fn link_seal(
+    link_public_key: &[u8],
+    link_id: &[u8],
+    user_id: &[u8],
+    backup: &KeyBackup,
+    handle: String,
+) -> Result<Vec<u8>> {
+    crate::link::seal(
+        &key32(link_public_key, "link_public_key")?,
+        &key32(link_id, "link_id")?,
+        &id16(user_id, "user_id")?,
+        &crate::link::LinkPayload {
+            backup: backup.to_payload()?,
+            handle,
+        },
+    )
+}
+
+#[uniffi::export]
+pub fn link_open(link_secret_key: &[u8], link_id: &[u8], user_id: &[u8], sealed: &[u8]) -> Result<LinkHandoff> {
+    let sk = Zeroizing::new(key32(link_secret_key, "link_secret_key")?);
+    let p = crate::link::open(&sk, &key32(link_id, "link_id")?, &id16(user_id, "user_id")?, sealed)?;
+    Ok(LinkHandoff {
+        backup: KeyBackup::from_payload(p.backup),
+        handle: p.handle,
+    })
 }
 
 /// A fresh Ed25519 key pair for this device's MLS signatures (never used for anything else).

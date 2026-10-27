@@ -1793,6 +1793,7 @@ export interface paths {
                 content: {
                     "application/json": {
                         userIds: components["schemas"]["Id"][];
+                        deviceIds?: components["schemas"]["Id"][];
                     };
                 };
             };
@@ -2070,6 +2071,281 @@ export interface paths {
                 };
             };
         };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/devices/{deviceId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                deviceId: components["schemas"]["Id"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Revoke one of my devices (removed from chats, no more pushes, key packages deleted) */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    deviceId: components["schemas"]["Id"];
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": Record<string, never>;
+                    };
+                };
+                404: components["responses"]["Error"];
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/devices/{deviceId}/push-token": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                deviceId: components["schemas"]["Id"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /** Register this device's push token (stored sealed; pushes carry no content) */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    deviceId: components["schemas"]["Id"];
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        token: string;
+                        /** @enum {string} */
+                        platform: "android" | "ios";
+                    };
+                };
+            };
+            responses: {
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": Record<string, never>;
+                    };
+                };
+                404: components["responses"]["Error"];
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/device-links": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Hand off account secrets sealed to a new device's QR key (single use, 10 minutes) */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        linkId: components["schemas"]["Bytes"];
+                        sealed: components["schemas"]["Bytes"];
+                    };
+                };
+            };
+            responses: {
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": Record<string, never>;
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/device-links/{linkId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                linkId: string;
+            };
+            cookie?: never;
+        };
+        /** The new device picks up its hand-off once, with a session (no auth; rate-limited) */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    linkId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            userId?: components["schemas"]["Id"];
+                            sealed?: components["schemas"]["Bytes"];
+                            accessToken?: string;
+                            refreshToken?: string;
+                        };
+                    };
+                };
+                404: components["responses"]["Error"];
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/mls/groups/{groupId}/missing-devices": {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The calling device (must be one of the caller's registered devices) */
+                "X-Halqo-Device": components["parameters"]["Device"];
+            };
+            path: {
+                groupId: components["schemas"]["Id"];
+            };
+            cookie?: never;
+        };
+        /** Members' active devices that aren't in the group yet (e.g. a new phone) */
+        get: {
+            parameters: {
+                query?: never;
+                header: {
+                    /** @description The calling device (must be one of the caller's registered devices) */
+                    "X-Halqo-Device": components["parameters"]["Device"];
+                };
+                path: {
+                    groupId: components["schemas"]["Id"];
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            userId?: components["schemas"]["Id"];
+                            deviceId?: components["schemas"]["Id"];
+                        }[];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/mls/groups/{groupId}/media": {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The calling device (must be one of the caller's registered devices) */
+                "X-Halqo-Device": components["parameters"]["Device"];
+            };
+            path: {
+                groupId: components["schemas"]["Id"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Attach my uploaded objects to a chat (members-only downloads) */
+        post: {
+            parameters: {
+                query?: never;
+                header: {
+                    /** @description The calling device (must be one of the caller's registered devices) */
+                    "X-Halqo-Device": components["parameters"]["Device"];
+                };
+                path: {
+                    groupId: components["schemas"]["Id"];
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        objectKeys: string[];
+                    };
+                };
+            };
+            responses: {
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": Record<string, never>;
+                    };
+                };
+                400: components["responses"]["Error"];
+            };
+        };
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;

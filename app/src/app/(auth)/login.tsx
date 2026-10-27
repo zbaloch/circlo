@@ -37,6 +37,9 @@ export default function LoginScreen() {
       <Pressable accessibilityRole="link" onPress={() => router.push('/recover')} className="items-center py-2">
         <Text className="font-semibold text-primary dark:text-primary-dark">Forgot password? Use your recovery phrase</Text>
       </Pressable>
+      <Pressable accessibilityRole="link" onPress={() => router.push('/link')} className="items-center py-2">
+        <Text className="font-semibold text-primary dark:text-primary-dark">Link from another device</Text>
+      </Pressable>
     </AuthScreen>
   );
 }

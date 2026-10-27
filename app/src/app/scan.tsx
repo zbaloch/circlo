@@ -5,10 +5,11 @@ import { Text, View } from 'react-native';
 
 import { Button, ErrorText } from '@/components/form';
 import { describeError } from '@/lib/account';
+import { parseLinkQr, setScannedLink } from '@/lib/device-link';
 import { acceptInvite, getContact, InviteError, safetyNumber, setVerified } from '@/lib/friends';
 import { useSession } from '@/lib/session';
 
-/** Scans an invite QR (sends a friend request) or a friend's safety-number QR (marks them verified if it matches). */
+/** Scans an invite QR, a friend's safety-number QR, or a new device's link code (Devices: Link a new device). */
 export default function ScanScreen() {
   const { safetyFor } = useLocalSearchParams<{ safetyFor?: string }>();
   const session = useSession();
@@ -34,6 +35,12 @@ export default function ScanScreen() {
     if (handled.current) return;
     handled.current = true;
     try {
+      if (parseLinkQr(data)) {
+        // A new device's link code: confirm the 6-digit code before anything is sent.
+        setScannedLink(data);
+        router.replace('/link-confirm');
+        return;
+      }
       if (safetyFor) {
         const contact = await getContact(account, safetyFor);
         const mine = contact && `halqo-safety:${safetyNumber(account, safetyFor, contact).qr}`;

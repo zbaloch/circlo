@@ -13,7 +13,9 @@ import { Screen } from '@/components/screen';
 import { loadAddressBook, type AddressBook } from '@/lib/addressbook';
 import { resumePendingRotation } from '@/lib/circles';
 import { checkForNewPosts, loadMoreFeed, refreshFeed, showPendingPosts, useFeed } from '@/lib/feed-store';
+import { syncMessaging } from '@/lib/messaging';
 import { dismissPost, retryPost, useOutbox } from '@/lib/outbox';
+import { onPushActivity, registerForPush } from '@/lib/push';
 import type { FeedPost } from '@/lib/posts';
 import { useSession } from '@/lib/session';
 
@@ -32,6 +34,16 @@ export default function HomeScreen() {
   // Finish any key rotation that was interrupted (app closed mid-way, offline): it retries quietly in the background.
   useEffect(() => {
     if (account) resumePendingRotation(account).catch(() => {});
+  }, [account]);
+
+  // Content-free pushes: register once, and on "new activity" just fetch and decrypt as usual.
+  useEffect(() => {
+    if (!account) return;
+    registerForPush(account);
+    return onPushActivity(() => {
+      checkForNewPosts(account);
+      syncMessaging(account).catch(() => {});
+    });
   }, [account]);
 
   const refresh = useCallback(async () => {
