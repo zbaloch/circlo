@@ -1,9 +1,10 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { Modal, Pressable, ScrollView, Text, View } from 'react-native';
+import { Modal, Pressable, ScrollView, View } from 'react-native';
 
 import type { AddressBook } from '@/lib/addressbook';
 import { audienceSize, labelOf, listedCircles } from '@/lib/circles';
 import { usePalette } from '@/theme/use-palette';
+import { Text } from '@/components/ui/text';
 
 type Props = {
   visible: boolean;

@@ -434,6 +434,7 @@ See docs/HARDENING.md for how to repeat each check.
 | 2026-10-27 | App core built with Cargo profile `app` (panic=unwind) instead of `release` (abort) | uniffi turns a panic into a JS error instead of killing the app |
 | 2026-10-27 | osv-scanner + cargo-deny in CI instead of local tools; accepted findings need a reason and expiry | One scanner for all three ecosystems; accepted risk is revisited |
 | 2026-10-27 | **No tracking** (owner rule): no IP/email/phone/location/device/last-seen data anywhere; install-referrer and ad-id permissions stripped; iOS privacy manifest declares no tracking; schema test blocks tracking columns; docs/PRIVACY.md lists everything stored | Only what users post for others is kept, and only as ciphertext |
+| 2026-10-27 | **UI identical on iOS and Android, X/Bluesky style**: bundled Inter font, own header/tab bar/dialogs/toggle/spinner instead of native ones; teal brand kept | Owner request; native headers, alerts and switches looked like stock Material on Android. Fonts ship in the app (no runtime download, no third-party requests) |
 | 2026-10-25 | Only `secret-scan / gitleaks` should be a required check | Path-filtered CI workflows don't run on every PR |
 
 ## Waiting on owner

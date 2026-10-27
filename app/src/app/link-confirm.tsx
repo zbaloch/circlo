@@ -1,11 +1,12 @@
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { Text, View } from 'react-native';
+import { View } from 'react-native';
 
 import { Button, ErrorText } from '@/components/form';
 import { describeError } from '@/lib/account';
 import { confirmationCodeFor, linkFromParams, parseLinkQr, sendLink, takeScannedLink } from '@/lib/device-link';
 import { useSession } from '@/lib/session';
+import { Text } from '@/components/ui/text';
 
 /** Signed-in device: check the code matches the new phone's screen, then hand off this account's keys to it. */
 export default function LinkConfirmScreen() {

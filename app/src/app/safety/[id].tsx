@@ -1,12 +1,13 @@
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { ScrollView, Text, View } from 'react-native';
+import { ScrollView, View } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
 
 import { Button } from '@/components/form';
 import type { Contact } from '@/lib/addressbook';
 import { acceptNewIdentity, getContact, safetyNumber, setVerified } from '@/lib/friends';
 import { useSession } from '@/lib/session';
+import { Text } from '@/components/ui/text';
 
 /**
  * Safety number (CRYPTO.md section 12): the same 60 digits on both phones if neither side's keys were swapped.

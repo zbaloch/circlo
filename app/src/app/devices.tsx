@@ -1,12 +1,15 @@
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, Alert, FlatList, Pressable, RefreshControl, Text, View } from 'react-native';
+import { FlatList, Pressable, RefreshControl, View } from 'react-native';
 
 import { api, ok } from '@/api/client';
 import { Button } from '@/components/form';
 import { Screen } from '@/components/screen';
 import { describeError } from '@/lib/account';
 import { useSession } from '@/lib/session';
+import { Text } from '@/components/ui/text';
+import { showAlert } from '@/lib/dialog';
+import { Spinner } from '@/components/ui/spinner';
 
 type Device = { deviceId?: string; createdAt?: string; revoked?: boolean };
 
@@ -33,7 +36,7 @@ export default function DevicesScreen() {
   );
 
   const revoke = (d: Device) =>
-    Alert.alert('Revoke this device?', 'It will be signed out of messaging and stop getting notifications. It keeps anything already on it.', [
+    showAlert('Revoke this device?', 'It will be signed out of messaging and stop getting notifications. It keeps anything already on it.', [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Revoke',
@@ -43,7 +46,7 @@ export default function DevicesScreen() {
             ok(await api.DELETE('/v1/devices/{deviceId}', { params: { path: { deviceId: d.deviceId! } } }));
             load();
           } catch (e) {
-            Alert.alert('Couldn’t revoke', describeError(e));
+            showAlert('Couldn’t revoke', describeError(e));
           }
         },
       },
@@ -56,7 +59,7 @@ export default function DevicesScreen() {
   return (
     <Screen>
       {devices === null && !error ? (
-        <ActivityIndicator className="mt-10" />
+        <Spinner className="mt-10" />
       ) : (
         <FlatList
           data={sorted}

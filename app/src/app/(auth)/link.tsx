@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Text, View } from 'react-native';
+import { View } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
 
 import { AuthScreen } from '@/components/auth-screen';
@@ -7,6 +7,8 @@ import { ErrorText, Title } from '@/components/form';
 import { describeError } from '@/lib/account';
 import { pickUpLink, startLink } from '@/lib/device-link';
 import { useSession } from '@/lib/session';
+import { Text } from '@/components/ui/text';
+import { Spinner } from '@/components/ui/spinner';
 
 /**
  * New device: show a one-time code for the signed-in phone to scan (Devices → Link a new device). The account keys
@@ -49,7 +51,7 @@ export default function LinkScreen() {
           {link.code.slice(0, 3)} {link.code.slice(3)}
         </Text>
         <View className="flex-row items-center gap-2">
-          <ActivityIndicator />
+          <Spinner />
           <Text className="text-muted dark:text-muted-dark">Waiting for your other phone…</Text>
         </View>
         <ErrorText>{error}</ErrorText>

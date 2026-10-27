@@ -2,7 +2,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import * as ImagePicker from 'expo-image-picker';
 import { router, useFocusEffect, useLocalSearchParams, useNavigation } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, FlatList, KeyboardAvoidingView, Modal, Platform, Pressable, Text, TextInput, View } from 'react-native';
+import { FlatList, KeyboardAvoidingView, Modal, Platform, Pressable, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Avatar } from '@/components/avatar';
@@ -15,6 +15,9 @@ import { markRead, removePerson, sendMessage, syncMessaging, useConversations, t
 import { useSession } from '@/lib/session';
 import { chatTitle, dayLabel } from '@/lib/view-logic';
 import { usePalette } from '@/theme/use-palette';
+import { Text, TextInput } from '@/components/ui/text';
+import { showAlert } from '@/lib/dialog';
+import { Spinner } from '@/components/ui/spinner';
 
 type Row = { kind: 'day'; label: string; key: string } | { kind: 'msg'; msg: ChatMessage; key: string; showName: boolean };
 
@@ -64,7 +67,7 @@ export default function ChatScreen() {
   if (!account || !conv) {
     return (
       <View className="flex-1 items-center justify-center bg-surface dark:bg-surface-dark">
-        <ActivityIndicator />
+        <Spinner />
       </View>
     );
   }
@@ -98,7 +101,7 @@ export default function ChatScreen() {
       setText('');
       list.current?.scrollToEnd({ animated: true });
     } catch (e) {
-      Alert.alert('Couldn’t send', e instanceof Error ? e.message : 'Check your connection and try again.');
+      showAlert('Couldn’t send', e instanceof Error ? e.message : 'Check your connection and try again.');
     } finally {
       discardPrepared(prepared);
       setSending(false);
@@ -143,7 +146,7 @@ export default function ChatScreen() {
             ) : (
               <Pressable
                 onLongPress={() =>
-                  Alert.alert('Message', undefined, [
+                  showAlert('Message', undefined, [
                     { text: 'Cancel', style: 'cancel' },
                     { text: 'Delete for me', style: 'destructive' as const, onPress: () => setHidden(new Set([...hidden, item.msg.seq])) },
                   ])
@@ -191,7 +194,7 @@ export default function ChatScreen() {
             disabled={!canSend || !text.trim() || sending}
             onPress={() => send()}
             className={`h-10 w-10 items-center justify-center rounded-full bg-primary dark:bg-primary-dark ${!canSend || !text.trim() || sending ? 'opacity-50' : ''}`}>
-            {sending ? <ActivityIndicator color="#FFFFFF" /> : <Ionicons name="arrow-up" size={20} color="#FFFFFF" />}
+            {sending ? <Spinner tone="onPrimary" /> : <Ionicons name="arrow-up" size={20} color="#FFFFFF" />}
           </Pressable>
         </View>
       </KeyboardAvoidingView>
@@ -208,9 +211,9 @@ export default function ChatScreen() {
                 <Pressable
                   accessibilityRole="button"
                   onPress={() =>
-                    Alert.alert('Remove from chat?', 'They won’t be able to read anything sent after this.', [
+                    showAlert('Remove from chat?', 'They won’t be able to read anything sent after this.', [
                       { text: 'Cancel', style: 'cancel' },
-                      { text: 'Remove', style: 'destructive', onPress: () => removePerson(account, conv.groupId, u).catch((e) => Alert.alert('Couldn’t remove', String(e))) },
+                      { text: 'Remove', style: 'destructive', onPress: () => removePerson(account, conv.groupId, u).catch((e) => showAlert('Couldn’t remove', String(e))) },
                     ])
                   }>
                   <Text className="font-semibold text-danger dark:text-danger-dark">Remove</Text>

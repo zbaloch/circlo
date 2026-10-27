@@ -1,8 +1,9 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { Pressable, Text, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 
 import { useIntegrityWarning } from '@/lib/device-integrity';
 import { usePalette } from '@/theme/use-palette';
+import { Text } from '@/components/ui/text';
 
 /** Home banner on a rooted/jailbroken phone; warns only and can be dismissed (Settings keeps showing it). */
 export function IntegrityBanner() {

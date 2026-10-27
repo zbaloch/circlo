@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import { Pressable, ScrollView, View } from 'react-native';
 
 import { ErrorText } from '@/components/form';
 import { Screen } from '@/components/screen';
@@ -10,6 +10,7 @@ import { loadAddressBook, type AddressBook } from '@/lib/addressbook';
 import { audienceSize, labelOf, listedCircles, membersOf, nextCustomCircle, resumePendingRotation } from '@/lib/circles';
 import { useSession } from '@/lib/session';
 import { usePalette } from '@/theme/use-palette';
+import { Text } from '@/components/ui/text';
 
 /** Your circles, nearest first. Only you ever see these labels and who is in which circle. */
 export default function CirclesScreen() {

@@ -1,6 +1,6 @@
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { FlatList, Pressable, RefreshControl, Text, View } from 'react-native';
+import { FlatList, Pressable, RefreshControl, View } from 'react-native';
 
 import { Avatar } from '@/components/avatar';
 import { EmptyState } from '@/components/empty-state';
@@ -12,6 +12,7 @@ import { syncMessaging, unreadCount, useConversations, type Conversation } from 
 import { useSession } from '@/lib/session';
 import { relativeTime } from '@/lib/time';
 import { chatTitle } from '@/lib/view-logic';
+import { Text } from '@/components/ui/text';
 
 /** Messages inbox (PLAN.md 2A): conversations newest first, unread counts kept on this device. */
 export default function MessagesScreen() {

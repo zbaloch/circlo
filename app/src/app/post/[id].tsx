@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, Alert, FlatList, KeyboardAvoidingView, Platform, Pressable, Text, TextInput, View } from 'react-native';
+import { FlatList, KeyboardAvoidingView, Platform, Pressable, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Avatar } from '@/components/avatar';
@@ -16,6 +16,9 @@ import { deleteReply, fetchLikers, fetchReplies, MAX_REPLY_CHARS, sendReply, val
 import { relativeTime } from '@/lib/time';
 import { likersLine } from '@/lib/view-logic';
 import { usePalette } from '@/theme/use-palette';
+import { Text, TextInput } from '@/components/ui/text';
+import { showAlert } from '@/lib/dialog';
+import { Spinner } from '@/components/ui/spinner';
 
 /** Thread view (PLAN.md 2A): the post, its replies in order, and a reply composer docked at the bottom. */
 export default function ThreadScreen() {
@@ -72,14 +75,14 @@ export default function ThreadScreen() {
       putPost({ ...post, replyCount: post.replyCount + 1 });
       setText('');
     } catch {
-      Alert.alert('Couldn’t send reply', 'Check your connection and try again.');
+      showAlert('Couldn’t send reply', 'Check your connection and try again.');
     } finally {
       setSending(false);
     }
   };
 
   const removeReply = (r: Reply) =>
-    Alert.alert('Delete reply?', undefined, [
+    showAlert('Delete reply?', undefined, [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Delete',
@@ -102,7 +105,7 @@ export default function ThreadScreen() {
             <>
               <PostCard post={post} {...actions.cardProps(post)} />
               {line ? <Text className="border-b border-border px-4 py-2 text-sm text-muted dark:border-border-dark dark:text-muted-dark">{line}</Text> : null}
-              {replies === null ? <ActivityIndicator className="py-6" /> : null}
+              {replies === null ? <Spinner className="py-6" /> : null}
             </>
           }
           ListEmptyComponent={replies ? <Text className="px-4 py-6 text-center text-muted dark:text-muted-dark">No replies yet.</Text> : undefined}
@@ -142,7 +145,7 @@ export default function ThreadScreen() {
             disabled={!!validateReply(text) || sending}
             onPress={send}
             className={`h-10 w-10 items-center justify-center rounded-full bg-primary dark:bg-primary-dark ${validateReply(text) || sending ? 'opacity-50' : ''}`}>
-            {sending ? <ActivityIndicator color="#FFFFFF" /> : <Ionicons name="arrow-up" size={20} color="#FFFFFF" />}
+            {sending ? <Spinner tone="onPrimary" /> : <Ionicons name="arrow-up" size={20} color="#FFFFFF" />}
           </Pressable>
         </View>
       </KeyboardAvoidingView>

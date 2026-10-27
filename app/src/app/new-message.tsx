@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { FlatList, Pressable, Text, View } from 'react-native';
+import { FlatList, Pressable, View } from 'react-native';
 
 import { Avatar } from '@/components/avatar';
 import { Button, ErrorText } from '@/components/form';
@@ -10,6 +10,7 @@ import { loadAddressBook, type AddressBook } from '@/lib/addressbook';
 import { addPeople, startChat } from '@/lib/messaging';
 import { useSession } from '@/lib/session';
 import { usePalette } from '@/theme/use-palette';
+import { Text } from '@/components/ui/text';
 
 /** Pick friends for a new chat, or (with `group`) people to add to an existing one. */
 export default function NewMessageScreen() {

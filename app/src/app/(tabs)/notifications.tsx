@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { RefreshControl, ScrollView, Text, View } from 'react-native';
+import { RefreshControl, ScrollView, View } from 'react-native';
 
 import { Avatar } from '@/components/avatar';
 import { EmptyState } from '@/components/empty-state';
@@ -8,6 +8,7 @@ import { Screen } from '@/components/screen';
 import { describeError } from '@/lib/account';
 import { acceptRequest, declineRequest, InviteError } from '@/lib/friends';
 import { displayName, useConnections } from '@/lib/use-connections';
+import { Text } from '@/components/ui/text';
 
 /** Friend requests with inline Accept / Decline (PLAN.md 2A). Replies and likes arrive in later phases. */
 export default function NotificationsScreen() {
