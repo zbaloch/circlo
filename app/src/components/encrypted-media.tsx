@@ -3,10 +3,11 @@ import { Image } from 'expo-image';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import type React from 'react';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 
 import { imageUri, startPlayback, type UploadedMedia } from '@/lib/media';
 import { usePalette } from '@/theme/use-palette';
+import { Spinner } from './ui/spinner';
 
 /** An image decrypted in memory on the device. Placeholder while decrypting; lock icon if it can't be opened. */
 export function EncryptedImage({ media, className, fit = 'cover' }: { media: UploadedMedia; className: string; fit?: 'cover' | 'contain' }) {
@@ -26,7 +27,7 @@ export function EncryptedImage({ media, className, fit = 'cover' }: { media: Upl
   if (uri) return <Image source={{ uri }} className={className} contentFit={fit} accessibilityIgnoresInvertColors />;
   return (
     <View className={`items-center justify-center bg-surface-raised dark:bg-surface-raised-dark ${className}`}>
-      {failed ? <Ionicons name="lock-closed" size={22} color={palette.muted} accessibilityLabel="Couldn't decrypt" /> : <ActivityIndicator />}
+      {failed ? <Ionicons name="lock-closed" size={22} color={palette.muted} accessibilityLabel="Couldn't decrypt" /> : <Spinner />}
     </View>
   );
 }

@@ -1,7 +1,8 @@
-import { Text, View } from 'react-native';
+import { View } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
 
 import { usePalette } from '@/theme/use-palette';
+import { Text } from '@/components/ui/text';
 
 const R = 10;
 const C = 2 * Math.PI * R;

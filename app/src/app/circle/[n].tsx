@@ -1,6 +1,6 @@
 import { useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import { Pressable, ScrollView, View } from 'react-native';
 
 import { Avatar } from '@/components/avatar';
 import { Button, ErrorText, TextField } from '@/components/form';
@@ -8,6 +8,7 @@ import { describeError } from '@/lib/account';
 import { DEFAULT_CIRCLE, loadAddressBook, type AddressBook, type Contact } from '@/lib/addressbook';
 import { audienceSize, labelOf, membersOf, placeFriend, renameCircle } from '@/lib/circles';
 import { useSession } from '@/lib/session';
+import { Text } from '@/components/ui/text';
 
 function name(c: Contact) {
   return c.displayName || (c.handle ? `@${c.handle}` : 'Friend');

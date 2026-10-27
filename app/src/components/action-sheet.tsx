@@ -1,4 +1,5 @@
-import { Modal, Pressable, Text, View } from 'react-native';
+import { Modal, Pressable, View } from 'react-native';
+import { Text } from '@/components/ui/text';
 
 export type SheetAction = { label: string; destructive?: boolean; onPress: () => void };
 

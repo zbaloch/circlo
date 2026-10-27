@@ -10,7 +10,17 @@ module.exports = {
   presets: [require('nativewind/preset')],
   darkMode: 'media',
   theme: {
-    extend: { colors },
+    extend: {
+      colors,
+      // Inter, bundled with the app; components/ui/text.tsx maps font-weight classes to these families.
+      fontFamily: {
+        sans: ['Inter_400Regular'],
+        'sans-medium': ['Inter_500Medium'],
+        'sans-semibold': ['Inter_600SemiBold'],
+        'sans-bold': ['Inter_700Bold'],
+        'sans-extrabold': ['Inter_800ExtraBold'],
+      },
+    },
   },
   plugins: [],
 };

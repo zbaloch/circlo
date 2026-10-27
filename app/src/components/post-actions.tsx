@@ -1,6 +1,5 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Alert } from 'react-native';
 
 import { updateAddressBook, type AddressBook } from '@/lib/addressbook';
 import { ActionSheet, type SheetAction } from '@/components/action-sheet';
@@ -10,6 +9,7 @@ import type { StoredAccount } from '@/lib/keystore';
 import { deletePost, type FeedPost } from '@/lib/posts';
 import { blockUser } from '@/lib/safety';
 import { setLiked, toggledLike } from '@/lib/thread';
+import { showAlert } from '@/lib/dialog';
 
 /** Display name for an author: me, a friend's decrypted profile name, or a neutral fallback. Pure. */
 export function authorName(account: Pick<StoredAccount, 'userId' | 'handle'>, book: Pick<AddressBook, 'contacts'> | null, authorId: string) {
@@ -46,7 +46,7 @@ export function usePostActions(account: StoredAccount | null, book: AddressBook 
   const more = (post: FeedPost) => {
     if (!account) return;
     if (post.mine) {
-      Alert.alert('Delete post?', 'It will be removed for everyone who could see it, with its replies and likes.', [
+      showAlert('Delete post?', 'It will be removed for everyone who could see it, with its replies and likes.', [
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Delete',
@@ -56,7 +56,7 @@ export function usePostActions(account: StoredAccount | null, book: AddressBook 
               removePost(post.postId);
               opts.onChange?.();
               if (opts.inThread) router.back();
-            }, () => Alert.alert('Couldn’t delete', 'Check your connection and try again.')),
+            }, () => showAlert('Couldn’t delete', 'Check your connection and try again.')),
         },
       ]);
       return;
@@ -76,12 +76,12 @@ export function usePostActions(account: StoredAccount | null, book: AddressBook 
           label: `Block ${name}`,
           destructive: true,
           onPress: () =>
-            Alert.alert(`Block ${name}?`, 'You’ll stop being friends and they won’t be able to send you requests or see anything new you post. They aren’t told.', [
+            showAlert(`Block ${name}?`, 'You’ll stop being friends and they won’t be able to send you requests or see anything new you post. They aren’t told.', [
               { text: 'Cancel', style: 'cancel' },
               {
                 text: 'Block',
                 style: 'destructive',
-                onPress: () => blockUser(account, post.authorId).then(() => opts.onChange?.(), () => Alert.alert('Couldn’t block', 'Check your connection and try again.')),
+                onPress: () => blockUser(account, post.authorId).then(() => opts.onChange?.(), () => showAlert('Couldn’t block', 'Check your connection and try again.')),
               },
             ]),
         },

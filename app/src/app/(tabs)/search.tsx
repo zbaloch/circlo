@@ -2,7 +2,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import * as Clipboard from 'expo-clipboard';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, RefreshControl, ScrollView, Share, Text, View } from 'react-native';
+import { Pressable, RefreshControl, ScrollView, Share, View } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
 
 import { Avatar } from '@/components/avatar';
@@ -11,6 +11,7 @@ import { describeError } from '@/lib/account';
 import { acceptInvite, createInviteLink, InviteError, requestByHandle } from '@/lib/friends';
 import { displayName, useConnections } from '@/lib/use-connections';
 import { usePalette } from '@/theme/use-palette';
+import { Text } from '@/components/ui/text';
 
 function message(e: unknown) {
   return e instanceof InviteError ? e.message : describeError(e);

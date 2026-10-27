@@ -2,7 +2,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useState } from 'react';
-import { FlatList, Pressable, Text, useWindowDimensions, View } from 'react-native';
+import { FlatList, Pressable, useWindowDimensions, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -10,6 +10,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { EncryptedImage } from '@/components/encrypted-media';
 import { viewerState } from '@/lib/feed-store';
 import type { UploadedMedia } from '@/lib/media';
+import { Text } from '@/components/ui/text';
 
 function ZoomableImage({ media, width, height, onDismiss }: { media: UploadedMedia; width: number; height: number; onDismiss: () => void }) {
   const scale = useSharedValue(1);

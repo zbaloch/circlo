@@ -1,7 +1,7 @@
 import { FlashList } from '@shopify/flash-list';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, RefreshControl, Text, View, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native';
+import { Pressable, RefreshControl, View, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 
 import { EmptyState } from '@/components/empty-state';
@@ -19,6 +19,8 @@ import { dismissPost, retryPost, useOutbox } from '@/lib/outbox';
 import { onPushActivity, registerForPush } from '@/lib/push';
 import type { FeedPost } from '@/lib/posts';
 import { useSession } from '@/lib/session';
+import { Text } from '@/components/ui/text';
+import { Spinner } from '@/components/ui/spinner';
 
 const NEW_POSTS_INTERVAL = 60_000;
 
@@ -125,7 +127,7 @@ export default function HomeScreen() {
             </View>
           )
         }
-        ListFooterComponent={feed.loading ? <ActivityIndicator className="py-6" /> : null}
+        ListFooterComponent={feed.loading ? <Spinner className="py-6" /> : null}
         renderItem={({ item }: { item: FeedPost }) => <PostCard post={item} {...actions.cardProps(item)} />}
       />
 

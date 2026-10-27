@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { Alert, Pressable, ScrollView, Text, View } from 'react-native';
+import { Pressable, ScrollView, View } from 'react-native';
 
 import { Avatar } from '@/components/avatar';
 import { Button, ErrorText } from '@/components/form';
@@ -12,6 +12,8 @@ import { labelOf, listedCircles, placeFriend, unfriend } from '@/lib/circles';
 import { blockUser } from '@/lib/safety';
 import { displayName, useConnections } from '@/lib/use-connections';
 import { usePalette } from '@/theme/use-palette';
+import { Text } from '@/components/ui/text';
+import { showAlert } from '@/lib/dialog';
 
 /**
  * A friend's profile, decrypted on this device. The circle section is author-only: it shows MY placement of this
@@ -117,7 +119,7 @@ export default function FriendScreen() {
               accessibilityRole="button"
               disabled={busy}
               onPress={() =>
-                Alert.alert('Unfriend?', `${displayName(c)} won’t be able to read anything you post from now on. They aren’t notified.`, [
+                showAlert('Unfriend?', `${displayName(c)} won’t be able to read anything you post from now on. They aren’t notified.`, [
                   { text: 'Cancel', style: 'cancel' },
                   {
                     text: 'Unfriend',
@@ -141,7 +143,7 @@ export default function FriendScreen() {
             accessibilityRole="button"
             disabled={busy}
             onPress={() =>
-              Alert.alert(`Block ${displayName(c)}?`, 'You’ll stop being friends and they can’t send you requests or see anything new you post. They aren’t told.', [
+              showAlert(`Block ${displayName(c)}?`, 'You’ll stop being friends and they can’t send you requests or see anything new you post. They aren’t told.', [
                 { text: 'Cancel', style: 'cancel' },
                 {
                   text: 'Block',

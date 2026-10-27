@@ -1,9 +1,10 @@
 import { router } from 'expo-router';
-import { Text, View } from 'react-native';
+import { View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Button } from '@/components/form';
 import { HalqoMark } from '@/components/halqo-mark';
+import { Text } from '@/components/ui/text';
 
 export default function WelcomeScreen() {
   return (

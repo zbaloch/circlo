@@ -1,6 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useEffect, type ComponentProps } from 'react';
-import { Linking, Pressable, Text, View } from 'react-native';
+import { Linking, Pressable, View } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 
 import { Avatar } from '@/components/avatar';
@@ -10,6 +10,7 @@ import type { FeedPost } from '@/lib/posts';
 import { relativeTime } from '@/lib/time';
 import { linkParts } from '@/lib/view-logic';
 import { usePalette } from '@/theme/use-palette';
+import { Text } from '@/components/ui/text';
 
 type Props = {
   post: FeedPost;
@@ -43,15 +44,15 @@ export function PostCard({ post, name, handle, audience, onOpen, onReply, onLike
       <Avatar name={name} />
       <View className="flex-1 gap-2">
         <View className="flex-row items-center gap-1">
-          <Text numberOfLines={1} className="shrink text-base font-bold text-ink dark:text-ink-dark">
+          <Text numberOfLines={1} className="shrink text-[15px] font-bold text-ink dark:text-ink-dark">
             {name}
           </Text>
           {handle ? (
-            <Text numberOfLines={1} className="shrink text-base text-muted dark:text-muted-dark">
+            <Text numberOfLines={1} className="shrink text-[15px] text-muted dark:text-muted-dark">
               @{handle}
             </Text>
           ) : null}
-          <Text className="text-base text-muted dark:text-muted-dark">· {relativeTime(post.createdAtMs)}</Text>
+          <Text className="text-[15px] text-muted dark:text-muted-dark">· {relativeTime(post.createdAtMs)}</Text>
           <View className="flex-1" />
           {onMore ? (
             <Pressable accessibilityRole="button" accessibilityLabel="More options" onPress={onMore} hitSlop={8}>
@@ -66,7 +67,7 @@ export function PostCard({ post, name, handle, audience, onOpen, onReply, onLike
           </View>
         ) : null}
         {post.text ? (
-          <Text className="text-base text-ink dark:text-ink-dark">
+          <Text className="text-[15px] leading-5 text-ink dark:text-ink-dark">
             {linkParts(post.text).map((part, i) =>
               part.url ? (
                 <Text key={i} accessibilityRole="link" onPress={() => Linking.openURL(part.url!)} className="text-primary dark:text-primary-dark">

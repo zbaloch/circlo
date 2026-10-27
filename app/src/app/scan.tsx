@@ -1,13 +1,14 @@
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useRef, useState } from 'react';
-import { Text, View } from 'react-native';
+import { View } from 'react-native';
 
 import { Button, ErrorText } from '@/components/form';
 import { describeError } from '@/lib/account';
 import { parseLinkQr, setScannedLink } from '@/lib/device-link';
 import { acceptInvite, getContact, InviteError, safetyNumber, setVerified } from '@/lib/friends';
 import { useSession } from '@/lib/session';
+import { Text } from '@/components/ui/text';
 
 /** Scans an invite QR, a friend's safety-number QR, or a new device's link code (Devices: Link a new device). */
 export default function ScanScreen() {

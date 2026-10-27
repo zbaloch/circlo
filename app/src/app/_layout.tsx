@@ -1,15 +1,29 @@
 import '../global.css';
 import '@/lib/interop';
 
+import { Inter_400Regular } from '@expo-google-fonts/inter/400Regular';
+import { Inter_500Medium } from '@expo-google-fonts/inter/500Medium';
+import { Inter_600SemiBold } from '@expo-google-fonts/inter/600SemiBold';
+import { Inter_700Bold } from '@expo-google-fonts/inter/700Bold';
+import { Inter_800ExtraBold } from '@expo-google-fonts/inter/800ExtraBold';
+import { useFonts } from 'expo-font';
 import { DarkTheme, DefaultTheme, ThemeProvider } from 'expo-router';
 import { Drawer } from 'expo-router/drawer';
+import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
-import { ActivityIndicator, View } from 'react-native';
+import { useEffect } from 'react';
+import { View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { AppDrawer } from '@/components/app-drawer';
+import { DialogHost } from '@/components/ui/dialog-host';
+import { BackButton, HeaderBar } from '@/components/ui/header';
+import { Spinner } from '@/components/ui/spinner';
 import { SessionProvider, useSession } from '@/lib/session';
 import { usePalette } from '@/theme/use-palette';
+
+// Keep the splash screen up until the bundled fonts are ready, so text never flashes in the system font.
+SplashScreen.preventAutoHideAsync().catch(() => undefined);
 
 /** Signed-out users only reach the onboarding stack; signed-in users get the drawer + tabs. */
 function Navigator() {
@@ -18,7 +32,7 @@ function Navigator() {
   if (session.status === 'loading') {
     return (
       <View className="flex-1 items-center justify-center bg-surface dark:bg-surface-dark">
-        <ActivityIndicator />
+        <Spinner size="large" />
       </View>
     );
   }
@@ -31,7 +45,15 @@ function Navigator() {
       drawerContent={(props) => <AppDrawer {...props} />}
       // Back returns to the previous screen (thread → viewer → thread), not always to the first route.
       backBehavior="history"
-      screenOptions={{ headerTintColor: palette.ink, swipeEnabled: signedIn }}>
+      screenOptions={{
+        swipeEnabled: signedIn,
+        drawerType: 'front',
+        overlayColor: 'rgba(0,0,0,0.4)',
+        // Same header everywhere (components/ui/header.tsx) instead of the platform's native one.
+        header: ({ options }) => (
+          <HeaderBar title={options.title} left={<BackButton />} right={options.headerRight?.({ tintColor: palette.ink, canGoBack: true })} />
+        ),
+      }}>
       <Drawer.Protected guard={!signedIn} redirectTo="/">
         <Drawer.Screen name="(auth)" options={{ headerShown: false }} />
       </Drawer.Protected>
@@ -62,17 +84,25 @@ function Navigator() {
 
 export default function RootLayout() {
   const palette = usePalette();
+  const [fontsLoaded, fontError] = useFonts({ Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold, Inter_800ExtraBold });
+  const ready = fontsLoaded || !!fontError;
+  useEffect(() => {
+    if (ready) SplashScreen.hideAsync().catch(() => undefined);
+  }, [ready]);
   const base = palette.dark ? DarkTheme : DefaultTheme;
   const theme = {
     ...base,
     colors: { ...base.colors, primary: palette.primary, background: palette.surface, card: palette.surface, text: palette.ink, border: palette.border },
   };
 
+  if (!ready) return null;
+
   return (
     <GestureHandlerRootView className="flex-1">
       <ThemeProvider value={theme}>
         <SessionProvider>
           <Navigator />
+          <DialogHost />
         </SessionProvider>
         <StatusBar style="auto" />
       </ThemeProvider>

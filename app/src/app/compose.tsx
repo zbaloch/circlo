@@ -3,7 +3,7 @@ import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AudienceSheet, audienceLine } from '@/components/audience-sheet';
@@ -18,6 +18,7 @@ import { enqueuePost } from '@/lib/outbox';
 import { defaultCircle, MAX_POST_CHARS, validateDraft } from '@/lib/posts';
 import { useSession } from '@/lib/session';
 import { usePalette } from '@/theme/use-palette';
+import { Text, TextInput } from '@/components/ui/text';
 
 function toPicked(a: ImagePicker.ImagePickerAsset): PickedMedia {
   return {

@@ -1,6 +1,7 @@
-import { Pressable, Text, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 
 import { HalqoMark } from './halqo-mark';
+import { Text } from '@/components/ui/text';
 
 type Props = { title: string; body?: string; actionLabel?: string; onAction?: () => void };
 

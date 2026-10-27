@@ -1,6 +1,6 @@
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { Text, View } from 'react-native';
+import { View } from 'react-native';
 
 import { Fab } from '@/components/fab';
 import { Button } from '@/components/form';
@@ -11,6 +11,7 @@ import { loadAddressBook } from '@/lib/addressbook';
 import { hexGroups } from '@/lib/bytes';
 import { loadMyProfile, type Profile } from '@/lib/friends';
 import { useSession } from '@/lib/session';
+import { Text } from '@/components/ui/text';
 
 export default function ProfileScreen() {
   const session = useSession();

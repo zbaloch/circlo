@@ -1,6 +1,6 @@
 import { useLocalSearchParams, useNavigation } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, FlatList, Text, View } from 'react-native';
+import { FlatList, View } from 'react-native';
 
 import { EmptyState } from '@/components/empty-state';
 import { authorName } from '@/components/post-actions';
@@ -8,6 +8,8 @@ import { PostCard } from '@/components/post-card';
 import { loadAddressBook, type AddressBook } from '@/lib/addressbook';
 import { previewAs, type FeedPost } from '@/lib/posts';
 import { useSession } from '@/lib/session';
+import { Text } from '@/components/ui/text';
+import { Spinner } from '@/components/ui/spinner';
 
 /**
  * "Preview as…" (PLAN.md Phase 8): my posts exactly as this friend can open them. Built from the same circle key
@@ -38,7 +40,7 @@ export default function PreviewScreen() {
         This is what {authorName(account, book, id).name} sees of your posts. They never see circle names or numbers.
       </Text>
       {posts === null ? (
-        <ActivityIndicator className="py-10" />
+        <Spinner className="py-10" />
       ) : (
         <FlatList
           data={posts}

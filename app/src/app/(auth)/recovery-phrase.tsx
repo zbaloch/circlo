@@ -1,11 +1,12 @@
 import { Redirect, router } from 'expo-router';
-import { Text, View } from 'react-native';
+import { View } from 'react-native';
 
 import { usePreventScreenCapture } from 'expo-screen-capture';
 
 import { AuthScreen } from '@/components/auth-screen';
 import { Button, Title } from '@/components/form';
 import { pendingSignup } from '@/lib/signup-store';
+import { Text } from '@/components/ui/text';
 
 /** Shows the 24-word recovery phrase once. It is the only way back in if the password is forgotten. */
 export default function RecoveryPhraseScreen() {

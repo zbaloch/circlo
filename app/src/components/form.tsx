@@ -1,7 +1,9 @@
 import type { ReactNode } from 'react';
-import { ActivityIndicator, Pressable, Text, TextInput, View, type TextInputProps } from 'react-native';
+import { Pressable, View, type TextInputProps } from 'react-native';
 
 import { usePalette } from '@/theme/use-palette';
+import { Text, TextInput } from '@/components/ui/text';
+import { Spinner } from './ui/spinner';
 
 type FieldProps = TextInputProps & { label: string; hint?: string };
 
@@ -15,7 +17,7 @@ export function TextField({ label, hint, ...input }: FieldProps) {
         placeholderTextColor={palette.muted}
         autoCapitalize="none"
         autoCorrect={false}
-        className="rounded-xl border border-border px-4 py-3 text-base text-ink dark:border-border-dark dark:text-ink-dark"
+        className="rounded-lg border border-border px-4 py-3 text-[15px] text-ink focus:border-primary dark:border-border-dark dark:text-ink-dark"
         {...input}
       />
       {hint ? <Text className="text-sm text-muted dark:text-muted-dark">{hint}</Text> : null}
@@ -23,24 +25,33 @@ export function TextField({ label, hint, ...input }: FieldProps) {
   );
 }
 
-type ButtonProps = { label: string; onPress: () => void; loading?: boolean; disabled?: boolean; variant?: 'primary' | 'outline' };
+type ButtonProps = {
+  label: string;
+  onPress: () => void;
+  loading?: boolean;
+  disabled?: boolean;
+  /** primary: brand pill; outline: secondary; danger: destructive actions (red). */
+  variant?: 'primary' | 'outline' | 'danger';
+};
 
+const BUTTON: Record<NonNullable<ButtonProps['variant']>, { box: string; text: string }> = {
+  primary: { box: 'bg-primary active:bg-primary-pressed dark:bg-primary-dark', text: 'text-white' },
+  outline: { box: 'border border-border active:bg-surface-raised dark:border-border-dark dark:active:bg-surface-raised-dark', text: 'text-ink dark:text-ink-dark' },
+  danger: { box: 'bg-danger active:opacity-80 dark:bg-danger-dark', text: 'text-white' },
+};
+
+/** Pill button (X style), the same on iOS and Android. */
 export function Button({ label, onPress, loading = false, disabled = false, variant = 'primary' }: ButtonProps) {
   const off = disabled || loading;
-  const base = 'items-center rounded-full py-4';
-  const style =
-    variant === 'primary'
-      ? `${base} bg-primary active:bg-primary-pressed dark:bg-primary-dark ${off ? 'opacity-50' : ''}`
-      : `${base} border border-primary active:opacity-60 dark:border-primary-dark ${off ? 'opacity-50' : ''}`;
+  const v = BUTTON[variant];
   return (
-    <Pressable accessibilityRole="button" accessibilityState={{ disabled: off, busy: loading }} disabled={off} onPress={onPress} className={style}>
-      {loading ? (
-        <ActivityIndicator color={variant === 'primary' ? '#FFFFFF' : undefined} />
-      ) : (
-        <Text className={`text-base font-bold ${variant === 'primary' ? 'text-white' : 'text-primary dark:text-primary-dark'}`}>
-          {label}
-        </Text>
-      )}
+    <Pressable
+      accessibilityRole="button"
+      accessibilityState={{ disabled: off, busy: loading }}
+      disabled={off}
+      onPress={onPress}
+      className={`min-h-[48px] items-center justify-center rounded-full px-5 ${v.box} ${off ? 'opacity-50' : ''}`}>
+      {loading ? <Spinner tone={variant === 'outline' ? 'default' : 'onPrimary'} /> : <Text className={`text-[15px] font-bold ${v.text}`}>{label}</Text>}
     </Pressable>
   );
 }

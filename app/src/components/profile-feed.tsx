@@ -1,16 +1,12 @@
 import { useFocusEffect } from "expo-router";
 import { useCallback, useState, type ReactElement } from "react";
-import {
-  ActivityIndicator,
-  FlatList,
-  Pressable,
-  Text,
-  View,
-} from "react-native";
+import { FlatList, Pressable, View } from "react-native";
 
 import { Avatar } from "@/components/avatar";
 import { usePostActions, visiblePosts } from "@/components/post-actions";
 import { PostCard } from "@/components/post-card";
+import { Spinner } from "@/components/ui/spinner";
+import { Text } from "@/components/ui/text";
 import { loadAddressBook, type AddressBook } from "@/lib/addressbook";
 import { putPosts, useFeed } from "@/lib/feed-store";
 import type { StoredAccount } from "@/lib/keystore";
@@ -160,7 +156,7 @@ export function ProfileFeed({
                 </Pressable>
               ))}
             </View>
-            {authored === null ? <ActivityIndicator className="py-8" /> : null}
+            {authored === null ? <Spinner className="py-8" /> : null}
           </View>
         }
         ListEmptyComponent={
@@ -175,7 +171,7 @@ export function ProfileFeed({
           )
         }
         ListFooterComponent={
-          loadingMore ? <ActivityIndicator className="py-6" /> : undefined
+          loadingMore ? <Spinner className="py-6" /> : undefined
         }
         renderItem={({ item }) => (
           <PostCard post={item} {...actionsFor.cardProps(item)} />

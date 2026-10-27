@@ -1,4 +1,5 @@
-import { Text, View } from 'react-native';
+import { View } from 'react-native';
+import { Text } from '@/components/ui/text';
 
 type Props = { size?: 'sm' | 'lg'; wordmark?: boolean };
 

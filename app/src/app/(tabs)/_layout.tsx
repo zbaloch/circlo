@@ -1,40 +1,27 @@
-import Ionicons from '@expo/vector-icons/Ionicons';
 import { Tabs } from 'expo-router';
-import type { ComponentProps } from 'react';
 
-import { usePalette } from '@/theme/use-palette';
+import { DrawerAvatarButton, HeaderBar } from '@/components/ui/header';
+import { TabBar, type TabSpec } from '@/components/ui/tab-bar';
 
-type IconName = ComponentProps<typeof Ionicons>['name'];
-
-export const TABS: { name: string; label: string; icon: IconName; iconActive: IconName }[] = [
+export const TABS: TabSpec[] = [
   { name: 'index', label: 'Home', icon: 'home-outline', iconActive: 'home' },
   { name: 'search', label: 'Search', icon: 'search-outline', iconActive: 'search' },
   { name: 'notifications', label: 'Notifications', icon: 'notifications-outline', iconActive: 'notifications' },
   { name: 'messages', label: 'Messages', icon: 'mail-outline', iconActive: 'mail' },
 ];
 
-/** Bottom tab bar with icons only (PLAN.md 2A). Labels exist for screen readers. */
+/** Bottom tab bar with icons only (PLAN.md 2A). Labels exist for screen readers. Same on iOS and Android. */
 export default function TabLayout() {
-  const palette = usePalette();
   return (
     <Tabs
-      screenOptions={{
-        tabBarShowLabel: false,
-        tabBarActiveTintColor: palette.ink,
-        tabBarInactiveTintColor: palette.muted,
-        headerTitleAlign: 'center',
-        headerTintColor: palette.ink,
-      }}>
+      tabBar={(props) => <TabBar {...props} tabs={TABS} />}
+      screenOptions={{ header: ({ options }) => <HeaderBar title={options.title} left={<DrawerAvatarButton />} /> }}>
       {TABS.map((t) => (
         <Tabs.Screen
           key={t.name}
           name={t.name}
           options={{
             title: t.label,
-            tabBarAccessibilityLabel: t.label,
-            tabBarIcon: ({ focused, color }) => (
-              <Ionicons name={focused ? t.iconActive : t.icon} size={26} color={String(color)} />
-            ),
             // Home draws its own header so it can hide on scroll (PLAN.md 2A).
             ...(t.name === 'index' ? { headerShown: false } : {}),
           }}

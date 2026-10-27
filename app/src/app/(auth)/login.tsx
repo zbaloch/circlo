@@ -1,11 +1,12 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, Text } from 'react-native';
+import { Pressable } from 'react-native';
 
 import { AuthScreen } from '@/components/auth-screen';
 import { Button, ErrorText, TextField, Title } from '@/components/form';
 import { describeError, login } from '@/lib/account';
 import { useSession } from '@/lib/session';
+import { Text } from '@/components/ui/text';
 
 /** Log in on this device: the encrypted key backup is downloaded and decrypted here. */
 export default function LoginScreen() {
