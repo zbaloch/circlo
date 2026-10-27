@@ -345,7 +345,15 @@ See docs/HARDENING.md for how to repeat each check.
         advisories, AGPL-compatible licences and crates.io-only sources; runs on lockfile changes and weekly;
       - `npm audit fix` updated node-forge;
       - the remaining zod 3 advisory is in Expo's build-time command-line tool only (not in the app), accepted until
-        2027-01-31 in `osv-scanner.toml`
+        2027-01-31 in `osv-scanner.toml`;
+      - the first CI run found 6 Rust advisories. None is reachable or exploitable in Halqo, so each is accepted until
+        2027-01-31 with its reason in `osv-scanner.toml` and `core/deny.toml`:
+        - crypto-bigint timing: only in P-256 code, and Halqo uses X25519/Ed25519 only;
+        - block-buffer: needs a hash function to panic;
+        - libcrux-kem and basic-toml: in Cargo.lock but never compiled;
+        - proc-macro-error2: build-time only.
+
+        The crypto-bigint and block-buffer fixes need upstream releases (OpenMLS, opaque-ke)
 - [x] **Leaked-database drill** (`infra/leak-drill.sh` + scanner): dev DB (125 KB dump) and all 11 bucket objects
       plus the server log scanned for 13 markers typed on the emulators (handles, names, post text, EXIF test tags),
       image/video signatures, emails and IPs, and low-entropy objects: **PASS, nothing readable**. The scanner's own
