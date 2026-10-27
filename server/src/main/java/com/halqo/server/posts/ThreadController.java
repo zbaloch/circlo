@@ -24,6 +24,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
@@ -60,13 +61,15 @@ public class ThreadController {
         return Ids.bytes(UUID.fromString(jwt.getSubject()));
     }
 
-    /** The post's author, if I may read it; otherwise 404 (indistinguishable from a missing post). */
-    private byte[] readableAuthor(byte[] me, UUID postId) {
-        byte[] author = access.authorOf(Ids.bytes(postId)).orElseThrow(ApiException::notFound);
-        if (!access.canRead(me, author)) {
+    static final String READ_TOKEN = "X-Halqo-Read-Token";
+
+    /** The post's author, if I'm in its audience (read token checked); otherwise 404, like a missing post. */
+    private byte[] readableAuthor(byte[] me, UUID postId, String readTokenHeader) {
+        byte[] post = Ids.bytes(postId);
+        if (!access.inAudience(me, post, PostAccess.tokenFromHeader(readTokenHeader))) {
             throw ApiException.notFound();
         }
-        return author;
+        return access.authorOf(post).orElseThrow(ApiException::notFound);
     }
 
     // ---------- replies ----------
@@ -77,9 +80,10 @@ public class ThreadController {
 
     @PostMapping("/v1/posts/{postId}/replies")
     @ResponseStatus(HttpStatus.CREATED)
-    public Map<String, Object> reply(@AuthenticationPrincipal Jwt jwt, @PathVariable("postId") UUID postId, @Valid @RequestBody NewReply r) {
+    public Map<String, Object> reply(@AuthenticationPrincipal Jwt jwt, @PathVariable("postId") UUID postId,
+            @RequestHeader(value = READ_TOKEN, required = false) String readToken, @Valid @RequestBody NewReply r) {
         byte[] me = me(jwt);
-        byte[] author = readableAuthor(me, postId);
+        byte[] author = readableAuthor(me, postId, readToken);
         if (!limiter.tryAcquire("replies", me, 120, 60_000)) {
             throw new ApiException(HttpStatus.TOO_MANY_REQUESTS, "rate_limited");
         }
@@ -91,9 +95,10 @@ public class ThreadController {
 
     @GetMapping("/v1/posts/{postId}/replies")
     public List<ReplyView> replies(@AuthenticationPrincipal Jwt jwt, @PathVariable("postId") UUID postId,
+            @RequestHeader(value = READ_TOKEN, required = false) String readToken,
             @RequestParam(value = "after", required = false) Instant after,
             @RequestParam(value = "limit", defaultValue = "100") @Min(1) @Max(200) int limit) {
-        readableAuthor(me(jwt), postId);
+        readableAuthor(me(jwt), postId, readToken);
         return jdbc.query(
                 "SELECT id, author_id, ciphertext, created_at FROM post_replies WHERE post_id = ? AND created_at > ? ORDER BY created_at, id LIMIT ?",
                 (rs, i) -> new ReplyView(Ids.uuid(rs.getBytes(1)), Ids.uuid(rs.getBytes(2)), rs.getBytes(3), rs.getTimestamp(4).toInstant()),
@@ -104,9 +109,9 @@ public class ThreadController {
     @DeleteMapping("/v1/posts/{postId}/replies/{replyId}")
     @Transactional
     public Map<String, String> deleteReply(@AuthenticationPrincipal Jwt jwt, @PathVariable("postId") UUID postId,
-            @PathVariable("replyId") UUID replyId) {
+            @PathVariable("replyId") UUID replyId, @RequestHeader(value = READ_TOKEN, required = false) String readToken) {
         byte[] me = me(jwt);
-        byte[] author = readableAuthor(me, postId);
+        byte[] author = readableAuthor(me, postId, readToken);
         int n = java.util.Arrays.equals(me, author)
                 ? jdbc.update("DELETE FROM post_replies WHERE id = ? AND post_id = ?", Ids.bytes(replyId), Ids.bytes(postId))
                 : jdbc.update("DELETE FROM post_replies WHERE id = ? AND post_id = ? AND author_id = ?", Ids.bytes(replyId), Ids.bytes(postId), me);
@@ -119,9 +124,10 @@ public class ThreadController {
     // ---------- likes ----------
 
     @PutMapping("/v1/posts/{postId}/like")
-    public Map<String, String> like(@AuthenticationPrincipal Jwt jwt, @PathVariable("postId") UUID postId) {
+    public Map<String, String> like(@AuthenticationPrincipal Jwt jwt, @PathVariable("postId") UUID postId,
+            @RequestHeader(value = READ_TOKEN, required = false) String readToken) {
         byte[] me = me(jwt);
-        byte[] author = readableAuthor(me, postId);
+        byte[] author = readableAuthor(me, postId, readToken);
         int added = jdbc.update("INSERT IGNORE INTO post_likes (post_id, liker_id, created_at) VALUES (?, ?, ?)", Ids.bytes(postId), me,
                 Timestamp.from(Instant.now()));
         if (added == 1) {
@@ -131,9 +137,10 @@ public class ThreadController {
     }
 
     @DeleteMapping("/v1/posts/{postId}/like")
-    public Map<String, String> unlike(@AuthenticationPrincipal Jwt jwt, @PathVariable("postId") UUID postId) {
+    public Map<String, String> unlike(@AuthenticationPrincipal Jwt jwt, @PathVariable("postId") UUID postId,
+            @RequestHeader(value = READ_TOKEN, required = false) String readToken) {
         byte[] me = me(jwt);
-        readableAuthor(me, postId);
+        readableAuthor(me, postId, readToken);
         jdbc.update("DELETE FROM post_likes WHERE post_id = ? AND liker_id = ?", Ids.bytes(postId), me);
         return Map.of("status", "unliked");
     }
@@ -141,9 +148,34 @@ public class ThreadController {
     public record LikeView(UUID userId, Instant createdAt) {}
 
     @GetMapping("/v1/posts/{postId}/likes")
-    public List<LikeView> likes(@AuthenticationPrincipal Jwt jwt, @PathVariable("postId") UUID postId) {
-        readableAuthor(me(jwt), postId);
+    public List<LikeView> likes(@AuthenticationPrincipal Jwt jwt, @PathVariable("postId") UUID postId,
+            @RequestHeader(value = READ_TOKEN, required = false) String readToken) {
+        readableAuthor(me(jwt), postId, readToken);
         return jdbc.query("SELECT liker_id, created_at FROM post_likes WHERE post_id = ? ORDER BY created_at",
                 (rs, i) -> new LikeView(Ids.uuid(rs.getBytes(1)), rs.getTimestamp(2).toInstant()), (Object) Ids.bytes(postId));
+    }
+
+    public record StatsItem(@NotNull UUID postId, @NotNull @Size(min = 32, max = 32) byte[] readToken) {}
+
+    public record StatsRequest(@NotNull @Size(max = 200) List<@Valid StatsItem> items) {}
+
+    public record PostStats(UUID postId, int replyCount, int likeCount, boolean likedByMe) {}
+
+    /** Counts for posts I can prove I can read (one read token each); others are silently left out. */
+    @PostMapping("/v1/posts/stats")
+    public List<PostStats> stats(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody StatsRequest r) {
+        byte[] me = me(jwt);
+        List<PostStats> out = new java.util.ArrayList<>();
+        for (StatsItem item : r.items()) {
+            byte[] post = Ids.bytes(item.postId());
+            if (!access.inAudience(me, post, item.readToken())) {
+                continue;
+            }
+            out.add(jdbc.queryForObject("""
+                    SELECT (SELECT COUNT(*) FROM post_replies WHERE post_id = ?), (SELECT COUNT(*) FROM post_likes WHERE post_id = ?),
+                           EXISTS (SELECT 1 FROM post_likes WHERE post_id = ? AND liker_id = ?)""",
+                    (rs, i) -> new PostStats(item.postId(), rs.getInt(1), rs.getInt(2), rs.getBoolean(3)), post, post, post, me));
+        }
+        return out;
     }
 }

@@ -1,17 +1,27 @@
-import { useFocusEffect } from 'expo-router';
-import { useCallback, useState, type ReactElement } from 'react';
-import { ActivityIndicator, FlatList, Pressable, Text, View } from 'react-native';
+import { useFocusEffect } from "expo-router";
+import { useCallback, useState, type ReactElement } from "react";
+import {
+  ActivityIndicator,
+  FlatList,
+  Pressable,
+  Text,
+  View,
+} from "react-native";
 
-import { Avatar } from '@/components/avatar';
-import { usePostActions, visiblePosts } from '@/components/post-actions';
-import { PostCard } from '@/components/post-card';
-import { loadAddressBook, type AddressBook } from '@/lib/addressbook';
-import { putPosts, useFeed } from '@/lib/feed-store';
-import type { StoredAccount } from '@/lib/keystore';
-import { fetchAuthorPosts, type FeedPost } from '@/lib/posts';
-import { postsForTab, profileTabs, type ProfileTab } from '@/lib/view-logic';
+import { Avatar } from "@/components/avatar";
+import { usePostActions, visiblePosts } from "@/components/post-actions";
+import { PostCard } from "@/components/post-card";
+import { loadAddressBook, type AddressBook } from "@/lib/addressbook";
+import { putPosts, useFeed } from "@/lib/feed-store";
+import type { StoredAccount } from "@/lib/keystore";
+import { fetchAuthorPosts, type FeedPost } from "@/lib/posts";
+import { postsForTab, profileTabs, type ProfileTab } from "@/lib/view-logic";
 
-const TAB_LABEL: Record<ProfileTab, string> = { posts: 'Posts', media: 'Media', likes: 'Likes' };
+const TAB_LABEL: Record<ProfileTab, string> = {
+  posts: "Posts",
+  media: "Media",
+  likes: "Likes",
+};
 
 type Props = {
   account: StoredAccount;
@@ -27,11 +37,20 @@ type Props = {
 };
 
 /** Profile (PLAN.md 2A): banner, avatar, name, @handle, bio, friend count, then Posts | Media | Likes. */
-export function ProfileFeed({ account, userId, name, handle, bio, friendCount, actions, extra }: Props) {
+export function ProfileFeed({
+  account,
+  userId,
+  name,
+  handle,
+  bio,
+  friendCount,
+  actions,
+  extra,
+}: Props) {
   const own = userId === account.userId;
   const timeline = useFeed();
   const [book, setBook] = useState<AddressBook | null>(null);
-  const [tab, setTab] = useState<ProfileTab>('posts');
+  const [tab, setTab] = useState<ProfileTab>("posts");
   const [authored, setAuthored] = useState<FeedPost[] | null>(null);
   const [cursor, setCursor] = useState<string>();
   const [hasMore, setHasMore] = useState(false);
@@ -67,59 +86,102 @@ export function ProfileFeed({ account, userId, name, handle, bio, friendCount, a
   };
 
   // Prefer the live copy from the store so likes and reply counts stay in sync with the thread view.
-  const live = (authored ?? []).map((p) => timeline.posts.find((t) => t.postId === p.postId) ?? p);
-  const data = visiblePosts(own ? null : book, postsForTab(tab, live, timeline.posts));
+  const live = (authored ?? []).map(
+    (p) => timeline.posts.find((t) => t.postId === p.postId) ?? p,
+  );
+  const data = visiblePosts(
+    own ? null : book,
+    postsForTab(tab, live, timeline.posts),
+  );
 
   return (
-    <FlatList
-      className="flex-1 bg-surface dark:bg-surface-dark"
-      data={data}
-      keyExtractor={(p) => p.postId}
-      onEndReached={tab === 'likes' ? undefined : more}
-      onEndReachedThreshold={0.5}
-      ListHeaderComponent={
-        <View>
-          <View className="h-28 bg-primary-soft dark:bg-primary-soft-dark" />
-          <View className="-mt-10 gap-2 px-4">
-            <View className="self-start rounded-full border-4 border-surface dark:border-surface-dark">
-              <Avatar size="lg" name={name} />
-            </View>
-            <Text className="text-2xl font-bold text-ink dark:text-ink-dark">{name}</Text>
-            {handle ? <Text className="text-muted dark:text-muted-dark">@{handle}</Text> : null}
-            {bio ? <Text className="text-base text-ink dark:text-ink-dark">{bio}</Text> : null}
-            {friendCount !== undefined ? (
-              <Text className="text-muted dark:text-muted-dark">
-                <Text className="font-bold text-ink dark:text-ink-dark">{friendCount}</Text> {friendCount === 1 ? 'friend' : 'friends'}
+    <>
+      <FlatList
+        className="flex-1 bg-surface dark:bg-surface-dark"
+        data={data}
+        keyExtractor={(p) => p.postId}
+        onEndReached={tab === "likes" ? undefined : more}
+        onEndReachedThreshold={0.5}
+        ListHeaderComponent={
+          <View>
+            <View className="h-28 bg-primary-soft dark:bg-primary-soft-dark" />
+            <View className="-mt-10 gap-2 px-4">
+              <View className="self-start rounded-full border-4 border-surface dark:border-surface-dark">
+                <Avatar size="lg" name={name} />
+              </View>
+              <Text className="text-2xl font-bold text-ink dark:text-ink-dark">
+                {name}
               </Text>
-            ) : null}
-            {actions}
-            {extra}
+              {handle ? (
+                <Text className="text-muted dark:text-muted-dark">
+                  @{handle}
+                </Text>
+              ) : null}
+              {bio ? (
+                <Text className="text-base text-ink dark:text-ink-dark">
+                  {bio}
+                </Text>
+              ) : null}
+              {friendCount !== undefined ? (
+                <Text className="text-muted dark:text-muted-dark">
+                  <Text className="font-bold text-ink dark:text-ink-dark">
+                    {friendCount}
+                  </Text>{" "}
+                  {friendCount === 1 ? "friend" : "friends"}
+                </Text>
+              ) : null}
+              {actions}
+              {extra}
+            </View>
+            <View
+              className="mt-3 flex-row border-b border-border dark:border-border-dark"
+              accessibilityRole="tablist"
+            >
+              {profileTabs(own).map((t) => (
+                <Pressable
+                  key={t}
+                  accessibilityRole="tab"
+                  accessibilityState={{ selected: tab === t }}
+                  onPress={() => setTab(t)}
+                  className="flex-1 items-center pt-3"
+                >
+                  <Text
+                    className={
+                      tab === t
+                        ? "font-bold text-ink dark:text-ink-dark"
+                        : "text-muted dark:text-muted-dark"
+                    }
+                  >
+                    {TAB_LABEL[t]}
+                  </Text>
+                  <View
+                    className={`mt-3 h-1 w-14 rounded-full ${tab === t ? "bg-primary dark:bg-primary-dark" : "bg-transparent"}`}
+                  />
+                </Pressable>
+              ))}
+            </View>
+            {authored === null ? <ActivityIndicator className="py-8" /> : null}
           </View>
-          <View className="mt-3 flex-row border-b border-border dark:border-border-dark" accessibilityRole="tablist">
-            {profileTabs(own).map((t) => (
-              <Pressable
-                key={t}
-                accessibilityRole="tab"
-                accessibilityState={{ selected: tab === t }}
-                onPress={() => setTab(t)}
-                className="flex-1 items-center pt-3">
-                <Text className={tab === t ? 'font-bold text-ink dark:text-ink-dark' : 'text-muted dark:text-muted-dark'}>{TAB_LABEL[t]}</Text>
-                <View className={`mt-3 h-1 w-14 rounded-full ${tab === t ? 'bg-primary dark:bg-primary-dark' : 'bg-transparent'}`} />
-              </Pressable>
-            ))}
-          </View>
-          {authored === null ? <ActivityIndicator className="py-8" /> : null}
-        </View>
-      }
-      ListEmptyComponent={
-        authored === null ? undefined : (
-          <Text className="px-6 py-10 text-center text-muted dark:text-muted-dark">
-            {tab === 'likes' ? 'Posts you like appear here.' : tab === 'media' ? 'No photos or videos yet.' : 'No posts yet.'}
-          </Text>
-        )
-      }
-      ListFooterComponent={loadingMore ? <ActivityIndicator className="py-6" /> : undefined}
-      renderItem={({ item }) => <PostCard post={item} {...actionsFor.cardProps(item)} />}
-    />
+        }
+        ListEmptyComponent={
+          authored === null ? undefined : (
+            <Text className="px-6 py-10 text-center text-muted dark:text-muted-dark">
+              {tab === "likes"
+                ? "Posts you like appear here."
+                : tab === "media"
+                  ? "No photos or videos yet."
+                  : "No posts yet."}
+            </Text>
+          )
+        }
+        ListFooterComponent={
+          loadingMore ? <ActivityIndicator className="py-6" /> : undefined
+        }
+        renderItem={({ item }) => (
+          <PostCard post={item} {...actionsFor.cardProps(item)} />
+        )}
+      />
+      {actionsFor.sheet}
+    </>
   );
 }

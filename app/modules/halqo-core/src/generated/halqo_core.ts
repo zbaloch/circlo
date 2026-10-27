@@ -1055,6 +1055,57 @@ export function openUserBlob(
   }
 }
 
+/**
+ * The post's read token (proves to the server that I can open the post, without revealing anything else).
+ */
+export function postReadToken(postKey: ArrayBuffer): ArrayBuffer /*throws*/ {
+  const __rb: Uint8Array = uniffiCaller.rustCallWithError(
+    /*liftError:*/ FfiConverterTypeCoreError.lift.bind(
+      FfiConverterTypeCoreError,
+    ),
+    /*caller:*/ (callStatus) => {
+      return nativeModule().uniffi_halqo_core_fn_func_post_read_token(
+        FfiConverterArrayBuffer.lower(postKey, nativeModule().rustbuffer_alloc),
+        callStatus,
+      );
+    },
+    /*liftString:*/ FfiConverterString.lift.bind(FfiConverterString),
+  );
+  try {
+    return FfiConverterArrayBuffer.lift(__rb);
+  } finally {
+    nativeModule().rustbuffer_free(__rb);
+  }
+}
+
+/**
+ * Hash of a read token; sent once, when the post is created.
+ */
+export function postReadTokenHash(
+  readToken: ArrayBuffer,
+): ArrayBuffer /*throws*/ {
+  const __rb: Uint8Array = uniffiCaller.rustCallWithError(
+    /*liftError:*/ FfiConverterTypeCoreError.lift.bind(
+      FfiConverterTypeCoreError,
+    ),
+    /*caller:*/ (callStatus) => {
+      return nativeModule().uniffi_halqo_core_fn_func_post_read_token_hash(
+        FfiConverterArrayBuffer.lower(
+          readToken,
+          nativeModule().rustbuffer_alloc,
+        ),
+        callStatus,
+      );
+    },
+    /*liftString:*/ FfiConverterString.lift.bind(FfiConverterString),
+  );
+  try {
+    return FfiConverterArrayBuffer.lift(__rb);
+  } finally {
+    nativeModule().rustbuffer_free(__rb);
+  }
+}
+
 export function recoveryEntropyFromPhrase(
   phrase: string,
 ): ArrayBuffer /*throws*/ {
@@ -5193,6 +5244,21 @@ function uniffiEnsureInitialized() {
   ) {
     throw new UniffiInternalError.ApiChecksumMismatch(
       "uniffi_halqo_core_checksum_func_open_user_blob",
+    );
+  }
+  if (
+    nativeModule().uniffi_halqo_core_checksum_func_post_read_token() !== 10769
+  ) {
+    throw new UniffiInternalError.ApiChecksumMismatch(
+      "uniffi_halqo_core_checksum_func_post_read_token",
+    );
+  }
+  if (
+    nativeModule().uniffi_halqo_core_checksum_func_post_read_token_hash() !==
+    62071
+  ) {
+    throw new UniffiInternalError.ApiChecksumMismatch(
+      "uniffi_halqo_core_checksum_func_post_read_token_hash",
     );
   }
   if (

@@ -16,8 +16,9 @@ Memory file for Claude Code sessions. Read this first when resuming. Keep it acc
 | 7 Posts and media | Done on Android (merged PR #9) |
 | 8 Timeline, threads, replies, likes, profiles | Done on Android (merged PR #10) |
 | 9 Messaging (MLS) | Done on Android (merged PR #11; attachments finished in Phase 10) |
-| 10 Multi-device and push | **Done on Android** on `phase-10-push-devices` (PR pending) |
-| 11–12 | Not started |
+| 10 Multi-device and push | Done on Android (merged PR #12) |
+| 11 Safety, abuse, legal | Done on Android (PR pending) |
+| 12 | Not started |
 
 ## Environment (as of 2026-10-25)
 
@@ -247,7 +248,29 @@ Memory file for Claude Code sessions. Read this first when resuming. Keep it acc
       must return `undefined` for unchanged responses; MLS state now kept per device id and discarded if it can't
       be opened (re-install); scanned link codes passed in memory (a `#` in a route param was dropped)
 - [x] app 50 tests, core 68, server 47
-- [ ] CI green, merge
+- [x] CI green, merged (PR #12)
+
+## Phase 11 (safety, abuse, legal) — summary
+
+- [x] **Read token** (owner-approved, CRYPTO.md 13c): `read_token = HKDF(post_key, "halqo/v1/read-token")`; the
+      post stores only its labelled SHA-256 hash; listing/adding replies and likes, likers and counts all need the
+      token (`X-Halqo-Read-Token`, constant-time compare). Counts moved out of the feed into `POST /v1/posts/stats`.
+      Friends outside a post's circle can no longer see who interacted. THREAT_MODEL leak 14 closed
+- [x] ~~Reports to the operator~~: built (HPKE-sealed to a moderation key, offline CLI), checked on the emulator,
+      then **removed by owner decision** — posts are shared between people who know each other, who can ask each
+      other to remove things. V10 drops the `reports` table. App store review may still ask for reporting (LEGAL.md)
+- [x] **Block**: unfriends first (rotates my epoch), then a server-side block that refuses friend requests, invite
+      redemption and chat adds both ways; unblock in Settings. Mute stays local
+- [x] **Account deletion** (retype handle): S3 objects first, then the user; every row cascades (V9 added the
+      missing posts→epochs cascade). SafetyFlowIT checks no table still holds the user id
+- [x] **Data export**: decrypted on the device (profile, friends as I named them, circle labels, my posts with
+      photos as data URIs, chats) to one JSON file in a folder the user picks. Nothing goes to the server
+- [x] Settings screen: discoverable, blocked people, export, delete account; reusable ActionSheet (Android alerts
+      allow only three buttons)
+- [x] Legal: docs/LEGAL.md lists the questions for counsel (platform liability for content we can't see, CSAM
+      reporting duties, lawful access requests, GDPR roles and data export/erasure, app store rules for user content,
+      AGPL obligations). **Needs a lawyer before launch**
+- [x] app 50 tests, core 69, server 50
 
 ## Decisions log
 
@@ -307,15 +330,16 @@ Memory file for Claude Code sessions. Read this first when resuming. Keep it acc
 | 2026-10-27 | **Owner approved** the per-post read token (`halqo/v1/read-token`) so only a post's audience can see/add replies and likes; built in Phase 11 | Closes THREAT_MODEL leak 14 |
 | 2026-10-27 | Device linking: HPKE base to a QR key + 6-digit confirmation code; single-use 10-min server hand-off with a session | Encrypted transfer; resists scanning an attacker's code |
 | 2026-10-27 | Pushes: `{"type":"activity"}` plus a fixed generic notification text; tokens sealed with HALQO_PUSH_TOKEN_KEY | No content, names or counts ever leave the server in a push |
+| 2026-10-27 | **Owner removed reporting to the operator** (built, then removed before merge); block + mute only | Posts are between acquaintances; nothing should ever become readable by the operator |
 | 2026-10-25 | Only `secret-scan / gitleaks` should be a required check | Path-filtered CI workflows don't run on every PR |
 
 ## Waiting on owner
 
 - Push credentials: FCM service account (HALQO_FCM_PROJECT_ID, HALQO_FCM_SERVICE_ACCOUNT in the server's secret store)
   and google-services.json / APNs key in EAS credentials. Without them pushes are simply off; everything else works.
+- Legal review of docs/LEGAL.md before a public launch.
 
-
-0. iPhone dev build (Phase 2 criterion): needs an Expo account (`npx eas-cli@latest login`) and an Apple Developer
+1. iPhone dev build (Phase 2 criterion): needs an Expo account (`npx eas-cli@latest login`) and an Apple Developer
    account for device provisioning. Then `cd app && npx eas-cli@latest build --profile development --platform ios`.
 
 2. Create the `halqo` MariaDB user (DEV_SETUP §3) and switch `server/.env` off `root`.

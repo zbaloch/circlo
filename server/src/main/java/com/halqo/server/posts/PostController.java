@@ -101,7 +101,8 @@ public class PostController {
     public record NewPost(@NotNull UUID postId, @NotNull UUID epochId,
             @NotNull @Size(min = 32, max = 32) byte[] keyRef,
             @NotNull @Size(min = 64, max = 65_536) byte[] headerCt,
-            @NotNull @Size(max = MAX_OBJECTS_PER_POST) List<@Valid MediaRef> media) {}
+            @NotNull @Size(max = MAX_OBJECTS_PER_POST) List<@Valid MediaRef> media,
+            @NotNull @Size(min = 32, max = 32) byte[] readTokenHash) {}
 
     @PostMapping("/v1/posts")
     @ResponseStatus(HttpStatus.CREATED)
@@ -128,8 +129,9 @@ public class PostController {
             }
         }
         byte[] postId = Ids.bytes(p.postId());
-        jdbc.update("INSERT INTO posts (id, author_id, epoch_id, key_ref, header_ct, created_at, size_bucket) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                postId, me, Ids.bytes(p.epochId()), p.keyRef(), p.headerCt(), now(), sizeBucket(p.headerCt().length));
+        jdbc.update("INSERT INTO posts (id, author_id, epoch_id, key_ref, header_ct, created_at, size_bucket, read_token_hash) "
+                + "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                postId, me, Ids.bytes(p.epochId()), p.keyRef(), p.headerCt(), now(), sizeBucket(p.headerCt().length), p.readTokenHash());
         for (MediaRef m : p.media()) {
             long size = jdbc.queryForObject("SELECT ct_size FROM media_uploads WHERE object_key = ?", Long.class, m.objectKey());
             jdbc.update("INSERT INTO post_media (id, post_id, object_key, ct_size_padded, chunk_size, kind) VALUES (?, ?, ?, ?, ?, ?)",
@@ -148,20 +150,15 @@ public class PostController {
     public record Media(String objectKey, String kind, long ctSize) {}
 
     public record PostView(UUID postId, UUID authorId, UUID epochId, byte[] keyRef, byte[] headerCt, Instant createdAt,
-            List<Media> media, int replyCount, int likeCount, boolean likedByMe) {}
+            List<Media> media) {}
 
-    private static final String VIEW_SELECT = """
-            SELECT p.id, p.author_id, p.epoch_id, p.key_ref, p.header_ct, p.created_at,
-                   (SELECT COUNT(*) FROM post_replies r WHERE r.post_id = p.id),
-                   (SELECT COUNT(*) FROM post_likes l WHERE l.post_id = p.id),
-                   EXISTS (SELECT 1 FROM post_likes l WHERE l.post_id = p.id AND l.liker_id = ?)
-            FROM posts p
-            """;
+    // Counts aren't here: they reveal who interacted, so they come from /v1/posts/stats with the post's read token.
+    private static final String VIEW_SELECT = "SELECT p.id, p.author_id, p.epoch_id, p.key_ref, p.header_ct, p.created_at FROM posts p ";
 
     private List<PostView> views(String where, Object... args) {
         List<PostView> posts = jdbc.query(VIEW_SELECT + where,
                 (rs, i) -> new PostView(Ids.uuid(rs.getBytes(1)), Ids.uuid(rs.getBytes(2)), Ids.uuid(rs.getBytes(3)), rs.getBytes(4),
-                        rs.getBytes(5), rs.getTimestamp(6).toInstant(), new ArrayList<>(), rs.getInt(7), rs.getInt(8), rs.getBoolean(9)),
+                        rs.getBytes(5), rs.getTimestamp(6).toInstant(), new ArrayList<>()),
                 args);
         for (PostView p : posts) {
             p.media().addAll(jdbc.query("SELECT object_key, kind, ct_size_padded FROM post_media WHERE post_id = ?",
@@ -185,7 +182,7 @@ public class PostController {
             throw ApiException.notFound();
         }
         return views("WHERE p.author_id = ? AND p.created_at < ? ORDER BY p.created_at DESC LIMIT ?",
-                me, author, cursor(before), Math.max(1, Math.min(limit, 100)));
+                author, cursor(before), Math.max(1, Math.min(limit, 100)));
     }
 
     /** My posts and my accepted friends' posts in one newest-first page (same headers a per-author fetch returns). */
@@ -199,7 +196,7 @@ public class PostController {
                         SELECT user_b FROM friendships WHERE user_a = ? AND status = 'accepted'
                         UNION SELECT user_a FROM friendships WHERE user_b = ? AND status = 'accepted'))
                   AND p.created_at < ? ORDER BY p.created_at DESC LIMIT ?""",
-                me, me, me, me, cursor(before), Math.max(1, Math.min(limit, 200)));
+                me, me, me, cursor(before), Math.max(1, Math.min(limit, 200)));
     }
 
     public record DownloadRequest(@NotNull @Size(min = 1, max = 50) List<@Pattern(regexp = "[0-9a-f]{64}") String> objectKeys) {}

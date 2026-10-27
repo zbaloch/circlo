@@ -306,7 +306,7 @@ Build the familiar Twitter/X interaction model under the **Halqo** brand. Do not
   - **display name** in bold, `@handle`, and relative time (e.g. "2h")
   - text, with links auto-detected
   - media grid: 1 image full-width, 2 side-by-side, 3 as one large plus two stacked, 4 as a 2×2 grid; video with a poster frame and play button, muted autoplay in view
-  - action row: **Reply** (count), **Like** (count), **Share-to-DM**, and an overflow menu (Mute, Block, Report; Delete if it's your own post)
+  - action row: **Reply** (count), **Like** (count), **Share-to-DM**, and an overflow menu (Mute, Block; Delete if it's your own post)
 - **No reposts/retweets.** Resharing would leak a post beyond its intended circle. Leave this out deliberately.
 - **Tap a post** to open the thread view: the original post, then replies in order, with a reply composer docked at the bottom.
 - **Media viewer:** full-screen, swipe between images, pinch to zoom, and swipe down to dismiss.
@@ -610,7 +610,8 @@ On the device:
 **Done when:** linking and revoking work, and a push payload captured in tests contains no content or names.
 
 ### Phase 11: Safety, abuse, legal
-- In-app report: the reporter's device sends decrypted content plus a signed context to a moderation endpoint.
+- ~~In-app report: the reporter's device sends decrypted content plus a signed context to a moderation endpoint.~~
+  *Removed by owner decision (2026-10-27): posts are shared between people who know each other; block and mute instead.*
 - Block and mute.
 - Account deletion, which deletes all blobs and rows.
 - Data-export of your own content (decrypted on the device).

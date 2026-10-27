@@ -1334,3 +1334,17 @@ impl MlsClient {
         self.inner.lock().map_err(|_| invalid("mls client poisoned"))
     }
 }
+
+// ---------------- read tokens (CRYPTO.md 13c) ----------------
+
+/// The post's read token (proves to the server that I can open the post, without revealing anything else).
+#[uniffi::export]
+pub fn post_read_token(post_key: &[u8]) -> Result<Vec<u8>> {
+    Ok(post::read_token(&key32(post_key, "post_key")?).to_vec())
+}
+
+/// Hash of a read token; sent once, when the post is created.
+#[uniffi::export]
+pub fn post_read_token_hash(read_token: &[u8]) -> Result<Vec<u8>> {
+    Ok(post::read_token_hash(&key32(read_token, "read_token")?).to_vec())
+}

@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Halqo API
-  version: 0.10.0
+  version: 0.11.1
   description: >
     halqo-server API. The server stores and relays ciphertext only. Request and response bodies never contain
     plaintext content, names, emails, circle numbers or private keys. Byte fields are standard base64 strings;
@@ -557,12 +557,13 @@ paths:
           application/json:
             schema:
               type: object
-              required: [postId, epochId, keyRef, headerCt, media]
+              required: [postId, epochId, keyRef, headerCt, media, readTokenHash]
               properties:
                 postId: { $ref: "#/components/schemas/Id" }
                 epochId: { $ref: "#/components/schemas/Id" }
                 keyRef: { $ref: "#/components/schemas/Bytes" }
                 headerCt: { $ref: "#/components/schemas/Bytes" }
+                readTokenHash: { $ref: "#/components/schemas/Bytes" }
                 media:
                   type: array
                   items:
@@ -603,6 +604,7 @@ paths:
   /v1/posts/{postId}/replies:
     parameters:
       - { name: postId, in: path, required: true, schema: { $ref: "#/components/schemas/Id" } }
+      - { $ref: "#/components/parameters/ReadToken" }
     get:
       summary: Encrypted replies, oldest first (readers of the author only)
       parameters:
@@ -637,6 +639,7 @@ paths:
     parameters:
       - { name: postId, in: path, required: true, schema: { $ref: "#/components/schemas/Id" } }
       - { name: replyId, in: path, required: true, schema: { $ref: "#/components/schemas/Id" } }
+      - { $ref: "#/components/parameters/ReadToken" }
     delete:
       summary: Delete a reply (its author or the post's author)
       responses:
@@ -646,6 +649,7 @@ paths:
   /v1/posts/{postId}/like:
     parameters:
       - { name: postId, in: path, required: true, schema: { $ref: "#/components/schemas/Id" } }
+      - { $ref: "#/components/parameters/ReadToken" }
     put:
       summary: Like (idempotent)
       responses:
@@ -660,6 +664,7 @@ paths:
   /v1/posts/{postId}/likes:
     parameters:
       - { name: postId, in: path, required: true, schema: { $ref: "#/components/schemas/Id" } }
+      - { $ref: "#/components/parameters/ReadToken" }
     get:
       summary: Who liked a post (clients show it only if they can decrypt the post)
       responses:
@@ -942,8 +947,92 @@ paths:
         "200": { content: { application/json: { schema: { type: object } } } }
         "400": { $ref: "#/components/responses/Error" }
 
+  /v1/posts/stats:
+    post:
+      summary: Reply/like counts for posts I can prove I can read (one read token each)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [items]
+              properties:
+                items:
+                  type: array
+                  maxItems: 200
+                  items:
+                    type: object
+                    required: [postId, readToken]
+                    properties:
+                      postId: { $ref: "#/components/schemas/Id" }
+                      readToken: { $ref: "#/components/schemas/Bytes" }
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    postId: { $ref: "#/components/schemas/Id" }
+                    replyCount: { type: integer }
+                    likeCount: { type: integer }
+                    likedByMe: { type: boolean }
+
+  /v1/blocks:
+    get:
+      summary: People I blocked
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    userId: { $ref: "#/components/schemas/Id" }
+                    createdAt: { type: string, format: date-time }
+
+  /v1/blocks/{userId}:
+    parameters:
+      - { name: userId, in: path, required: true, schema: { $ref: "#/components/schemas/Id" } }
+    post:
+      summary: Block (removes any friendship; no requests or invites either way)
+      responses:
+        "200": { content: { application/json: { schema: { type: object } } } }
+        "404": { $ref: "#/components/responses/Error" }
+    delete:
+      summary: Unblock
+      responses:
+        "200": { content: { application/json: { schema: { type: object } } } }
+
+  /v1/account:
+    delete:
+      summary: Delete my account and everything I left behind (retype the handle to confirm)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [handle]
+              properties:
+                handle: { type: string }
+      responses:
+        "200": { content: { application/json: { schema: { type: object } } } }
+        "400": { $ref: "#/components/responses/Error" }
+
 components:
   parameters:
+    ReadToken:
+      name: X-Halqo-Read-Token
+      in: header
+      required: false
+      description: The post's read token (base64); only its audience can derive it
+      schema: { type: string }
     Device:
       name: X-Halqo-Device
       in: header
@@ -975,9 +1064,6 @@ components:
               objectKey: { type: string }
               kind: { type: string, enum: [full, thumb, poster] }
               ctSize: { type: integer, format: int64 }
-        replyCount: { type: integer }
-        likeCount: { type: integer }
-        likedByMe: { type: boolean }
     ReplyView:
       type: object
       properties:

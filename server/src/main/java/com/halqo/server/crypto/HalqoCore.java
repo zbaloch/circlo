@@ -73,6 +73,11 @@ public class HalqoCore {
         return HalqoCoreNative.inviteTokenHash(token);
     }
 
+    /** {@code H(read_token)} (CRYPTO.md 13c); the server stores and compares only hashes. */
+    public byte[] readTokenHash(byte[] token) {
+        return HalqoCoreNative.readTokenHash(token);
+    }
+
     /** What the delivery service may read from an MLS message: its group, epoch, and whether it is a commit. */
     public record MlsMeta(byte[] groupId, long epoch, boolean commit) {}
 

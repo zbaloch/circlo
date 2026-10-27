@@ -143,9 +143,9 @@ export default function ChatScreen() {
             ) : (
               <Pressable
                 onLongPress={() =>
-                  Alert.alert('Delete for you?', 'It’s removed from this device only.', [
+                  Alert.alert('Message', undefined, [
                     { text: 'Cancel', style: 'cancel' },
-                    { text: 'Delete', style: 'destructive', onPress: () => setHidden(new Set([...hidden, item.msg.seq])) },
+                    { text: 'Delete for me', style: 'destructive' as const, onPress: () => setHidden(new Set([...hidden, item.msg.seq])) },
                   ])
                 }
                 className={`max-w-[80%] ${item.msg.mine ? 'self-end' : 'self-start'}`}>

@@ -612,6 +612,16 @@ const DEFINITIONS = {
       ret: FfiType.RustBuffer,
       hasRustCallStatus: true,
     },
+    uniffi_halqo_core_fn_func_post_read_token: {
+      args: [FfiType.RustBuffer],
+      ret: FfiType.RustBuffer,
+      hasRustCallStatus: true,
+    },
+    uniffi_halqo_core_fn_func_post_read_token_hash: {
+      args: [FfiType.RustBuffer],
+      ret: FfiType.RustBuffer,
+      hasRustCallStatus: true,
+    },
     uniffi_halqo_core_fn_func_recovery_entropy_from_phrase: {
       args: [FfiType.RustBuffer],
       ret: FfiType.RustBuffer,
@@ -1146,6 +1156,16 @@ const DEFINITIONS = {
       hasRustCallStatus: false,
     },
     uniffi_halqo_core_checksum_func_open_user_blob: {
+      args: [],
+      ret: FfiType.UInt16,
+      hasRustCallStatus: false,
+    },
+    uniffi_halqo_core_checksum_func_post_read_token: {
+      args: [],
+      ret: FfiType.UInt16,
+      hasRustCallStatus: false,
+    },
+    uniffi_halqo_core_checksum_func_post_read_token_hash: {
       args: [],
       ret: FfiType.UInt16,
       hasRustCallStatus: false,
@@ -1813,6 +1833,14 @@ interface NativeModuleInterface {
     ciphertext: Uint8Array,
     uniffi_out_err: UniffiRustCallStatus,
   ): Uint8Array;
+  uniffi_halqo_core_fn_func_post_read_token(
+    postKey: Uint8Array,
+    uniffi_out_err: UniffiRustCallStatus,
+  ): Uint8Array;
+  uniffi_halqo_core_fn_func_post_read_token_hash(
+    readToken: Uint8Array,
+    uniffi_out_err: UniffiRustCallStatus,
+  ): Uint8Array;
   uniffi_halqo_core_fn_func_recovery_entropy_from_phrase(
     phrase: Uint8Array,
     uniffi_out_err: UniffiRustCallStatus,
@@ -2155,6 +2183,8 @@ interface NativeModuleInterface {
   uniffi_halqo_core_checksum_func_open_recovery_backup(): number;
   uniffi_halqo_core_checksum_func_open_reply(): number;
   uniffi_halqo_core_checksum_func_open_user_blob(): number;
+  uniffi_halqo_core_checksum_func_post_read_token(): number;
+  uniffi_halqo_core_checksum_func_post_read_token_hash(): number;
   uniffi_halqo_core_checksum_func_recovery_entropy_from_phrase(): number;
   uniffi_halqo_core_checksum_func_recovery_public_key(): number;
   uniffi_halqo_core_checksum_func_safety_number(): number;

@@ -167,6 +167,9 @@ public class SocialController {
         if (inviter.isEmpty() || !isActive(inviter.get(0))) {
             throw ApiException.notFound();
         }
+        if (com.halqo.server.safety.SafetyController.blockedEitherWay(jdbc, inviter.get(0), me)) {
+            throw ApiException.notFound();
+        }
         if (java.util.Arrays.equals(inviter.get(0), me)) {
             throw ApiException.badRequest("own_invite");
         }
@@ -206,7 +209,7 @@ public class SocialController {
     public Map<String, String> request(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody FriendRequest r) {
         byte[] me = me(jwt);
         byte[] to = Ids.bytes(r.toUserId());
-        if (java.util.Arrays.equals(me, to) || !isActive(to)) {
+        if (java.util.Arrays.equals(me, to) || !isActive(to) || com.halqo.server.safety.SafetyController.blockedEitherWay(jdbc, me, to)) {
             throw ApiException.notFound();
         }
         boolean invitedMe = !jdbc.queryForList("SELECT 1 FROM invites WHERE inviter_id = ? AND redeemed_by = ?", to, me).isEmpty();
@@ -214,6 +217,9 @@ public class SocialController {
                 jdbc.queryForObject("SELECT discoverable FROM users WHERE id = ?", Boolean.class, (Object) to));
         if (!invitedMe && !discoverable) {
             throw ApiException.forbidden();
+        }
+        if (com.halqo.server.safety.SafetyController.blockedEitherWay(jdbc, me, to)) {
+            throw ApiException.notFound();
         }
         if (relation(me, to) != null) {
             throw ApiException.conflict("already_connected");

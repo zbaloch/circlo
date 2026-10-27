@@ -1,11 +1,14 @@
 import { router } from 'expo-router';
+import { useState } from 'react';
 import { Alert } from 'react-native';
 
 import { updateAddressBook, type AddressBook } from '@/lib/addressbook';
+import { ActionSheet, type SheetAction } from '@/components/action-sheet';
 import { labelOf } from '@/lib/circles';
 import { getPost, openViewer, putPost, removePost } from '@/lib/feed-store';
 import type { StoredAccount } from '@/lib/keystore';
 import { deletePost, type FeedPost } from '@/lib/posts';
+import { blockUser } from '@/lib/safety';
 import { setLiked, toggledLike } from '@/lib/thread';
 
 /** Display name for an author: me, a friend's decrypted profile name, or a neutral fallback. Pure. */
@@ -29,11 +32,12 @@ export function visiblePosts(book: Pick<AddressBook, 'muted'> | null, posts: Fee
 
 /** Everything a post card needs, shared by Home, the thread view and profiles. */
 export function usePostActions(account: StoredAccount | null, book: AddressBook | null, opts: { inThread?: boolean; onChange?: () => void } = {}) {
+  const [menu, setMenu] = useState<{ title: string; actions: SheetAction[] } | null>(null);
   const like = async (post: FeedPost) => {
     const next = toggledLike(post);
     putPost(next);
     try {
-      await setLiked(post.postId, next.likedByMe);
+      await setLiked(post, next.likedByMe);
     } catch {
       putPost(getPost(post.postId) === next ? post : (getPost(post.postId) ?? post)); // roll back
     }
@@ -58,16 +62,31 @@ export function usePostActions(account: StoredAccount | null, book: AddressBook 
       return;
     }
     const { name } = authorName(account, book, post.authorId);
-    Alert.alert(name, 'Muting hides their posts from your timeline. Only you know; they aren’t told.', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: `Mute ${name}`,
-        onPress: () =>
-          updateAddressBook(account, (b) => {
-            b.muted = [...new Set([...(b.muted ?? []), post.authorId])];
-          }).then(() => opts.onChange?.()),
-      },
-    ]);
+    setMenu({
+      title: name,
+      actions: [
+        {
+          label: `Mute ${name}`,
+          onPress: () =>
+            updateAddressBook(account, (b) => {
+              b.muted = [...new Set([...(b.muted ?? []), post.authorId])];
+            }).then(() => opts.onChange?.()),
+        },
+        {
+          label: `Block ${name}`,
+          destructive: true,
+          onPress: () =>
+            Alert.alert(`Block ${name}?`, 'You’ll stop being friends and they won’t be able to send you requests or see anything new you post. They aren’t told.', [
+              { text: 'Cancel', style: 'cancel' },
+              {
+                text: 'Block',
+                style: 'destructive',
+                onPress: () => blockUser(account, post.authorId).then(() => opts.onChange?.(), () => Alert.alert('Couldn’t block', 'Check your connection and try again.')),
+              },
+            ]),
+        },
+      ],
+    });
   };
 
   const cardProps = (post: FeedPost) => {
@@ -86,5 +105,5 @@ export function usePostActions(account: StoredAccount | null, book: AddressBook 
     };
   };
 
-  return { cardProps, sheet: null };
+  return { cardProps, sheet: <ActionSheet title={menu?.title} actions={menu?.actions ?? null} onClose={() => setMenu(null)} /> };
 }

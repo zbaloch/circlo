@@ -31,6 +31,8 @@ export type FeedPost = {
   epochId: string;
   /** Memory only: opens this post's replies. Never stored or sent anywhere. */
   postKey: ArrayBuffer;
+  /** Memory only: proves to the server I'm in this post's audience (replies, likes, counts). Derived from postKey. */
+  readToken: ArrayBuffer;
   replyCount: number;
   likeCount: number;
   likedByMe: boolean;
@@ -78,6 +80,8 @@ export async function publishPost(account: StoredAccount, draft: Draft, onProgre
           keyRef: toB64(sealed.keyRef),
           headerCt: toB64(sealed.headerCt),
           media: uploaded.map((u) => ({ objectKey: u.objectKey, kind: u.kind })),
+          // Only H(read_token): replies and likes then need the token, which only this post's audience can derive.
+          readTokenHash: toB64(Core.postReadTokenHash(Core.postReadToken(sealed.postKey))),
         },
       }),
     );
@@ -146,9 +150,10 @@ function openRows(account: StoredAccount, book: AddressBook, rows: PostRow[], ke
       mine,
       circle: mine ? book.postCircles?.[row.postId] : undefined,
       postKey: opened.postKey,
-      replyCount: row.replyCount ?? 0,
-      likeCount: row.likeCount ?? 0,
-      likedByMe: !!row.likedByMe,
+      readToken: Core.postReadToken(opened.postKey),
+      replyCount: 0,
+      likeCount: 0,
+      likedByMe: false,
     });
   }
   return posts;
@@ -169,9 +174,21 @@ async function refreshUnknownEpochs(account: StoredAccount, book: AddressBook, r
 
 export type Page = { posts: FeedPost[]; cursor?: string; hasMore: boolean };
 
+/** Fills in reply/like counts for posts I opened, proving audience membership with each post's read token. */
+export async function withStats(posts: FeedPost[]): Promise<FeedPost[]> {
+  if (posts.length === 0) return posts;
+  const res = await api.POST('/v1/posts/stats', { body: { items: posts.map((p) => ({ postId: p.postId, readToken: toB64(p.readToken) })) } });
+  if (!res.response.ok || !res.data) return posts; // counts are cosmetic; the posts still show
+  const byId = new Map(res.data.map((s) => [s.postId, s]));
+  return posts.map((p) => {
+    const s = byId.get(p.postId);
+    return s ? { ...p, replyCount: s.replyCount ?? 0, likeCount: s.likeCount ?? 0, likedByMe: !!s.likedByMe } : p;
+  });
+}
+
 async function readPage(account: StoredAccount, rows: PostRow[], limit: number): Promise<Page> {
   const book = await refreshUnknownEpochs(account, await loadAddressBook(account), rows);
-  const posts = openRows(account, book, rows, (author, epoch) => keyringFor(account, book, author, epoch));
+  const posts = await withStats(openRows(account, book, rows, (author, epoch) => keyringFor(account, book, author, epoch)));
   return { posts, cursor: rows.length ? rows[rows.length - 1].createdAt : undefined, hasMore: rows.length === limit };
 }
 

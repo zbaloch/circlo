@@ -21,6 +21,7 @@ const post = (over: Partial<FeedPost> = {}): FeedPost => ({
   media: [],
   mine: false,
   postKey: new ArrayBuffer(32),
+  readToken: new ArrayBuffer(32),
   replyCount: 0,
   likeCount: 0,
   likedByMe: false,

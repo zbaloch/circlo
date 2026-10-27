@@ -72,7 +72,7 @@ class PostsFlowIT extends IntegrationTest {
 
     private Map<String, Object> newPost(UUID epoch, List<Map<String, String>> media) {
         return Map.of("postId", Ids.newId().toString(), "epochId", epoch.toString(), "keyRef", Ids.random(32),
-                "headerCt", Ids.random(512), "media", media);
+                "headerCt", Ids.random(512), "media", media, "readTokenHash", core.readTokenHash(Ids.random(32)));
     }
 
     @Test
