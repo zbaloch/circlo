@@ -35,6 +35,8 @@ const config: ExpoConfig = {
   plugins: [
     'expo-router',
     './plugins/with-android-cmake',
+    // No install attribution, advertising ids or tracking on either platform.
+    './plugins/with-no-tracking',
     // Keys live in the Android Keystore / iOS Keychain; excluded from Android Auto Backup.
     ['expo-secure-store', { configureAndroidBackup: true }],
     ['./plugins/with-network-security', { allowAllCleartext: isDev, pinning }],

@@ -19,11 +19,14 @@ class SchemaIT extends IntegrationTest {
     }
 
     @Test
-    void noNameEmailCircleCaptionPhoneOrPasswordColumns() {
+    void noIdentityOrTrackingColumns() {
         List<String> bad = jdbc.queryForList(
                 "SELECT CONCAT(table_name, '.', column_name) FROM information_schema.columns "
                         + "WHERE table_schema = DATABASE() AND table_name <> 'flyway_schema_history' "
                         + "AND (column_name REGEXP '(^|_)(name|email|circle|caption|phone|password|ip|address)(_|$)' "
+                        // No tracking: where, on what, or when someone was last around.
+                        + "OR column_name REGEXP '(^|_)(location|lat|lng|latitude|longitude|geo|country|city|agent|ua|model|os|locale|timezone|tz|fingerprint)(_|$)' "
+                        + "OR column_name REGEXP '^last_(seen|login|active|ip)' "
                         // handle_lookup is the keyed HMAC; a plaintext handle column must never exist.
                         + "OR column_name = 'handle')",
                 String.class);
