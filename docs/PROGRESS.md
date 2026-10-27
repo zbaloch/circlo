@@ -16,8 +16,9 @@ Memory file for Claude Code sessions. Read this first when resuming. Keep it acc
 | 7 Posts and media | Done on Android (merged PR #9) |
 | 8 Timeline, threads, replies, likes, profiles | Done on Android (merged PR #10) |
 | 9 Messaging (MLS) | Done on Android (merged PR #11; attachments finished in Phase 10) |
-| 10 Multi-device and push | **Done on Android** on `phase-10-push-devices` (PR pending) |
-| 11–12 | Not started |
+| 10 Multi-device and push | Done on Android (merged PR #12) |
+| 11 Safety, abuse, legal | **In progress** on `phase-11-safety` |
+| 12 | Not started |
 
 ## Environment (as of 2026-10-25)
 
@@ -247,7 +248,23 @@ Memory file for Claude Code sessions. Read this first when resuming. Keep it acc
       must return `undefined` for unchanged responses; MLS state now kept per device id and discarded if it can't
       be opened (re-install); scanned link codes passed in memory (a `#` in a route param was dropped)
 - [x] app 50 tests, core 68, server 47
-- [ ] CI green, merge
+- [x] CI green, merged (PR #12)
+
+## Phase 11 (safety, abuse, legal) — plan
+
+1. **Read token** (owner-approved): `read_token = HKDF(post_key, "halqo/v1/read-token")`; the post stores only
+   `H(read_token)`; listing/adding replies and likes (and their counts) needs the token, so only the post's audience
+   sees who interacted. Counts move out of the feed into a token-checked batch call
+2. **Reports**: the reporter's phone builds the report (reported content decrypted on the device, ids, and the
+   author's signed post header + post key so moderators can verify authorship) and seals it with HPKE to the
+   operator's moderation public key. The server stores ciphertext only; the operator decrypts offline with a CLI
+3. **Block** (server-side; unfriends, rotates my epoch, refuses requests/invites/chat adds both ways) and local
+   **mute** (exists)
+4. **Account deletion**: deletes S3 objects first, then the user (all rows cascade); proven by a test that finds no
+   trace of the user id afterwards
+5. **Data export**: on the device, decrypted (profile, posts with photos, chats) to a JSON file shared via the system
+   share sheet
+6. Legal note for the owner (platform liability, lawful access) in the summary
 
 ## Decisions log
 

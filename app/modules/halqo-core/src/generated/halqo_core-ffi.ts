@@ -612,6 +612,16 @@ const DEFINITIONS = {
       ret: FfiType.RustBuffer,
       hasRustCallStatus: true,
     },
+    uniffi_halqo_core_fn_func_post_read_token: {
+      args: [FfiType.RustBuffer],
+      ret: FfiType.RustBuffer,
+      hasRustCallStatus: true,
+    },
+    uniffi_halqo_core_fn_func_post_read_token_hash: {
+      args: [FfiType.RustBuffer],
+      ret: FfiType.RustBuffer,
+      hasRustCallStatus: true,
+    },
     uniffi_halqo_core_fn_func_recovery_entropy_from_phrase: {
       args: [FfiType.RustBuffer],
       ret: FfiType.RustBuffer,
@@ -695,6 +705,16 @@ const DEFINITIONS = {
       args: [
         FfiType.RustBuffer,
         FfiType.RustBuffer,
+        FfiType.RustBuffer,
+        FfiType.RustBuffer,
+        FfiType.RustBuffer,
+        FfiType.RustBuffer,
+      ],
+      ret: FfiType.RustBuffer,
+      hasRustCallStatus: true,
+    },
+    uniffi_halqo_core_fn_func_seal_report: {
+      args: [
         FfiType.RustBuffer,
         FfiType.RustBuffer,
         FfiType.RustBuffer,
@@ -1150,6 +1170,16 @@ const DEFINITIONS = {
       ret: FfiType.UInt16,
       hasRustCallStatus: false,
     },
+    uniffi_halqo_core_checksum_func_post_read_token: {
+      args: [],
+      ret: FfiType.UInt16,
+      hasRustCallStatus: false,
+    },
+    uniffi_halqo_core_checksum_func_post_read_token_hash: {
+      args: [],
+      ret: FfiType.UInt16,
+      hasRustCallStatus: false,
+    },
     uniffi_halqo_core_checksum_func_recovery_entropy_from_phrase: {
       args: [],
       ret: FfiType.UInt16,
@@ -1201,6 +1231,11 @@ const DEFINITIONS = {
       hasRustCallStatus: false,
     },
     uniffi_halqo_core_checksum_func_seal_reply: {
+      args: [],
+      ret: FfiType.UInt16,
+      hasRustCallStatus: false,
+    },
+    uniffi_halqo_core_checksum_func_seal_report: {
       args: [],
       ret: FfiType.UInt16,
       hasRustCallStatus: false,
@@ -1813,6 +1848,14 @@ interface NativeModuleInterface {
     ciphertext: Uint8Array,
     uniffi_out_err: UniffiRustCallStatus,
   ): Uint8Array;
+  uniffi_halqo_core_fn_func_post_read_token(
+    postKey: Uint8Array,
+    uniffi_out_err: UniffiRustCallStatus,
+  ): Uint8Array;
+  uniffi_halqo_core_fn_func_post_read_token_hash(
+    readToken: Uint8Array,
+    uniffi_out_err: UniffiRustCallStatus,
+  ): Uint8Array;
   uniffi_halqo_core_fn_func_recovery_entropy_from_phrase(
     phrase: Uint8Array,
     uniffi_out_err: UniffiRustCallStatus,
@@ -1889,6 +1932,13 @@ interface NativeModuleInterface {
     replyId: Uint8Array,
     replierId: Uint8Array,
     reply: Uint8Array,
+    uniffi_out_err: UniffiRustCallStatus,
+  ): Uint8Array;
+  uniffi_halqo_core_fn_func_seal_report(
+    moderationPublicKey: Uint8Array,
+    reporter: Uint8Array,
+    reporterId: Uint8Array,
+    content: Uint8Array,
     uniffi_out_err: UniffiRustCallStatus,
   ): Uint8Array;
   uniffi_halqo_core_fn_func_seal_user_blob(
@@ -2155,6 +2205,8 @@ interface NativeModuleInterface {
   uniffi_halqo_core_checksum_func_open_recovery_backup(): number;
   uniffi_halqo_core_checksum_func_open_reply(): number;
   uniffi_halqo_core_checksum_func_open_user_blob(): number;
+  uniffi_halqo_core_checksum_func_post_read_token(): number;
+  uniffi_halqo_core_checksum_func_post_read_token_hash(): number;
   uniffi_halqo_core_checksum_func_recovery_entropy_from_phrase(): number;
   uniffi_halqo_core_checksum_func_recovery_public_key(): number;
   uniffi_halqo_core_checksum_func_safety_number(): number;
@@ -2166,6 +2218,7 @@ interface NativeModuleInterface {
   uniffi_halqo_core_checksum_func_seal_push_token(): number;
   uniffi_halqo_core_checksum_func_seal_recovery_backup(): number;
   uniffi_halqo_core_checksum_func_seal_reply(): number;
+  uniffi_halqo_core_checksum_func_seal_report(): number;
   uniffi_halqo_core_checksum_func_seal_user_blob(): number;
   uniffi_halqo_core_checksum_func_sign_device_certificate(): number;
   uniffi_halqo_core_checksum_func_sign_identity(): number;

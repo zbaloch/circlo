@@ -36,20 +36,41 @@ class ThreadFlowIT extends IntegrationTest {
                 inviter.accessToken);
     }
 
+    /** Every post here uses this read token; the friends in these tests are all in the audience. */
+    private static final byte[] TOKEN = Ids.random(32);
+
     private String post(TestApp a, UUID epoch) {
         String id = Ids.newId().toString();
         call("POST", "/v1/posts", Map.of("postId", id, "epochId", epoch.toString(), "keyRef", Ids.random(32), "headerCt", Ids.random(256),
-                "media", List.of()), a.accessToken);
+                "media", List.of(), "readTokenHash", core.readTokenHash(TOKEN)), a.accessToken);
         return id;
+    }
+
+    private static String token() {
+        return java.util.Base64.getEncoder().encodeToString(TOKEN);
     }
 
     @SuppressWarnings("unchecked")
     private List<Map<String, Object>> list(String path, TestApp a) {
-        return http().get().uri(path).header("Authorization", "Bearer " + a.accessToken).retrieve().body(List.class);
+        return http().get().uri(path).header("Authorization", "Bearer " + a.accessToken).header("X-Halqo-Read-Token", token())
+                .retrieve().body(List.class);
     }
 
     private int status(String method, String path, Object body, TestApp a) {
-        return call(method, path, body, a.accessToken).getStatusCode().value();
+        var spec = http().method(org.springframework.http.HttpMethod.valueOf(method)).uri(path).header("Authorization", "Bearer " + a.accessToken)
+                .header("X-Halqo-Read-Token", token());
+        if (body != null) {
+            spec = spec.contentType(org.springframework.http.MediaType.APPLICATION_JSON).body(body);
+        }
+        return spec.retrieve().onStatus(x -> true, (q, r) -> {}).toBodilessEntity().getStatusCode().value();
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> stats(TestApp a, String postId) {
+        List<Map<String, Object>> res = http().post().uri("/v1/posts/stats").header("Authorization", "Bearer " + a.accessToken)
+                .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                .body(Map.of("items", List.of(Map.of("postId", postId, "readToken", TOKEN)))).retrieve().body(List.class);
+        return res.get(0);
     }
 
     @Test
@@ -88,10 +109,9 @@ class ThreadFlowIT extends IntegrationTest {
         assertThat(status("PUT", base + "/like", null, eve)).isEqualTo(404);
         assertThat(list(base + "/likes", alice)).extracting(l -> l.get("userId"))
                 .containsExactlyInAnyOrder(bob.userId.toString(), carol.userId.toString());
-        Map<String, Object> view = list("/v1/users/" + alice.userId + "/posts", bob).get(0);
-        assertThat(view).containsEntry("replyCount", 2).containsEntry("likeCount", 2).containsEntry("likedByMe", true);
+        assertThat(stats(bob, postId)).containsEntry("replyCount", 2).containsEntry("likeCount", 2).containsEntry("likedByMe", true);
         assertThat(status("DELETE", base + "/like", null, bob)).isEqualTo(200);
-        assertThat(list("/v1/users/" + alice.userId + "/posts", bob).get(0)).containsEntry("likeCount", 1).containsEntry("likedByMe", false);
+        assertThat(stats(bob, postId)).containsEntry("likeCount", 1).containsEntry("likedByMe", false);
 
         // Delete: own reply, or any reply on my post; nobody else's.
         assertThat(status("DELETE", base + "/replies/" + r2, null, bob)).isEqualTo(404);
@@ -135,7 +155,7 @@ class ThreadFlowIT extends IntegrationTest {
         String cursor = (String) page1.get(3).get("createdAt");
         List<Map<String, Object>> page2 = list("/v1/feed?limit=4&before=" + cursor, bob);
         assertThat(page2).extracting(p -> p.get("postId")).containsExactlyElementsOf(expected.subList(4, 6));
-        assertThat(page1.get(0)).containsKeys("authorId", "media", "likeCount", "replyCount", "likedByMe");
+        assertThat(page1.get(0)).containsKeys("authorId", "media").doesNotContainKeys("likeCount", "replyCount", "likedByMe");
     }
 
     /** PLAN.md Phase 8 perf: 500 posts across 50 friends; the server side of a feed page must be far under budget. */

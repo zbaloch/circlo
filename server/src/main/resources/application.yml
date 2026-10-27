@@ -24,6 +24,14 @@ halqo:
     handle-key: ${HALQO_HANDLE_KEY:}
     push-token-key: ${HALQO_PUSH_TOKEN_KEY:}
     jwt-key: ${HALQO_JWT_KEY:}
+  # Operator's moderation public key (core CLI: halqo-moderation keygen). The secret half stays offline.
+  moderation:
+    public-key: ${HALQO_MODERATION_PUBLIC_KEY:}
+  # FCM HTTP v1 for content-free pushes; both empty = push off.
+  push:
+    fcm:
+      project-id: ${HALQO_FCM_PROJECT_ID:}
+      service-account: ${HALQO_FCM_SERVICE_ACCOUNT:}
   auth:
     access-ttl: 15m
     refresh-ttl: 30d

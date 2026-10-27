@@ -1055,6 +1055,57 @@ export function openUserBlob(
   }
 }
 
+/**
+ * The post's read token (proves to the server that I can open the post, without revealing anything else).
+ */
+export function postReadToken(postKey: ArrayBuffer): ArrayBuffer /*throws*/ {
+  const __rb: Uint8Array = uniffiCaller.rustCallWithError(
+    /*liftError:*/ FfiConverterTypeCoreError.lift.bind(
+      FfiConverterTypeCoreError,
+    ),
+    /*caller:*/ (callStatus) => {
+      return nativeModule().uniffi_halqo_core_fn_func_post_read_token(
+        FfiConverterArrayBuffer.lower(postKey, nativeModule().rustbuffer_alloc),
+        callStatus,
+      );
+    },
+    /*liftString:*/ FfiConverterString.lift.bind(FfiConverterString),
+  );
+  try {
+    return FfiConverterArrayBuffer.lift(__rb);
+  } finally {
+    nativeModule().rustbuffer_free(__rb);
+  }
+}
+
+/**
+ * Hash of a read token; sent once, when the post is created.
+ */
+export function postReadTokenHash(
+  readToken: ArrayBuffer,
+): ArrayBuffer /*throws*/ {
+  const __rb: Uint8Array = uniffiCaller.rustCallWithError(
+    /*liftError:*/ FfiConverterTypeCoreError.lift.bind(
+      FfiConverterTypeCoreError,
+    ),
+    /*caller:*/ (callStatus) => {
+      return nativeModule().uniffi_halqo_core_fn_func_post_read_token_hash(
+        FfiConverterArrayBuffer.lower(
+          readToken,
+          nativeModule().rustbuffer_alloc,
+        ),
+        callStatus,
+      );
+    },
+    /*liftString:*/ FfiConverterString.lift.bind(FfiConverterString),
+  );
+  try {
+    return FfiConverterArrayBuffer.lift(__rb);
+  } finally {
+    nativeModule().rustbuffer_free(__rb);
+  }
+}
+
 export function recoveryEntropyFromPhrase(
   phrase: string,
 ): ArrayBuffer /*throws*/ {
@@ -1419,6 +1470,46 @@ export function sealReply(
           reply,
           nativeModule().rustbuffer_alloc,
         ),
+        callStatus,
+      );
+    },
+    /*liftString:*/ FfiConverterString.lift.bind(FfiConverterString),
+  );
+  try {
+    return FfiConverterArrayBuffer.lift(__rb);
+  } finally {
+    nativeModule().rustbuffer_free(__rb);
+  }
+}
+
+/**
+ * Signs and seals a report for the operator's moderation key; the server only ever stores the ciphertext.
+ */
+export function sealReport(
+  moderationPublicKey: ArrayBuffer,
+  reporter: IdentityKeys,
+  reporterId: ArrayBuffer,
+  content: ArrayBuffer,
+): ArrayBuffer /*throws*/ {
+  const __rb: Uint8Array = uniffiCaller.rustCallWithError(
+    /*liftError:*/ FfiConverterTypeCoreError.lift.bind(
+      FfiConverterTypeCoreError,
+    ),
+    /*caller:*/ (callStatus) => {
+      return nativeModule().uniffi_halqo_core_fn_func_seal_report(
+        FfiConverterArrayBuffer.lower(
+          moderationPublicKey,
+          nativeModule().rustbuffer_alloc,
+        ),
+        FfiConverterTypeIdentityKeys.lower(
+          reporter,
+          nativeModule().rustbuffer_alloc,
+        ),
+        FfiConverterArrayBuffer.lower(
+          reporterId,
+          nativeModule().rustbuffer_alloc,
+        ),
+        FfiConverterArrayBuffer.lower(content, nativeModule().rustbuffer_alloc),
         callStatus,
       );
     },
@@ -5196,6 +5287,21 @@ function uniffiEnsureInitialized() {
     );
   }
   if (
+    nativeModule().uniffi_halqo_core_checksum_func_post_read_token() !== 10769
+  ) {
+    throw new UniffiInternalError.ApiChecksumMismatch(
+      "uniffi_halqo_core_checksum_func_post_read_token",
+    );
+  }
+  if (
+    nativeModule().uniffi_halqo_core_checksum_func_post_read_token_hash() !==
+    62071
+  ) {
+    throw new UniffiInternalError.ApiChecksumMismatch(
+      "uniffi_halqo_core_checksum_func_post_read_token_hash",
+    );
+  }
+  if (
     nativeModule().uniffi_halqo_core_checksum_func_recovery_entropy_from_phrase() !==
     33763
   ) {
@@ -5267,6 +5373,11 @@ function uniffiEnsureInitialized() {
   if (nativeModule().uniffi_halqo_core_checksum_func_seal_reply() !== 55067) {
     throw new UniffiInternalError.ApiChecksumMismatch(
       "uniffi_halqo_core_checksum_func_seal_reply",
+    );
+  }
+  if (nativeModule().uniffi_halqo_core_checksum_func_seal_report() !== 52687) {
+    throw new UniffiInternalError.ApiChecksumMismatch(
+      "uniffi_halqo_core_checksum_func_seal_report",
     );
   }
   if (

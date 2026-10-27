@@ -13,6 +13,16 @@ use crate::padding::{pad, unpad};
 use crate::primitives::{hkdf32, labelled, random_secret, sha256};
 
 pub const MAX_TEXT_CHARS: usize = 500;
+
+/// Proof that the holder can open a post (CRYPTO.md 13c): only its audience can derive it from the post key.
+pub fn read_token(post_key: &[u8; 32]) -> Zeroizing<[u8; 32]> {
+    hkdf32(post_key, "halqo/v1/read-token")
+}
+
+/// What the server stores and compares: a hash, so a database copy can't be used to interact with the post.
+pub fn read_token_hash(token: &[u8; 32]) -> [u8; 32] {
+    sha256(&[labelled("halqo/v1/read-token-hash", &[token]).as_slice()])
+}
 const MAX_TEXT_BYTES: usize = MAX_TEXT_CHARS * 4;
 pub const MAX_MEDIA: usize = 12;
 const MAX_MIME_BYTES: usize = 100;
@@ -460,5 +470,14 @@ mod tests {
         )
         .is_err());
         assert!(open_reply(&sealed.post_key, &rpk, &[1; 16], &[2; 16], &[4; 16], &ct).is_err());
+    }
+
+    #[test]
+    fn read_token_is_per_post_and_stored_only_as_a_hash() {
+        let (a, b) = ([1u8; 32], [2u8; 32]);
+        assert_eq!(*read_token(&a), *read_token(&a));
+        assert_ne!(*read_token(&a), *read_token(&b));
+        assert_ne!(read_token_hash(&read_token(&a)), *read_token(&a));
+        assert_ne!(*read_token(&a), a, "not the post key itself");
     }
 }

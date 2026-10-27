@@ -217,6 +217,19 @@ pub extern "system" fn Java_com_halqo_server_crypto_HalqoCoreNative_inviteTokenH
     })
 }
 
+/// `H(read_token)` for comparing a presented read token with the one stored at post creation (CRYPTO.md 13c).
+#[no_mangle]
+pub extern "system" fn Java_com_halqo_server_crypto_HalqoCoreNative_readTokenHash(
+    mut env: JNIEnv,
+    _c: JClass,
+    token: JByteArray,
+) -> jbyteArray {
+    guard(&mut env, std::ptr::null_mut(), |env| {
+        let t: [u8; 32] = fixed(&bytes(env, &token)?, "read_token")?;
+        out(env, &crate::post::read_token_hash(&t))
+    })
+}
+
 /// MLS framing the delivery service may read: `group_id || epoch:u64 BE || is_commit:u8` (CRYPTO.md 13a).
 #[no_mangle]
 pub extern "system" fn Java_com_halqo_server_crypto_HalqoCoreNative_mlsMessageMeta(

@@ -21,6 +21,7 @@ pub mod playback;
 pub mod post;
 pub mod primitives;
 pub mod recovery;
+pub mod report;
 pub mod social;
 pub mod stream;
 #[cfg(test)]
