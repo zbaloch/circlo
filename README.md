@@ -16,7 +16,7 @@ your posts, media, name, email or which circle anyone is in.
 - **Login without revealing your password.** Your device derives a signing key from your password with Argon2id;
   the server stores only the public key and verifies a signed challenge.
 
-Details: [docs/CRYPTO.md](docs/CRYPTO.md), [docs/THREAT_MODEL.md](docs/THREAT_MODEL.md), [docs/PLAN.md](docs/PLAN.md).
+Details: [docs/CRYPTO.md](docs/CRYPTO.md), [docs/THREAT_MODEL.md](docs/THREAT_MODEL.md), [docs/PRIVACY.md](docs/PRIVACY.md) (everything the server stores, and what it never collects), [docs/PLAN.md](docs/PLAN.md).
 
 ## Repository layout
 
