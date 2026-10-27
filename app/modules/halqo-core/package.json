@@ -20,7 +20,9 @@
   ],
   "scripts": {
     "ubrn:android": "ubrn build jsi2 android --and-generate --config ubrn.config.yaml",
-    "ubrn:ios": "ubrn build jsi2 ios --and-generate --config ubrn.config.yaml"
+    "ubrn:ios": "ubrn build jsi2 ios --and-generate --config ubrn.config.yaml",
+    "ubrn:android:release": "ubrn build jsi2 android --profile app --and-generate --config ubrn.config.yaml",
+    "ubrn:ios:release": "ubrn build jsi2 ios --profile app --and-generate --config ubrn.config.yaml"
   },
   "codegenConfig": {
     "android": {

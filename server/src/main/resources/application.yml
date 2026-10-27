@@ -5,6 +5,9 @@ spring:
     url: ${HALQO_DB_URL:jdbc:mariadb://localhost:3306/halqo}
     username: ${HALQO_DB_USER:halqo}
     password: ${HALQO_DB_PASSWORD}
+    # Sized by the Phase 12 load test (64 concurrent clients queued behind Hikari's default of 10).
+    hikari:
+      maximum-pool-size: ${HALQO_DB_POOL_SIZE:24}
   flyway:
     clean-disabled: true
 

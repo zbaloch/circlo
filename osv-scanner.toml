@@ -1,0 +1,7 @@
+# osv-scanner (PLAN.md Phase 12 dependency audit). Each accepted finding needs a reason and an expiry date, so it
+# is looked at again.
+
+[[IgnoredVulns]]
+id = "GHSA-mrhx-c7xc-m3w5"
+ignoreUntil = 2027-01-31T00:00:00Z
+reason = "zod 3 inside @expo/cli (build-time tool, validates our own config); not in the app bundle. Fixed only in zod 4; revisit with the next Expo SDK."

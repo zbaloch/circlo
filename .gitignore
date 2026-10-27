@@ -34,3 +34,6 @@ app/android/
 .idea/
 .vscode/*
 !.vscode/extensions.json
+
+# Python bytecode (infra scripts)
+__pycache__/

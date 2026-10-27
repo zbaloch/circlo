@@ -72,6 +72,13 @@ lto = true
 codegen-units = 1
 panic = "abort"
 
+# For the app's library (ubrn --profile app): optimised like release, but a bug surfaces as a JS error
+# (uniffi catches the panic) instead of killing the app; debug info stripped to keep the package small.
+[profile.app]
+inherits = "release"
+panic = "unwind"
+strip = "debuginfo"
+
 # For halqo-server's JNI library: a bug must surface as a Java exception, never abort the JVM.
 [profile.server]
 inherits = "release"

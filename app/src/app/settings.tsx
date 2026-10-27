@@ -6,6 +6,7 @@ import { api, ok } from '@/api/client';
 import { Button, ErrorText } from '@/components/form';
 import { authorName } from '@/components/post-actions';
 import { describeError } from '@/lib/account';
+import { useIntegrityWarning } from '@/lib/device-integrity';
 import { loadAddressBook, type AddressBook } from '@/lib/addressbook';
 import { deleteAccount, exportMyData, unblockUser } from '@/lib/safety';
 import { useSession } from '@/lib/session';
@@ -16,6 +17,7 @@ export default function SettingsScreen() {
   const session = useSession();
   const account = session.status === 'signedIn' ? session.account : null;
   const palette = usePalette();
+  const integrity = useIntegrityWarning();
   const [discoverable, setDiscoverable] = useState<boolean | null>(null);
   const [blocked, setBlocked] = useState<string[]>([]);
   const [book, setBook] = useState<AddressBook | null>(null);
@@ -103,6 +105,13 @@ export default function SettingsScreen() {
         </View>
         <Switch accessibilityLabel="Let people find me by handle" value={!!discoverable} disabled={discoverable === null} onValueChange={toggle} trackColor={{ true: palette.primary }} />
       </View>
+
+      {integrity.message ? (
+        <View className="gap-2 rounded-2xl border border-danger p-4 dark:border-danger-dark">
+          <Text className="text-base font-bold text-ink dark:text-ink-dark">Device security</Text>
+          <Text className="text-muted dark:text-muted-dark">{integrity.message}</Text>
+        </View>
+      ) : null}
 
       <View className="gap-2 rounded-2xl border border-border p-4 dark:border-border-dark">
         <Text className="text-base font-bold text-ink dark:text-ink-dark">Blocked people</Text>

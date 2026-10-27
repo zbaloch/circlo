@@ -17,8 +17,8 @@ Memory file for Claude Code sessions. Read this first when resuming. Keep it acc
 | 8 Timeline, threads, replies, likes, profiles | Done on Android (merged PR #10) |
 | 9 Messaging (MLS) | Done on Android (merged PR #11; attachments finished in Phase 10) |
 | 10 Multi-device and push | Done on Android (merged PR #12) |
-| 11 Safety, abuse, legal | Done on Android (PR pending) |
-| 12 | Not started |
+| 11 Safety, abuse, legal | Done on Android (merged PR #13) |
+| 12 Hardening | Done (PR pending); external crypto audit still required before launch |
 
 ## Environment (as of 2026-10-25)
 
@@ -272,6 +272,42 @@ Memory file for Claude Code sessions. Read this first when resuming. Keep it acc
       AGPL obligations). **Needs a lawyer before launch**
 - [x] app 50 tests, core 69, server 50
 
+## Phase 12 (hardening) — summary
+
+See docs/HARDENING.md for how to repeat each check.
+
+- [x] **Certificate pinning** in release builds (Android pin-set, iOS NSPinnedDomains). The host comes from
+      `EXPO_PUBLIC_API_URL` and the pins from `HALQO_PIN_SHA256` (EAS env), so no production hostname or key is in
+      git. A production build fails without a live pin and a backup pin. Tested: config generation and validation
+- [x] **Rooted/jailbroken warning**: checked once per launch; dismissible Home banner plus a permanent note in
+      Settings. Warns only, never blocks
+- [x] **Reproducible builds**: server jar byte-identical across clean builds (fixed outputTimestamp; checked
+      locally and in CI); Rust release library checked in CI from two source paths
+      (`core/scripts/check-reproducible.sh`)
+- [x] **Optimised app core**: Cargo profile `app` (release, panic=unwind so a Rust bug becomes a JS error),
+      `make core-android-release`. Android library is now 4.5 MB, down from 75 MB
+- [x] **Dependency audit**:
+      - new CI workflow `deps-audit`: osv-scanner over the Rust, npm and Maven dependencies, plus cargo-deny for
+        advisories, AGPL-compatible licences and crates.io-only sources; runs on lockfile changes and weekly;
+      - `npm audit fix` updated node-forge;
+      - the remaining zod 3 advisory is in Expo's build-time command-line tool only (not in the app), accepted until
+        2027-01-31 in `osv-scanner.toml`
+- [x] **Leaked-database drill** (`infra/leak-drill.sh` + scanner): dev DB (125 KB dump) and all 11 bucket objects
+      plus the server log scanned for 13 markers typed on the emulators (handles, names, post text, EXIF test tags),
+      image/video signatures, emails and IPs, and low-entropy objects: **PASS, nothing readable**. The scanner's own
+      tests prove each kind of leak is caught (run in CI)
+- [x] **Load test** (`LoadIT`, on request, 64 clients, 30 s, real OPAQUE logins). It found two N+1 query patterns
+      (feed media, batch stats) and an undersized connection pool. Fixed:
+
+      | | Before | After |
+      |---|---|---|
+      | Throughput | 106 req/s | 919 req/s |
+      | Feed p95 | 963 ms | 156 ms |
+      | Stats p95 | 3.5 s | 204 ms |
+      | Errors | 0 | 0 |
+
+      The pool size is set by `HALQO_DB_POOL_SIZE` (default 24)
+
 ## Decisions log
 
 | Date | Decision | Why |
@@ -331,6 +367,10 @@ Memory file for Claude Code sessions. Read this first when resuming. Keep it acc
 | 2026-10-27 | Device linking: HPKE base to a QR key + 6-digit confirmation code; single-use 10-min server hand-off with a session | Encrypted transfer; resists scanning an attacker's code |
 | 2026-10-27 | Pushes: `{"type":"activity"}` plus a fixed generic notification text; tokens sealed with HALQO_PUSH_TOKEN_KEY | No content, names or counts ever leave the server in a push |
 | 2026-10-27 | **Owner removed reporting to the operator** (built, then removed before merge); block + mute only | Posts are between acquaintances; nothing should ever become readable by the operator |
+| 2026-10-27 | Pinning: leaf SPKI pins (live + offline backup) from EAS env; production builds fail without them; only the API host is pinned | No hostnames in a public repo; backup key avoids lock-out; media is E2EE and AEAD-checked |
+| 2026-10-27 | Rooted/jailbroken: warn only (expo-device check) | PLAN.md says warn; the check is heuristic and blocking hurts honest users |
+| 2026-10-27 | App core built with Cargo profile `app` (panic=unwind) instead of `release` (abort) | uniffi turns a panic into a JS error instead of killing the app |
+| 2026-10-27 | osv-scanner + cargo-deny in CI instead of local tools; accepted findings need a reason and expiry | One scanner for all three ecosystems; accepted risk is revisited |
 | 2026-10-25 | Only `secret-scan / gitleaks` should be a required check | Path-filtered CI workflows don't run on every PR |
 
 ## Waiting on owner
@@ -388,8 +428,9 @@ Memory file for Claude Code sessions. Read this first when resuming. Keep it acc
   in one session. Workaround: run `wsl -d Debian -- sleep infinity` in a terminal while developing. Symptom: server
   logs "Connection refused" to localhost:3306 and the app shows "Something went wrong".
 
-- Android `libhalqo_core.so` is currently a debug build (~21 MB, slow); release builds need `--release` in ubrn cargo extras (Phase 12).
-- `npm audit` reports advisories in app dev dependencies (Expo toolchain); review in Phase 12 dependency audit.
+- zod 3 advisory (GHSA-mrhx-c7xc-m3w5) in Expo's build-time CLI; accepted until 2027-01-31 (`osv-scanner.toml`).
+- Dev builds still use the debug core (`make core-android`); use `make core-android-release` for performance checks and
+  release builds. EAS builds need the Rust toolchain + cargo-ndk in the build image (or a prebuilt library step).
 
 - Flyway (managed by Boot 3.5) logs "MariaDB 11.8 is newer than this version of Flyway". Works; resolved by a Flyway/Boot upgrade.
 - First commit `12fbddb` is authored with a personal email and is already public (can't be undone; future commits
