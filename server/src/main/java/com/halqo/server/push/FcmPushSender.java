@@ -18,8 +18,9 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * FCM HTTP v1 sender using a service account (JWT bearer grant, RS256 signed with the JDK). Sends data-only messages
- * ({@code {"type":"activity"}}) with high priority so the app can wake, fetch and decrypt.
+ * FCM HTTP v1 sender using a service account (JWT bearer grant, RS256 signed with the JDK). Sends
+ * {@code {"type":"activity"}} plus a fixed, generic notification ("You have new activity") with high priority; the app
+ * fetches and decrypts when opened.
  */
 final class FcmPushSender implements PushSender {
 
@@ -82,7 +83,8 @@ final class FcmPushSender implements PushSender {
             byte[] message = json.writeValueAsBytes(Map.of("message", Map.of(
                     "token", new String(token, StandardCharsets.UTF_8),
                     "data", data,
-                    "android", Map.of("priority", "high"))));
+                    // Always the same generic text: never names, previews or counts.
+                    "android", Map.of("priority", "high", "notification", Map.of("title", "Halqo", "body", "You have new activity")))));
             http.send(HttpRequest.newBuilder(URI.create("https://fcm.googleapis.com/v1/projects/" + projectId + "/messages:send"))
                     .timeout(Duration.ofSeconds(10)).header("Authorization", "Bearer " + accessToken())
                     .header("Content-Type", "application/json").POST(HttpRequest.BodyPublishers.ofByteArray(message)).build(),

@@ -15,8 +15,9 @@ Memory file for Claude Code sessions. Read this first when resuming. Keep it acc
 | 6 Circles | Done on Android (merged PR #8) |
 | 7 Posts and media | Done on Android (merged PR #9) |
 | 8 Timeline, threads, replies, likes, profiles | Done on Android (merged PR #10) |
-| 9 Messaging (MLS) | **Done (text) on Android** on `phase-9-messaging`; attachments carried to Phase 10 |
-| 10–12 | Not started |
+| 9 Messaging (MLS) | Done on Android (merged PR #11; attachments finished in Phase 10) |
+| 10 Multi-device and push | **Done on Android** on `phase-10-push-devices` (PR pending) |
+| 11–12 | Not started |
 
 ## Environment (as of 2026-10-25)
 
@@ -218,9 +219,34 @@ Memory file for Claude Code sessions. Read this first when resuming. Keep it acc
       chat, Bob's device joined from the Welcome, messages went both ways and decrypted on each phone. DB: 3 MLS
       messages, 0 plaintext hits; two texts of different lengths both stored as 446 bytes (padding)
 - [x] app 48 tests, core 66, server 43
-- [ ] **Not done yet (carried to Phase 10):** image/video attachments in chats (needs group-scoped media download
-      authorization on the server); adding a member's *new* device to existing chats automatically; sign-out should
-      revoke the device server-side so stale devices stop being claimed
+- [x] Carry-overs (attachments, new devices joining chats, revoke on sign-out) done in Phase 10
+- [x] CI green, merged (PR #11)
+
+## Phase 10 (multi-device, push, and Phase 9 carry-overs) — summary
+
+- [x] Device linking by QR (CRYPTO.md 13b): new phone shows a QR (`halqo://link/<id>#<key>`) and a 6-digit code;
+      the signed-in phone checks the code, seals the account secrets to that key (HPKE), and the server relays them
+      once (10 min, single use, rate-limited pickup with a session). Core `link.rs` with tests (round trip, bound to
+      link id + user, wrong key/tamper fail, code stability)
+- [x] Revoke devices (Devices screen, and automatically on sign-out): removed from chats' server ACL, key packages,
+      welcomes and push token deleted
+- [x] Carry-over: a member's new device is added to existing chats by any member (`missing-devices` + claim by
+      device id), throttled to every 5 min per chat
+- [x] Carry-over: chat attachments — same strip/encrypt/upload pipeline as posts, objects attached to the group
+      (members-only download URLs, 30-day retention, never swept as unattached), keys and object keys inside MLS
+- [x] Push: content-free `{"type":"activity"}` + a fixed generic notification; recipients only (chat messages to
+      other members' devices, replies/likes to the author, friend requests); tokens sealed with
+      HALQO_PUSH_TOKEN_KEY; FCM HTTP v1 sender when configured. App registers via expo-notifications and syncs on
+      a push. **DevicesFlowIT captures the push: only the recipient's token, data exactly `{"type":"activity"}`, no
+      names, ids or content**
+- [x] **Emulator:** Alice → Bob photo in a chat (decrypted on Bob's phone); Bob's phone linked a fresh phone by QR
+      (codes matched on both screens) → it signed in as Bob without a password; Bob's two phones both got the new
+      chat and message ("You: …" on the other device)
+- [x] Bugs found and fixed: access tokens (15 min) were never renewed while the app stayed open — the API client
+      now refreshes once (single flight, so a rotating refresh token is never reused) and retries; `onResponse`
+      must return `undefined` for unchanged responses; MLS state now kept per device id and discarded if it can't
+      be opened (re-install); scanned link codes passed in memory (a `#` in a route param was dropped)
+- [x] app 50 tests, core 68, server 47
 - [ ] CI green, merge
 
 ## Decisions log
@@ -278,13 +304,16 @@ Memory file for Claude Code sessions. Read this first when resuming. Keep it acc
 | 2026-10-27 | Calling device named by `X-Halqo-Device` header and checked against my devices (tokens have no device claim) | Smallest change to auth; a user can only act as their own devices |
 | 2026-10-27 | Server orders commits by epoch from the clear MLS framing (first wins, 409 for the loser) | Prevents forks without reading content |
 | 2026-10-27 | gitleaks allowlist moved to `[[allowlists]]`; crate name `libcrux-secrets` allowed only in Cargo.lock | False positive from OpenMLS's dependency list; every rule still applies elsewhere |
+| 2026-10-27 | **Owner approved** the per-post read token (`halqo/v1/read-token`) so only a post's audience can see/add replies and likes; built in Phase 11 | Closes THREAT_MODEL leak 14 |
+| 2026-10-27 | Device linking: HPKE base to a QR key + 6-digit confirmation code; single-use 10-min server hand-off with a session | Encrypted transfer; resists scanning an attacker's code |
+| 2026-10-27 | Pushes: `{"type":"activity"}` plus a fixed generic notification text; tokens sealed with HALQO_PUSH_TOKEN_KEY | No content, names or counts ever leave the server in a push |
 | 2026-10-25 | Only `secret-scan / gitleaks` should be a required check | Path-filtered CI workflows don't run on every PR |
 
 ## Waiting on owner
 
-- **Decision (Phase 8):** add a per-post read token so only a post's audience can list/add replies and likes
-  (THREAT_MODEL leak 14)? Recommended: yes, in Phase 11 with moderation. Needs a new HKDF label
-  `halqo/v1/read-token` (CRYPTO.md change).
+- Push credentials: FCM service account (HALQO_FCM_PROJECT_ID, HALQO_FCM_SERVICE_ACCOUNT in the server's secret store)
+  and google-services.json / APNs key in EAS credentials. Without them pushes are simply off; everything else works.
+
 
 0. iPhone dev build (Phase 2 criterion): needs an Expo account (`npx eas-cli@latest login`) and an Apple Developer
    account for device provisioning. Then `cd app && npx eas-cli@latest build --profile development --platform ios`.
@@ -294,6 +323,10 @@ Memory file for Claude Code sessions. Read this first when resuming. Keep it acc
 4. Phone checks below.
 
 ## Needs manual check
+
+- (Phase 10) With push credentials configured: a chat message to a locked phone shows only "Halqo · You have new
+  activity"; opening the app shows the decrypted message. Link a second physical phone by QR (compare the 6-digit
+  codes) and revoke it from Devices.
 
 - (Phase 9) Two physical phones: start a chat, message both ways, add a third person, remove them, and confirm the
   removed person stops receiving. Log in on a second phone as the same user and check new chats arrive there too.

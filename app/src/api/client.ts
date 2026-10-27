@@ -12,12 +12,45 @@ export function setAccessToken(token: string | null) {
   accessToken = token;
 }
 
+type Refresher = () => Promise<string | null>;
+let refresher: Refresher | null = null;
+let refreshing: Promise<string | null> | null = null;
+
+/**
+ * The session's way to get a new access token (rotating the refresh token). Called when the server says the access
+ * token expired; one refresh at a time, because a refresh token used twice revokes the session.
+ */
+export function setRefresher(fn: Refresher | null) {
+  refresher = fn;
+}
+
+function refreshOnce(): Promise<string | null> {
+  if (!refresher) return Promise.resolve(null);
+  refreshing ??= refresher().finally(() => {
+    refreshing = null;
+  });
+  return refreshing;
+}
+
+// Unsent copies of session-authenticated requests, so an expired-token 401 can be retried once.
+const retryable = new WeakMap<Request, Request>();
+
 const auth: Middleware = {
   onRequest({ request }) {
-    if (accessToken && !request.headers.has('Authorization')) {
-      request.headers.set('Authorization', `Bearer ${accessToken}`);
-    }
+    if (request.headers.has('Authorization')) return request; // an explicit token (e.g. recovery scope)
+    if (accessToken) request.headers.set('Authorization', `Bearer ${accessToken}`);
+    // Session calls (not login/refresh themselves) can be retried once after renewing an expired or missing token.
+    if (refresher && !new URL(request.url).pathname.startsWith('/v1/auth/')) retryable.set(request, request.clone());
     return request;
+  },
+  async onResponse({ request, response }) {
+    const copy = retryable.get(request);
+    retryable.delete(request);
+    if (response.status !== 401 || !copy) return undefined; // unchanged (openapi-fetch wants undefined, not the same object)
+    const token = await refreshOnce();
+    if (!token) return undefined;
+    copy.headers.set('Authorization', `Bearer ${token}`);
+    return fetch(copy);
   },
 };
 

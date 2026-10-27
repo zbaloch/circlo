@@ -286,6 +286,22 @@ storage plug into it.
 - **Removal:** removing a member commits Remove proposals for all of their devices; MLS guarantees they can't derive
   the new epoch's keys, so they can't read anything sent afterwards (tested).
 
+## 13b. Linking a new device (Phase 10)
+
+- The new device generates a one-time X25519 key pair and a random 32-byte `link_id`, and shows a QR code
+  `halqo://link/<link_id>#<link_pk>` (base64url).
+- Both devices show a 6-digit confirmation code `SHA-256("halqo/v1/device-link-code" || 0x00 || link_pk)` (first 4
+  bytes, mod 10^6). The signed-in device sends nothing until the user confirms the codes match, so tricking someone
+  into scanning an attacker's code doesn't hand over their keys.
+- The signed-in device seals `CBOR {1: backup payload (section 6), 2: handle}` with HPKE base mode
+  (X25519-HKDF-SHA256, HKDF-SHA256, ChaCha20-Poly1305), `info = "halqo/v1/device-link"`,
+  `aad = "halqo/v1/device-link" || 0x00 || link_id || user_id`, and posts it to the server.
+- The server keeps the ciphertext at most 10 minutes and hands it out once (unauthenticated, rate-limited pickup by
+  `link_id`) together with a session for the account. The new device opens it, checks the published identity keys
+  match (as at login), registers itself as a new device and joins chats as its members add it.
+- Revoking a device removes it from every chat's server-side ACL, deletes its key packages, welcomes and push token;
+  members' apps remove its MLS leaves.
+
 ## 13. Server-side secrets (outside the DB, via the core)
 
 | Secret | Env var | Used for | If lost |

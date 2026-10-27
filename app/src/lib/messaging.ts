@@ -15,7 +15,7 @@ import { loadAddressBook } from './addressbook';
 import { fromB64, toB64, utf8, uuidFromRandom, uuidToBytes, bytesToUuid } from './bytes';
 import { verifyIdentitySignature, type Identity } from './friends';
 import { localCacheKey, type StoredAccount } from './keystore';
-import type { UploadedMedia } from './media';
+import { kindName, type UploadedMedia } from './media';
 
 const SIGNER_SLOT = 'halqo.mls-signer.v1';
 const KEYCHAIN = { keychainService: 'com.halqo.app.keys', keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY };
@@ -53,8 +53,9 @@ type History = { v: 1; conversations: Record<string, Conversation>; sentSeqs: Re
 
 // ---------------- local, sealed storage ----------------
 
+/** Per-device folder: state and history belong to one device id (a re-login is a new device). */
 function dir(): Directory {
-  const d = new Directory(Paths.document, 'messaging');
+  const d = new Directory(Paths.document, 'messaging', deviceId || 'none');
   if (!d.exists) d.create({ intermediates: true, idempotent: true });
   return d;
 }
@@ -125,9 +126,20 @@ export async function ensureMessaging(account: StoredAccount): Promise<Core.MlsC
   deviceId = account.deviceId;
   const s = await signer(account);
   const key = await localCacheKey();
+  history = null;
   const stateFile = new File(dir(), 'state.sealed');
   const state = stateFile.exists ? (await stateFile.bytes()).slice().buffer : undefined;
-  client = new Core.MlsClient(uuidToBytes(account.userId), uuidToBytes(account.deviceId), fromB64(s.sk), fromB64(s.pk), fromB64(s.binding), key, state);
+  const make = (st?: ArrayBuffer) =>
+    new Core.MlsClient(uuidToBytes(account.userId), uuidToBytes(account.deviceId), fromB64(s.sk), fromB64(s.pk), fromB64(s.binding), key, st);
+  try {
+    client = make(state);
+  } catch {
+    // Sealed under a device key this install no longer has (e.g. app data partly lost): start this device fresh.
+    stateFile.delete();
+    const hist = new File(dir(), 'history.sealed');
+    if (hist.exists) hist.delete();
+    client = make();
+  }
   const h = await loadHistory();
   const status = ok(await api.PUT('/v1/mls/key-packages', { params: dev(), body: { keyPackages: [] } }));
   const available = status.available ?? 0;
@@ -275,7 +287,16 @@ export async function sendMessage(account: StoredAccount, groupId: string, text:
   if (!conv?.active) throw new Error('You’re no longer in this chat.');
   if (conv.unverified) throw new Error('Someone’s security keys in this chat changed. Verify them before sending.');
   const createdAtMs = Date.now();
-  const payload = Core.encodeChatPayload({ text, createdAtMs: BigInt(createdAtMs), media: media.map((m) => m.item) });
+  if (media.length) {
+    // Members-only downloads: attach the uploaded ciphertext to this chat before sending its keys.
+    ok(await api.POST('/v1/mls/groups/{groupId}/media', { params: { ...dev(), path: { groupId } }, body: { objectKeys: media.map((m) => m.objectKey) } }));
+  }
+  const payload = Core.encodeChatPayload({
+    text,
+    createdAtMs: BigInt(createdAtMs),
+    media: media.map((m) => m.item),
+    objectKeys: media.map((m) => m.objectKey),
+  });
   const res = ok(await postToGroup(groupId, c.encrypt(uuidToBytes(groupId), payload)));
   const seq = Number(res.seq);
   rememberSent(h, groupId, seq);
@@ -316,7 +337,7 @@ async function syncGroup(account: StoredAccount, groupId: string) {
             senderUser: bytesToUuid(sender.userId),
             senderDevice: bytesToUuid(sender.deviceId),
             text: content.text,
-            media: [],
+            media: content.media.map((item, i) => ({ objectKey: content.objectKeys[i], kind: kindName(item.kind), item })),
             createdAtMs: Number(content.createdAtMs),
             mine: bytesToUuid(sender.userId) === account.userId,
           });
@@ -357,6 +378,31 @@ export async function syncMessaging(account: StoredAccount): Promise<void> {
     if (conv && Number(g.lastSeq ?? 0) > conv.cursor) await syncGroup(account, conv.groupId);
   }
   for (const conv of Object.values(h.conversations)) if (!live.has(conv.groupId)) conv.active = false;
+  await saveAll();
+  for (const conv of Object.values(h.conversations)) {
+    if (conv.active) await addMissingDevices(account, conv.groupId).catch(() => {});
+  }
+}
+
+const lastDeviceCheck = new Map<string, number>();
+
+/**
+ * A member logged in on a new phone: add that device to the chat so it receives new messages (any member may do it;
+ * the server orders the commits). Checked at most every 5 minutes per chat.
+ */
+async function addMissingDevices(account: StoredAccount, groupId: string) {
+  const now = Date.now();
+  if (now - (lastDeviceCheck.get(groupId) ?? 0) < 5 * 60_000) return;
+  lastDeviceCheck.set(groupId, now);
+  const missing = ok(await api.GET('/v1/mls/groups/{groupId}/missing-devices', { params: { ...dev(), path: { groupId } } }));
+  const deviceIds = missing.flatMap((m) => (m.deviceId ? [m.deviceId] : []));
+  if (deviceIds.length === 0) return;
+  const res = ok(await api.POST('/v1/mls/key-packages/claim', { params: dev(), body: { userIds: [], deviceIds } }));
+  const kps = (res.keyPackages ?? []).flatMap((k) => (k.deviceId && k.keyPackage ? [{ deviceId: k.deviceId, keyPackage: k.keyPackage }] : []));
+  if (kps.length === 0) return;
+  await commit(account, groupId, () => ({ out: client!.addMembers(uuidToBytes(groupId), kps.map((k) => fromB64(k.keyPackage))), add: kps.map((k) => k.deviceId) }));
+  const conv = (await loadHistory()).conversations[groupId];
+  if (conv) await refreshMembers(account, conv);
   await saveAll();
 }
 

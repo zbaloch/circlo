@@ -96,6 +96,8 @@ fn parse_credential(credential: &Credential, signature_key: &[u8]) -> Result<Lea
 pub struct ChatPayload {
     pub text: String,
     pub media: Vec<crate::post::MediaDescriptor>,
+    /// The S3 object key for each media item (same order), so recipients can request download URLs.
+    pub object_keys: Vec<String>,
     pub created_at_ms: u64,
 }
 
@@ -105,19 +107,26 @@ pub fn encode_chat(p: &ChatPayload) -> Result<Vec<u8>> {
     if p.text.len() > MAX_CHAT_TEXT_BYTES || p.media.len() > crate::post::MAX_MEDIA {
         return Err(invalid("message too large"));
     }
+    if p.object_keys.len() != p.media.len() || !p.object_keys.iter().all(|k| valid_object_key(k)) {
+        return Err(invalid("bad object keys"));
+    }
     let kind = u64::from(!p.media.is_empty());
     let v = crate::cbor::map(vec![
         (1, crate::cbor::uint(kind)),
         (2, Value::Text(p.text.clone())),
         (3, Value::Array(p.media.iter().map(|m| m.to_value()).collect())),
         (4, crate::cbor::uint(p.created_at_ms)),
+        (
+            5,
+            Value::Array(p.object_keys.iter().map(|k| Value::Text(k.clone())).collect()),
+        ),
     ]);
     crate::padding::pad(&crate::cbor::encode(&v))
 }
 
 pub fn decode_chat(bytes: &[u8]) -> Result<ChatPayload> {
     let plain = crate::padding::unpad(bytes)?;
-    let mut f = crate::cbor::Fields::parse(crate::cbor::decode(&plain)?, &[1, 2, 3, 4])?;
+    let mut f = crate::cbor::Fields::parse(crate::cbor::decode(&plain)?, &[1, 2, 3, 4, 5])?;
     let _kind = f.uint(1)?;
     let text = f.text(2, MAX_CHAT_TEXT_BYTES)?;
     let media = f
@@ -125,11 +134,28 @@ pub fn decode_chat(bytes: &[u8]) -> Result<ChatPayload> {
         .into_iter()
         .map(crate::post::MediaDescriptor::from_value)
         .collect::<Result<Vec<_>>>()?;
+    let created_at_ms = f.uint(4)?;
+    let object_keys = f
+        .array(5, crate::post::MAX_MEDIA)?
+        .into_iter()
+        .map(|v| match v {
+            Value::Text(k) if valid_object_key(&k) => Ok(k),
+            _ => Err(CoreError::Malformed),
+        })
+        .collect::<Result<Vec<_>>>()?;
+    if object_keys.len() != media.len() {
+        return Err(CoreError::Malformed);
+    }
     Ok(ChatPayload {
         text,
         media,
-        created_at_ms: f.uint(4)?,
+        object_keys,
+        created_at_ms,
     })
+}
+
+fn valid_object_key(k: &str) -> bool {
+    k.len() == 64 && k.bytes().all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
 }
 
 // ---------------- provider with exportable storage ----------------
@@ -637,6 +663,7 @@ mod tests {
         let p = ChatPayload {
             text: "hi 👋".into(),
             media: vec![],
+            object_keys: vec![],
             created_at_ms: 42,
         };
         let enc = encode_chat(&p).unwrap();
@@ -648,6 +675,14 @@ mod tests {
         assert!(encode_chat(&ChatPayload {
             text: "x".repeat(MAX_CHAT_TEXT_BYTES + 1),
             media: vec![],
+            object_keys: vec![],
+            created_at_ms: 0
+        })
+        .is_err());
+        assert!(encode_chat(&ChatPayload {
+            text: "x".into(),
+            media: vec![],
+            object_keys: vec!["ab".into()],
             created_at_ms: 0
         })
         .is_err());

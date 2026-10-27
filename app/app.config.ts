@@ -45,6 +45,8 @@ const config: ExpoConfig = {
       },
     ],
     ['expo-video', { supportsPictureInPicture: false, supportsBackgroundPlayback: false }],
+    // Push carries no content; FCM/APNs credentials come from EAS, never the repo.
+    ['expo-notifications', { color: '#0E8C7F' }],
     [
       'expo-splash-screen',
       {

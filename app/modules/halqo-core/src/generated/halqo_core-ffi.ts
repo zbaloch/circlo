@@ -431,6 +431,37 @@ const DEFINITIONS = {
       ret: FfiType.RustBuffer,
       hasRustCallStatus: true,
     },
+    uniffi_halqo_core_fn_func_link_confirmation_code: {
+      args: [FfiType.RustBuffer],
+      ret: FfiType.RustBuffer,
+      hasRustCallStatus: true,
+    },
+    uniffi_halqo_core_fn_func_link_generate_keys: {
+      args: [],
+      ret: FfiType.RustBuffer,
+      hasRustCallStatus: true,
+    },
+    uniffi_halqo_core_fn_func_link_open: {
+      args: [
+        FfiType.RustBuffer,
+        FfiType.RustBuffer,
+        FfiType.RustBuffer,
+        FfiType.RustBuffer,
+      ],
+      ret: FfiType.RustBuffer,
+      hasRustCallStatus: true,
+    },
+    uniffi_halqo_core_fn_func_link_seal: {
+      args: [
+        FfiType.RustBuffer,
+        FfiType.RustBuffer,
+        FfiType.RustBuffer,
+        FfiType.RustBuffer,
+        FfiType.RustBuffer,
+      ],
+      ret: FfiType.RustBuffer,
+      hasRustCallStatus: true,
+    },
     uniffi_halqo_core_fn_func_media_chunk_offset: {
       args: [FfiType.UInt64],
       ret: FfiType.UInt64,
@@ -980,6 +1011,26 @@ const DEFINITIONS = {
       hasRustCallStatus: false,
     },
     uniffi_halqo_core_checksum_func_invite_token_hash: {
+      args: [],
+      ret: FfiType.UInt16,
+      hasRustCallStatus: false,
+    },
+    uniffi_halqo_core_checksum_func_link_confirmation_code: {
+      args: [],
+      ret: FfiType.UInt16,
+      hasRustCallStatus: false,
+    },
+    uniffi_halqo_core_checksum_func_link_generate_keys: {
+      args: [],
+      ret: FfiType.UInt16,
+      hasRustCallStatus: false,
+    },
+    uniffi_halqo_core_checksum_func_link_open: {
+      args: [],
+      ret: FfiType.UInt16,
+      hasRustCallStatus: false,
+    },
+    uniffi_halqo_core_checksum_func_link_seal: {
       args: [],
       ret: FfiType.UInt16,
       hasRustCallStatus: false,
@@ -1616,6 +1667,28 @@ interface NativeModuleInterface {
     token: Uint8Array,
     uniffi_out_err: UniffiRustCallStatus,
   ): Uint8Array;
+  uniffi_halqo_core_fn_func_link_confirmation_code(
+    linkPublicKey: Uint8Array,
+    uniffi_out_err: UniffiRustCallStatus,
+  ): Uint8Array;
+  uniffi_halqo_core_fn_func_link_generate_keys(
+    uniffi_out_err: UniffiRustCallStatus,
+  ): Uint8Array;
+  uniffi_halqo_core_fn_func_link_open(
+    linkSecretKey: Uint8Array,
+    linkId: Uint8Array,
+    userId: Uint8Array,
+    sealed: Uint8Array,
+    uniffi_out_err: UniffiRustCallStatus,
+  ): Uint8Array;
+  uniffi_halqo_core_fn_func_link_seal(
+    linkPublicKey: Uint8Array,
+    linkId: Uint8Array,
+    userId: Uint8Array,
+    backup: Uint8Array,
+    handle: Uint8Array,
+    uniffi_out_err: UniffiRustCallStatus,
+  ): Uint8Array;
   uniffi_halqo_core_fn_func_media_chunk_offset(
     index: bigint,
     uniffi_out_err: UniffiRustCallStatus,
@@ -2055,6 +2128,10 @@ interface NativeModuleInterface {
   uniffi_halqo_core_checksum_func_identity_fingerprint(): number;
   uniffi_halqo_core_checksum_func_identity_from_secrets(): number;
   uniffi_halqo_core_checksum_func_invite_token_hash(): number;
+  uniffi_halqo_core_checksum_func_link_confirmation_code(): number;
+  uniffi_halqo_core_checksum_func_link_generate_keys(): number;
+  uniffi_halqo_core_checksum_func_link_open(): number;
+  uniffi_halqo_core_checksum_func_link_seal(): number;
   uniffi_halqo_core_checksum_func_media_chunk_offset(): number;
   uniffi_halqo_core_checksum_func_media_layout(): number;
   uniffi_halqo_core_checksum_func_mls_bind_credential(): number;

@@ -58,7 +58,7 @@ impl Fields {
         Ok(Fields(out))
     }
 
-    fn take(&mut self, key: u64) -> Result<Value> {
+    pub fn take(&mut self, key: u64) -> Result<Value> {
         let pos = self.0.iter().position(|(k, _)| *k == key).ok_or(CoreError::Malformed)?;
         Ok(std::mem::replace(&mut self.0[pos].1, Value::Null))
     }
