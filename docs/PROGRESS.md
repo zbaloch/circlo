@@ -17,8 +17,62 @@ Memory file for Claude Code sessions. Read this first when resuming. Keep it acc
 | 8 Timeline, threads, replies, likes, profiles | Done on Android (merged PR #10) |
 | 9 Messaging (MLS) | Done on Android (merged PR #11; attachments finished in Phase 10) |
 | 10 Multi-device and push | Done on Android (merged PR #12) |
-| 11 Safety, abuse, legal | Done on Android (PR pending) |
-| 12 | Not started |
+| 11 Safety, abuse, legal | Done on Android (merged PR #13) |
+| 12 Hardening | Done (PR pending); external crypto audit still required before launch |
+
+## Final summary (all phases, 2026-10-27)
+
+**What's built.** Halqo is an end-to-end encrypted, circles-based social app: a Twitter-style timeline, threads,
+replies, likes, profiles and DMs. Posts go only to the circles the author picks, and the server can't tell which.
+
+- **Core (Rust, `halqo-core`)**: every cryptographic step:
+  - XChaCha20-Poly1305 with AAD binding everywhere; Padmé padding;
+  - HKDF circle chains with per-post keys and read tokens; HPKE friend payloads; Ed25519 signatures;
+  - STREAM media encryption; OPAQUE login; BIP39 recovery;
+  - MLS messaging (OpenMLS); QR device linking.
+
+  It is bound to the app (uniffi/JSI) and to the server (JNI). It is fuzzed in CI, and the release build is
+  reproducible.
+- **Server (Spring Boot 4, MariaDB, S3/MinIO)**:
+  - stores only ciphertext, hashes and opaque ids; no names, emails, phone numbers, plaintext handles, circle
+    numbers or IPs;
+  - content-free push;
+  - account deletion that leaves no trace;
+  - rate limits.
+
+  It has 50 integration tests plus an on-demand load test (919 req/s locally).
+- **App (Expo SDK 58, Android verified on emulators)**:
+  - signup and login with a 24-word recovery phrase;
+  - invites and safety numbers;
+  - circles with key rotation;
+  - posts with photos and video (metadata stripped, encrypted on the phone);
+  - a timeline and threads;
+  - MLS chats with attachments;
+  - linking devices by QR, and revoking them;
+  - block and mute;
+  - data export;
+  - account deletion;
+  - certificate pinning and a rooted-phone warning in release builds.
+- **Proven**: the leaked-database drill finds nothing readable in a dump of the database, the bucket and the server
+  log. Pushes carry no content (tested). Each phase's flows were checked on emulators (see each phase below).
+
+**Still needs checking on real devices**: everything under "Needs manual check". Most importantly: iOS has never
+run; push on locked phones; video recorded on a real phone; performance on a mid-range Android release build; and
+pinning against the real HTTPS host.
+
+**Must happen before a public launch**:
+
+1. An **external cryptography audit** of /core and docs/CRYPTO.md (non-negotiable for an E2EE claim), plus a
+   penetration test of the server and app.
+2. A **legal review** (docs/LEGAL.md): platform liability, CSAM and lawful-access duties, GDPR, export controls, and
+   app-store rules on reporting user content, since in-app reporting was removed.
+3. Production infrastructure:
+   - secrets in a secret store (OPAQUE setup, handle/JWT/push keys);
+   - TLS with pinned keys plus an offline backup key;
+   - a dedicated database user and encrypted backups;
+   - FCM/APNs credentials;
+   - Rust in the EAS build image.
+4. The items under "Waiting on owner".
 
 ## Environment (as of 2026-10-25)
 
@@ -272,6 +326,50 @@ Memory file for Claude Code sessions. Read this first when resuming. Keep it acc
       AGPL obligations). **Needs a lawyer before launch**
 - [x] app 50 tests, core 69, server 50
 
+## Phase 12 (hardening) — summary
+
+See docs/HARDENING.md for how to repeat each check.
+
+- [x] **Certificate pinning** in release builds (Android pin-set, iOS NSPinnedDomains). The host comes from
+      `EXPO_PUBLIC_API_URL` and the pins from `HALQO_PIN_SHA256` (EAS env), so no production hostname or key is in
+      git. A production build fails without a live pin and a backup pin. Tested: config generation and validation
+- [x] **Rooted/jailbroken warning**: checked once per launch; dismissible Home banner plus a permanent note in
+      Settings. Warns only, never blocks
+- [x] **Reproducible builds**: server jar byte-identical across clean builds (fixed outputTimestamp; checked
+      locally and in CI); Rust release library checked in CI from two source paths
+      (`core/scripts/check-reproducible.sh`)
+- [x] **Optimised app core**: Cargo profile `app` (release, panic=unwind so a Rust bug becomes a JS error),
+      `make core-android-release`. Android library is now 4.5 MB, down from 75 MB
+- [x] **Dependency audit**:
+      - new CI workflow `deps-audit`: osv-scanner over the Rust, npm and Maven dependencies, plus cargo-deny for
+        advisories, AGPL-compatible licences and crates.io-only sources; runs on lockfile changes and weekly;
+      - `npm audit fix` updated node-forge;
+      - the remaining zod 3 advisory is in Expo's build-time command-line tool only (not in the app), accepted until
+        2027-01-31 in `osv-scanner.toml`;
+      - the first CI run found 6 Rust advisories. None is reachable or exploitable in Halqo, so each is accepted until
+        2027-01-31 with its reason in `osv-scanner.toml` and `core/deny.toml`:
+        - crypto-bigint timing: only in P-256 code, and Halqo uses X25519/Ed25519 only;
+        - block-buffer: needs a hash function to panic;
+        - libcrux-kem and basic-toml: in Cargo.lock but never compiled;
+        - proc-macro-error2: build-time only.
+
+        The crypto-bigint and block-buffer fixes need upstream releases (OpenMLS, opaque-ke)
+- [x] **Leaked-database drill** (`infra/leak-drill.sh` + scanner): dev DB (125 KB dump) and all 11 bucket objects
+      plus the server log scanned for 13 markers typed on the emulators (handles, names, post text, EXIF test tags),
+      image/video signatures, emails and IPs, and low-entropy objects: **PASS, nothing readable**. The scanner's own
+      tests prove each kind of leak is caught (run in CI)
+- [x] **Load test** (`LoadIT`, on request, 64 clients, 30 s, real OPAQUE logins). It found two N+1 query patterns
+      (feed media, batch stats) and an undersized connection pool. Fixed:
+
+      | | Before | After |
+      |---|---|---|
+      | Throughput | 106 req/s | 919 req/s |
+      | Feed p95 | 963 ms | 156 ms |
+      | Stats p95 | 3.5 s | 204 ms |
+      | Errors | 0 | 0 |
+
+      The pool size is set by `HALQO_DB_POOL_SIZE` (default 24)
+
 ## Decisions log
 
 | Date | Decision | Why |
@@ -331,22 +429,35 @@ Memory file for Claude Code sessions. Read this first when resuming. Keep it acc
 | 2026-10-27 | Device linking: HPKE base to a QR key + 6-digit confirmation code; single-use 10-min server hand-off with a session | Encrypted transfer; resists scanning an attacker's code |
 | 2026-10-27 | Pushes: `{"type":"activity"}` plus a fixed generic notification text; tokens sealed with HALQO_PUSH_TOKEN_KEY | No content, names or counts ever leave the server in a push |
 | 2026-10-27 | **Owner removed reporting to the operator** (built, then removed before merge); block + mute only | Posts are between acquaintances; nothing should ever become readable by the operator |
+| 2026-10-27 | Pinning: leaf SPKI pins (live + offline backup) from EAS env; production builds fail without them; only the API host is pinned | No hostnames in a public repo; backup key avoids lock-out; media is E2EE and AEAD-checked |
+| 2026-10-27 | Rooted/jailbroken: warn only (expo-device check) | PLAN.md says warn; the check is heuristic and blocking hurts honest users |
+| 2026-10-27 | App core built with Cargo profile `app` (panic=unwind) instead of `release` (abort) | uniffi turns a panic into a JS error instead of killing the app |
+| 2026-10-27 | osv-scanner + cargo-deny in CI instead of local tools; accepted findings need a reason and expiry | One scanner for all three ecosystems; accepted risk is revisited |
 | 2026-10-25 | Only `secret-scan / gitleaks` should be a required check | Path-filtered CI workflows don't run on every PR |
 
 ## Waiting on owner
 
-- Push credentials: FCM service account (HALQO_FCM_PROJECT_ID, HALQO_FCM_SERVICE_ACCOUNT in the server's secret store)
-  and google-services.json / APNs key in EAS credentials. Without them pushes are simply off; everything else works.
-- Legal review of docs/LEGAL.md before a public launch.
-
-1. iPhone dev build (Phase 2 criterion): needs an Expo account (`npx eas-cli@latest login`) and an Apple Developer
-   account for device provisioning. Then `cd app && npx eas-cli@latest build --profile development --platform ios`.
-
-2. Create the `halqo` MariaDB user (DEV_SETUP §3) and switch `server/.env` off `root`.
-3. GitHub web settings (PLAN.md 0B step 5), incl. required check `secret-scan / gitleaks`.
-4. Phone checks below.
+1. **iPhone build**: an Expo account (`npx eas-cli@latest login`) and an Apple Developer account, then
+   `cd app && npx eas-cli@latest build --profile development --platform ios`. iOS has never been run.
+2. **EAS builds need the Rust core**: add the Rust toolchain + cargo-ndk to the EAS build image (or a prebuilt
+   library step) running `make core-android-release` / `core-ios`; built libraries are not in git.
+3. **Push credentials**: FCM service account (HALQO_FCM_PROJECT_ID, HALQO_FCM_SERVICE_ACCOUNT in the server's secret
+   store) and google-services.json / APNs key in EAS credentials. Without them pushes are off; everything else works.
+4. **Certificate pins** for production: `HALQO_PIN_SHA256` (live key + offline backup key) and `EXPO_PUBLIC_API_URL`
+   in EAS (docs/HARDENING.md).
+5. Create the `halqo` MariaDB user (DEV_SETUP §3) and switch `server/.env` off `root`.
+6. GitHub web settings (PLAN.md 0B step 5), incl. required check `secret-scan / gitleaks`.
+7. **Legal review** of docs/LEGAL.md, including whether app stores require in-app reporting (removed by owner).
+8. **External cryptography audit** of /core and docs/CRYPTO.md before any public launch.
+9. Phone checks below.
 
 ## Needs manual check
+
+- (Phase 12) Release build with pins on a physical phone: the app works against the real HTTPS host; with a wrong
+  pin it refuses to connect (Android and iOS). Root warning shows on a rooted test phone and not on a normal one.
+
+- (Phase 11) Physical phones: block someone (they can no longer send requests or see new posts), unblock in Settings;
+  export my data to a folder and open the JSON; delete a throwaway account and confirm it can't log in.
 
 - (Phase 10) With push credentials configured: a chat message to a locked phone shows only "Halqo · You have new
   activity"; opening the app shows the decrypted message. Link a second physical phone by QR (compare the 6-digit
@@ -388,8 +499,9 @@ Memory file for Claude Code sessions. Read this first when resuming. Keep it acc
   in one session. Workaround: run `wsl -d Debian -- sleep infinity` in a terminal while developing. Symptom: server
   logs "Connection refused" to localhost:3306 and the app shows "Something went wrong".
 
-- Android `libhalqo_core.so` is currently a debug build (~21 MB, slow); release builds need `--release` in ubrn cargo extras (Phase 12).
-- `npm audit` reports advisories in app dev dependencies (Expo toolchain); review in Phase 12 dependency audit.
+- zod 3 advisory (GHSA-mrhx-c7xc-m3w5) in Expo's build-time CLI; accepted until 2027-01-31 (`osv-scanner.toml`).
+- Dev builds still use the debug core (`make core-android`); use `make core-android-release` for performance checks and
+  release builds. EAS builds need the Rust toolchain + cargo-ndk in the build image (or a prebuilt library step).
 
 - Flyway (managed by Boot 3.5) logs "MariaDB 11.8 is newer than this version of Flyway". Works; resolved by a Flyway/Boot upgrade.
 - First commit `12fbddb` is authored with a personal email and is already public (can't be undone; future commits

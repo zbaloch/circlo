@@ -1,0 +1,42 @@
+name: deps-audit
+
+# Known-vulnerable dependencies in every lockfile, and Rust licences/sources. Runs on lockfile changes and weekly,
+# because new advisories appear for code that hasn't changed.
+on:
+  pull_request:
+    paths: ["core/Cargo.lock", "core/Cargo.toml", "core/deny.toml", "app/package-lock.json", "server/pom.xml", "osv-scanner.toml", ".github/workflows/deps-audit.yml"]
+  push:
+    branches: [main]
+  schedule:
+    - cron: "17 5 * * 1"
+
+permissions:
+  contents: read
+
+jobs:
+  osv-scanner:
+    runs-on: ubuntu-latest
+    env:
+      OSV_SCANNER_VERSION: 2.6.0
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - name: Install osv-scanner (checksum verified)
+        run: |
+          base="https://github.com/google/osv-scanner/releases/download/v${OSV_SCANNER_VERSION}"
+          curl -fsSL -o osv-scanner_linux_amd64 "$base/osv-scanner_linux_amd64"
+          curl -fsSL -o SHA256SUMS "$base/osv-scanner_SHA256SUMS"
+          grep " osv-scanner_linux_amd64$" SHA256SUMS | sha256sum -c -
+          sudo install osv-scanner_linux_amd64 /usr/local/bin/osv-scanner
+      - name: Scan Rust, npm and Maven dependencies
+        run: |
+          osv-scanner scan source --config osv-scanner.toml \
+            -L core/Cargo.lock -L app/package-lock.json -L app/modules/halqo-core/package-lock.json -L server/pom.xml
+
+  cargo-deny:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: EmbarkStudios/cargo-deny-action@v2.1.1
+        with:
+          manifest-path: core/Cargo.toml
+          command: check advisories licenses bans sources

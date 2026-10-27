@@ -1,33 +1,32 @@
-// Android network security config. Encrypted video plays through the core's loopback server
+// Network security for both platforms. Encrypted video plays through the core's loopback server
 // (core/src/playback.rs), so plain HTTP to 127.0.0.1 must work in every build. Everything else is HTTPS-only in
-// release builds; development builds also allow plain HTTP to the local server on the LAN.
+// release builds; development builds also allow plain HTTP to the local server on the LAN. Release builds pin the
+// API host's keys (see pinning.js).
 const fs = require('fs');
 const path = require('path');
-const { withAndroidManifest, withDangerousMod } = require('expo/config-plugins');
+const { withAndroidManifest, withDangerousMod, withInfoPlist } = require('expo/config-plugins');
 
-module.exports = function withNetworkSecurity(config, { allowAllCleartext = false } = {}) {
+const { iosPinnedDomains, networkSecurityXml } = require('./pinning');
+
+module.exports = function withNetworkSecurity(config, { allowAllCleartext = false, pinning = null } = {}) {
   config = withDangerousMod(config, [
     'android',
     async (cfg) => {
       const dir = path.join(cfg.modRequest.platformProjectRoot, 'app/src/main/res/xml');
       fs.mkdirSync(dir, { recursive: true });
-      fs.writeFileSync(
-        path.join(dir, 'network_security_config.xml'),
-        `<?xml version="1.0" encoding="utf-8"?>
-<network-security-config>
-    <base-config cleartextTrafficPermitted="${allowAllCleartext}" />
-    <domain-config cleartextTrafficPermitted="true">
-        <domain includeSubdomains="false">127.0.0.1</domain>
-    </domain-config>
-</network-security-config>
-`,
-      );
+      fs.writeFileSync(path.join(dir, 'network_security_config.xml'), networkSecurityXml({ allowAllCleartext, pinning }));
       return cfg;
     },
   ]);
-  return withAndroidManifest(config, (cfg) => {
+  config = withAndroidManifest(config, (cfg) => {
     const app = cfg.modResults.manifest.application[0];
     app.$['android:networkSecurityConfig'] = '@xml/network_security_config';
+    return cfg;
+  });
+  if (!pinning) return config;
+  return withInfoPlist(config, (cfg) => {
+    const ats = cfg.modResults.NSAppTransportSecurity ?? {};
+    cfg.modResults.NSAppTransportSecurity = { ...ats, NSPinnedDomains: { ...(ats.NSPinnedDomains ?? {}), ...iosPinnedDomains(pinning) } };
     return cfg;
   });
 };

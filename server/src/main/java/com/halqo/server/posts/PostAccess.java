@@ -1,11 +1,17 @@
 package com.halqo.server.posts;
 
 import com.halqo.server.crypto.HalqoCore;
+import com.halqo.server.web.Ids;
 import java.security.MessageDigest;
 import java.util.Arrays;
 import java.util.Base64;
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
@@ -46,6 +52,38 @@ public class PostAccess {
             return true; // created before read tokens existed
         }
         return readToken != null && readToken.length == 32 && MessageDigest.isEqual(stored, core.readTokenHash(readToken));
+    }
+
+    /**
+     * {@link #inAudience} for many posts at once, in two queries (feed-sized batches; PLAN.md Phase 12 load test).
+     * Returns the ids of the posts the caller may see interactions on.
+     */
+    public Set<UUID> inAudience(byte[] me, Map<UUID, byte[]> readTokens) {
+        if (readTokens.isEmpty()) {
+            return Set.of();
+        }
+        String marks = String.join(",", Collections.nCopies(readTokens.size(), "?"));
+        List<Object[]> posts = jdbc.query("SELECT id, author_id, read_token_hash FROM posts WHERE id IN (" + marks + ")",
+                (rs, i) -> new Object[] {Ids.uuid(rs.getBytes(1)), rs.getBytes(2), rs.getBytes(3)},
+                readTokens.keySet().stream().map(Ids::bytes).toArray());
+        Set<UUID> friends = new HashSet<>();
+        jdbc.query("SELECT IF(user_a = ?, user_b, user_a) FROM friendships WHERE status = 'accepted' AND (user_a = ? OR user_b = ?)",
+                rs -> {
+                    friends.add(Ids.uuid(rs.getBytes(1)));
+                }, me, me, me);
+        Set<UUID> out = new HashSet<>();
+        for (Object[] p : posts) {
+            byte[] author = (byte[]) p[1];
+            if (!Arrays.equals(me, author) && !friends.contains(Ids.uuid(author))) {
+                continue;
+            }
+            byte[] stored = (byte[]) p[2];
+            byte[] token = readTokens.get((UUID) p[0]);
+            if (stored == null || (token != null && token.length == 32 && MessageDigest.isEqual(stored, core.readTokenHash(token)))) {
+                out.add((UUID) p[0]);
+            }
+        }
+        return out;
     }
 
     /** Decodes the X-Halqo-Read-Token header (base64); null if missing or malformed. */

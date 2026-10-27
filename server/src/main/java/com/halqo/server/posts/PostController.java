@@ -160,10 +160,18 @@ public class PostController {
                 (rs, i) -> new PostView(Ids.uuid(rs.getBytes(1)), Ids.uuid(rs.getBytes(2)), Ids.uuid(rs.getBytes(3)), rs.getBytes(4),
                         rs.getBytes(5), rs.getTimestamp(6).toInstant(), new ArrayList<>()),
                 args);
-        for (PostView p : posts) {
-            p.media().addAll(jdbc.query("SELECT object_key, kind, ct_size_padded FROM post_media WHERE post_id = ?",
-                    (rs, i) -> new Media(rs.getString(1), rs.getString(2), rs.getLong(3)), (Object) Ids.bytes(p.postId())));
+        if (posts.isEmpty()) {
+            return posts;
         }
+        // All media for the page in one query (not one per post).
+        Map<UUID, List<Media>> media = new java.util.HashMap<>();
+        jdbc.query("SELECT post_id, object_key, kind, ct_size_padded FROM post_media WHERE post_id IN ("
+                + String.join(",", java.util.Collections.nCopies(posts.size(), "?")) + ") ORDER BY post_id, id",
+                rs -> {
+                    media.computeIfAbsent(Ids.uuid(rs.getBytes(1)), k -> new ArrayList<>())
+                            .add(new Media(rs.getString(2), rs.getString(3), rs.getLong(4)));
+                }, posts.stream().map(p -> Ids.bytes(p.postId())).toArray());
+        posts.forEach(p -> p.media().addAll(media.getOrDefault(p.postId(), List.of())));
         return posts;
     }
 

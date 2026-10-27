@@ -34,6 +34,16 @@ jobs:
           /usr/bin/time -v cargo test --release --test flows -- --ignored large_file 2> time.txt
           grep "Maximum resident set size" time.txt
 
+  reproducible:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - name: Two release builds from different directories are byte-identical
+        run: core/scripts/check-reproducible.sh
+
   fuzz:
     runs-on: ubuntu-latest
     defaults:

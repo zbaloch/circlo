@@ -1,4 +1,4 @@
-.PHONY: dev test test-core test-server test-app core-android core-ios scan
+.PHONY: dev test test-core test-server test-app core-android core-android-release core-ios scan
 
 dev:
 	./infra/dev-up.sh
@@ -18,7 +18,11 @@ test-app:
 core-android:
 	cd app/modules/halqo-core && npm run ubrn:android
 
-# Same for iOS (needs a Mac with Xcode, or run in EAS).
+# Optimised library for release builds and performance checks (Cargo profile "app").
+core-android-release:
+	cd app/modules/halqo-core && npm run ubrn:android:release
+
+# Build the Rust core for iOS (needs a Mac with Xcode, or run in EAS).
 core-ios:
 	cd app/modules/halqo-core && npm run ubrn:ios
 

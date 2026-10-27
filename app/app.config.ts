@@ -4,6 +4,9 @@ import type { ExpoConfig } from 'expo/config';
 // google-services.json come from EAS credentials / EAS file environment variables.
 // Development builds talk to the local server over plain HTTP (LAN / emulator). Release builds are HTTPS-only.
 const isDev = process.env.APP_VARIANT !== 'production';
+// Release builds pin the API host's keys; host and pins come from EAS environment variables (plugins/pinning.js).
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const pinning = require('./plugins/pinning').pinningFromEnv(process.env);
 
 const config: ExpoConfig = {
   name: 'Halqo',
@@ -34,7 +37,7 @@ const config: ExpoConfig = {
     './plugins/with-android-cmake',
     // Keys live in the Android Keystore / iOS Keychain; excluded from Android Auto Backup.
     ['expo-secure-store', { configureAndroidBackup: true }],
-    ['./plugins/with-network-security', { allowAllCleartext: isDev }],
+    ['./plugins/with-network-security', { allowAllCleartext: isDev, pinning }],
     ['expo-camera', { cameraPermission: 'Halqo uses the camera to scan friend invites and safety numbers, and to take photos you share.', microphonePermission: false, recordAudioAndroid: false }],
     [
       'expo-image-picker',

@@ -161,21 +161,33 @@ public class ThreadController {
 
     public record PostStats(UUID postId, int replyCount, int likeCount, boolean likedByMe) {}
 
-    /** Counts for posts I can prove I can read (one read token each); others are silently left out. */
+    /** Counts for posts I can prove I can read (one read token each); others are silently left out. Five queries per batch. */
     @PostMapping("/v1/posts/stats")
     public List<PostStats> stats(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody StatsRequest r) {
         byte[] me = me(jwt);
-        List<PostStats> out = new java.util.ArrayList<>();
-        for (StatsItem item : r.items()) {
-            byte[] post = Ids.bytes(item.postId());
-            if (!access.inAudience(me, post, item.readToken())) {
-                continue;
-            }
-            out.add(jdbc.queryForObject("""
-                    SELECT (SELECT COUNT(*) FROM post_replies WHERE post_id = ?), (SELECT COUNT(*) FROM post_likes WHERE post_id = ?),
-                           EXISTS (SELECT 1 FROM post_likes WHERE post_id = ? AND liker_id = ?)""",
-                    (rs, i) -> new PostStats(item.postId(), rs.getInt(1), rs.getInt(2), rs.getBoolean(3)), post, post, post, me));
+        Map<UUID, byte[]> tokens = new java.util.LinkedHashMap<>();
+        r.items().forEach(i -> tokens.putIfAbsent(i.postId(), i.readToken()));
+        List<UUID> allowed = tokens.keySet().stream().filter(access.inAudience(me, tokens)::contains).toList();
+        if (allowed.isEmpty()) {
+            return List.of();
         }
+        String marks = String.join(",", java.util.Collections.nCopies(allowed.size(), "?"));
+        Object[] ids = allowed.stream().map(Ids::bytes).toArray();
+        Map<UUID, Integer> replies = counts("SELECT post_id, COUNT(*) FROM post_replies WHERE post_id IN (" + marks + ") GROUP BY post_id", ids);
+        Map<UUID, Integer> likes = counts("SELECT post_id, COUNT(*) FROM post_likes WHERE post_id IN (" + marks + ") GROUP BY post_id", ids);
+        Object[] mine = new Object[ids.length + 1];
+        mine[0] = me;
+        System.arraycopy(ids, 0, mine, 1, ids.length);
+        java.util.Set<UUID> liked = new java.util.HashSet<>(jdbc.query("SELECT post_id FROM post_likes WHERE liker_id = ? AND post_id IN (" + marks + ")",
+                (rs, i) -> Ids.uuid(rs.getBytes(1)), mine));
+        return allowed.stream().map(id -> new PostStats(id, replies.getOrDefault(id, 0), likes.getOrDefault(id, 0), liked.contains(id))).toList();
+    }
+
+    private Map<UUID, Integer> counts(String sql, Object[] ids) {
+        Map<UUID, Integer> out = new java.util.HashMap<>();
+        jdbc.query(sql, rs -> {
+            out.put(Ids.uuid(rs.getBytes(1)), rs.getInt(2));
+        }, ids);
         return out;
     }
 }

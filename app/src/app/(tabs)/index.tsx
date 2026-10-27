@@ -7,6 +7,7 @@ import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-na
 import { EmptyState } from '@/components/empty-state';
 import { Fab } from '@/components/fab';
 import { HomeHeader } from '@/components/home-header';
+import { IntegrityBanner } from '@/components/integrity-banner';
 import { OutboxCard, PostCard } from '@/components/post-card';
 import { usePostActions, visiblePosts } from '@/components/post-actions';
 import { Screen } from '@/components/screen';
@@ -105,6 +106,7 @@ export default function HomeScreen() {
             <View className="opacity-0" importantForAccessibility="no-hide-descendants" accessibilityElementsHidden>
               <HomeHeader />
             </View>
+            <IntegrityBanner />
             {pending.map((i) => (
               <OutboxCard key={i.id} item={i} onRetry={() => retryPost(account, i.id)} onDismiss={() => dismissPost(i.id)} />
             ))}

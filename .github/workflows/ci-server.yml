@@ -2,10 +2,10 @@ name: ci-server
 
 on:
   pull_request:
-    paths: ["server/**", "core/**", "docs/api/**", ".github/workflows/ci-server.yml"]
+    paths: ["server/**", "core/**", "docs/api/**", "infra/**", ".github/workflows/ci-server.yml"]
   push:
     branches: [main]
-    paths: ["server/**", "core/**", "docs/api/**", ".github/workflows/ci-server.yml"]
+    paths: ["server/**", "core/**", "docs/api/**", "infra/**", ".github/workflows/ci-server.yml"]
 
 permissions:
   contents: read
@@ -62,3 +62,13 @@ jobs:
           java-version: "21"
           cache: maven
       - run: mvn -B verify
+      - name: Leaked-database drill scanner catches leaks
+        working-directory: .
+        run: python3 -m unittest infra/test_leak_drill.py
+      - name: Reproducible jar (two clean builds are byte-identical)
+        run: |
+          mvn -B -q clean package -DskipTests
+          a=$(sha256sum target/halqo-server-*.jar)
+          mvn -B -q clean package -DskipTests
+          b=$(sha256sum target/halqo-server-*.jar)
+          echo "$a"; [ "$a" = "$b" ]

@@ -19,6 +19,10 @@
 
     <properties>
         <java.version>21</java.version>
+        <!-- Reproducible builds (PLAN.md Phase 12): fixed timestamps in the jar, so the same commit gives the same bytes. -->
+        <project.build.outputTimestamp>2026-01-01T00:00:00Z</project.build.outputTimestamp>
+        <!-- The load test (LoadIT, tag "load") runs only on request: mvn verify -Dhalqo.excludedGroups= -Dit.test=LoadIT -->
+        <halqo.excludedGroups>load</halqo.excludedGroups>
         <awssdk.version>2.57.3</awssdk.version>
     </properties>
 
@@ -100,6 +104,9 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-failsafe-plugin</artifactId>
+                <configuration>
+                    <excludedGroups>${halqo.excludedGroups}</excludedGroups>
+                </configuration>
                 <executions>
                     <execution>
                         <goals>

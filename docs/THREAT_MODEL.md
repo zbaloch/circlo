@@ -23,7 +23,7 @@ server secrets (CRYPTO.md section 13) live outside the database and still cannot
 | **Honest-but-curious server operator** | Reads every DB row, S3 object and request; keeps logs. |
 | **Malicious server** | Additionally modifies, drops, replays or injects data; serves fake keys. |
 | **Database / bucket thief** | Gets a full dump of MySQL and S3 at one point in time. |
-| **Network attacker** | Observes and tampers with traffic (TLS in production; certificate pinning in Phase 12). |
+| **Network attacker** | Observes and tampers with traffic (TLS in production; release builds pin the API host's keys, docs/HARDENING.md). |
 | **Curious friend** | Holds legitimate keys for their circle; inspects app internals. |
 | **Stranger** | Can register, search handles, use invite links. |
 | **Device thief** | Holds an unlocked or locked phone. |
@@ -87,7 +87,8 @@ circle numbers, circle labels, group names.
 
 ## Out of scope (for now)
 
-- A compromised, unlocked device (malware with app access sees what the user sees).
+- A compromised, unlocked device (malware with app access sees what the user sees). On a rooted/jailbroken phone the
+  app warns the user but keeps working (docs/HARDENING.md).
 - Traffic analysis by a global network observer; IP addresses at the network layer (we don't log them, but the
   hosting provider can see them).
 - Code-delivery attacks on a future web client (PLAN.md open decision 2).
@@ -97,11 +98,13 @@ circle numbers, circle labels, group names.
 
 - No logging of request bodies, IPs or decrypted data; no access log.
 - Buckets are private; presigned URLs only (PUT 15 min, GET 5 min). Object keys are random.
-- Leaked-DB drill in Phase 12: dump MySQL and S3, confirm nothing readable.
+- Leaked-DB drill (`infra/leak-drill.sh`): dump the database and the bucket and confirm nothing readable. Passed on
+  the dev data in Phase 12; repeat before launch and after schema changes.
 - Video playback goes through the core's loopback HTTP server (`core/src/playback.rs`): bound to 127.0.0.1 only, one
   unguessable 256-bit token per video, plaintext only in memory one 64 KiB chunk at a time; the ciphertext cache file
   is never decrypted to disk. Another app on the same device would need the token to read a stream.
-- Decrypted photos are cached in the app's private cache directory and deleted at sign-out.
+- Decrypted photos are kept in memory only; thumbnails are cached sealed with a per-device `local_cache_key` and
+  deleted at sign-out.
 - External cryptography audit before any public launch.
 
 ## Comparison with Threema (owner's benchmark)
