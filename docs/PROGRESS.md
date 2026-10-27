@@ -20,6 +20,60 @@ Memory file for Claude Code sessions. Read this first when resuming. Keep it acc
 | 11 Safety, abuse, legal | Done on Android (merged PR #13) |
 | 12 Hardening | Done (PR pending); external crypto audit still required before launch |
 
+## Final summary (all phases, 2026-10-27)
+
+**What's built.** Halqo is an end-to-end encrypted, circles-based social app: a Twitter-style timeline, threads,
+replies, likes, profiles and DMs. Posts go only to the circles the author picks, and the server can't tell which.
+
+- **Core (Rust, `halqo-core`)**: every cryptographic step:
+  - XChaCha20-Poly1305 with AAD binding everywhere; Padmé padding;
+  - HKDF circle chains with per-post keys and read tokens; HPKE friend payloads; Ed25519 signatures;
+  - STREAM media encryption; OPAQUE login; BIP39 recovery;
+  - MLS messaging (OpenMLS); QR device linking.
+
+  It is bound to the app (uniffi/JSI) and to the server (JNI). It is fuzzed in CI, and the release build is
+  reproducible.
+- **Server (Spring Boot 4, MariaDB, S3/MinIO)**:
+  - stores only ciphertext, hashes and opaque ids; no names, emails, phone numbers, plaintext handles, circle
+    numbers or IPs;
+  - content-free push;
+  - account deletion that leaves no trace;
+  - rate limits.
+
+  It has 50 integration tests plus an on-demand load test (919 req/s locally).
+- **App (Expo SDK 58, Android verified on emulators)**:
+  - signup and login with a 24-word recovery phrase;
+  - invites and safety numbers;
+  - circles with key rotation;
+  - posts with photos and video (metadata stripped, encrypted on the phone);
+  - a timeline and threads;
+  - MLS chats with attachments;
+  - linking devices by QR, and revoking them;
+  - block and mute;
+  - data export;
+  - account deletion;
+  - certificate pinning and a rooted-phone warning in release builds.
+- **Proven**: the leaked-database drill finds nothing readable in a dump of the database, the bucket and the server
+  log. Pushes carry no content (tested). Each phase's flows were checked on emulators (see each phase below).
+
+**Still needs checking on real devices**: everything under "Needs manual check". Most importantly: iOS has never
+run; push on locked phones; video recorded on a real phone; performance on a mid-range Android release build; and
+pinning against the real HTTPS host.
+
+**Must happen before a public launch**:
+
+1. An **external cryptography audit** of /core and docs/CRYPTO.md (non-negotiable for an E2EE claim), plus a
+   penetration test of the server and app.
+2. A **legal review** (docs/LEGAL.md): platform liability, CSAM and lawful-access duties, GDPR, export controls, and
+   app-store rules on reporting user content, since in-app reporting was removed.
+3. Production infrastructure:
+   - secrets in a secret store (OPAQUE setup, handle/JWT/push keys);
+   - TLS with pinned keys plus an offline backup key;
+   - a dedicated database user and encrypted backups;
+   - FCM/APNs credentials;
+   - Rust in the EAS build image.
+4. The items under "Waiting on owner".
+
 ## Environment (as of 2026-10-25)
 
 - **Windows is the main dev platform (owner decision).** Repo at `C:\Users\zaheer\code\halqo`; public GitHub repo
@@ -375,18 +429,27 @@ See docs/HARDENING.md for how to repeat each check.
 
 ## Waiting on owner
 
-- Push credentials: FCM service account (HALQO_FCM_PROJECT_ID, HALQO_FCM_SERVICE_ACCOUNT in the server's secret store)
-  and google-services.json / APNs key in EAS credentials. Without them pushes are simply off; everything else works.
-- Legal review of docs/LEGAL.md before a public launch.
-
-1. iPhone dev build (Phase 2 criterion): needs an Expo account (`npx eas-cli@latest login`) and an Apple Developer
-   account for device provisioning. Then `cd app && npx eas-cli@latest build --profile development --platform ios`.
-
-2. Create the `halqo` MariaDB user (DEV_SETUP §3) and switch `server/.env` off `root`.
-3. GitHub web settings (PLAN.md 0B step 5), incl. required check `secret-scan / gitleaks`.
-4. Phone checks below.
+1. **iPhone build**: an Expo account (`npx eas-cli@latest login`) and an Apple Developer account, then
+   `cd app && npx eas-cli@latest build --profile development --platform ios`. iOS has never been run.
+2. **EAS builds need the Rust core**: add the Rust toolchain + cargo-ndk to the EAS build image (or a prebuilt
+   library step) running `make core-android-release` / `core-ios`; built libraries are not in git.
+3. **Push credentials**: FCM service account (HALQO_FCM_PROJECT_ID, HALQO_FCM_SERVICE_ACCOUNT in the server's secret
+   store) and google-services.json / APNs key in EAS credentials. Without them pushes are off; everything else works.
+4. **Certificate pins** for production: `HALQO_PIN_SHA256` (live key + offline backup key) and `EXPO_PUBLIC_API_URL`
+   in EAS (docs/HARDENING.md).
+5. Create the `halqo` MariaDB user (DEV_SETUP §3) and switch `server/.env` off `root`.
+6. GitHub web settings (PLAN.md 0B step 5), incl. required check `secret-scan / gitleaks`.
+7. **Legal review** of docs/LEGAL.md, including whether app stores require in-app reporting (removed by owner).
+8. **External cryptography audit** of /core and docs/CRYPTO.md before any public launch.
+9. Phone checks below.
 
 ## Needs manual check
+
+- (Phase 12) Release build with pins on a physical phone: the app works against the real HTTPS host; with a wrong
+  pin it refuses to connect (Android and iOS). Root warning shows on a rooted test phone and not on a normal one.
+
+- (Phase 11) Physical phones: block someone (they can no longer send requests or see new posts), unblock in Settings;
+  export my data to a folder and open the JSON; delete a throwaway account and confirm it can't log in.
 
 - (Phase 10) With push credentials configured: a chat message to a locked phone shows only "Halqo · You have new
   activity"; opening the app shows the decrypted message. Link a second physical phone by QR (compare the 6-digit
