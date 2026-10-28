@@ -14,6 +14,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import { View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { KeyboardProvider } from 'react-native-keyboard-controller';
 
 import { AppDrawer } from '@/components/app-drawer';
 import { DialogHost } from '@/components/ui/dialog-host';
@@ -99,6 +100,8 @@ export default function RootLayout() {
 
   return (
     <GestureHandlerRootView className="flex-1">
+      {/* Keyboard handling that works with Android's edge-to-edge layout (where window resizing no longer happens). */}
+      <KeyboardProvider>
       <ThemeProvider value={theme}>
         <SessionProvider>
           <Navigator />
@@ -106,6 +109,7 @@ export default function RootLayout() {
         </SessionProvider>
         <StatusBar style="auto" />
       </ThemeProvider>
+      </KeyboardProvider>
     </GestureHandlerRootView>
   );
 }

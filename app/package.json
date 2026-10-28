@@ -14,9 +14,9 @@
     "api:generate": "npx -y openapi-typescript@7.13.0 ../docs/api/openapi.yaml -o src/api/schema.d.ts"
   },
   "dependencies": {
+    "@circlo/core": "file:modules/circlo-core",
     "@expo-google-fonts/inter": "0.4.2",
     "@expo/vector-icons": "^15.0.2",
-    "@circlo/core": "file:modules/circlo-core",
     "@shopify/flash-list": "2.3.2",
     "@ubjs/core": "0.31.0-6",
     "@ubjs/react-native": "0.31.0-6",
@@ -48,6 +48,7 @@
     "react-dom": "19.3.0",
     "react-native": "0.88.0",
     "react-native-gesture-handler": "~3.3.0",
+    "react-native-keyboard-controller": "1.22.7",
     "react-native-qrcode-svg": "^6.3.27",
     "react-native-reanimated": "4.7.1",
     "react-native-safe-area-context": "~5.10.1",
