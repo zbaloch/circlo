@@ -73,8 +73,9 @@ padme(L): if L < 2: return L
 - The server never stores the handle. It stores
   `handle_lookup = HMAC-SHA256(HANDLE_KEY, "circlo/v1/handle" || 0x00 || normalize(handle))`, where `HANDLE_KEY` (32 bytes)
   is a server secret (`CIRCLO_HANDLE_KEY`) kept outside the database. A DB thief cannot reverse or test handles.
-- Discoverability: handles are **not searchable by default**. A user may opt in to "let people find me by handle";
-  only then does the server answer an exact-match lookup. Otherwise friends connect via invite link/QR (section 11).
+- **No search.** Handles are never searchable; `handle_lookup` is used only to log in. The only way to connect is an
+  invite link or QR code (section 12), and a friend request is accepted only from someone who redeemed the target's
+  invite. (Owner decision 2026-10-28; opt-in exact-match search was removed together with `users.discoverable`.)
 
 ### 5.2 OPAQUE configuration
 ```
@@ -335,7 +336,7 @@ The server calls the core (JNI) for OPAQUE, HMAC and the push-token seal; it imp
 | A4 | `user_blobs.kind` gains `'profile'`; profile keyed per epoch | The encrypted profile needs a home; ex-friends must lose access to future profile changes |
 | A6 | Padmé padding | Published, analysed bucket scheme |
 | A7 | **OPAQUE replaces Argon2id + Ed25519 challenge** (PLAN.md's own "upgrade path", done now). `users.auth_pubkey`/`auth_salt` become `users.opaque_record` | With the original design a DB dump allowed offline guessing of every password, then decryption of the password backups |
-| A8 | Handle required (login name); stored only as a keyed HMAC; not searchable unless the user opts in | No plaintext handle in the DB; resolves open decision 1 privately |
+| A8 | Handle required (login name); stored only as a keyed HMAC; never searchable (invite link or QR only) | No plaintext handle in the DB; resolves open decision 1 privately |
 | A9 | Per-post `key_ref` (HMAC over `post_id`) | Fixed tags let the server group posts by audience |
 | A10 | Every circle change rotates the epoch | Single inward-move payloads would reveal who was moved |
 | A11 | Push tokens sealed with a server key outside the DB | A DB thief gets no device push tokens |

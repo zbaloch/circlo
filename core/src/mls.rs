@@ -7,7 +7,7 @@
 use std::collections::BTreeMap;
 
 use ciborium::Value;
-use ed25519_dalek::{Signature, Signer as _, SigningKey, Verifier as _, VerifyingKey};
+use ed25519_dalek::{Signature, Signer as _, SigningKey, VerifyingKey};
 use openmls::prelude::tls_codec::{Deserialize as _, Serialize as _};
 use openmls::prelude::*;
 use openmls_basic_credential::SignatureKeyPair;
@@ -59,7 +59,7 @@ pub fn verify_binding(
     binding: &[u8; 64],
 ) -> Result<()> {
     let pk = VerifyingKey::from_bytes(identity_pk).map_err(|_| CoreError::BadSignature)?;
-    pk.verify(
+    pk.verify_strict(
         &binding_message(user_id, device_id, mls_sig_pk),
         &Signature::from_bytes(binding),
     )
@@ -703,5 +703,30 @@ mod tests {
         assert!(a.client.process(b"not mls").is_err());
         a.client.create_group(&[1; 16]).unwrap();
         assert!(a.client.add_members(&[1; 16], &[b"junk".to_vec()]).is_err());
+    }
+
+    /// The identity point (small order) with R = identity, s = 0 passes non-strict Ed25519 for any message.
+    #[test]
+    fn binding_rejects_weak_identity_key() {
+        use ed25519_dalek::Verifier as _;
+        let mut weak_pk = [0u8; 32];
+        weak_pk[0] = 1;
+        let mut sig = [0u8; 64];
+        sig[0] = 1;
+        let lax = VerifyingKey::from_bytes(&weak_pk).unwrap();
+        assert!(lax
+            .verify(
+                &binding_message(&[1; 16], &[2; 16], b"pk"),
+                &Signature::from_bytes(&sig)
+            )
+            .is_ok());
+        assert_eq!(
+            verify_binding(&weak_pk, &[1; 16], &[2; 16], b"pk", &sig),
+            Err(CoreError::BadSignature)
+        );
+
+        let id = SigningKey::from_bytes(&random());
+        let good = sign_binding(&id, &[1; 16], &[2; 16], b"pk");
+        assert!(verify_binding(&id.verifying_key().to_bytes(), &[1; 16], &[2; 16], b"pk", &good).is_ok());
     }
 }

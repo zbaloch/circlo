@@ -51,8 +51,10 @@ class CircleRotationIT extends IntegrationTest {
         UUID e1 = epoch(alice);
         befriend(alice, e1, bob, epoch(bob));
         befriend(alice, e1, carol, epoch(carol));
-        // Alice has a pending request to Dave (he's discoverable).
-        call("PUT", "/v1/me/discoverable", Map.of("discoverable", true), dave.accessToken);
+        // Alice redeemed Dave's invite and has a pending request to him.
+        byte[] daveInvite = Ids.random(32);
+        call("POST", "/v1/invites", Map.of("tokenHash", core.inviteTokenHash(daveInvite)), dave.accessToken);
+        call("POST", "/v1/invites/redeem", Map.of("token", daveInvite), alice.accessToken);
         call("POST", "/v1/friends/requests", Map.of("toUserId", dave.userId.toString(), "epochId", e1.toString(), "payload", Ids.random(160)),
                 alice.accessToken);
 

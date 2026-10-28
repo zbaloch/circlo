@@ -65,8 +65,11 @@ public class TokenService {
                 accessTtl.toSeconds(), scope);
     }
 
-    /** Single use: the presented refresh token is revoked and a new pair issued. Reuse of a revoked token fails. */
-    @Transactional
+    /**
+     * Single use: the presented refresh token is revoked and a new pair issued. Presenting an already-rotated token means
+     * it leaked (RFC 9700 section 4.14.2), so every session of that user is revoked; the 401 must not roll that back.
+     */
+    @Transactional(noRollbackFor = ApiException.class)
     public Tokens refresh(String refreshToken) {
         byte[] raw;
         try {
@@ -80,6 +83,12 @@ public class TokenService {
                 "SELECT user_id, scope FROM refresh_tokens WHERE token_hash = ? AND revoked_at IS NULL AND expires_at > ? FOR UPDATE",
                 (rs, i) -> new Object[] {rs.getBytes(1), rs.getString(2)}, hash, now);
         if (rows.isEmpty()) {
+            List<byte[]> reused = jdbc.query(
+                    "SELECT user_id FROM refresh_tokens WHERE token_hash = ? AND revoked_at IS NOT NULL",
+                    (rs, i) -> rs.getBytes(1), hash);
+            if (!reused.isEmpty()) {
+                revokeAll(Ids.uuid(reused.get(0)));
+            }
             throw ApiException.unauthorized();
         }
         jdbc.update("UPDATE refresh_tokens SET revoked_at = ? WHERE token_hash = ?", now, hash);

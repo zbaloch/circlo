@@ -173,17 +173,6 @@ async function sendRequest(account: StoredAccount, toUserId: string, identity: I
   await updateAddressBook(account, (b) => recordPlacement(b, epoch.epochId, toUserId, DEFAULT_CIRCLE));
 }
 
-/** Finds someone who opted into handle search and sends them a request. */
-export async function requestByHandle(account: StoredAccount, handle: string): Promise<string> {
-  const res = await api.GET('/v1/users/search', { params: { query: { handle } } });
-  if (res.response.status === 404) throw new InviteError('No one with that handle lets others find them. Ask for an invite instead.');
-  const found = ok(res);
-  if (found.userId === account.userId) throw new InviteError('That’s you.');
-  verifyIdentitySignature(found.userId!, found.identity as Identity);
-  await sendRequest(account, found.userId!, found.identity as Identity);
-  return found.userId!;
-}
-
 // ---------------- requests and friends ----------------
 
 export type Connection = {

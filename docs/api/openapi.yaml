@@ -279,26 +279,6 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/Identity" }
 
-  /v1/me/discoverable:
-    get:
-      summary: Whether others can find me by exact handle (off by default)
-      responses:
-        "200": { content: { application/json: { schema: { $ref: "#/components/schemas/Discoverable" } } } }
-    put:
-      summary: Opt in or out of handle search
-      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/Discoverable" } } } }
-      responses:
-        "200": { content: { application/json: { schema: { $ref: "#/components/schemas/Discoverable" } } } }
-
-  /v1/users/search:
-    get:
-      summary: Exact-match handle lookup; finds only users who opted in (others 404)
-      parameters:
-        - { name: handle, in: query, required: true, schema: { type: string } }
-      responses:
-        "200": { content: { application/json: { schema: { $ref: "#/components/schemas/UserWithIdentity" } } } }
-        "404": { $ref: "#/components/responses/Error" }
-
   /v1/invites:
     post:
       summary: Register an invite by the hash of a client-generated token (7 days, single use)
@@ -363,7 +343,7 @@ paths:
 
   /v1/friends/requests:
     post:
-      summary: Send a friend request with my friend payload (after redeeming their invite, or if they are discoverable)
+      summary: Send a friend request with my friend payload; only after redeeming their invite (403 otherwise, there is no search)
       requestBody:
         required: true
         content:
@@ -1071,11 +1051,6 @@ components:
         authorId: { $ref: "#/components/schemas/Id" }
         ciphertext: { $ref: "#/components/schemas/Bytes" }
         createdAt: { type: string, format: date-time }
-    Discoverable:
-      type: object
-      required: [discoverable]
-      properties:
-        discoverable: { type: boolean }
     UserWithIdentity:
       type: object
       properties:

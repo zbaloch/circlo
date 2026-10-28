@@ -43,7 +43,7 @@ jest.mock('@/lib/feed-store', () => ({
 // it is checked on the emulator (docs/PROGRESS.md "Needs manual check").
 describe('app shell', () => {
   it('has exactly the four icon-only tabs from PLAN.md 2A, each with a screen-reader label', () => {
-    expect(TABS.map((t) => t.label)).toEqual(['Home', 'Search', 'Notifications', 'Messages']);
+    expect(TABS.map((t) => t.label)).toEqual(['Home', 'Friends', 'Notifications', 'Messages']);
     for (const t of TABS) {
       expect(t.icon).toBeTruthy();
       expect(t.iconActive).toBeTruthy();

@@ -1,5 +1,5 @@
 import { useFocusEffect } from 'expo-router';
-import { useCallback, useEffect, useState, type ReactNode } from 'react';
+import { useCallback, useState, type ReactNode } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
 
 import { api, ok } from '@/api/client';
@@ -12,35 +12,20 @@ import { deleteAccount, exportMyData, unblockUser } from '@/lib/safety';
 import { useSession } from '@/lib/session';
 import { usePalette } from '@/theme/use-palette';
 import { Text, TextInput } from '@/components/ui/text';
-import { Toggle } from '@/components/ui/toggle';
 import { showAlert } from '@/lib/dialog';
 
-/** Settings: discoverability, blocked people, export my data, delete my account. */
+/** Settings: privacy, blocked people, export my data, delete my account. */
 export default function SettingsScreen() {
   const session = useSession();
   const account = session.status === 'signedIn' ? session.account : null;
   const palette = usePalette();
   const integrity = useIntegrityWarning();
-  const [discoverable, setDiscoverable] = useState<boolean | null>(null);
   const [blocked, setBlocked] = useState<string[]>([]);
   const [book, setBook] = useState<AddressBook | null>(null);
   const [error, setError] = useState<string>();
   const [exporting, setExporting] = useState<string | null>(null);
   const [confirm, setConfirm] = useState('');
   const [deleting, setDeleting] = useState(false);
-
-  useEffect(() => {
-    api.GET('/v1/me/discoverable').then(
-      (r) => {
-        try {
-          setDiscoverable(ok(r).discoverable);
-        } catch (e) {
-          setError(describeError(e));
-        }
-      },
-      (e) => setError(describeError(e)),
-    );
-  }, []);
 
   const loadBlocks = useCallback(async () => {
     try {
@@ -57,16 +42,6 @@ export default function SettingsScreen() {
   );
 
   if (!account) return null;
-
-  const toggle = async (value: boolean) => {
-    setDiscoverable(value);
-    try {
-      ok(await api.PUT('/v1/me/discoverable', { body: { discoverable: value } }));
-    } catch (e) {
-      setDiscoverable(!value);
-      setError(describeError(e));
-    }
-  };
 
   const runExport = async () => {
     setError(undefined);
@@ -102,9 +77,7 @@ export default function SettingsScreen() {
   return (
     <ScrollView className="flex-1 bg-surface dark:bg-surface-dark" contentContainerClassName="pb-10" keyboardShouldPersistTaps="handled">
       <Section title="Privacy">
-        <Row title="Let people find me by handle" subtitle="Off: only people you invite can add you. On: anyone who types your exact handle can send a request.">
-          <Toggle accessibilityLabel="Let people find me by handle" value={!!discoverable} disabled={discoverable === null} onValueChange={toggle} />
-        </Row>
+        <Row title="Only people you invite can add you" subtitle="No one can search for you. Friends connect by scanning your QR code or opening your invite link." />
         {integrity.message ? <Row title="Device security" subtitle={integrity.message} danger /> : null}
       </Section>
 

@@ -93,3 +93,18 @@ Real accounts register and log in through OPAQUE. Then many clients mix the app'
 - likes (5%).
 
 The test fails on any error, or if the p95 for the feed, stats or posts reaches 500 ms or more.
+
+## Rate limiting
+
+The server limits auth attempts per client address, login and recovery attempts per handle, and a few costly
+actions per user (`web.RateLimiter`: Bucket4j token buckets in a Caffeine cache). Buckets live in memory only; keys are
+salted hashes and are dropped once idle, so no IP-derived data is ever stored (PRIVACY.md).
+
+- **Behind a reverse proxy or load balancer**, set `CIRCLO_TRUSTED_PROXIES` to a regex matching the proxy's own
+  address(es), e.g. `10\.0\.0\.\d+`. Tomcat's `RemoteIpValve` then takes the client address from `X-Forwarded-For`,
+  but only when the request comes from a trusted proxy. Left empty (the default), no proxy is trusted and forwarded
+  headers are ignored, so clients can't spoof their address. The proxy must overwrite, not append to, any
+  `X-Forwarded-For` it receives from clients.
+- **With more than one server instance**, each enforces its own limits. Put the shared per-IP limit at the edge
+  (nginx `limit_req`, the load balancer or the CDN/WAF) for `/v1/auth/*` and `/v1/device-links/*`. Login guessing
+  stays expensive regardless: every OPAQUE attempt costs the client an Argon2id at 64 MiB.
