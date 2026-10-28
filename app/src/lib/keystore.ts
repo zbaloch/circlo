@@ -1,18 +1,18 @@
-import * as Core from '@halqo/core';
+import * as Core from '@circlo/core';
 import * as SecureStore from 'expo-secure-store';
 
 import { fromB64, toB64 } from './bytes';
 
 /**
- * Account secrets in the iOS Keychain / Android Keystore (service com.halqo.app.keys). "This device only": keys are
+ * Account secrets in the iOS Keychain / Android Keystore (service com.circlo.app.keys). "This device only": keys are
  * never migrated by OS backups; a new device logs in (backup download) or is linked.
  */
 const OPTIONS: SecureStore.SecureStoreOptions = {
-  keychainService: 'com.halqo.app.keys',
+  keychainService: 'com.circlo.app.keys',
   keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
 };
 
-const KEY = 'halqo.account.v1';
+const KEY = 'circlo.account.v1';
 
 /** All byte fields are base64. */
 export type StoredAccount = {
@@ -51,7 +51,7 @@ export async function clearAccount(): Promise<void> {
 }
 
 // CRYPTO.md section 10: `local_cache_key` is random, per device, never backed up; it seals cached thumbnails.
-const CACHE_KEY = 'halqo.local-cache-key.v1';
+const CACHE_KEY = 'circlo.local-cache-key.v1';
 let cacheKey: ArrayBuffer | null = null;
 
 export async function localCacheKey(): Promise<ArrayBuffer> {

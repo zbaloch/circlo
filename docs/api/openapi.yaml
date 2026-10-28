@@ -1,9 +1,9 @@
 openapi: 3.1.0
 info:
-  title: Halqo API
+  title: Circlo API
   version: 0.11.1
   description: >
-    halqo-server API. The server stores and relays ciphertext only. Request and response bodies never contain
+    circlo-server API. The server stores and relays ciphertext only. Request and response bodies never contain
     plaintext content, names, emails, circle numbers or private keys. Byte fields are standard base64 strings;
     IDs are UUID strings (16 bytes, the same bytes used in crypto AAD). Errors are `{"error": "<code>"}` and never
     echo request data. See docs/CRYPTO.md for every byte format.
@@ -1028,13 +1028,13 @@ paths:
 components:
   parameters:
     ReadToken:
-      name: X-Halqo-Read-Token
+      name: X-Circlo-Read-Token
       in: header
       required: false
       description: The post's read token (base64); only its audience can derive it
       schema: { type: string }
     Device:
-      name: X-Halqo-Device
+      name: X-Circlo-Device
       in: header
       required: true
       description: The calling device (must be one of the caller's registered devices)
@@ -1044,7 +1044,7 @@ components:
       type: http
       scheme: bearer
       bearerFormat: JWT
-      description: HS256, iss halqo-server, aud halqo-app, scope full|recovery, 15 minutes
+      description: HS256, iss circlo-server, aud circlo-app, scope full|recovery, 15 minutes
 
   schemas:
     PostView:

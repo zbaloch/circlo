@@ -2,7 +2,7 @@
  * On-device crypto self-test (Phase 2 dev screen). Exercises the native Rust core end to end; contains no crypto
  * of its own. Never shipped to users: the dev screen only appears in __DEV__ builds.
  */
-import * as Core from '@halqo/core';
+import * as Core from '@circlo/core';
 import { File, FileMode, Paths } from 'expo-file-system';
 
 export type CheckResult = { name: string; ok: boolean; ms: number; detail?: string };

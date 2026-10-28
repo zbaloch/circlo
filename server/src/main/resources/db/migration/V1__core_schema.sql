@@ -1,4 +1,4 @@
--- Halqo core schema (docs/PLAN.md section 3, adjusted per docs/CRYPTO.md section 14).
+-- Circlo core schema (docs/PLAN.md section 3, adjusted per docs/CRYPTO.md section 14).
 -- The server stores only ciphertext, public keys and opaque protocol records.
 -- No name, email, circle or caption columns, ever. IDs are 16 random bytes (UUIDv7 or random).
 -- Timestamps are UTC DATETIME(6).
@@ -7,9 +7,9 @@
 
 CREATE TABLE users (
     id              BINARY(16)    NOT NULL PRIMARY KEY,
-    -- HMAC(HALQO_HANDLE_KEY, normalized handle): the handle itself is never stored.
+    -- HMAC(CIRCLO_HANDLE_KEY, normalized handle): the handle itself is never stored.
     handle_lookup   BINARY(32)    NOT NULL,
-    -- OPAQUE registration record; useless without HALQO_OPAQUE_SERVER_SETUP (kept outside the DB).
+    -- OPAQUE registration record; useless without CIRCLO_OPAQUE_SERVER_SETUP (kept outside the DB).
     opaque_record   VARBINARY(512) NULL,
     recovery_pubkey BINARY(32)    NULL,
     discoverable    BOOLEAN       NOT NULL DEFAULT FALSE,
@@ -70,7 +70,7 @@ CREATE TABLE devices (
     user_id        BINARY(16)     NOT NULL,
     device_pubkey  BINARY(32)     NOT NULL,
     device_cert    BINARY(64)     NOT NULL,
-    -- Sealed with HALQO_PUSH_TOKEN_KEY (kept outside the DB).
+    -- Sealed with CIRCLO_PUSH_TOKEN_KEY (kept outside the DB).
     push_token_enc VARBINARY(1024) NULL,
     created_at     DATETIME(6)    NOT NULL,
     revoked_at     DATETIME(6)    NULL,

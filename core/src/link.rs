@@ -17,9 +17,9 @@ use crate::cbor::{self, Fields};
 use crate::error::{invalid, CoreError, Result};
 use crate::primitives::aad;
 
-const LABEL: &str = "halqo/v1/device-link";
-const SAS_LABEL: &str = "halqo/v1/device-link-code";
-const INFO: &[u8] = b"halqo/v1/device-link";
+const LABEL: &str = "circlo/v1/device-link";
+const SAS_LABEL: &str = "circlo/v1/device-link-code";
+const INFO: &[u8] = b"circlo/v1/device-link";
 const MAX_HANDLE: usize = 64;
 
 type PrivateKey = <X25519HkdfSha256 as Kem>::PrivateKey;

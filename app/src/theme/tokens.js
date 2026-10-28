@@ -1,5 +1,5 @@
 /**
- * Halqo design tokens (docs/PLAN.md section 2A): the single source for colours.
+ * Circlo design tokens (docs/PLAN.md section 2A): the single source for colours.
  * tailwind.config.js builds the NativeWind palette from this; navigation options that need raw values import it.
  * Our own palette: deep teal, not X's blue.
  */

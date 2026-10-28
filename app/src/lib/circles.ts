@@ -3,7 +3,7 @@
  * book and are never shown to anyone else. Every placement change, inward or outward, and every unfriend rotates the
  * epoch, so the server can't tell who moved or how.
  */
-import * as Core from '@halqo/core';
+import * as Core from '@circlo/core';
 
 import { api, ApiError, ok } from '@/api/client';
 

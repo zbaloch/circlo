@@ -3,7 +3,7 @@
  * link id and a one-time public key; the signed-in device scans it, the user compares a 6-digit code on both screens,
  * and the signed-in device seals the account secrets to that key. The server relays the ciphertext once.
  */
-import * as Core from '@halqo/core';
+import * as Core from '@circlo/core';
 
 import { api, ok } from '@/api/client';
 
@@ -12,7 +12,7 @@ import { fromB64, toB64, uuidToBytes } from './bytes';
 import { b64url, fromB64url } from './friends';
 import type { StoredAccount } from './keystore';
 
-export const LINK_PREFIX = 'halqo://link/';
+export const LINK_PREFIX = 'circlo://link/';
 
 export type PendingLink = { linkId: ArrayBuffer; keys: Core.LinkKeyPair; qr: string; code: string };
 
@@ -30,7 +30,7 @@ export function startLink(): PendingLink {
 
 /** Parses a link QR (pure). Returns null for anything else. */
 export function parseLinkQr(text: string): { linkId: ArrayBuffer; publicKey: ArrayBuffer } | null {
-  const m = text.trim().match(/^halqo:\/\/link\/([A-Za-z0-9_-]{43})#([A-Za-z0-9_-]{43})$/);
+  const m = text.trim().match(/^circlo:\/\/link\/([A-Za-z0-9_-]{43})#([A-Za-z0-9_-]{43})$/);
   if (!m) return null;
   try {
     const linkId = fromB64url(m[1]);
@@ -54,7 +54,7 @@ export function takeScannedLink(): string | null {
   return s;
 }
 
-/** Deep-link form `halqo://link-confirm?id=<link_id>&k=<link_pk>` (base64url), equivalent to the QR text. */
+/** Deep-link form `circlo://link-confirm?id=<link_id>&k=<link_pk>` (base64url), equivalent to the QR text. */
 export function linkFromParams(id?: string, k?: string): string | null {
   return id && k ? `${LINK_PREFIX}${id}#${k}` : null;
 }

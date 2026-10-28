@@ -3,7 +3,7 @@ import { Text } from 'react-native';
 
 import { EmptyState } from '@/components/empty-state';
 import { Fab } from '@/components/fab';
-import { HalqoMark } from '@/components/halqo-mark';
+import { CircloMark } from '@/components/circlo-mark';
 import { IconButton } from '@/components/icon-button';
 
 describe('components', () => {
@@ -32,8 +32,8 @@ describe('components', () => {
     expect(screen.getByRole('button', { name: 'Compose post' })).toBeTruthy();
   });
 
-  it('HalqoMark is announced as the Halqo logo', async () => {
-    await render(<HalqoMark wordmark />);
-    expect(screen.getByLabelText('Halqo')).toBeTruthy();
+  it('CircloMark is announced as the Circlo logo', async () => {
+    await render(<CircloMark wordmark />);
+    expect(screen.getByLabelText('Circlo')).toBeTruthy();
   });
 });

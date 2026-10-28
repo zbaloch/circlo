@@ -1469,7 +1469,7 @@ export interface paths {
             query?: never;
             header?: {
                 /** @description The post's read token (base64); only its audience can derive it */
-                "X-Halqo-Read-Token"?: components["parameters"]["ReadToken"];
+                "X-Circlo-Read-Token"?: components["parameters"]["ReadToken"];
             };
             path: {
                 postId: components["schemas"]["Id"];
@@ -1485,7 +1485,7 @@ export interface paths {
                 };
                 header?: {
                     /** @description The post's read token (base64); only its audience can derive it */
-                    "X-Halqo-Read-Token"?: components["parameters"]["ReadToken"];
+                    "X-Circlo-Read-Token"?: components["parameters"]["ReadToken"];
                 };
                 path: {
                     postId: components["schemas"]["Id"];
@@ -1512,7 +1512,7 @@ export interface paths {
                 query?: never;
                 header?: {
                     /** @description The post's read token (base64); only its audience can derive it */
-                    "X-Halqo-Read-Token"?: components["parameters"]["ReadToken"];
+                    "X-Circlo-Read-Token"?: components["parameters"]["ReadToken"];
                 };
                 path: {
                     postId: components["schemas"]["Id"];
@@ -1551,7 +1551,7 @@ export interface paths {
             query?: never;
             header?: {
                 /** @description The post's read token (base64); only its audience can derive it */
-                "X-Halqo-Read-Token"?: components["parameters"]["ReadToken"];
+                "X-Circlo-Read-Token"?: components["parameters"]["ReadToken"];
             };
             path: {
                 postId: components["schemas"]["Id"];
@@ -1568,7 +1568,7 @@ export interface paths {
                 query?: never;
                 header?: {
                     /** @description The post's read token (base64); only its audience can derive it */
-                    "X-Halqo-Read-Token"?: components["parameters"]["ReadToken"];
+                    "X-Circlo-Read-Token"?: components["parameters"]["ReadToken"];
                 };
                 path: {
                     postId: components["schemas"]["Id"];
@@ -1599,7 +1599,7 @@ export interface paths {
             query?: never;
             header?: {
                 /** @description The post's read token (base64); only its audience can derive it */
-                "X-Halqo-Read-Token"?: components["parameters"]["ReadToken"];
+                "X-Circlo-Read-Token"?: components["parameters"]["ReadToken"];
             };
             path: {
                 postId: components["schemas"]["Id"];
@@ -1613,7 +1613,7 @@ export interface paths {
                 query?: never;
                 header?: {
                     /** @description The post's read token (base64); only its audience can derive it */
-                    "X-Halqo-Read-Token"?: components["parameters"]["ReadToken"];
+                    "X-Circlo-Read-Token"?: components["parameters"]["ReadToken"];
                 };
                 path: {
                     postId: components["schemas"]["Id"];
@@ -1640,7 +1640,7 @@ export interface paths {
                 query?: never;
                 header?: {
                     /** @description The post's read token (base64); only its audience can derive it */
-                    "X-Halqo-Read-Token"?: components["parameters"]["ReadToken"];
+                    "X-Circlo-Read-Token"?: components["parameters"]["ReadToken"];
                 };
                 path: {
                     postId: components["schemas"]["Id"];
@@ -1670,7 +1670,7 @@ export interface paths {
             query?: never;
             header?: {
                 /** @description The post's read token (base64); only its audience can derive it */
-                "X-Halqo-Read-Token"?: components["parameters"]["ReadToken"];
+                "X-Circlo-Read-Token"?: components["parameters"]["ReadToken"];
             };
             path: {
                 postId: components["schemas"]["Id"];
@@ -1683,7 +1683,7 @@ export interface paths {
                 query?: never;
                 header?: {
                     /** @description The post's read token (base64); only its audience can derive it */
-                    "X-Halqo-Read-Token"?: components["parameters"]["ReadToken"];
+                    "X-Circlo-Read-Token"?: components["parameters"]["ReadToken"];
                 };
                 path: {
                     postId: components["schemas"]["Id"];
@@ -1767,7 +1767,7 @@ export interface paths {
                 query?: never;
                 header: {
                     /** @description The calling device (must be one of the caller's registered devices) */
-                    "X-Halqo-Device": components["parameters"]["Device"];
+                    "X-Circlo-Device": components["parameters"]["Device"];
                 };
                 path?: never;
                 cookie?: never;
@@ -1815,7 +1815,7 @@ export interface paths {
                 query?: never;
                 header: {
                     /** @description The calling device (must be one of the caller's registered devices) */
-                    "X-Halqo-Device": components["parameters"]["Device"];
+                    "X-Circlo-Device": components["parameters"]["Device"];
                 };
                 path?: never;
                 cookie?: never;
@@ -1865,7 +1865,7 @@ export interface paths {
                 query?: never;
                 header: {
                     /** @description The calling device (must be one of the caller's registered devices) */
-                    "X-Halqo-Device": components["parameters"]["Device"];
+                    "X-Circlo-Device": components["parameters"]["Device"];
                 };
                 path?: never;
                 cookie?: never;
@@ -1895,7 +1895,7 @@ export interface paths {
                 query?: never;
                 header: {
                     /** @description The calling device (must be one of the caller's registered devices) */
-                    "X-Halqo-Device": components["parameters"]["Device"];
+                    "X-Circlo-Device": components["parameters"]["Device"];
                 };
                 path?: never;
                 cookie?: never;
@@ -1929,7 +1929,7 @@ export interface paths {
             query?: never;
             header: {
                 /** @description The calling device (must be one of the caller's registered devices) */
-                "X-Halqo-Device": components["parameters"]["Device"];
+                "X-Circlo-Device": components["parameters"]["Device"];
             };
             path: {
                 groupId: components["schemas"]["Id"];
@@ -1945,7 +1945,7 @@ export interface paths {
                 };
                 header: {
                     /** @description The calling device (must be one of the caller's registered devices) */
-                    "X-Halqo-Device": components["parameters"]["Device"];
+                    "X-Circlo-Device": components["parameters"]["Device"];
                 };
                 path: {
                     groupId: components["schemas"]["Id"];
@@ -1978,7 +1978,7 @@ export interface paths {
                 query?: never;
                 header: {
                     /** @description The calling device (must be one of the caller's registered devices) */
-                    "X-Halqo-Device": components["parameters"]["Device"];
+                    "X-Circlo-Device": components["parameters"]["Device"];
                 };
                 path: {
                     groupId: components["schemas"]["Id"];
@@ -2031,7 +2031,7 @@ export interface paths {
                 query?: never;
                 header: {
                     /** @description The calling device (must be one of the caller's registered devices) */
-                    "X-Halqo-Device": components["parameters"]["Device"];
+                    "X-Circlo-Device": components["parameters"]["Device"];
                 };
                 path?: never;
                 cookie?: never;
@@ -2067,7 +2067,7 @@ export interface paths {
             query?: never;
             header: {
                 /** @description The calling device (must be one of the caller's registered devices) */
-                "X-Halqo-Device": components["parameters"]["Device"];
+                "X-Circlo-Device": components["parameters"]["Device"];
             };
             path: {
                 welcomeId: components["schemas"]["Id"];
@@ -2083,7 +2083,7 @@ export interface paths {
                 query?: never;
                 header: {
                     /** @description The calling device (must be one of the caller's registered devices) */
-                    "X-Halqo-Device": components["parameters"]["Device"];
+                    "X-Circlo-Device": components["parameters"]["Device"];
                 };
                 path: {
                     welcomeId: components["schemas"]["Id"];
@@ -2287,7 +2287,7 @@ export interface paths {
             query?: never;
             header: {
                 /** @description The calling device (must be one of the caller's registered devices) */
-                "X-Halqo-Device": components["parameters"]["Device"];
+                "X-Circlo-Device": components["parameters"]["Device"];
             };
             path: {
                 groupId: components["schemas"]["Id"];
@@ -2300,7 +2300,7 @@ export interface paths {
                 query?: never;
                 header: {
                     /** @description The calling device (must be one of the caller's registered devices) */
-                    "X-Halqo-Device": components["parameters"]["Device"];
+                    "X-Circlo-Device": components["parameters"]["Device"];
                 };
                 path: {
                     groupId: components["schemas"]["Id"];
@@ -2335,7 +2335,7 @@ export interface paths {
             query?: never;
             header: {
                 /** @description The calling device (must be one of the caller's registered devices) */
-                "X-Halqo-Device": components["parameters"]["Device"];
+                "X-Circlo-Device": components["parameters"]["Device"];
             };
             path: {
                 groupId: components["schemas"]["Id"];
@@ -2350,7 +2350,7 @@ export interface paths {
                 query?: never;
                 header: {
                     /** @description The calling device (must be one of the caller's registered devices) */
-                    "X-Halqo-Device": components["parameters"]["Device"];
+                    "X-Circlo-Device": components["parameters"]["Device"];
                 };
                 path: {
                     groupId: components["schemas"]["Id"];

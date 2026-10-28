@@ -3,7 +3,7 @@ import { defaultCircle, validateDraft } from '@/lib/posts';
 import { relativeTime } from '@/lib/time';
 
 // Native modules don't load under jest; these tests cover the pure logic only.
-jest.mock('@halqo/core', () => ({}));
+jest.mock('@circlo/core', () => ({}));
 jest.mock('expo-file-system', () => ({}));
 jest.mock('expo-image-manipulator', () => ({}));
 jest.mock('expo-video-thumbnails', () => ({}));

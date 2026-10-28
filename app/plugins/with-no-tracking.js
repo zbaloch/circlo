@@ -1,7 +1,7 @@
 // No tracking (owner rule: nothing about a user is collected except what they post for others to see).
 // Android: strips permissions that only serve install attribution or advertising, even when a library declares them
-// (expo-application, pulled in by expo-notifications, declares the Play install-referrer permission; Halqo never
-// calls it). iOS: the privacy manifest says Halqo does no tracking and collects no data types.
+// (expo-application, pulled in by expo-notifications, declares the Play install-referrer permission; Circlo never
+// calls it). iOS: the privacy manifest says Circlo does no tracking and collects no data types.
 const { withAndroidManifest } = require('expo/config-plugins');
 
 const BLOCKED_PERMISSIONS = [

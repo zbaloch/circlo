@@ -1,6 +1,6 @@
 # Security policy
 
-Halqo is an end-to-end encrypted app, so security reports are very welcome.
+Circlo is an end-to-end encrypted app, so security reports are very welcome.
 
 ## Reporting a vulnerability
 
@@ -23,4 +23,4 @@ circle membership or keys, or lets a friend read posts addressed to a narrower c
 
 ## Status
 
-Halqo has **not** yet had an external cryptography audit. Do not rely on it for sensitive communication yet.
+Circlo has **not** yet had an external cryptography audit. Do not rely on it for sensitive communication yet.

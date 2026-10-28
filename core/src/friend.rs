@@ -13,8 +13,8 @@ use crate::primitives::{aad, VERSION};
 
 pub const PLAINTEXT_LEN: usize = 112;
 pub const PAYLOAD_LEN: usize = 32 + PLAINTEXT_LEN + 16;
-const INFO: &[u8] = b"halqo/v1/friend-payload";
-const LABEL: &str = "halqo/v1/friend-payload";
+const INFO: &[u8] = b"circlo/v1/friend-payload";
+const LABEL: &str = "circlo/v1/friend-payload";
 
 type EncappedKey = <X25519HkdfSha256 as Kem>::EncappedKey;
 

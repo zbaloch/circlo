@@ -2,7 +2,7 @@ import { unreadCount, type ChatMessage } from '@/lib/messaging';
 import { chatTitle, dayLabel } from '@/lib/view-logic';
 
 // Native modules don't load under jest; these tests cover the pure logic only.
-jest.mock('@halqo/core', () => ({}));
+jest.mock('@circlo/core', () => ({}));
 jest.mock('expo-file-system', () => ({}));
 jest.mock('expo-secure-store', () => ({}));
 jest.mock('expo-image-manipulator', () => ({}));

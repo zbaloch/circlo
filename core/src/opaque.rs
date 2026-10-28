@@ -1,7 +1,7 @@
 //! OPAQUE password authentication, RFC 9807 via `opaque-ke` (CRYPTO.md section 5).
 //!
-//! Client functions run in the app; server functions run in halqo-server via JNI. The server's `ServerSetup`
-//! is a secret held outside the database (`HALQO_OPAQUE_SERVER_SETUP`).
+//! Client functions run in the app; server functions run in circlo-server via JNI. The server's `ServerSetup`
+//! is a secret held outside the database (`CIRCLO_OPAQUE_SERVER_SETUP`).
 
 use opaque_ke::argon2::{Algorithm, Argon2, Params, Version};
 use opaque_ke::{
@@ -23,8 +23,8 @@ impl CipherSuite for Suite {
     type Ksf = Argon2<'static>;
 }
 
-const SERVER_ID: &[u8] = b"halqo-server";
-const CONTEXT: &[u8] = b"halqo/v1/opaque";
+const SERVER_ID: &[u8] = b"circlo-server";
+const CONTEXT: &[u8] = b"circlo/v1/opaque";
 
 /// Argon2id, 64 MiB, t = 3, p = 1 (CRYPTO.md section 2).
 fn ksf() -> Argon2<'static> {

@@ -4,7 +4,7 @@
  * the local chat history (sealed the same way: forward secrecy means old messages can't be decrypted again), key
  * packages topped up, and syncs welcomes and group logs from the delivery service.
  */
-import * as Core from '@halqo/core';
+import * as Core from '@circlo/core';
 import { Directory, File, Paths } from 'expo-file-system';
 import * as SecureStore from 'expo-secure-store';
 import { useSyncExternalStore } from 'react';
@@ -17,12 +17,12 @@ import { verifyIdentitySignature, type Identity } from './friends';
 import { localCacheKey, type StoredAccount } from './keystore';
 import { kindName, type UploadedMedia } from './media';
 
-const SIGNER_SLOT = 'halqo.mls-signer.v1';
-const KEYCHAIN = { keychainService: 'com.halqo.app.keys', keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY };
+const SIGNER_SLOT = 'circlo.mls-signer.v1';
+const KEYCHAIN = { keychainService: 'com.circlo.app.keys', keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY };
 const KEY_PACKAGE_TARGET = 20;
 const KEY_PACKAGE_LOW = 5;
 const MAX_HISTORY = 1000;
-const HISTORY_ID = utf8('halqo-chat-index').slice(0, 16);
+const HISTORY_ID = utf8('circlo-chat-index').slice(0, 16);
 
 export type ChatMessage = {
   seq: number;
@@ -118,7 +118,7 @@ async function signer(account: StoredAccount): Promise<Signer> {
   return s;
 }
 
-const dev = () => ({ header: { 'X-Halqo-Device': deviceId } });
+const dev = () => ({ header: { 'X-Circlo-Device': deviceId } });
 
 /** Creates (or restores) this device's MLS client and keeps its key packages topped up. */
 export async function ensureMessaging(account: StoredAccount): Promise<Core.MlsClientLike> {
@@ -246,7 +246,7 @@ export async function startChat(account: StoredAccount, userIds: string[]): Prom
   ok(await api.POST('/v1/mls/groups', { params: dev(), body: { groupId } }));
   c.createGroup(uuidToBytes(groupId));
   const kps = (await claim([...userIds, account.userId])).filter((k) => k.deviceId !== account.deviceId);
-  if (!kps.some((k) => k.userId !== account.userId)) throw new Error('Your friend hasn’t set up messaging yet. Ask them to open Halqo.');
+  if (!kps.some((k) => k.userId !== account.userId)) throw new Error('Your friend hasn’t set up messaging yet. Ask them to open Circlo.');
   await commit(account, groupId, () => ({ out: c.addMembers(uuidToBytes(groupId), kps.map((k) => fromB64(k.keyPackage))), add: kps.map((k) => k.deviceId) }));
   const h = await loadHistory();
   const conv: Conversation = { groupId, members: [], cursor: 0, readSeq: 0, active: true, unverified: false, messages: [], updatedAtMs: Date.now() };

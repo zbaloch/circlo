@@ -1,6 +1,6 @@
 /**
  * Content-free push (PLAN.md Phase 10). The server only ever sends "new activity"; the app then fetches and decrypts
- * as usual. The device token is sent to the server, which stores it sealed (HALQO_PUSH_TOKEN_KEY, outside the DB).
+ * as usual. The device token is sent to the server, which stores it sealed (CIRCLO_PUSH_TOKEN_KEY, outside the DB).
  */
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';

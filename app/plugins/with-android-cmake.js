@@ -8,7 +8,7 @@ const CMAKE_VERSION = '4.1.2';
 
 module.exports = function withAndroidCmake(config) {
   config = withAppBuildGradle(config, (cfg) => {
-    const marker = '// halqo: cmake version';
+    const marker = '// circlo: cmake version';
     if (!cfg.modResults.contents.includes(marker)) {
       cfg.modResults.contents += `
 ${marker}
@@ -24,7 +24,7 @@ android {
     return cfg;
   });
   return withProjectBuildGradle(config, (cfg) => {
-    const marker = '// halqo: cmake version for libraries';
+    const marker = '// circlo: cmake version for libraries';
     if (!cfg.modResults.contents.includes(marker)) {
       cfg.modResults.contents += `
 ${marker}

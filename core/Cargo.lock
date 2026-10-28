@@ -410,6 +410,41 @@ dependencies = [
 ]
 
 [[package]]
+name = "circlo-core"
+version = "0.1.0"
+dependencies = [
+ "argon2",
+ "bip39",
+ "chacha20poly1305",
+ "ciborium",
+ "ed25519-dalek",
+ "hex",
+ "hkdf 0.12.4",
+ "hmac 0.12.1",
+ "hpke",
+ "jni",
+ "opaque-ke",
+ "openmls",
+ "openmls_basic_credential",
+ "openmls_memory_storage",
+ "openmls_rust_crypto",
+ "openmls_traits",
+ "proptest",
+ "rand_core 0.6.4",
+ "rand_core 0.9.5",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "subtle",
+ "tempfile",
+ "thiserror 2.0.21",
+ "tls_codec 0.4.2",
+ "unicode-normalization",
+ "uniffi",
+ "zeroize",
+]
+
+[[package]]
 name = "clang-sys"
 version = "1.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -934,41 +969,6 @@ dependencies = [
  "cfg-if",
  "crunchy",
  "zerocopy",
-]
-
-[[package]]
-name = "halqo-core"
-version = "0.1.0"
-dependencies = [
- "argon2",
- "bip39",
- "chacha20poly1305",
- "ciborium",
- "ed25519-dalek",
- "hex",
- "hkdf 0.12.4",
- "hmac 0.12.1",
- "hpke",
- "jni",
- "opaque-ke",
- "openmls",
- "openmls_basic_credential",
- "openmls_memory_storage",
- "openmls_rust_crypto",
- "openmls_traits",
- "proptest",
- "rand_core 0.6.4",
- "rand_core 0.9.5",
- "serde",
- "serde_json",
- "sha2 0.10.9",
- "subtle",
- "tempfile",
- "thiserror 2.0.21",
- "tls_codec 0.4.2",
- "unicode-normalization",
- "uniffi",
- "zeroize",
 ]
 
 [[package]]

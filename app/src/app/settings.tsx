@@ -81,7 +81,7 @@ export default function SettingsScreen() {
   };
 
   const runDelete = () =>
-    showAlert('Delete your account?', 'Your posts, photos, replies, likes, friends, chats and keys are deleted from Halqo for good. This can’t be undone.', [
+    showAlert('Delete your account?', 'Your posts, photos, replies, likes, friends, chats and keys are deleted from Circlo for good. This can’t be undone.', [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Delete forever',
@@ -123,14 +123,14 @@ export default function SettingsScreen() {
       </Section>
 
       <Section title="Your data">
-        <Row title="Export my data" subtitle="Your profile, friends, posts (with photos) and chats, decrypted on this phone and saved as a file in a folder you pick. Nothing is sent to Halqo." />
+        <Row title="Export my data" subtitle="Your profile, friends, posts (with photos) and chats, decrypted on this phone and saved as a file in a folder you pick. Nothing is sent to Circlo." />
         <View className="px-4 pb-4">
           <Button label={exporting ?? 'Export'} variant="outline" loading={!!exporting} onPress={runExport} />
         </View>
       </Section>
 
       <Section title="Delete account">
-        <Row subtitle={`Deletes everything you have on Halqo: posts, photos, replies, likes, friends, chats and keys. Type your handle (${account.handle}) to confirm.`} />
+        <Row subtitle={`Deletes everything you have on Circlo: posts, photos, replies, likes, friends, chats and keys. Type your handle (${account.handle}) to confirm.`} />
         <View className="gap-3 px-4 pb-4">
           <TextInput
             accessibilityLabel="Type your handle to confirm"

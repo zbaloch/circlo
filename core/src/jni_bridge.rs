@@ -1,7 +1,7 @@
-//! JNI surface for halqo-server (`com.halqo.server.crypto.HalqoCoreNative`). Server-side operations only:
+//! JNI surface for circlo-server (`com.circlo.server.crypto.CircloCoreNative`). Server-side operations only:
 //! OPAQUE server, keyed handle lookup, signature checks, push-token sealing, invite hashing, MLS framing metadata.
 //!
-//! Errors and panics become `com.halqo.server.crypto.CoreException` carrying only the error kind — never key
+//! Errors and panics become `com.circlo.server.crypto.CoreException` carrying only the error kind — never key
 //! material or plaintext. Built with `--features jni --profile server` (panic = unwind, so a bug can't abort the JVM).
 
 use std::panic::{catch_unwind, AssertUnwindSafe};
@@ -13,7 +13,7 @@ use jni::JNIEnv;
 use crate::error::{fixed, CoreError};
 use crate::{blob, identity, opaque, recovery, social};
 
-const EXCEPTION: &str = "com/halqo/server/crypto/CoreException";
+const EXCEPTION: &str = "com/circlo/server/crypto/CoreException";
 
 enum Fail {
     Core(CoreError),
@@ -88,7 +88,7 @@ fn ok(r: Result<(), CoreError>) -> R<jboolean> {
 }
 
 #[no_mangle]
-pub extern "system" fn Java_com_halqo_server_crypto_HalqoCoreNative_opaqueServerSetupNew(
+pub extern "system" fn Java_com_circlo_server_crypto_CircloCoreNative_opaqueServerSetupNew(
     mut env: JNIEnv,
     _c: JClass,
 ) -> jbyteArray {
@@ -98,7 +98,7 @@ pub extern "system" fn Java_com_halqo_server_crypto_HalqoCoreNative_opaqueServer
 }
 
 #[no_mangle]
-pub extern "system" fn Java_com_halqo_server_crypto_HalqoCoreNative_opaqueServerRegistrationStart(
+pub extern "system" fn Java_com_circlo_server_crypto_CircloCoreNative_opaqueServerRegistrationStart(
     mut env: JNIEnv,
     _c: JClass,
     setup: JByteArray,
@@ -116,7 +116,7 @@ pub extern "system" fn Java_com_halqo_server_crypto_HalqoCoreNative_opaqueServer
 }
 
 #[no_mangle]
-pub extern "system" fn Java_com_halqo_server_crypto_HalqoCoreNative_opaqueServerRegistrationFinish(
+pub extern "system" fn Java_com_circlo_server_crypto_CircloCoreNative_opaqueServerRegistrationFinish(
     mut env: JNIEnv,
     _c: JClass,
     upload: JByteArray,
@@ -129,7 +129,7 @@ pub extern "system" fn Java_com_halqo_server_crypto_HalqoCoreNative_opaqueServer
 
 /// Returns `[response, state]`. `record` may be null for unknown handles (fake response).
 #[no_mangle]
-pub extern "system" fn Java_com_halqo_server_crypto_HalqoCoreNative_opaqueServerLoginStart(
+pub extern "system" fn Java_com_circlo_server_crypto_CircloCoreNative_opaqueServerLoginStart(
     mut env: JNIEnv,
     _c: JClass,
     setup: JByteArray,
@@ -162,7 +162,7 @@ pub extern "system" fn Java_com_halqo_server_crypto_HalqoCoreNative_opaqueServer
 }
 
 #[no_mangle]
-pub extern "system" fn Java_com_halqo_server_crypto_HalqoCoreNative_opaqueServerLoginFinish(
+pub extern "system" fn Java_com_circlo_server_crypto_CircloCoreNative_opaqueServerLoginFinish(
     mut env: JNIEnv,
     _c: JClass,
     state: JByteArray,
@@ -180,7 +180,7 @@ pub extern "system" fn Java_com_halqo_server_crypto_HalqoCoreNative_opaqueServer
 }
 
 #[no_mangle]
-pub extern "system" fn Java_com_halqo_server_crypto_HalqoCoreNative_normalizeHandle(
+pub extern "system" fn Java_com_circlo_server_crypto_CircloCoreNative_normalizeHandle(
     mut env: JNIEnv,
     _c: JClass,
     handle: JString,
@@ -192,7 +192,7 @@ pub extern "system" fn Java_com_halqo_server_crypto_HalqoCoreNative_normalizeHan
 }
 
 #[no_mangle]
-pub extern "system" fn Java_com_halqo_server_crypto_HalqoCoreNative_handleLookup(
+pub extern "system" fn Java_com_circlo_server_crypto_CircloCoreNative_handleLookup(
     mut env: JNIEnv,
     _c: JClass,
     key: JByteArray,
@@ -206,7 +206,7 @@ pub extern "system" fn Java_com_halqo_server_crypto_HalqoCoreNative_handleLookup
 }
 
 #[no_mangle]
-pub extern "system" fn Java_com_halqo_server_crypto_HalqoCoreNative_inviteTokenHash(
+pub extern "system" fn Java_com_circlo_server_crypto_CircloCoreNative_inviteTokenHash(
     mut env: JNIEnv,
     _c: JClass,
     token: JByteArray,
@@ -219,7 +219,7 @@ pub extern "system" fn Java_com_halqo_server_crypto_HalqoCoreNative_inviteTokenH
 
 /// `H(read_token)` for comparing a presented read token with the one stored at post creation (CRYPTO.md 13c).
 #[no_mangle]
-pub extern "system" fn Java_com_halqo_server_crypto_HalqoCoreNative_readTokenHash(
+pub extern "system" fn Java_com_circlo_server_crypto_CircloCoreNative_readTokenHash(
     mut env: JNIEnv,
     _c: JClass,
     token: JByteArray,
@@ -232,7 +232,7 @@ pub extern "system" fn Java_com_halqo_server_crypto_HalqoCoreNative_readTokenHas
 
 /// MLS framing the delivery service may read: `group_id || epoch:u64 BE || is_commit:u8` (CRYPTO.md 13a).
 #[no_mangle]
-pub extern "system" fn Java_com_halqo_server_crypto_HalqoCoreNative_mlsMessageMeta(
+pub extern "system" fn Java_com_circlo_server_crypto_CircloCoreNative_mlsMessageMeta(
     mut env: JNIEnv,
     _c: JClass,
     message: JByteArray,
@@ -247,7 +247,7 @@ pub extern "system" fn Java_com_halqo_server_crypto_HalqoCoreNative_mlsMessageMe
 }
 
 #[no_mangle]
-pub extern "system" fn Java_com_halqo_server_crypto_HalqoCoreNative_verifyRecoveryLogin(
+pub extern "system" fn Java_com_circlo_server_crypto_CircloCoreNative_verifyRecoveryLogin(
     mut env: JNIEnv,
     _c: JClass,
     pubkey: JByteArray,
@@ -271,7 +271,7 @@ pub extern "system" fn Java_com_halqo_server_crypto_HalqoCoreNative_verifyRecove
 }
 
 #[no_mangle]
-pub extern "system" fn Java_com_halqo_server_crypto_HalqoCoreNative_verifyIdentity(
+pub extern "system" fn Java_com_circlo_server_crypto_CircloCoreNative_verifyIdentity(
     mut env: JNIEnv,
     _c: JClass,
     ed25519_pk: JByteArray,
@@ -293,7 +293,7 @@ pub extern "system" fn Java_com_halqo_server_crypto_HalqoCoreNative_verifyIdenti
 }
 
 #[no_mangle]
-pub extern "system" fn Java_com_halqo_server_crypto_HalqoCoreNative_verifyDeviceCertificate(
+pub extern "system" fn Java_com_circlo_server_crypto_CircloCoreNative_verifyDeviceCertificate(
     mut env: JNIEnv,
     _c: JClass,
     identity_pk: JByteArray,
@@ -314,7 +314,7 @@ pub extern "system" fn Java_com_halqo_server_crypto_HalqoCoreNative_verifyDevice
 }
 
 #[no_mangle]
-pub extern "system" fn Java_com_halqo_server_crypto_HalqoCoreNative_sealPushToken(
+pub extern "system" fn Java_com_circlo_server_crypto_CircloCoreNative_sealPushToken(
     mut env: JNIEnv,
     _c: JClass,
     key: JByteArray,
@@ -332,7 +332,7 @@ pub extern "system" fn Java_com_halqo_server_crypto_HalqoCoreNative_sealPushToke
 }
 
 #[no_mangle]
-pub extern "system" fn Java_com_halqo_server_crypto_HalqoCoreNative_openPushToken(
+pub extern "system" fn Java_com_circlo_server_crypto_CircloCoreNative_openPushToken(
     mut env: JNIEnv,
     _c: JClass,
     key: JByteArray,
@@ -349,7 +349,7 @@ pub extern "system" fn Java_com_halqo_server_crypto_HalqoCoreNative_openPushToke
     })
 }
 
-/// Client-side operations so halqo-server's integration tests can act as a real app. Only compiled with
+/// Client-side operations so circlo-server's integration tests can act as a real app. Only compiled with
 /// `jni-test-client`; production server libraries are built without it.
 #[cfg(feature = "jni-test-client")]
 mod test_client {
@@ -378,7 +378,7 @@ mod test_client {
 
     /// `x25519_sk || x25519_pk || ed25519_sk || ed25519_pk` (128 bytes).
     #[no_mangle]
-    pub extern "system" fn Java_com_halqo_server_crypto_TestClientNative_generateIdentity(
+    pub extern "system" fn Java_com_circlo_server_crypto_TestClientNative_generateIdentity(
         mut env: JNIEnv,
         _c: JClass,
     ) -> jbyteArray {
@@ -393,7 +393,7 @@ mod test_client {
     }
 
     #[no_mangle]
-    pub extern "system" fn Java_com_halqo_server_crypto_TestClientNative_signIdentity(
+    pub extern "system" fn Java_com_circlo_server_crypto_TestClientNative_signIdentity(
         mut env: JNIEnv,
         _c: JClass,
         identity: JByteArray,
@@ -409,7 +409,7 @@ mod test_client {
 
     /// `device_sk || device_pk` (64 bytes).
     #[no_mangle]
-    pub extern "system" fn Java_com_halqo_server_crypto_TestClientNative_generateDeviceKeys(
+    pub extern "system" fn Java_com_circlo_server_crypto_TestClientNative_generateDeviceKeys(
         mut env: JNIEnv,
         _c: JClass,
     ) -> jbyteArray {
@@ -422,7 +422,7 @@ mod test_client {
     }
 
     #[no_mangle]
-    pub extern "system" fn Java_com_halqo_server_crypto_TestClientNative_signDeviceCertificate(
+    pub extern "system" fn Java_com_circlo_server_crypto_TestClientNative_signDeviceCertificate(
         mut env: JNIEnv,
         _c: JClass,
         identity: JByteArray,
@@ -442,7 +442,7 @@ mod test_client {
     }
 
     #[no_mangle]
-    pub extern "system" fn Java_com_halqo_server_crypto_TestClientNative_recoveryPublicKey(
+    pub extern "system" fn Java_com_circlo_server_crypto_TestClientNative_recoveryPublicKey(
         mut env: JNIEnv,
         _c: JClass,
         entropy: JByteArray,
@@ -456,7 +456,7 @@ mod test_client {
     }
 
     #[no_mangle]
-    pub extern "system" fn Java_com_halqo_server_crypto_TestClientNative_signRecoveryLogin(
+    pub extern "system" fn Java_com_circlo_server_crypto_TestClientNative_signRecoveryLogin(
         mut env: JNIEnv,
         _c: JClass,
         entropy: JByteArray,
@@ -479,7 +479,7 @@ mod test_client {
 
     /// Returns `[request, state]`.
     #[no_mangle]
-    pub extern "system" fn Java_com_halqo_server_crypto_TestClientNative_registrationStart(
+    pub extern "system" fn Java_com_circlo_server_crypto_TestClientNative_registrationStart(
         mut env: JNIEnv,
         _c: JClass,
         password: JByteArray,
@@ -493,7 +493,7 @@ mod test_client {
 
     /// Returns `[upload, export_key]`.
     #[no_mangle]
-    pub extern "system" fn Java_com_halqo_server_crypto_TestClientNative_registrationFinish(
+    pub extern "system" fn Java_com_circlo_server_crypto_TestClientNative_registrationFinish(
         mut env: JNIEnv,
         _c: JClass,
         state: JByteArray,
@@ -513,7 +513,7 @@ mod test_client {
 
     /// Returns `[request, state]`.
     #[no_mangle]
-    pub extern "system" fn Java_com_halqo_server_crypto_TestClientNative_loginStart(
+    pub extern "system" fn Java_com_circlo_server_crypto_TestClientNative_loginStart(
         mut env: JNIEnv,
         _c: JClass,
         password: JByteArray,
@@ -527,7 +527,7 @@ mod test_client {
 
     /// Returns `[finalization, export_key]`; throws CoreException(AuthFailed) for a wrong password.
     #[no_mangle]
-    pub extern "system" fn Java_com_halqo_server_crypto_TestClientNative_loginFinish(
+    pub extern "system" fn Java_com_circlo_server_crypto_TestClientNative_loginFinish(
         mut env: JNIEnv,
         _c: JClass,
         state: JByteArray,
@@ -582,7 +582,7 @@ mod test_client {
 
     /// A fresh MLS client for (user, device), with its credential bound by `identity` (128-byte test identity).
     #[no_mangle]
-    pub extern "system" fn Java_com_halqo_server_crypto_TestClientNative_mlsNew(
+    pub extern "system" fn Java_com_circlo_server_crypto_TestClientNative_mlsNew(
         mut env: JNIEnv,
         _c: JClass,
         identity: JByteArray,
@@ -609,7 +609,7 @@ mod test_client {
     }
 
     #[no_mangle]
-    pub extern "system" fn Java_com_halqo_server_crypto_TestClientNative_mlsKeyPackages(
+    pub extern "system" fn Java_com_circlo_server_crypto_TestClientNative_mlsKeyPackages(
         mut env: JNIEnv,
         _c: JClass,
         handle: jlong,
@@ -623,7 +623,7 @@ mod test_client {
     }
 
     #[no_mangle]
-    pub extern "system" fn Java_com_halqo_server_crypto_TestClientNative_mlsCreateGroup(
+    pub extern "system" fn Java_com_circlo_server_crypto_TestClientNative_mlsCreateGroup(
         mut env: JNIEnv,
         _c: JClass,
         handle: jlong,
@@ -637,7 +637,7 @@ mod test_client {
 
     /// `[commit, welcome]`; the commit stays pending until mlsMerge.
     #[no_mangle]
-    pub extern "system" fn Java_com_halqo_server_crypto_TestClientNative_mlsAdd(
+    pub extern "system" fn Java_com_circlo_server_crypto_TestClientNative_mlsAdd(
         mut env: JNIEnv,
         _c: JClass,
         handle: jlong,
@@ -653,7 +653,7 @@ mod test_client {
     }
 
     #[no_mangle]
-    pub extern "system" fn Java_com_halqo_server_crypto_TestClientNative_mlsRemove(
+    pub extern "system" fn Java_com_circlo_server_crypto_TestClientNative_mlsRemove(
         mut env: JNIEnv,
         _c: JClass,
         handle: jlong,
@@ -669,7 +669,7 @@ mod test_client {
     }
 
     #[no_mangle]
-    pub extern "system" fn Java_com_halqo_server_crypto_TestClientNative_mlsMerge(
+    pub extern "system" fn Java_com_circlo_server_crypto_TestClientNative_mlsMerge(
         mut env: JNIEnv,
         _c: JClass,
         handle: jlong,
@@ -682,7 +682,7 @@ mod test_client {
     }
 
     #[no_mangle]
-    pub extern "system" fn Java_com_halqo_server_crypto_TestClientNative_mlsClear(
+    pub extern "system" fn Java_com_circlo_server_crypto_TestClientNative_mlsClear(
         mut env: JNIEnv,
         _c: JClass,
         handle: jlong,
@@ -695,7 +695,7 @@ mod test_client {
     }
 
     #[no_mangle]
-    pub extern "system" fn Java_com_halqo_server_crypto_TestClientNative_mlsJoin(
+    pub extern "system" fn Java_com_circlo_server_crypto_TestClientNative_mlsJoin(
         mut env: JNIEnv,
         _c: JClass,
         handle: jlong,
@@ -709,7 +709,7 @@ mod test_client {
     }
 
     #[no_mangle]
-    pub extern "system" fn Java_com_halqo_server_crypto_TestClientNative_mlsEncrypt(
+    pub extern "system" fn Java_com_circlo_server_crypto_TestClientNative_mlsEncrypt(
         mut env: JNIEnv,
         _c: JClass,
         handle: jlong,
@@ -725,7 +725,7 @@ mod test_client {
 
     /// Plaintext for an application message, an empty array for a commit/proposal; throws if it can't be read.
     #[no_mangle]
-    pub extern "system" fn Java_com_halqo_server_crypto_TestClientNative_mlsProcess(
+    pub extern "system" fn Java_com_circlo_server_crypto_TestClientNative_mlsProcess(
         mut env: JNIEnv,
         _c: JClass,
         handle: jlong,

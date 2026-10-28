@@ -11,21 +11,21 @@ describe('certificate pinning config', () => {
   });
 
   it('pins the API host with a current and a backup key in production', () => {
-    const p = pinningFromEnv({ APP_VARIANT: 'production', EXPO_PUBLIC_API_URL: 'https://api.example.test', HALQO_PIN_SHA256: `${PIN_A}, ${PIN_B}`, HALQO_PIN_EXPIRES: '2027-06-01' });
+    const p = pinningFromEnv({ APP_VARIANT: 'production', EXPO_PUBLIC_API_URL: 'https://api.example.test', CIRCLO_PIN_SHA256: `${PIN_A}, ${PIN_B}`, CIRCLO_PIN_EXPIRES: '2027-06-01' });
     expect(p).toEqual({ host: 'api.example.test', pins: [PIN_A, PIN_B], expires: '2027-06-01' });
   });
 
   it('refuses a production build without pins, with a single pin, or with malformed pins', () => {
     const base = { APP_VARIANT: 'production', EXPO_PUBLIC_API_URL: 'https://api.example.test' };
-    expect(() => pinningFromEnv(base)).toThrow(/HALQO_PIN_SHA256/);
-    expect(() => pinningFromEnv({ ...base, HALQO_PIN_SHA256: PIN_A })).toThrow(/backup/);
-    expect(() => pinningFromEnv({ ...base, HALQO_PIN_SHA256: `${PIN_A},not-a-pin` })).toThrow(/SHA-256/);
-    expect(() => pinningFromEnv({ ...base, HALQO_PIN_SHA256: `${PIN_A},${PIN_B}`, HALQO_PIN_EXPIRES: 'soon' })).toThrow(/YYYY-MM-DD/);
-    expect(() => pinningFromEnv({ ...base, EXPO_PUBLIC_API_URL: 'http://api.example.test', HALQO_PIN_SHA256: `${PIN_A},${PIN_B}` })).toThrow(/https/);
+    expect(() => pinningFromEnv(base)).toThrow(/CIRCLO_PIN_SHA256/);
+    expect(() => pinningFromEnv({ ...base, CIRCLO_PIN_SHA256: PIN_A })).toThrow(/backup/);
+    expect(() => pinningFromEnv({ ...base, CIRCLO_PIN_SHA256: `${PIN_A},not-a-pin` })).toThrow(/SHA-256/);
+    expect(() => pinningFromEnv({ ...base, CIRCLO_PIN_SHA256: `${PIN_A},${PIN_B}`, CIRCLO_PIN_EXPIRES: 'soon' })).toThrow(/YYYY-MM-DD/);
+    expect(() => pinningFromEnv({ ...base, EXPO_PUBLIC_API_URL: 'http://api.example.test', CIRCLO_PIN_SHA256: `${PIN_A},${PIN_B}` })).toThrow(/https/);
   });
 
   it('can be skipped explicitly for an internal production test build', () => {
-    expect(pinningFromEnv({ APP_VARIANT: 'production', EXPO_PUBLIC_API_URL: 'https://api.example.test', HALQO_ALLOW_UNPINNED: '1' })).toBeNull();
+    expect(pinningFromEnv({ APP_VARIANT: 'production', EXPO_PUBLIC_API_URL: 'https://api.example.test', CIRCLO_ALLOW_UNPINNED: '1' })).toBeNull();
   });
 
   it('writes an Android pin-set that keeps loopback video working and blocks other cleartext', () => {

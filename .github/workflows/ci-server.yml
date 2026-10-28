@@ -18,8 +18,8 @@ jobs:
       mariadb:
         image: mariadb:11.8
         env:
-          MARIADB_DATABASE: halqo_test
-          MARIADB_USER: halqo
+          MARIADB_DATABASE: circlo_test
+          MARIADB_USER: circlo
           MARIADB_PASSWORD: test-only-not-a-secret
           MARIADB_ROOT_PASSWORD: test-only-not-a-secret
         ports: ["3306:3306"]
@@ -27,25 +27,25 @@ jobs:
           --health-cmd="healthcheck.sh --connect --innodb_initialized"
           --health-interval=5s --health-timeout=5s --health-retries=20
     env:
-      HALQO_DB_USER: halqo
-      HALQO_DB_PASSWORD: test-only-not-a-secret
-      HALQO_TEST_DB_URL: jdbc:mariadb://127.0.0.1:3306/halqo_test
-      HALQO_S3_PUBLIC_ENDPOINT: http://127.0.0.1:9000
-      HALQO_S3_ACCESS_KEY: test-only-not-a-secret
-      HALQO_S3_SECRET_KEY: test-only-not-a-secret
+      CIRCLO_DB_USER: circlo
+      CIRCLO_DB_PASSWORD: test-only-not-a-secret
+      CIRCLO_TEST_DB_URL: jdbc:mariadb://127.0.0.1:3306/circlo_test
+      CIRCLO_S3_PUBLIC_ENDPOINT: http://127.0.0.1:9000
+      CIRCLO_S3_ACCESS_KEY: test-only-not-a-secret
+      CIRCLO_S3_SECRET_KEY: test-only-not-a-secret
     defaults:
       run:
         working-directory: server
     steps:
       - uses: actions/checkout@v7.0.1
-      - name: Start MinIO (CI only) with the halqo-media-test bucket
+      - name: Start MinIO (CI only) with the circlo-media-test bucket
         run: |
-          docker run -d --name halqo-minio -p 9000:9000 \
+          docker run -d --name circlo-minio -p 9000:9000 \
             -e MINIO_ROOT_USER=test-only-not-a-secret -e MINIO_ROOT_PASSWORD=test-only-not-a-secret \
             cgr.dev/chainguard/minio:latest server /data
           for i in $(seq 1 30); do curl -fsS http://127.0.0.1:9000/minio/health/live && break; sleep 1; done
           docker exec -e MC_HOST_local=http://test-only-not-a-secret:test-only-not-a-secret@localhost:9000 \
-            halqo-minio mc mb --ignore-existing local/halqo-media-test
+            circlo-minio mc mb --ignore-existing local/circlo-media-test
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -53,7 +53,7 @@ jobs:
         with:
           workspaces: core
           key: server-jni
-      - name: Build native halqo-core for the server (with the test client)
+      - name: Build native circlo-core for the server (with the test client)
         working-directory: core
         run: cargo build --features jni-test-client --profile server
       - uses: actions/setup-java@v6.1.0
@@ -68,7 +68,7 @@ jobs:
       - name: Reproducible jar (two clean builds are byte-identical)
         run: |
           mvn -B -q clean package -DskipTests
-          a=$(sha256sum target/halqo-server-*.jar)
+          a=$(sha256sum target/circlo-server-*.jar)
           mvn -B -q clean package -DskipTests
-          b=$(sha256sum target/halqo-server-*.jar)
+          b=$(sha256sum target/circlo-server-*.jar)
           echo "$a"; [ "$a" = "$b" ]

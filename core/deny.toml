@@ -8,7 +8,7 @@ all-features = true
 # Every RustSec advisory fails the build, including unmaintained and unsound crates. Accepted ones are listed here
 # with a reason, and are reviewed again by 2027-01-31 (same date as osv-scanner.toml).
 ignore = [
-    { id = "RUSTSEC-2026-0387", reason = "crypto-bigint 0.5 timing: only reached through P-256/P-384 code in OpenMLS's provider; Halqo uses ciphersuite 0x0003 (X25519/Ed25519) only, so no secret reaches it. Needs an upstream OpenMLS release." },
+    { id = "RUSTSEC-2026-0387", reason = "crypto-bigint 0.5 timing: only reached through P-256/P-384 code in OpenMLS's provider; Circlo uses ciphersuite 0x0003 (X25519/Ed25519) only, so no secret reaches it. Needs an upstream OpenMLS release." },
     { id = "RUSTSEC-2026-0173", reason = "proc-macro-error2 unmaintained: build-time proc macro (hax-lib-macros via libcrux), never in the shipped library." },
 ]
 
@@ -37,5 +37,5 @@ unknown-registry = "deny"
 unknown-git = "deny"
 
 [licenses.private]
-# halqo-core itself (AGPL-3.0-only, publish = false).
+# circlo-core itself (AGPL-3.0-only, publish = false).
 ignore = true

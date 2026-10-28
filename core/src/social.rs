@@ -19,31 +19,31 @@ pub fn normalize_handle(handle: &str) -> Result<String> {
     Ok(n)
 }
 
-/// Server-side: `HMAC(HANDLE_KEY, "halqo/v1/handle" || 0x00 || normalize(handle))`.
+/// Server-side: `HMAC(HANDLE_KEY, "circlo/v1/handle" || 0x00 || normalize(handle))`.
 pub fn handle_lookup(handle_key: &[u8; 32], handle: &str) -> Result<[u8; 32]> {
     let n = normalize_handle(handle)?;
     Ok(hmac_sha256(
         handle_key,
-        &[&labelled("halqo/v1/handle", &[n.as_bytes()])],
+        &[&labelled("circlo/v1/handle", &[n.as_bytes()])],
     ))
 }
 
 /// Public-key fingerprint carried in invite links (URL fragment, never sent to the server).
 pub fn fingerprint(ed25519_pk: &[u8; 32], x25519_pk: &[u8; 32]) -> [u8; 16] {
-    sha256(&[&labelled("halqo/v1/fingerprint", &[ed25519_pk, x25519_pk])])[..16]
+    sha256(&[&labelled("circlo/v1/fingerprint", &[ed25519_pk, x25519_pk])])[..16]
         .try_into()
         .expect("16 bytes")
 }
 
 /// What the server stores for an invite token.
 pub fn invite_token_hash(token: &[u8; 32]) -> [u8; 32] {
-    sha256(&[&labelled("halqo/v1/invite", &[token])])
+    sha256(&[&labelled("circlo/v1/invite", &[token])])
 }
 
 const ITERATIONS: usize = 5200;
 
 fn safety_hash(user_id: &[u8; 16], ed25519_pk: &[u8; 32], x25519_pk: &[u8; 32]) -> [u8; 32] {
-    let mut h = sha256(&[&labelled("halqo/v1/safety-number", &[user_id]), ed25519_pk, x25519_pk]);
+    let mut h = sha256(&[&labelled("circlo/v1/safety-number", &[user_id]), ed25519_pk, x25519_pk]);
     for _ in 1..ITERATIONS {
         h = sha256(&[&h, ed25519_pk, x25519_pk]);
     }

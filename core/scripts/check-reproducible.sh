@@ -14,9 +14,9 @@ build() {
   local dir="$work/$1"
   mkdir -p "$dir"
   (cd "$src" && git ls-files -z . | xargs -0 -I{} cp --parents {} "$dir/")
-  (cd "$dir" && RUSTFLAGS="--remap-path-prefix=$dir=/halqo --remap-path-prefix=$cargo_home=/cargo" \
+  (cd "$dir" && RUSTFLAGS="--remap-path-prefix=$dir=/circlo --remap-path-prefix=$cargo_home=/cargo" \
     CARGO_TARGET_DIR="$dir/target" cargo build --locked "${args[@]}" >&2)
-  find "$dir/target/release" -maxdepth 1 -type f \( -name 'libhalqo_core.so' -o -name 'libhalqo_core.a' \) -print0 \
+  find "$dir/target/release" -maxdepth 1 -type f \( -name 'libcirclo_core.so' -o -name 'libcirclo_core.a' \) -print0 \
     | sort -z | xargs -0 sha256sum | sed "s#$dir/##"
 }
 

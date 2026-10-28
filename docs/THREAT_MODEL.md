@@ -1,4 +1,4 @@
-# Halqo threat model
+# Circlo threat model
 
 > **Status: v1.0 — approved 2026-10-25.** Derived from PLAN.md sections 1–2 and docs/CRYPTO.md v1.0.
 
@@ -112,9 +112,9 @@ circle numbers, circle labels, group names.
 Threema is a widely respected privacy messenger: anonymous random IDs (no phone number or email required), NaCl
 end-to-end encryption, the Ibex protocol for forward secrecy in one-to-one chats, QR-code contact verification,
 password-encrypted "Threema Safe" backups, open-source apps, and independent audits plus academic analysis.
-Halqo's design aims at the same bar. Where it stands today (design level; Halqo is unaudited):
+Circlo's design aims at the same bar. Where it stands today (design level; Circlo is unaudited):
 
-| Property | Threema | Halqo |
+| Property | Threema | Circlo |
 |---|---|---|
 | Account without phone/email | Yes (random ID) | Yes (pseudonymous handle; the server stores only a keyed hash of it) |
 | Content end-to-end encrypted | Yes | Yes (posts, media, replies, profiles, address book, backups; messages via MLS in Phase 9) |
@@ -127,7 +127,7 @@ Halqo's design aims at the same bar. Where it stands today (design level; Halqo 
 | Independent security audit | Yes | **Not yet: required before any public launch** |
 | Maturity | Years in production | Early development |
 
-**Bottom line:** at design level Halqo matches or exceeds Threema on content secrecy, backup protection and chat
+**Bottom line:** at design level Circlo matches or exceeds Threema on content secrecy, backup protection and chat
 security, and adds audience secrecy that Threema doesn't need. It is weaker on social-graph metadata (the server
 knows friendships), and it has none of Threema's track record or audits yet. "As secure as Threema" can only be
 claimed after an external audit.

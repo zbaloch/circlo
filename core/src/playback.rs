@@ -200,12 +200,12 @@ impl Server {
         });
         let s = server.clone();
         std::thread::Builder::new()
-            .name("halqo-playback".into())
+            .name("circlo-playback".into())
             .spawn(move || {
                 for conn in listener.incoming().flatten() {
                     let s = s.clone();
                     let _ = std::thread::Builder::new()
-                        .name("halqo-playback-conn".into())
+                        .name("circlo-playback-conn".into())
                         .spawn(move || {
                             let _ = s.handle(conn);
                         });

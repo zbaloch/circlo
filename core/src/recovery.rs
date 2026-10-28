@@ -35,7 +35,7 @@ pub fn entropy_from_phrase(phrase: &str) -> Result<Zeroizing<[u8; 32]>> {
 }
 
 fn recovery_signing_key(entropy: &[u8; 32]) -> SigningKey {
-    SigningKey::from_bytes(&hkdf32(entropy, "halqo/v1/recovery-auth"))
+    SigningKey::from_bytes(&hkdf32(entropy, "circlo/v1/recovery-auth"))
 }
 
 /// Stored by the server as `users.recovery_pubkey`.
@@ -45,7 +45,7 @@ pub fn recovery_public_key(entropy: &[u8; 32]) -> [u8; 32] {
 
 fn login_msg(user_id: &[u8; 16], challenge_id: &[u8; 16], nonce: &[u8; 32], expires_at: u64) -> Vec<u8> {
     labelled(
-        "halqo/v1/recovery-login",
+        "circlo/v1/recovery-login",
         &[user_id, challenge_id, nonce, &expires_at.to_be_bytes()],
     )
 }

@@ -16,12 +16,12 @@ pub const MAX_TEXT_CHARS: usize = 500;
 
 /// Proof that the holder can open a post (CRYPTO.md 13c): only its audience can derive it from the post key.
 pub fn read_token(post_key: &[u8; 32]) -> Zeroizing<[u8; 32]> {
-    hkdf32(post_key, "halqo/v1/read-token")
+    hkdf32(post_key, "circlo/v1/read-token")
 }
 
 /// What the server stores and compares: a hash, so a database copy can't be used to interact with the post.
 pub fn read_token_hash(token: &[u8; 32]) -> [u8; 32] {
-    sha256(&[labelled("halqo/v1/read-token-hash", &[token]).as_slice()])
+    sha256(&[labelled("circlo/v1/read-token-hash", &[token]).as_slice()])
 }
 const MAX_TEXT_BYTES: usize = MAX_TEXT_CHARS * 4;
 pub const MAX_MEDIA: usize = 12;
@@ -137,7 +137,7 @@ impl PostHeader {
 
 fn post_sig_msg(author_id: &[u8; 16], post_id: &[u8; 16], epoch_id: &[u8; 16], header: &PostHeader) -> Vec<u8> {
     labelled(
-        "halqo/v1/post-sig",
+        "circlo/v1/post-sig",
         &[author_id, post_id, epoch_id, &sha256(&[&header.unsigned_cbor()])],
     )
 }
@@ -168,13 +168,13 @@ pub fn seal_post(
     let wrapped = envelope::seal(
         &circle.wrap_key(),
         &*post_key,
-        "halqo/v1/post-key",
+        "circlo/v1/post-key",
         &[author_id, post_id, epoch_id],
     );
     let body = envelope::seal(
-        &hkdf32(&*post_key, "halqo/v1/post-header"),
+        &hkdf32(&*post_key, "circlo/v1/post-header"),
         &body_plain,
-        "halqo/v1/post-header",
+        "circlo/v1/post-header",
         &[author_id, post_id],
     );
     let mut header_ct = Vec::with_capacity(4 + wrapped.len() + body.len());
@@ -214,15 +214,15 @@ pub fn open_post(
     let pk = Zeroizing::new(envelope::open(
         &circle.wrap_key(),
         wrapped,
-        "halqo/v1/post-key",
+        "circlo/v1/post-key",
         &[author_id, post_id, epoch_id],
     )?);
     let post_key: Zeroizing<[u8; 32]> =
         Zeroizing::new(pk.as_slice().try_into().map_err(|_| CoreError::DecryptionFailed)?);
     let padded = Zeroizing::new(envelope::open(
-        &hkdf32(&*post_key, "halqo/v1/post-header"),
+        &hkdf32(&*post_key, "circlo/v1/post-header"),
         body,
-        "halqo/v1/post-header",
+        "circlo/v1/post-header",
         &[author_id, post_id],
     )?);
     let (header, sig) = PostHeader::parse_signed(&unpad(&padded)?)?;
@@ -244,7 +244,7 @@ pub struct Reply {
 
 fn reply_sig_msg(post_id: &[u8; 16], reply_id: &[u8; 16], replier_id: &[u8; 16], text: &str) -> Vec<u8> {
     labelled(
-        "halqo/v1/reply-sig",
+        "circlo/v1/reply-sig",
         &[post_id, reply_id, replier_id, &sha256(&[text.as_bytes()])],
     )
 }
@@ -271,9 +271,9 @@ pub fn seal_reply(
     let sig = sign(replier, &reply_sig_msg(post_id, reply_id, replier_id, &reply.text));
     let padded = Zeroizing::new(pad(&reply_cbor(reply, &sig))?);
     Ok(envelope::seal(
-        &hkdf32(post_key, "halqo/v1/reply"),
+        &hkdf32(post_key, "circlo/v1/reply"),
         &padded,
-        "halqo/v1/reply",
+        "circlo/v1/reply",
         &[post_id, reply_id, replier_id],
     ))
 }
@@ -287,9 +287,9 @@ pub fn open_reply(
     ciphertext: &[u8],
 ) -> Result<Reply> {
     let padded = Zeroizing::new(envelope::open(
-        &hkdf32(post_key, "halqo/v1/reply"),
+        &hkdf32(post_key, "circlo/v1/reply"),
         ciphertext,
-        "halqo/v1/reply",
+        "circlo/v1/reply",
         &[post_id, reply_id, replier_id],
     )?);
     let bytes = unpad(&padded)?;

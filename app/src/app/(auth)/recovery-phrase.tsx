@@ -17,7 +17,7 @@ export default function RecoveryPhraseScreen() {
 
   return (
     <AuthScreen>
-      <Title subtitle="Write these 24 words down, in order, and keep them somewhere safe. They are the only way to get back in if you forget your password. Halqo can’t reset it for you.">
+      <Title subtitle="Write these 24 words down, in order, and keep them somewhere safe. They are the only way to get back in if you forget your password. Circlo can’t reset it for you.">
         Your recovery phrase
       </Title>
       <View className="flex-row flex-wrap gap-2" accessibilityLabel="Recovery phrase, 24 words">

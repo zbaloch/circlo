@@ -1,6 +1,6 @@
 # Hardening (Phase 12)
 
-How Halqo's release builds are locked down, and how to repeat each check. See docs/PROGRESS.md for the latest
+How Circlo's release builds are locked down, and how to repeat each check. See docs/PROGRESS.md for the latest
 results.
 
 ## Certificate pinning (release builds)
@@ -12,9 +12,9 @@ Release builds (`APP_VARIANT=production`) pin the API host's public keys on both
 | EAS variable | Value |
 |---|---|
 | `EXPO_PUBLIC_API_URL` | `https://<api host>` (must be https) |
-| `HALQO_PIN_SHA256` | Comma-separated base64 SHA-256 SPKI pins: the live key **and at least one backup key** |
-| `HALQO_PIN_EXPIRES` | Optional `YYYY-MM-DD`. After this date Android stops enforcing the pins (normal TLS still applies), so an old app can't be locked out for good. iOS has no expiry, so keep the backup key safe |
-| `HALQO_ALLOW_UNPINNED` | `1` only for an internal test build against a host whose key you don't control yet |
+| `CIRCLO_PIN_SHA256` | Comma-separated base64 SHA-256 SPKI pins: the live key **and at least one backup key** |
+| `CIRCLO_PIN_EXPIRES` | Optional `YYYY-MM-DD`. After this date Android stops enforcing the pins (normal TLS still applies), so an old app can't be locked out for good. iOS has no expiry, so keep the backup key safe |
+| `CIRCLO_ALLOW_UNPINNED` | `1` only for an internal test build against a host whose key you don't control yet |
 
 A production build **fails** without pins, so pinning can't be forgotten by accident.
 
@@ -28,8 +28,8 @@ openssl s_client -connect <host>:443 -servername <host> </dev/null 2>/dev/null \
 Make a backup key, keep it offline, and pin it too:
 
 ```sh
-openssl genpkey -algorithm EC -pkeyopt ec_paramgen_curve:P-256 -out halqo-backup.key   # store offline, never in git
-openssl pkey -in halqo-backup.key -pubout -outform der | openssl dgst -sha256 -binary | base64
+openssl genpkey -algorithm EC -pkeyopt ec_paramgen_curve:P-256 -out circlo-backup.key   # store offline, never in git
+openssl pkey -in circlo-backup.key -pubout -outform der | openssl dgst -sha256 -binary | base64
 ```
 
 Renew certificates **with the same key** (e.g. `certbot renew --reuse-key`). To change keys, switch the server to
@@ -50,7 +50,7 @@ heuristic and easy to fool, and blocking would mostly hurt honest users.
   different directories (paths remapped) and compares hashes. CI (ci-core, job `reproducible`) runs it.
 - **App:** dependencies are locked (`package-lock.json`, `npm ci`), and the native core is built with the Cargo
   profile `app` (`make core-android-release`). Mobile app packages are signed by EAS, so they can't be compared
-  byte for byte. Instead, compare the extracted `libhalqo_core.so` and JS bundle with a local build of the same
+  byte for byte. Instead, compare the extracted `libcirclo_core.so` and JS bundle with a local build of the same
   commit.
 
 ## Dependency audit
@@ -69,7 +69,7 @@ Pretend a thief copied the database and the bucket, but not the server's secrets
 ./leak-drill.sh /path/to/markers.txt /path/to/server.log
 ```
 
-It dumps `halqo` and every bucket object to a temporary directory, then checks for:
+It dumps `circlo` and every bucket object to a temporary directory, then checks for:
 
 - the marker strings (in UTF-8, UTF-16 and hex);
 - image and video signatures or metadata;
@@ -81,8 +81,8 @@ Afterwards it deletes the copy. `infra/test_leak_drill.py` proves the scanner ca
 ## Load test
 
 ```sh
-cd server && mvn verify -Dhalqo.excludedGroups= -Dit.test=LoadIT -Dtest=NoSuchTest -Dsurefire.failIfNoSpecifiedTests=false
-# options: -Dhalqo.load.clients=64 -Dhalqo.load.seconds=30 -Dhalqo.load.users=24
+cd server && mvn verify -Dcirclo.excludedGroups= -Dit.test=LoadIT -Dtest=NoSuchTest -Dsurefire.failIfNoSpecifiedTests=false
+# options: -Dcirclo.load.clients=64 -Dcirclo.load.seconds=30 -Dcirclo.load.users=24
 ```
 
 Real accounts register and log in through OPAQUE. Then many clients mix the app's most frequent calls:

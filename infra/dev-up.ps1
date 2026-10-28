@@ -1,11 +1,11 @@
-# Bring up the Halqo dev stack from Windows: runs infra/dev-up.sh inside Debian WSL, then keeps
+# Bring up the Circlo dev stack from Windows: runs infra/dev-up.sh inside Debian WSL, then keeps
 # the WSL VM awake (WSL shuts the VM down shortly after the last WSL process exits, which stops MinIO).
 # Usage:  .\infra\dev-up.ps1          Stop keep-alive:  .\infra\dev-up.ps1 -Stop
 param([switch]$Stop)
 
 $ErrorActionPreference = 'Stop'
 $distro = 'Debian'
-$marker = 'halqo-keepalive'
+$marker = 'circlo-keepalive'
 
 function Get-KeepAlive {
     Get-CimInstance Win32_Process -Filter "Name = 'wsl.exe'" |

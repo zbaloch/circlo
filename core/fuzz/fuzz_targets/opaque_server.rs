@@ -2,7 +2,7 @@
 //! Attacker-controlled OPAQUE messages reaching the server: must never panic or authenticate.
 //! The server's login state is never attacker-controlled (it stays server-side), so it is generated here
 //! genuinely and only the client's messages are fuzzed.
-use halqo_core::opaque::*;
+use circlo_core::opaque::*;
 use libfuzzer_sys::fuzz_target;
 use std::sync::OnceLock;
 

@@ -25,7 +25,7 @@ export default function ScanScreen() {
     return (
       <View className="flex-1 items-center justify-center gap-4 bg-surface p-6 dark:bg-surface-dark">
         <Text className="text-center text-ink dark:text-ink-dark">
-          Halqo uses the camera only to scan invite and safety-number codes. Nothing is recorded.
+          Circlo uses the camera only to scan invite and safety-number codes. Nothing is recorded.
         </Text>
         <Button label="Allow camera" onPress={requestPermission} />
       </View>
@@ -44,7 +44,7 @@ export default function ScanScreen() {
       }
       if (safetyFor) {
         const contact = await getContact(account, safetyFor);
-        const mine = contact && `halqo-safety:${safetyNumber(account, safetyFor, contact).qr}`;
+        const mine = contact && `circlo-safety:${safetyNumber(account, safetyFor, contact).qr}`;
         if (mine && data === mine) {
           await setVerified(account, safetyFor, true);
           setStatus('Safety numbers match. Marked as verified.');

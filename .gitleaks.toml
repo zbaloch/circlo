@@ -1,4 +1,4 @@
-title = "halqo gitleaks config"
+title = "circlo gitleaks config"
 
 # Keep every default gitleaks rule.
 [extend]
@@ -13,8 +13,8 @@ regexes = [
   '''change-me''',
   '''test-only-not-a-secret''',
   '''_TEST_ONLY''',
-  # Public crypto domain-separation labels (docs/CRYPTO.md), e.g. "halqo/v1/reply".
-  '''^halqo/v1/[a-z0-9/-]+$''',
+  # Public crypto domain-separation labels (docs/CRYPTO.md), e.g. "circlo/v1/reply".
+  '''^circlo/v1/[a-z0-9/-]+$''',
 ]
 
 [[allowlists]]
