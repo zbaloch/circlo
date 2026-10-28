@@ -144,8 +144,8 @@ export default function HomeScreen() {
                 showPendingPosts();
                 list.current?.scrollToOffset({ offset: 0, animated: true });
               }}
-              className="rounded-full bg-primary px-4 py-2 shadow-lg active:bg-primary-pressed dark:bg-primary-dark">
-              <Text className="font-bold text-white">
+              className="rounded-full bg-primary px-4 py-2 shadow-lg active:bg-primary-pressed dark:bg-primary-dark dark:active:bg-primary-pressed-dark">
+              <Text className="font-bold text-on-primary dark:text-on-primary-dark">
                 ↑ {feed.pending.length} new {feed.pending.length === 1 ? 'post' : 'posts'}
               </Text>
             </Pressable>

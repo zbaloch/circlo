@@ -16,8 +16,8 @@ export function EmptyState({ title, body, actionLabel, onAction }: Props) {
         <Pressable
           accessibilityRole="button"
           onPress={onAction}
-          className="mt-3 rounded-full bg-primary px-6 py-3 active:bg-primary-pressed dark:bg-primary-dark">
-          <Text className="text-base font-bold text-white">{actionLabel}</Text>
+          className="mt-3 rounded-full bg-primary px-6 py-3 active:bg-primary-pressed dark:bg-primary-dark dark:active:bg-primary-pressed-dark">
+          <Text className="text-base font-bold text-on-primary dark:text-on-primary-dark">{actionLabel}</Text>
         </Pressable>
       ) : null}
     </View>

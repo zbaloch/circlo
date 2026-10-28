@@ -84,7 +84,7 @@ export default function MessagesScreen() {
               </View>
               {unread ? (
                 <View className="min-w-6 items-center rounded-full bg-primary px-2 py-0.5 dark:bg-primary-dark">
-                  <Text className="text-xs font-bold text-white">{unread}</Text>
+                  <Text className="text-xs font-bold text-on-primary dark:text-on-primary-dark">{unread}</Text>
                 </View>
               ) : null}
             </Pressable>

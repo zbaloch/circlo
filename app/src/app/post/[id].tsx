@@ -145,7 +145,7 @@ export default function ThreadScreen() {
             disabled={!!validateReply(text) || sending}
             onPress={send}
             className={`h-10 w-10 items-center justify-center rounded-full bg-primary dark:bg-primary-dark ${validateReply(text) || sending ? 'opacity-50' : ''}`}>
-            {sending ? <Spinner tone="onPrimary" /> : <Ionicons name="arrow-up" size={20} color="#FFFFFF" />}
+            {sending ? <Spinner tone="onPrimary" /> : <Ionicons name="arrow-up" size={20} color={palette.onPrimary} />}
           </Pressable>
         </View>
       </KeyboardAvoidingView>

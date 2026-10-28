@@ -13,7 +13,7 @@ export function Spinner({ size = 'small', tone = 'default', className = '' }: Pr
   }, [turn]);
   const rotate = turn.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] });
   const dims = size === 'large' ? 'h-8 w-8 border-[3px]' : 'h-5 w-5 border-2';
-  const colour = tone === 'onPrimary' ? 'border-white/30 border-t-white' : 'border-primary/25 border-t-primary dark:border-primary-dark/25 dark:border-t-primary-dark';
+  const colour = tone === 'onPrimary' ? 'border-on-primary/30 border-t-on-primary dark:border-on-primary-dark/30 dark:border-t-on-primary-dark' : 'border-primary/25 border-t-primary dark:border-primary-dark/25 dark:border-t-primary-dark';
   // Layout classes (padding, margins) go on the wrapper so the circle itself never stretches.
   return (
     <View accessibilityRole="progressbar" accessibilityLabel="Loading" className={`items-center justify-center ${className}`}>

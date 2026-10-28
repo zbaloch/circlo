@@ -102,8 +102,8 @@ export default function ComposeScreen() {
             accessibilityState={{ disabled: !postable }}
             disabled={!postable}
             onPress={post}
-            className={`rounded-full bg-primary px-5 py-2 active:bg-primary-pressed dark:bg-primary-dark ${postable ? '' : 'opacity-50'}`}>
-            <Text className="text-base font-bold text-white">Post</Text>
+            className={`rounded-full bg-primary px-5 py-2 active:bg-primary-pressed dark:bg-primary-dark dark:active:bg-primary-pressed-dark ${postable ? '' : 'opacity-50'}`}>
+            <Text className="text-base font-bold text-on-primary dark:text-on-primary-dark">Post</Text>
           </Pressable>
         </View>
 

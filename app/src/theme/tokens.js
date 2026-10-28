@@ -1,16 +1,28 @@
 /**
  * Circlo design tokens (docs/PLAN.md section 2A): the single source for colours.
  * tailwind.config.js builds the NativeWind palette from this; navigation options that need raw values import it.
- * Our own palette: deep teal, not X's blue.
+ * Primary is Tailwind sky, per the brand pack (circlo-brand-assets/brand/colors.json):
+ * - light: sky-600 for buttons, links and accent text (white text on it is 4.1:1; sky-500 would be 2.8:1)
+ * - dark: sky-400 (8.5:1 on ink), with dark sky-950 text on it, since white on sky-400 is only 2.1:1
  */
 const colors = {
-  primary: { DEFAULT: '#0E8C7F', dark: '#2BC4B1', pressed: '#0B7368', soft: '#E3F4F2', 'soft-dark': '#0F2A28' },
+  primary: {
+    DEFAULT: '#0284C7', // sky-600
+    dark: '#38BDF8', // sky-400
+    pressed: '#0369A1', // sky-700
+    'pressed-dark': '#7DD3FC', // sky-300
+    soft: '#E0F2FE', // sky-100
+    'soft-dark': '#082F49', // sky-950
+  },
+  // Text and icons drawn on a primary background.
+  'on-primary': { DEFAULT: '#FFFFFF', dark: '#082F49' },
   surface: { DEFAULT: '#FFFFFF', dark: '#0B0F14', raised: '#F7F9F9', 'raised-dark': '#151B22' },
   ink: { DEFAULT: '#0F1419', dark: '#E7E9EA' },
   muted: { DEFAULT: '#536471', dark: '#8B98A5' },
   border: { DEFAULT: '#E1E8ED', dark: '#2F3336' },
   danger: { DEFAULT: '#D92D20', dark: '#F97066' },
-  brand: { night: '#0B3B36' },
+  // Logo colours (brand pack): ink dots and sky-500 centre on light, white dots and sky-400 centre on dark.
+  brand: { ink: '#16141F', accent: '#0EA5E9', 'accent-dark': '#38BDF8' },
 };
 
 module.exports = { colors };

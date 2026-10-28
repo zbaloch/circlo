@@ -166,7 +166,7 @@ export default function ChatScreen() {
                 ) : null}
                 {item.msg.text ? (
                   <View className={`rounded-2xl px-4 py-2 ${item.msg.mine ? 'rounded-br-md bg-primary dark:bg-primary-dark' : 'rounded-bl-md bg-surface-raised dark:bg-surface-raised-dark'}`}>
-                    <Text className={item.msg.mine ? 'text-base text-white' : 'text-base text-ink dark:text-ink-dark'}>{item.msg.text}</Text>
+                    <Text className={item.msg.mine ? 'text-base text-on-primary dark:text-on-primary-dark' : 'text-base text-ink dark:text-ink-dark'}>{item.msg.text}</Text>
                   </View>
                 ) : null}
               </Pressable>
@@ -194,7 +194,7 @@ export default function ChatScreen() {
             disabled={!canSend || !text.trim() || sending}
             onPress={() => send()}
             className={`h-10 w-10 items-center justify-center rounded-full bg-primary dark:bg-primary-dark ${!canSend || !text.trim() || sending ? 'opacity-50' : ''}`}>
-            {sending ? <Spinner tone="onPrimary" /> : <Ionicons name="arrow-up" size={20} color="#FFFFFF" />}
+            {sending ? <Spinner tone="onPrimary" /> : <Ionicons name="arrow-up" size={20} color={palette.onPrimary} />}
           </Pressable>
         </View>
       </KeyboardAvoidingView>
