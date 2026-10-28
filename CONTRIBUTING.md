@@ -1,6 +1,6 @@
-# Contributing to Halqo
+# Contributing to Circlo
 
-Thanks for your interest. A few rules matter more here than in most projects, because Halqo is
+Thanks for your interest. A few rules matter more here than in most projects, because Circlo is
 end-to-end encrypted and this repository is public.
 
 ## Ground rules

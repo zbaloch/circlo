@@ -4,7 +4,7 @@
  * neither the circle nor which posts share an audience, and random object keys. The circle a post went to is kept
  * only in my encrypted address book, so only I ever see it.
  */
-import * as Core from '@halqo/core';
+import * as Core from '@circlo/core';
 
 import { api, ok } from '@/api/client';
 import type { components } from '@/api/schema';

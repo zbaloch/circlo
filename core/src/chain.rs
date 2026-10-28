@@ -7,9 +7,9 @@ use crate::error::{invalid, Result};
 use crate::primitives::{hkdf32, hmac_sha256, random};
 
 pub const CIRCLES: u8 = 100;
-const STEP: &str = "halqo/v1/circle-step";
-const WRAP: &str = "halqo/v1/post-wrap";
-const REF: &str = "halqo/v1/post-ref";
+const STEP: &str = "circlo/v1/circle-step";
+const WRAP: &str = "circlo/v1/post-wrap";
+const REF: &str = "circlo/v1/post-ref";
 
 /// One chain key `Cn`. Never used directly as an encryption key.
 #[derive(Clone, Zeroize, ZeroizeOnDrop)]
@@ -29,7 +29,7 @@ impl CircleKey {
         &self.0
     }
 
-    /// `C(n+1) = HKDF(Cn, "halqo/v1/circle-step")`.
+    /// `C(n+1) = HKDF(Cn, "circlo/v1/circle-step")`.
     pub fn next(&self) -> CircleKey {
         CircleKey(*hkdf32(&self.0, STEP))
     }
@@ -42,7 +42,7 @@ impl CircleKey {
         hkdf32(&self.0, REF)
     }
 
-    /// Per-post tag: `HMAC(ref_key, "halqo/v1/post-ref" || 0x00 || author_id || post_id)`.
+    /// Per-post tag: `HMAC(ref_key, "circlo/v1/post-ref" || 0x00 || author_id || post_id)`.
     pub fn key_ref(&self, author_id: &[u8; 16], post_id: &[u8; 16]) -> [u8; 32] {
         let rk = self.ref_key();
         hmac_sha256(&*rk, &[REF.as_bytes(), &[0x00], author_id, post_id])

@@ -1,5 +1,5 @@
 [package]
-name = "halqo-core-fuzz"
+name = "circlo-core-fuzz"
 version = "0.0.0"
 edition = "2021"
 publish = false
@@ -9,9 +9,9 @@ cargo-fuzz = true
 
 [dependencies]
 libfuzzer-sys = "0.4"
-halqo-core = { path = ".." }
+circlo-core = { path = ".." }
 
-# Standalone: not part of the halqo-core build.
+# Standalone: not part of the circlo-core build.
 [workspace]
 
 [[bin]]

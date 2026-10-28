@@ -30,7 +30,7 @@ jobs:
       - name: Scan Rust, npm and Maven dependencies
         run: |
           osv-scanner scan source --config osv-scanner.toml \
-            -L core/Cargo.lock -L app/package-lock.json -L app/modules/halqo-core/package-lock.json -L server/pom.xml
+            -L core/Cargo.lock -L app/package-lock.json -L app/modules/circlo-core/package-lock.json -L server/pom.xml
 
   cargo-deny:
     runs-on: ubuntu-latest

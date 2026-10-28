@@ -1,7 +1,7 @@
 //! End-to-end flows through the public FFI surface, as the app and server will call it.
 
-use halqo_core::error::CoreError;
-use halqo_core::ffi::*;
+use circlo_core::error::CoreError;
+use circlo_core::ffi::*;
 
 const SERVER_HANDLE_KEY: [u8; 32] = [0x11; 32];
 

@@ -1,6 +1,6 @@
 # Legal questions to take to counsel before launch
 
-Halqo is end-to-end encrypted: the operator cannot read posts, photos, replies, profiles or messages, and holds no
+Circlo is end-to-end encrypted: the operator cannot read posts, photos, replies, profiles or messages, and holds no
 names, emails or phone numbers. These are the questions a lawyer in each launch country should answer. Nothing here
 is legal advice.
 
@@ -14,7 +14,7 @@ is legal advice.
   content and to block abusive users, and timely responses; Google Play has a similar user-generated content
   policy. Expect review to ask about reporting; decide before submitting.
 - Child safety: obligations to detect or report CSAM on an E2EE service (e.g. US 18 U.S.C. § 2258A once the
-  operator has actual knowledge; EU and UK proposals on client-side scanning). Halqo does no scanning and has no
+  operator has actual knowledge; EU and UK proposals on client-side scanning). Circlo does no scanning and has no
   reporting channel; confirm this is lawful where you launch.
 - Terms of service and community guidelines; age limits (13/16) and age assurance.
 

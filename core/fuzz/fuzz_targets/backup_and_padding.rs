@@ -1,7 +1,7 @@
 #![no_main]
 //! Backup plaintext decoding, padding removal and sealed backups: must never panic.
-use halqo_core::backup::{open_password_backup, BackupPayload};
-use halqo_core::padding::unpad;
+use circlo_core::backup::{open_password_backup, BackupPayload};
+use circlo_core::padding::unpad;
 use libfuzzer_sys::fuzz_target;
 
 fuzz_target!(|data: &[u8]| {

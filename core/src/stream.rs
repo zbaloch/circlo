@@ -20,7 +20,7 @@ pub const TAG: usize = 16;
 pub const CT_CHUNK: usize = CHUNK + TAG;
 pub const PREFIX_LEN: usize = 19;
 pub const HEADER_LEN: usize = 1 + PREFIX_LEN;
-const LABEL: &str = "halqo/v1/media-chunk";
+const LABEL: &str = "circlo/v1/media-chunk";
 
 /// Chunk geometry for a given real content length (identical for encryptor and decryptor).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

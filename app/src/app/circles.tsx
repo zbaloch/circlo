@@ -39,7 +39,7 @@ export default function CirclesScreen() {
       <ScrollView contentContainerClassName="gap-2 p-4">
         <Text className="pb-2 text-muted dark:text-muted-dark">
           A post to a circle is visible to that circle and every closer one. Moving someone is silent: nobody is told,
-          and Halqo can’t see it either.
+          and Circlo can’t see it either.
         </Text>
         {book.pendingRotation ? <Text className="text-primary dark:text-primary-dark">Updating keys…</Text> : null}
         <ErrorText>{error}</ErrorText>

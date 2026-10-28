@@ -3,7 +3,7 @@
  * this module only sequences them and talks to the API. The server never receives the password, the recovery phrase,
  * a handle at rest, or any private key.
  */
-import * as Core from '@halqo/core';
+import * as Core from '@circlo/core';
 
 import { api, ok, setAccessToken, withToken } from '@/api/client';
 
@@ -30,7 +30,7 @@ export function describeError(e: unknown): string {
   const tag = (e as { tag?: string })?.tag;
   if (tag === 'AuthFailed') return 'Wrong handle or password.';
   if (tag === 'InvalidInput') return 'Please check what you entered.';
-  if (e instanceof TypeError) return 'Can’t reach the Halqo server. Check your connection.';
+  if (e instanceof TypeError) return 'Can’t reach the Circlo server. Check your connection.';
   return 'Something went wrong. Please try again.';
 }
 

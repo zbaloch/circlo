@@ -9,7 +9,7 @@ reason = "zod 3 inside @expo/cli (build-time tool, validates our own config); no
 [[IgnoredVulns]]
 id = "RUSTSEC-2026-0387"
 ignoreUntil = 2027-01-31T00:00:00Z
-reason = "crypto-bigint 0.5 timing: only reached through P-256/P-384 code in OpenMLS's provider; Halqo uses MLS ciphersuite 0x0003 (X25519/Ed25519) only, so no secret reaches it. Needs an upstream OpenMLS release."
+reason = "crypto-bigint 0.5 timing: only reached through P-256/P-384 code in OpenMLS's provider; Circlo uses MLS ciphersuite 0x0003 (X25519/Ed25519) only, so no secret reaches it. Needs an upstream OpenMLS release."
 
 [[IgnoredVulns]]
 id = "GHSA-qwgh-2vcv-g2f7"

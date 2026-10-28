@@ -1,7 +1,7 @@
 import { bytesToUuid, equalBytes, fromB64, hexGroups, toB64, uuidFromRandom, uuidToBytes } from '@/lib/bytes';
 
 // The native core isn't available under jest; only the pure helpers are tested here (flows run on the device).
-jest.mock('@halqo/core', () => ({
+jest.mock('@circlo/core', () => ({
   newSymmetricKey: () => new Uint8Array(32).map((_, i) => (i * 37 + 11) % 256).buffer,
   normalizeHandle: (h: string) => h.trim().toLowerCase(),
 }));

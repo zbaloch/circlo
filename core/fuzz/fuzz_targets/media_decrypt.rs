@@ -1,6 +1,6 @@
 #![no_main]
 //! Arbitrary media objects, content lengths and chunk indices: must never panic.
-use halqo_core::stream::{decrypt, ChunkCipher};
+use circlo_core::stream::{decrypt, ChunkCipher};
 use libfuzzer_sys::fuzz_target;
 
 fuzz_target!(|data: &[u8]| {

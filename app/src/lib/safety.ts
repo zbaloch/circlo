@@ -72,7 +72,7 @@ export async function exportMyData(account: StoredAccount, onProgress?: ExportPr
   }));
   const data = {
     exportedAt: new Date().toISOString(),
-    app: 'Halqo',
+    app: 'Circlo',
     account: { handle: account.handle, userId: account.userId },
     profile,
     circleLabels: book.labels ?? {},
@@ -81,7 +81,7 @@ export async function exportMyData(account: StoredAccount, onProgress?: ExportPr
     chats,
   };
   onProgress?.('Saving…');
-  const name = `halqo-export-${new Date().toISOString().slice(0, 10)}.json`;
+  const name = `circlo-export-${new Date().toISOString().slice(0, 10)}.json`;
   const file = folder.createFile(name, 'application/json');
   await file.write(JSON.stringify(data, null, 2));
   return name;

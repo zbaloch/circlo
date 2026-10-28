@@ -2,7 +2,7 @@
  * The encrypted address book (CRYPTO.md 6.1 v1.1 note, section 10): my epoch secrets, friends' received keys, pinned
  * identity keys and verification state. Sealed with data_key before it leaves the device; the server stores ciphertext.
  */
-import * as Core from '@halqo/core';
+import * as Core from '@circlo/core';
 
 import { api, ApiError, ok } from '@/api/client';
 

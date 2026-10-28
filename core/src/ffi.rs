@@ -1,4 +1,4 @@
-//! uniffi surface (`@halqo/core` for the app; JNI for the server). Thin: validates lengths and converts types.
+//! uniffi surface (`@circlo/core` for the app; JNI for the server). Thin: validates lengths and converts types.
 //! All logic lives in the modules it calls.
 // Flat byte-array parameters are the point of an FFI layer.
 #![allow(clippy::too_many_arguments)]

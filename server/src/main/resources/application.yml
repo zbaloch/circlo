@@ -1,37 +1,37 @@
 spring:
   application:
-    name: halqo-server
+    name: circlo-server
   datasource:
-    url: ${HALQO_DB_URL:jdbc:mariadb://localhost:3306/halqo}
-    username: ${HALQO_DB_USER:halqo}
-    password: ${HALQO_DB_PASSWORD}
+    url: ${CIRCLO_DB_URL:jdbc:mariadb://localhost:3306/circlo}
+    username: ${CIRCLO_DB_USER:circlo}
+    password: ${CIRCLO_DB_PASSWORD}
     # Sized by the Phase 12 load test (64 concurrent clients queued behind Hikari's default of 10).
     hikari:
-      maximum-pool-size: ${HALQO_DB_POOL_SIZE:24}
+      maximum-pool-size: ${CIRCLO_DB_POOL_SIZE:24}
   flyway:
     clean-disabled: true
 
 server:
-  port: ${HALQO_SERVER_PORT:8080}
+  port: ${CIRCLO_SERVER_PORT:8080}
   # No access log: we never record IPs or request lines.
   tomcat:
     accesslog:
       enabled: false
 
-halqo:
+circlo:
   core:
-    # Native halqo-core built with: cargo build --features jni --profile server (in core/)
-    library: ${HALQO_CORE_LIBRARY:}
+    # Native circlo-core built with: cargo build --features jni --profile server (in core/)
+    library: ${CIRCLO_CORE_LIBRARY:}
   secrets:
-    opaque-server-setup: ${HALQO_OPAQUE_SERVER_SETUP:}
-    handle-key: ${HALQO_HANDLE_KEY:}
-    push-token-key: ${HALQO_PUSH_TOKEN_KEY:}
-    jwt-key: ${HALQO_JWT_KEY:}
+    opaque-server-setup: ${CIRCLO_OPAQUE_SERVER_SETUP:}
+    handle-key: ${CIRCLO_HANDLE_KEY:}
+    push-token-key: ${CIRCLO_PUSH_TOKEN_KEY:}
+    jwt-key: ${CIRCLO_JWT_KEY:}
   # FCM HTTP v1 for content-free pushes; both empty = push off.
   push:
     fcm:
-      project-id: ${HALQO_FCM_PROJECT_ID:}
-      service-account: ${HALQO_FCM_SERVICE_ACCOUNT:}
+      project-id: ${CIRCLO_FCM_PROJECT_ID:}
+      service-account: ${CIRCLO_FCM_SERVICE_ACCOUNT:}
   auth:
     access-ttl: 15m
     refresh-ttl: 30d
@@ -40,11 +40,11 @@ halqo:
     # Time to write down and confirm the 24-word phrase.
     pending-registration-ttl: 30m
   s3:
-    bucket: ${HALQO_S3_BUCKET:halqo-media}
-    public-endpoint: ${HALQO_S3_PUBLIC_ENDPOINT}
-    region: ${HALQO_S3_REGION:us-east-1}
-    access-key: ${HALQO_S3_ACCESS_KEY}
-    secret-key: ${HALQO_S3_SECRET_KEY}
+    bucket: ${CIRCLO_S3_BUCKET:circlo-media}
+    public-endpoint: ${CIRCLO_S3_PUBLIC_ENDPOINT}
+    region: ${CIRCLO_S3_REGION:us-east-1}
+    access-key: ${CIRCLO_S3_ACCESS_KEY}
+    secret-key: ${CIRCLO_S3_SECRET_KEY}
     put-ttl: 15m
     get-ttl: 5m
 

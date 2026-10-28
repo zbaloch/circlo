@@ -2,7 +2,7 @@
  * Friends (PLAN.md Phase 5, CRYPTO.md sections 8.3, 10, 12). Every cryptographic step is a call into the core; the
  * server only relays ciphertext and never learns names, profiles, circles or keys.
  */
-import * as Core from '@halqo/core';
+import * as Core from '@circlo/core';
 
 import { api, ok } from '@/api/client';
 
@@ -20,7 +20,7 @@ import {
 import { equalBytes, fromB64, toB64, utf8, uuidFromRandom, uuidToBytes } from './bytes';
 import type { StoredAccount } from './keystore';
 
-export const INVITE_HOST = 'https://halqo.com/i/';
+export const INVITE_HOST = 'https://circlo.com/i/';
 
 export type Profile = { displayName: string; bio: string; handle: string };
 
@@ -39,9 +39,9 @@ export function fromB64url(s: string): ArrayBuffer {
   return fromB64(b64 + '='.repeat((4 - (b64.length % 4)) % 4));
 }
 
-/** Parses `https://halqo.com/i/<token>#<fingerprint>` (or `halqo://i/...`). Pure; returns null if malformed. */
+/** Parses `https://circlo.com/i/<token>#<fingerprint>` (or `circlo://i/...`). Pure; returns null if malformed. */
 export function parseInviteLink(link: string): { token: ArrayBuffer; fingerprint: ArrayBuffer } | null {
-  const m = link.trim().match(/^(?:https:\/\/halqo\.com|halqo:\/)\/i\/([A-Za-z0-9_-]{43})#([A-Za-z0-9_-]{22})$/);
+  const m = link.trim().match(/^(?:https:\/\/circlo\.com|circlo:\/)\/i\/([A-Za-z0-9_-]{43})#([A-Za-z0-9_-]{22})$/);
   if (!m) return null;
   try {
     const token = fromB64url(m[1]);
@@ -119,7 +119,7 @@ export class InviteError extends Error {}
 /** Redeems an invite, checks the inviter's keys against the link's fingerprint, then sends a friend request. */
 export async function acceptInvite(account: StoredAccount, link: string): Promise<string> {
   const parsed = parseInviteLink(link);
-  if (!parsed) throw new InviteError('That isn’t a Halqo invite link.');
+  if (!parsed) throw new InviteError('That isn’t a Circlo invite link.');
   const res = await api.POST('/v1/invites/redeem', { body: { token: toB64(parsed.token) } });
   if (res.response.status === 404) throw new InviteError('This invite has expired or was already used. Ask for a new one.');
   if (res.response.status === 400) throw new InviteError('That’s your own invite.');
@@ -128,7 +128,7 @@ export async function acceptInvite(account: StoredAccount, link: string): Promis
   const fp = Core.identityFingerprint(fromB64(identity.ed25519Pub), fromB64(identity.x25519Pub));
   if (!equalBytes(fp, parsed.fingerprint)) {
     // The server returned keys that don't belong to the person who made this invite.
-    throw new InviteError('This invite doesn’t match the keys Halqo returned. Don’t continue; ask your friend to show their code in person.');
+    throw new InviteError('This invite doesn’t match the keys Circlo returned. Don’t continue; ask your friend to show their code in person.');
   }
   verifyIdentitySignature(inviter.userId!, identity);
   await sendRequest(account, inviter.userId!, identity);

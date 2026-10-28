@@ -67,7 +67,7 @@ export default function SearchScreen() {
             </Text>
             <View className="w-full flex-row gap-3">
               <View className="flex-1">
-                <Button label="Share link" onPress={() => Share.share({ message: `Join me on Halqo: ${link}` })} />
+                <Button label="Share link" onPress={() => Share.share({ message: `Join me on Circlo: ${link}` })} />
               </View>
               <View className="flex-1">
                 <Button label="Copy" variant="outline" onPress={async () => { await Clipboard.setStringAsync(link); setNotice('Invite link copied.'); }} />
@@ -82,7 +82,7 @@ export default function SearchScreen() {
       <View className="gap-3">
         <Text className="text-lg font-bold text-ink dark:text-ink-dark">Got an invite?</Text>
         <Button label="Scan QR code" variant="outline" onPress={() => router.push('/scan')} />
-        <TextField label="Or paste an invite link" placeholder="https://halqo.com/i/…" value={pasted} onChangeText={setPasted} />
+        <TextField label="Or paste an invite link" placeholder="https://circlo.com/i/…" value={pasted} onChangeText={setPasted} />
         <Button
           label="Send friend request"
           disabled={!pasted}

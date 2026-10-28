@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Bring up the local Halqo dev stack inside Debian WSL: existing MySQL/MariaDB + MinIO in Docker.
+# Bring up the local Circlo dev stack inside Debian WSL: existing MySQL/MariaDB + MinIO in Docker.
 # From Windows, run infra/dev-up.ps1 instead (it calls this script and keeps WSL awake).
 set -euo pipefail
 
@@ -10,7 +10,7 @@ if [[ ! -f .env ]]; then
   exit 1
 fi
 set -a; source <(tr -d '\r' < .env); set +a
-MINIO_CONTAINER=${MINIO_CONTAINER:-halqo-minio}
+MINIO_CONTAINER=${MINIO_CONTAINER:-circlo-minio}
 
 # 1. Existing database server (never a container).
 db_unit=""
@@ -30,7 +30,7 @@ echo "Database: $db_unit is running on localhost:3306"
 # 2. MinIO: reuse $MINIO_CONTAINER if it exists, otherwise start the compose service.
 if docker inspect "$MINIO_CONTAINER" >/dev/null 2>&1; then
   docker start "$MINIO_CONTAINER" >/dev/null
-elif [[ "$MINIO_CONTAINER" == "halqo-minio" ]]; then
+elif [[ "$MINIO_CONTAINER" == "circlo-minio" ]]; then
   docker compose up -d
 else
   echo "Container $MINIO_CONTAINER (from MINIO_CONTAINER in infra/.env) does not exist." >&2
@@ -48,18 +48,18 @@ echo " ok"
 
 # 3. Buckets (private) and the non-root app user. Idempotent.
 mc() { docker exec -e "MC_HOST_local=http://${MINIO_ROOT_USER}:${MINIO_ROOT_PASSWORD}@localhost:9000" "$MINIO_CONTAINER" mc "$@"; }
-mc mb --ignore-existing local/halqo-media local/halqo-media-test >/dev/null
-mc anonymous set none local/halqo-media >/dev/null
-mc anonymous set none local/halqo-media-test >/dev/null
+mc mb --ignore-existing local/circlo-media local/circlo-media-test >/dev/null
+mc anonymous set none local/circlo-media >/dev/null
+mc anonymous set none local/circlo-media-test >/dev/null
 if ! mc admin user info local "$MINIO_APP_USER" >/dev/null 2>&1; then
   mc admin user add local "$MINIO_APP_USER" "$MINIO_APP_PASSWORD" >/dev/null
 fi
 mc admin policy attach local readwrite --user "$MINIO_APP_USER" >/dev/null 2>&1 || true
-echo "Buckets halqo-media, halqo-media-test and user $MINIO_APP_USER are ready"
+echo "Buckets circlo-media, circlo-media-test and user $MINIO_APP_USER are ready"
 
 cat <<EOF
 
-Halqo dev stack is up:
+Circlo dev stack is up:
   API (when running):  http://${LAN_IP}:8080
   MinIO S3:            http://${LAN_IP}:9000
   MinIO console:       http://${LAN_IP}:9001

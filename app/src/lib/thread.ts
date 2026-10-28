@@ -3,7 +3,7 @@
  * the post key and signed by the replier, so exactly the people who can read the post can read its replies.
  * Likes are plain rows; the app only shows them on posts it could decrypt.
  */
-import * as Core from '@halqo/core';
+import * as Core from '@circlo/core';
 
 import { api, ok } from '@/api/client';
 
@@ -48,7 +48,7 @@ async function signingKey(account: StoredAccount, userId: string): Promise<{ key
 
 /** Replies I can open, oldest first. Replies that fail to open (tampered, wrong signer) are dropped. */
 /** The read-token header that proves I'm in the post's audience. */
-const audience = (post: Pick<FeedPost, 'readToken'>) => ({ header: { 'X-Halqo-Read-Token': toB64(post.readToken) } });
+const audience = (post: Pick<FeedPost, 'readToken'>) => ({ header: { 'X-Circlo-Read-Token': toB64(post.readToken) } });
 
 export async function fetchReplies(account: StoredAccount, post: FeedPost): Promise<Reply[]> {
   const rows = ok(await api.GET('/v1/posts/{postId}/replies', { params: { path: { postId: post.postId }, ...audience(post) } }));

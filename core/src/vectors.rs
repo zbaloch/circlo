@@ -1,5 +1,5 @@
 //! Committed test vectors (core/test_vectors/vectors_TEST_ONLY.json). All keys here are public test values.
-//! Regenerate deliberately with `HALQO_WRITE_VECTORS=1 cargo test vectors` — only after a CRYPTO.md change.
+//! Regenerate deliberately with `CIRCLO_WRITE_VECTORS=1 cargo test vectors` — only after a CRYPTO.md change.
 
 use std::collections::BTreeMap;
 
@@ -34,16 +34,16 @@ fn compute() -> BTreeMap<String, String> {
 
     // AAD and envelope with a fixed nonce.
     put(
-        "aad(halqo/v1/post-key,a1*16,50*16)",
-        &aad("halqo/v1/post-key", &[&[0xA1; 16], &[0x50; 16]]),
+        "aad(circlo/v1/post-key,a1*16,50*16)",
+        &aad("circlo/v1/post-key", &[&[0xA1; 16], &[0x50; 16]]),
     );
     put(
-        "envelope(key=07*32,nonce=24*24,label=halqo/v1/profile,fields=a1*16|e1*16,pt=hello)",
+        "envelope(key=07*32,nonce=24*24,label=circlo/v1/profile,fields=a1*16|e1*16,pt=hello)",
         &seal_with_nonce(
             &[0x07; 32],
             &[0x24; 24],
             b"hello",
-            "halqo/v1/profile",
+            "circlo/v1/profile",
             &[&[0xA1; 16], &[0xE1; 16]],
         ),
     );
@@ -105,7 +105,7 @@ fn compute() -> BTreeMap<String, String> {
 #[test]
 fn vectors_match_committed_file() {
     let got = compute();
-    if std::env::var("HALQO_WRITE_VECTORS").as_deref() == Ok("1") {
+    if std::env::var("CIRCLO_WRITE_VECTORS").as_deref() == Ok("1") {
         let json = serde_json::to_string_pretty(&got).unwrap() + "\n";
         std::fs::create_dir_all(std::path::Path::new(PATH).parent().unwrap()).unwrap();
         std::fs::write(PATH, json).unwrap();

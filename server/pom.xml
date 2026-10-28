@@ -11,18 +11,18 @@
         <relativePath/>
     </parent>
 
-    <groupId>com.halqo</groupId>
-    <artifactId>halqo-server</artifactId>
+    <groupId>com.circlo</groupId>
+    <artifactId>circlo-server</artifactId>
     <version>0.1.0-SNAPSHOT</version>
-    <name>halqo-server</name>
-    <description>Halqo server: stores only ciphertext</description>
+    <name>circlo-server</name>
+    <description>Circlo server: stores only ciphertext</description>
 
     <properties>
         <java.version>21</java.version>
         <!-- Reproducible builds (PLAN.md Phase 12): fixed timestamps in the jar, so the same commit gives the same bytes. -->
         <project.build.outputTimestamp>2026-01-01T00:00:00Z</project.build.outputTimestamp>
-        <!-- The load test (LoadIT, tag "load") runs only on request: mvn verify -Dhalqo.excludedGroups= -Dit.test=LoadIT -->
-        <halqo.excludedGroups>load</halqo.excludedGroups>
+        <!-- The load test (LoadIT, tag "load") runs only on request: mvn verify -Dcirclo.excludedGroups= -Dit.test=LoadIT -->
+        <circlo.excludedGroups>load</circlo.excludedGroups>
         <awssdk.version>2.57.3</awssdk.version>
     </properties>
 
@@ -100,12 +100,12 @@
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
             </plugin>
-            <!-- *IT classes need the halqo_test database; they run in `mvn verify`. -->
+            <!-- *IT classes need the circlo_test database; they run in `mvn verify`. -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-failsafe-plugin</artifactId>
                 <configuration>
-                    <excludedGroups>${halqo.excludedGroups}</excludedGroups>
+                    <excludedGroups>${circlo.excludedGroups}</excludedGroups>
                 </configuration>
                 <executions>
                     <execution>

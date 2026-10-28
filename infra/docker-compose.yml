@@ -1,4 +1,4 @@
-name: halqo
+name: circlo
 # MinIO only. MySQL/MariaDB is the EXISTING install in Debian WSL — never add a database container here.
 # The minio/minio and minio/mc images are no longer published, so we use Chainguard's MinIO image.
 # Buckets and the app user are created by infra/dev-up.sh via the `mc` bundled in this image
@@ -6,14 +6,14 @@ name: halqo
 services:
   minio:
     image: cgr.dev/chainguard/minio:latest
-    container_name: halqo-minio
+    container_name: circlo-minio
     command: ["server", "/data", "--console-address", ":9001"]
     ports: ["9000:9000", "9001:9001"]
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
       MINIO_SERVER_URL: http://${LAN_IP}:9000   # presigned URLs must use an address phones can reach
-    volumes: ["halqo-minio-data:/data"]
+    volumes: ["circlo-minio-data:/data"]
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "mc", "ready", "local"]
@@ -21,5 +21,5 @@ services:
       timeout: 3s
       retries: 20
 volumes:
-  halqo-minio-data:
-    name: halqo-minio-data
+  circlo-minio-data:
+    name: circlo-minio-data

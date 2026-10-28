@@ -62,42 +62,42 @@ mod tests {
 
     #[test]
     fn round_trip() {
-        let env = seal(&KEY, b"hello", "halqo/v1/test", &[&[1; 16]]);
+        let env = seal(&KEY, b"hello", "circlo/v1/test", &[&[1; 16]]);
         assert_eq!(env.len(), OVERHEAD + 5);
-        assert_eq!(open(&KEY, &env, "halqo/v1/test", &[&[1; 16]]).unwrap(), b"hello");
+        assert_eq!(open(&KEY, &env, "circlo/v1/test", &[&[1; 16]]).unwrap(), b"hello");
     }
 
     #[test]
     fn wrong_key_label_or_field_fails() {
-        let env = seal(&KEY, b"hello", "halqo/v1/test", &[&[1; 16]]);
+        let env = seal(&KEY, b"hello", "circlo/v1/test", &[&[1; 16]]);
         assert_eq!(
-            open(&[8; 32], &env, "halqo/v1/test", &[&[1; 16]]),
+            open(&[8; 32], &env, "circlo/v1/test", &[&[1; 16]]),
             Err(CoreError::DecryptionFailed)
         );
         assert_eq!(
-            open(&KEY, &env, "halqo/v1/other", &[&[1; 16]]),
+            open(&KEY, &env, "circlo/v1/other", &[&[1; 16]]),
             Err(CoreError::DecryptionFailed)
         );
         assert_eq!(
-            open(&KEY, &env, "halqo/v1/test", &[&[2; 16]]),
+            open(&KEY, &env, "circlo/v1/test", &[&[2; 16]]),
             Err(CoreError::DecryptionFailed)
         );
     }
 
     #[test]
     fn every_single_bit_flip_fails() {
-        let env = seal(&KEY, b"some plaintext", "halqo/v1/test", &[]);
+        let env = seal(&KEY, b"some plaintext", "circlo/v1/test", &[]);
         for i in 0..env.len() * 8 {
             let mut t = env.clone();
             t[i / 8] ^= 1 << (i % 8);
-            assert!(open(&KEY, &t, "halqo/v1/test", &[]).is_err(), "bit {i}");
+            assert!(open(&KEY, &t, "circlo/v1/test", &[]).is_err(), "bit {i}");
         }
     }
 
     #[test]
     fn short_inputs_fail() {
         for n in 0..OVERHEAD {
-            assert!(open(&KEY, &vec![VERSION; n], "halqo/v1/test", &[]).is_err());
+            assert!(open(&KEY, &vec![VERSION; n], "circlo/v1/test", &[]).is_err());
         }
     }
 }

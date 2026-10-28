@@ -5,7 +5,7 @@ import { toggledLike, validateReply } from '@/lib/thread';
 import { likersLine, linkParts, postsForTab, profileTabs } from '@/lib/view-logic';
 
 // Native modules and navigation don't load under jest; these tests cover the pure logic only.
-jest.mock('@halqo/core', () => ({}));
+jest.mock('@circlo/core', () => ({}));
 jest.mock('expo-file-system', () => ({}));
 jest.mock('expo-image-manipulator', () => ({}));
 jest.mock('expo-video-thumbnails', () => ({}));
@@ -57,7 +57,7 @@ describe('author names and mutes', () => {
 
 describe('links', () => {
   it('linkifies only http(s) URLs and trims trailing punctuation', () => {
-    expect(linkParts('see https://halqo.com/x, ok')).toEqual([{ text: 'see ' }, { text: 'https://halqo.com/x,', url: 'https://halqo.com/x' }, { text: ' ok' }]);
+    expect(linkParts('see https://circlo.com/x, ok')).toEqual([{ text: 'see ' }, { text: 'https://circlo.com/x,', url: 'https://circlo.com/x' }, { text: ' ok' }]);
     expect(linkParts('javascript:alert(1) ftp://x')).toEqual([{ text: 'javascript:alert(1) ftp://x' }]);
   });
 });

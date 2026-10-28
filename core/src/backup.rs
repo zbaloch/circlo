@@ -84,11 +84,11 @@ impl BackupPayload {
 
 fn seal_with(key: &[u8; 32], user_id: &[u8; 16], kind: u8, payload: &BackupPayload) -> Result<Vec<u8>> {
     let padded = Zeroizing::new(pad(&payload.encode()?)?);
-    Ok(envelope::seal(key, &padded, "halqo/v1/backup", &[user_id, &[kind]]))
+    Ok(envelope::seal(key, &padded, "circlo/v1/backup", &[user_id, &[kind]]))
 }
 
 fn open_with(key: &[u8; 32], user_id: &[u8; 16], kind: u8, ct: &[u8]) -> Result<BackupPayload> {
-    let padded = Zeroizing::new(envelope::open(key, ct, "halqo/v1/backup", &[user_id, &[kind]])?);
+    let padded = Zeroizing::new(envelope::open(key, ct, "circlo/v1/backup", &[user_id, &[kind]])?);
     let plain = Zeroizing::new(unpad(&padded)?);
     BackupPayload::decode(&plain)
 }
@@ -96,7 +96,7 @@ fn open_with(key: &[u8; 32], user_id: &[u8; 16], kind: u8, ct: &[u8]) -> Result<
 /// `export_key` is the 64-byte OPAQUE export key; it never leaves the device.
 pub fn seal_password_backup(export_key: &[u8; 64], user_id: &[u8; 16], p: &BackupPayload) -> Result<Vec<u8>> {
     seal_with(
-        &hkdf32(export_key, "halqo/v1/backup-password"),
+        &hkdf32(export_key, "circlo/v1/backup-password"),
         user_id,
         KIND_PASSWORD,
         p,
@@ -105,7 +105,7 @@ pub fn seal_password_backup(export_key: &[u8; 64], user_id: &[u8; 16], p: &Backu
 
 pub fn open_password_backup(export_key: &[u8; 64], user_id: &[u8; 16], ct: &[u8]) -> Result<BackupPayload> {
     open_with(
-        &hkdf32(export_key, "halqo/v1/backup-password"),
+        &hkdf32(export_key, "circlo/v1/backup-password"),
         user_id,
         KIND_PASSWORD,
         ct,
@@ -113,11 +113,16 @@ pub fn open_password_backup(export_key: &[u8; 64], user_id: &[u8; 16], ct: &[u8]
 }
 
 pub fn seal_recovery_backup(entropy: &[u8; 32], user_id: &[u8; 16], p: &BackupPayload) -> Result<Vec<u8>> {
-    seal_with(&hkdf32(entropy, "halqo/v1/backup-recovery"), user_id, KIND_RECOVERY, p)
+    seal_with(&hkdf32(entropy, "circlo/v1/backup-recovery"), user_id, KIND_RECOVERY, p)
 }
 
 pub fn open_recovery_backup(entropy: &[u8; 32], user_id: &[u8; 16], ct: &[u8]) -> Result<BackupPayload> {
-    open_with(&hkdf32(entropy, "halqo/v1/backup-recovery"), user_id, KIND_RECOVERY, ct)
+    open_with(
+        &hkdf32(entropy, "circlo/v1/backup-recovery"),
+        user_id,
+        KIND_RECOVERY,
+        ct,
+    )
 }
 
 #[cfg(test)]

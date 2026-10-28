@@ -1,16 +1,16 @@
-# Integration tests: ONLY the halqo_test database and halqo-media-test bucket. Never halqo.
-# Locally the values come from server/.env; in CI from HALQO_* environment variables.
+# Integration tests: ONLY the circlo_test database and circlo-media-test bucket. Never circlo.
+# Locally the values come from server/.env; in CI from CIRCLO_* environment variables.
 spring:
   config:
     import: optional:file:./.env[.properties]
   datasource:
-    url: ${HALQO_TEST_DB_URL:jdbc:mariadb://localhost:3306/halqo_test}
+    url: ${CIRCLO_TEST_DB_URL:jdbc:mariadb://localhost:3306/circlo_test}
   flyway:
     clean-disabled: false
 
-halqo:
+circlo:
   auth:
     # Many auth calls come from localhost in tests; production keeps the default of 30/minute.
     ip-requests-per-minute: 100000
   s3:
-    bucket: halqo-media-test
+    bucket: circlo-media-test

@@ -7,7 +7,7 @@
  * Reading reverses it: download ciphertext and decrypt in memory with the core (images; thumbnails also cached sealed
  * under the device key), or stream through the core's loopback player (video). No crypto is implemented here.
  */
-import * as Core from '@halqo/core';
+import * as Core from '@circlo/core';
 import { Directory, File, FileMode, Paths, UploadType } from 'expo-file-system';
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 import { getThumbnailAsync } from 'expo-video-thumbnails';

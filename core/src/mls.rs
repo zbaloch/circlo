@@ -21,8 +21,8 @@ use crate::error::{invalid, CoreError, Result};
 use crate::primitives::aad;
 
 pub const SUITE: Ciphersuite = Ciphersuite::MLS_128_DHKEMX25519_CHACHA20POLY1305_SHA256_Ed25519;
-const BINDING_LABEL: &str = "halqo/v1/mls-credential";
-const STATE_LABEL_ID: [u8; 16] = *b"halqo-mls-state1";
+const BINDING_LABEL: &str = "circlo/v1/mls-credential";
+const STATE_LABEL_ID: [u8; 16] = *b"circlo-mlsstate1";
 /// Padding applied by MLS to every PrivateMessage (on top of Padmé for application payloads).
 const PADDING: usize = 64;
 
@@ -210,7 +210,7 @@ pub struct MessageMeta {
 
 /// Reads group id, epoch and whether a handshake message is a commit... from the clear framing only. For a
 /// PrivateMessage the content type is visible (application vs handshake); a handshake from a member is a commit
-/// in Halqo (proposals are always committed together).
+/// in Circlo (proposals are always committed together).
 pub fn message_meta(bytes: &[u8]) -> Result<MessageMeta> {
     let msg = MlsMessageIn::tls_deserialize_exact(bytes).map_err(|_| CoreError::Malformed)?;
     let proto = msg.try_into_protocol_message().map_err(|_| CoreError::Malformed)?;

@@ -1,6 +1,6 @@
-# Halqo
+# Circlo
 
-Halqo is an end-to-end encrypted social network. You share posts with **circles**: nested audiences from
+Circlo is an end-to-end encrypted social network. You share posts with **circles**: nested audiences from
 "only me" (1) out to your widest contacts (100). The server only ever stores ciphertext. It never sees
 your posts, media, name, email or which circle anyone is in.
 
@@ -22,9 +22,9 @@ Details: [docs/CRYPTO.md](docs/CRYPTO.md), [docs/THREAT_MODEL.md](docs/THREAT_MO
 
 | Folder | What | Tooling |
 |---|---|---|
-| `core/` | `halqo-core`, the Rust crypto core, exposed to the app via uniffi | Cargo |
-| `server/` | `halqo-server`, Spring Boot 3 / Java 21 API (ciphertext store and relay) | Maven |
-| `app/` | `@halqo/app`, the Expo / React Native app | npm |
+| `core/` | `circlo-core`, the Rust crypto core, exposed to the app via uniffi | Cargo |
+| `server/` | `circlo-server`, Spring Boot 3 / Java 21 API (ciphertext store and relay) | Maven |
+| `app/` | `@circlo/app`, the Expo / React Native app | npm |
 | `infra/` | Local MinIO (Docker Compose) and the dev-up script | Docker |
 | `docs/` | Plan, crypto spec, threat model, dev setup, OpenAPI contract | |
 

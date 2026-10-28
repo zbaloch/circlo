@@ -17,8 +17,8 @@ pub enum BlobKind {
 impl BlobKind {
     fn label(self) -> &'static str {
         match self {
-            BlobKind::AddressBook => "halqo/v1/address-book",
-            BlobKind::Settings => "halqo/v1/settings",
+            BlobKind::AddressBook => "circlo/v1/address-book",
+            BlobKind::Settings => "circlo/v1/settings",
         }
     }
 }
@@ -26,18 +26,18 @@ impl BlobKind {
 pub fn seal_profile(profile_key: &[u8; 32], user_id: &[u8; 16], epoch_id: &[u8; 16], plain: &[u8]) -> Result<Vec<u8>> {
     let padded = Zeroizing::new(pad(plain)?);
     Ok(envelope::seal(
-        &hkdf32(profile_key, "halqo/v1/profile"),
+        &hkdf32(profile_key, "circlo/v1/profile"),
         &padded,
-        "halqo/v1/profile",
+        "circlo/v1/profile",
         &[user_id, epoch_id],
     ))
 }
 
 pub fn open_profile(profile_key: &[u8; 32], user_id: &[u8; 16], epoch_id: &[u8; 16], ct: &[u8]) -> Result<Vec<u8>> {
     let padded = Zeroizing::new(envelope::open(
-        &hkdf32(profile_key, "halqo/v1/profile"),
+        &hkdf32(profile_key, "circlo/v1/profile"),
         ct,
-        "halqo/v1/profile",
+        "circlo/v1/profile",
         &[user_id, epoch_id],
     )?);
     unpad(&padded)
@@ -65,21 +65,21 @@ pub fn open_user_blob(data_key: &[u8; 32], kind: BlobKind, user_id: &[u8; 16], c
 
 /// Device-local cache files (decrypted thumbnails etc.); `local_cache_key` lives in Keychain/Keystore.
 pub fn seal_local(local_cache_key: &[u8; 32], file_id: &[u8; 16], plain: &[u8]) -> Vec<u8> {
-    envelope::seal(local_cache_key, plain, "halqo/v1/local-cache", &[file_id])
+    envelope::seal(local_cache_key, plain, "circlo/v1/local-cache", &[file_id])
 }
 
 pub fn open_local(local_cache_key: &[u8; 32], file_id: &[u8; 16], ct: &[u8]) -> Result<Vec<u8>> {
-    envelope::open(local_cache_key, ct, "halqo/v1/local-cache", &[file_id])
+    envelope::open(local_cache_key, ct, "circlo/v1/local-cache", &[file_id])
 }
 
-/// Server-side: push tokens at rest, sealed with `HALQO_PUSH_TOKEN_KEY` (kept outside the DB).
+/// Server-side: push tokens at rest, sealed with `CIRCLO_PUSH_TOKEN_KEY` (kept outside the DB).
 pub fn seal_push_token(push_key: &[u8; 32], device_id: &[u8; 16], token: &[u8]) -> Result<Vec<u8>> {
     let padded = Zeroizing::new(pad(token)?);
-    Ok(envelope::seal(push_key, &padded, "halqo/v1/push-token", &[device_id]))
+    Ok(envelope::seal(push_key, &padded, "circlo/v1/push-token", &[device_id]))
 }
 
 pub fn open_push_token(push_key: &[u8; 32], device_id: &[u8; 16], ct: &[u8]) -> Result<Vec<u8>> {
-    let padded = Zeroizing::new(envelope::open(push_key, ct, "halqo/v1/push-token", &[device_id])?);
+    let padded = Zeroizing::new(envelope::open(push_key, ct, "circlo/v1/push-token", &[device_id])?);
     unpad(&padded)
 }
 

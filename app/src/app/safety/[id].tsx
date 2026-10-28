@@ -44,7 +44,7 @@ export default function SafetyScreen() {
         ))}
       </View>
       <View className="rounded-xl bg-white p-3">
-        <QRCode value={`halqo-safety:${sn.qr}`} size={180} />
+        <QRCode value={`circlo-safety:${sn.qr}`} size={180} />
       </View>
       <View className="w-full gap-3">
         <Button label="Scan their code" variant="outline" onPress={() => router.push({ pathname: '/scan', params: { safetyFor: id } })} />

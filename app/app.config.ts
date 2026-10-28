@@ -9,22 +9,22 @@ const isDev = process.env.APP_VARIANT !== 'production';
 const pinning = require('./plugins/pinning').pinningFromEnv(process.env);
 
 const config: ExpoConfig = {
-  name: 'Halqo',
-  slug: 'halqo',
-  scheme: 'halqo',
+  name: 'Circlo',
+  slug: 'circlo',
+  scheme: 'circlo',
   version: '0.1.0',
   orientation: 'portrait',
   icon: './assets/images/icon.png',
   userInterfaceStyle: 'automatic',
   ios: {
-    bundleIdentifier: 'com.halqo.app',
+    bundleIdentifier: 'com.circlo.app',
     supportsTablet: false,
     config: { usesNonExemptEncryption: false },
     // Loopback is needed in every build: encrypted video plays through the core's 127.0.0.1 server.
     infoPlist: { NSAppTransportSecurity: { NSAllowsLocalNetworking: true } },
   },
   android: {
-    package: 'com.halqo.app',
+    package: 'com.circlo.app',
     adaptiveIcon: {
       backgroundColor: '#0B3B36',
       foregroundImage: './assets/images/android-icon-foreground.png',
@@ -40,12 +40,12 @@ const config: ExpoConfig = {
     // Keys live in the Android Keystore / iOS Keychain; excluded from Android Auto Backup.
     ['expo-secure-store', { configureAndroidBackup: true }],
     ['./plugins/with-network-security', { allowAllCleartext: isDev, pinning }],
-    ['expo-camera', { cameraPermission: 'Halqo uses the camera to scan friend invites and safety numbers, and to take photos you share.', microphonePermission: false, recordAudioAndroid: false }],
+    ['expo-camera', { cameraPermission: 'Circlo uses the camera to scan friend invites and safety numbers, and to take photos you share.', microphonePermission: false, recordAudioAndroid: false }],
     [
       'expo-image-picker',
       {
-        photosPermission: 'Halqo lets you pick photos and videos to share. They are encrypted on your phone before upload.',
-        cameraPermission: 'Halqo uses the camera to scan friend invites and safety numbers, and to take photos you share.',
+        photosPermission: 'Circlo lets you pick photos and videos to share. They are encrypted on your phone before upload.',
+        cameraPermission: 'Circlo uses the camera to scan friend invites and safety numbers, and to take photos you share.',
         microphonePermission: false,
       },
     ],

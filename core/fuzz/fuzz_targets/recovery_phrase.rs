@@ -1,6 +1,6 @@
 #![no_main]
 //! Arbitrary recovery phrase input: must never panic.
-use halqo_core::recovery::entropy_from_phrase;
+use circlo_core::recovery::entropy_from_phrase;
 use libfuzzer_sys::fuzz_target;
 
 fuzz_target!(|data: &[u8]| {

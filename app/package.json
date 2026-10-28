@@ -1,5 +1,5 @@
 {
-  "name": "@halqo/app",
+  "name": "@circlo/app",
   "version": "0.1.0",
   "private": true,
   "license": "AGPL-3.0-only",
@@ -16,7 +16,7 @@
   "dependencies": {
     "@expo-google-fonts/inter": "0.4.2",
     "@expo/vector-icons": "^15.0.2",
-    "@halqo/core": "file:modules/halqo-core",
+    "@circlo/core": "file:modules/circlo-core",
     "@shopify/flash-list": "2.3.2",
     "@ubjs/core": "0.31.0-6",
     "@ubjs/react-native": "0.31.0-6",
@@ -72,7 +72,7 @@
     "preset": "jest-expo",
     "moduleNameMapper": {
       ".css$": "<rootDir>/jest.css-stub.js",
-      "^@halqo/core$": "<rootDir>/__mocks__/halqo-core.js"
+      "^@circlo/core$": "<rootDir>/__mocks__/circlo-core.js"
     }
   }
 }

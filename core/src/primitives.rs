@@ -76,8 +76,8 @@ mod tests {
     #[test]
     fn aad_layout() {
         assert_eq!(
-            aad("halqo/v1/x", &[&[1, 2], &[3]]),
-            b"halqo/v1/x\x00\x01\x02\x03\x01".to_vec()
+            aad("circlo/v1/x", &[&[1, 2], &[3]]),
+            b"circlo/v1/x\x00\x01\x02\x03\x01".to_vec()
         );
     }
 

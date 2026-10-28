@@ -1,6 +1,6 @@
-# What Halqo stores, and what it doesn't
+# What Circlo stores, and what it doesn't
 
-Rule: Halqo collects nothing about a person except what they post for others to see, and the server can't read
+Rule: Circlo collects nothing about a person except what they post for others to see, and the server can't read
 even that. This page lists everything the server keeps, so it can be checked. The schema test (`SchemaIT`) fails
 the build if a column for identity or tracking data is ever added, and the leaked-database drill
 (`infra/leak-drill.sh`) checks a real dump.

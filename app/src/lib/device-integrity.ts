@@ -1,19 +1,19 @@
 /**
  * Rooted / jailbroken phone warning (PLAN.md Phase 12: warn only, never block). On such a phone other apps may be
- * able to read Halqo's keys and decrypted data, so the user should know; whether to keep using it is their choice.
+ * able to read Circlo's keys and decrypted data, so the user should know; whether to keep using it is their choice.
  */
 import * as Device from 'expo-device';
 import * as SecureStore from 'expo-secure-store';
 import { useEffect, useState } from 'react';
 import { Platform } from 'react-native';
 
-const DISMISSED = 'halqo.integrity-warning-dismissed';
+const DISMISSED = 'circlo.integrity-warning-dismissed';
 
 /** The warning to show, or null on a normal phone. Pure; exported for tests. */
 export function integrityWarning(compromised: boolean, os: string): string | null {
   if (!compromised) return null;
   const what = os === 'ios' ? 'jailbroken' : 'rooted';
-  return `This phone looks ${what}. Other apps on it may be able to read your Halqo keys and messages. Halqo still works, but your encryption is only as safe as this phone.`;
+  return `This phone looks ${what}. Other apps on it may be able to read your Circlo keys and messages. Circlo still works, but your encryption is only as safe as this phone.`;
 }
 
 let check: Promise<boolean> | null = null;

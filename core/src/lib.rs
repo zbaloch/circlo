@@ -1,6 +1,6 @@
-//! Halqo crypto core. Implements docs/CRYPTO.md v1.0; nothing else in Halqo implements crypto.
+//! Circlo crypto core. Implements docs/CRYPTO.md v1.0; nothing else in Circlo implements crypto.
 //!
-//! `ffi` is the uniffi surface used by the app (`@halqo/core`) and, later, the server (JNI).
+//! `ffi` is the uniffi surface used by the app (`@circlo/core`) and, later, the server (JNI).
 
 pub mod backup;
 pub mod blob;
@@ -26,7 +26,7 @@ pub mod stream;
 #[cfg(test)]
 mod vectors;
 
-uniffi::setup_scaffolding!("halqo_core");
+uniffi::setup_scaffolding!("circlo_core");
 
 /// OS CSPRNG behind the rand_core 0.9 traits that `hpke` 0.13 expects.
 pub(crate) fn hpke_rng() -> rand_core09::UnwrapErr<rand_core09::OsRng> {

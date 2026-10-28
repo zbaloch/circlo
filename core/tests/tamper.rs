@@ -1,7 +1,7 @@
 //! Phase 1 criterion: tampered ciphertext always fails, for every ciphertext type.
 //! Property tests flip a random bit, truncate, or extend each kind of ciphertext.
 
-use halqo_core::ffi::*;
+use circlo_core::ffi::*;
 use proptest::prelude::*;
 
 #[derive(Debug, Clone)]

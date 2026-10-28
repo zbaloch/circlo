@@ -63,13 +63,13 @@ impl Identity {
     pub fn device_cert(&self, user_id: &[u8; 16], device_id: &[u8; 16], device_pk: &[u8; 32]) -> [u8; 64] {
         sign(
             &self.ed25519,
-            &labelled("halqo/v1/device", &[user_id, device_id, device_pk]),
+            &labelled("circlo/v1/device", &[user_id, device_id, device_pk]),
         )
     }
 }
 
 fn identity_msg(user_id: &[u8; 16], version: u8, x25519_pk: &[u8; 32]) -> Vec<u8> {
-    labelled("halqo/v1/identity", &[user_id, &[version], x25519_pk])
+    labelled("circlo/v1/identity", &[user_id, &[version], x25519_pk])
 }
 
 pub fn verify_identity_sig(
@@ -91,7 +91,7 @@ pub fn verify_device_cert(
 ) -> Result<()> {
     verify(
         identity_pk,
-        &labelled("halqo/v1/device", &[user_id, device_id, device_pk]),
+        &labelled("circlo/v1/device", &[user_id, device_id, device_pk]),
         sig,
     )
 }
