@@ -1197,6 +1197,7 @@ export function sealFriendPayload(
   epochRoot: ArrayBuffer,
   circle: number,
   profileKey: ArrayBuffer,
+  closeFriend: boolean,
 ): ArrayBuffer /*throws*/ {
   const __rb: Uint8Array = uniffiCaller.rustCallWithError(
     /*liftError:*/ FfiConverterTypeCoreError.lift.bind(
@@ -1227,6 +1228,7 @@ export function sealFriendPayload(
           profileKey,
           nativeModule().rustbuffer_alloc,
         ),
+        FfiConverterBool.lower(closeFriend, nativeModule().rustbuffer_alloc),
         callStatus,
       );
     },
@@ -1333,6 +1335,54 @@ export function sealPost(
           nativeModule().rustbuffer_alloc,
         ),
         FfiConverterUInt8.lower(circle, nativeModule().rustbuffer_alloc),
+        FfiConverterTypePostContent.lower(
+          content,
+          nativeModule().rustbuffer_alloc,
+        ),
+        callStatus,
+      );
+    },
+    /*liftString:*/ FfiConverterString.lift.bind(FfiConverterString),
+  );
+  try {
+    return FfiConverterTypeSealedPost.lift(__rb);
+  } finally {
+    nativeModule().rustbuffer_free(__rb);
+  }
+}
+
+/**
+ * A post to Close Friends (exclusive circle 1, CRYPTO.md 8.5): sealed with `X1` instead of a chain key, otherwise
+ * identical to any other post.
+ */
+export function sealPostCloseFriends(
+  author: IdentityKeys,
+  authorId: ArrayBuffer,
+  postId: ArrayBuffer,
+  epochId: ArrayBuffer,
+  epochRoot: ArrayBuffer,
+  content: PostContent,
+): SealedPost /*throws*/ {
+  const __rb: Uint8Array = uniffiCaller.rustCallWithError(
+    /*liftError:*/ FfiConverterTypeCoreError.lift.bind(
+      FfiConverterTypeCoreError,
+    ),
+    /*caller:*/ (callStatus) => {
+      return nativeModule().uniffi_circlo_core_fn_func_seal_post_close_friends(
+        FfiConverterTypeIdentityKeys.lower(
+          author,
+          nativeModule().rustbuffer_alloc,
+        ),
+        FfiConverterArrayBuffer.lower(
+          authorId,
+          nativeModule().rustbuffer_alloc,
+        ),
+        FfiConverterArrayBuffer.lower(postId, nativeModule().rustbuffer_alloc),
+        FfiConverterArrayBuffer.lower(epochId, nativeModule().rustbuffer_alloc),
+        FfiConverterArrayBuffer.lower(
+          epochRoot,
+          nativeModule().rustbuffer_alloc,
+        ),
         FfiConverterTypePostContent.lower(
           content,
           nativeModule().rustbuffer_alloc,
@@ -2586,6 +2636,10 @@ export type ReceivedFriendKey = {
   epochId: ArrayBuffer;
   circleKey: ArrayBuffer;
   profileKey: ArrayBuffer;
+  /**
+   * The exclusive-circle key slot (CRYPTO.md 8.5): `X` for members, random filler otherwise; empty for a v1 payload.
+   */
+  exclusiveKey: ArrayBuffer;
 };
 
 /**
@@ -2613,18 +2667,21 @@ const FfiConverterTypeReceivedFriendKey = (() => {
         epochId: FfiConverterArrayBuffer.readFromCursor(c),
         circleKey: FfiConverterArrayBuffer.readFromCursor(c),
         profileKey: FfiConverterArrayBuffer.readFromCursor(c),
+        exclusiveKey: FfiConverterArrayBuffer.readFromCursor(c),
       };
     }
     writeIntoCursor(value: TypeName, c: Cursor): void {
       FfiConverterArrayBuffer.writeIntoCursor(value.epochId, c);
       FfiConverterArrayBuffer.writeIntoCursor(value.circleKey, c);
       FfiConverterArrayBuffer.writeIntoCursor(value.profileKey, c);
+      FfiConverterArrayBuffer.writeIntoCursor(value.exclusiveKey, c);
     }
     allocationSize(value: TypeName): number {
       return (
         FfiConverterArrayBuffer.allocationSize(value.epochId) +
         FfiConverterArrayBuffer.allocationSize(value.circleKey) +
-        FfiConverterArrayBuffer.allocationSize(value.profileKey)
+        FfiConverterArrayBuffer.allocationSize(value.profileKey) +
+        FfiConverterArrayBuffer.allocationSize(value.exclusiveKey)
       );
     }
   }
@@ -4736,11 +4793,13 @@ export class ReaderKeyring
   }
 
   /**
-   * The owner's view as a friend in `circle` sees it ("Preview as…"): the same `Cn` that friend was given.
+   * The owner's view as a friend in `circle` sees it ("Preview as…"): the same `Cn` that friend was given, plus
+   * `X1` if they're in Close Friends.
    */
   static forCircle(
     epochRoot: ArrayBuffer,
     circle: number,
+    closeFriend: boolean,
   ): ReaderKeyringLike /*throws*/ {
     return FfiConverterTypeReaderKeyring.lift(
       uniffiCaller.rustCallWithError(
@@ -4754,6 +4813,10 @@ export class ReaderKeyring
               nativeModule().rustbuffer_alloc,
             ),
             FfiConverterUInt8.lower(circle, nativeModule().rustbuffer_alloc),
+            FfiConverterBool.lower(
+              closeFriend,
+              nativeModule().rustbuffer_alloc,
+            ),
             callStatus,
           );
         },
@@ -4763,7 +4826,7 @@ export class ReaderKeyring
   }
 
   /**
-   * Owner's own keyring: from the epoch root (C1), so they can read all their own posts.
+   * Owner's own keyring: from the epoch root (C1) plus Close Friends, so they can read all their own posts.
    */
   static forOwner(epochRoot: ArrayBuffer): ReaderKeyringLike /*throws*/ {
     return FfiConverterTypeReaderKeyring.lift(
@@ -4775,6 +4838,37 @@ export class ReaderKeyring
           return nativeModule().uniffi_circlo_core_fn_constructor_readerkeyring_for_owner(
             FfiConverterArrayBuffer.lower(
               epochRoot,
+              nativeModule().rustbuffer_alloc,
+            ),
+            callStatus,
+          );
+        },
+        /*liftString:*/ FfiConverterString.lift.bind(FfiConverterString),
+      ),
+    );
+  }
+
+  /**
+   * A friend's keyring from their payload: forward keys from `Ck`, plus the exclusive-circle slot `X` (empty for
+   * a version 1 payload). For a non-member `X` is random filler and simply never matches a post.
+   */
+  static withExclusive(
+    circleKey: ArrayBuffer,
+    exclusiveKey: ArrayBuffer,
+  ): ReaderKeyringLike /*throws*/ {
+    return FfiConverterTypeReaderKeyring.lift(
+      uniffiCaller.rustCallWithError(
+        /*liftError:*/ FfiConverterTypeCoreError.lift.bind(
+          FfiConverterTypeCoreError,
+        ),
+        /*caller:*/ (callStatus) => {
+          return nativeModule().uniffi_circlo_core_fn_constructor_readerkeyring_with_exclusive(
+            FfiConverterArrayBuffer.lower(
+              circleKey,
+              nativeModule().rustbuffer_alloc,
+            ),
+            FfiConverterArrayBuffer.lower(
+              exclusiveKey,
               nativeModule().rustbuffer_alloc,
             ),
             callStatus,
@@ -5297,7 +5391,7 @@ function uniffiEnsureInitialized() {
   }
   if (
     nativeModule().uniffi_circlo_core_checksum_func_seal_friend_payload() !==
-    58295
+    11442
   ) {
     throw new UniffiInternalError.ApiChecksumMismatch(
       "uniffi_circlo_core_checksum_func_seal_friend_payload",
@@ -5319,6 +5413,14 @@ function uniffiEnsureInitialized() {
   if (nativeModule().uniffi_circlo_core_checksum_func_seal_post() !== 14186) {
     throw new UniffiInternalError.ApiChecksumMismatch(
       "uniffi_circlo_core_checksum_func_seal_post",
+    );
+  }
+  if (
+    nativeModule().uniffi_circlo_core_checksum_func_seal_post_close_friends() !==
+    44975
+  ) {
+    throw new UniffiInternalError.ApiChecksumMismatch(
+      "uniffi_circlo_core_checksum_func_seal_post_close_friends",
     );
   }
   if (
@@ -5626,7 +5728,7 @@ function uniffiEnsureInitialized() {
   }
   if (
     nativeModule().uniffi_circlo_core_checksum_constructor_readerkeyring_for_circle() !==
-    50597
+    30089
   ) {
     throw new UniffiInternalError.ApiChecksumMismatch(
       "uniffi_circlo_core_checksum_constructor_readerkeyring_for_circle",
@@ -5634,7 +5736,7 @@ function uniffiEnsureInitialized() {
   }
   if (
     nativeModule().uniffi_circlo_core_checksum_constructor_readerkeyring_for_owner() !==
-    57932
+    8885
   ) {
     throw new UniffiInternalError.ApiChecksumMismatch(
       "uniffi_circlo_core_checksum_constructor_readerkeyring_for_owner",
@@ -5646,6 +5748,14 @@ function uniffiEnsureInitialized() {
   ) {
     throw new UniffiInternalError.ApiChecksumMismatch(
       "uniffi_circlo_core_checksum_constructor_readerkeyring_new",
+    );
+  }
+  if (
+    nativeModule().uniffi_circlo_core_checksum_constructor_readerkeyring_with_exclusive() !==
+    46085
+  ) {
+    throw new UniffiInternalError.ApiChecksumMismatch(
+      "uniffi_circlo_core_checksum_constructor_readerkeyring_with_exclusive",
     );
   }
   if (

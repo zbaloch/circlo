@@ -114,6 +114,7 @@ fn friends_circles_and_epoch_rotation() {
         &root1,
         7,
         &profile1,
+        true, // Bob is in Close Friends
     )
     .unwrap();
     let to_carol = seal_friend_payload(
@@ -125,13 +126,20 @@ fn friends_circles_and_epoch_rotation() {
         &root1,
         2,
         &profile1,
+        false,
     )
     .unwrap();
-    assert_eq!(to_bob.len(), to_carol.len(), "server can't tell circles apart by size");
+    assert_eq!(
+        to_bob.len(),
+        to_carol.len(),
+        "server can't tell circles or Close Friends membership apart by size"
+    );
 
     let bob_key = open_friend_payload(&bob, &alice.x25519_pk, &alice_id, &bob_id, &epoch1, &to_bob).unwrap();
     assert_eq!(bob_key.profile_key, profile1);
-    let bob_ring = ReaderKeyring::new(&bob_key.circle_key).unwrap();
+    let bob_ring = ReaderKeyring::with_exclusive(&bob_key.circle_key, &bob_key.exclusive_key).unwrap();
+    let carol_key = open_friend_payload(&carol, &alice.x25519_pk, &alice_id, &carol_id, &epoch1, &to_carol).unwrap();
+    let carol_ring = ReaderKeyring::with_exclusive(&carol_key.circle_key, &carol_key.exclusive_key).unwrap();
 
     // Profile readable with the shared profile key.
     let prof = seal_profile(&profile1, &alice_id, &epoch1, b"{\"displayName\":\"Alice\"}").unwrap();
@@ -152,8 +160,32 @@ fn friends_circles_and_epoch_rotation() {
         let p = post(&epoch1, &root1, circle, circle);
         assert_eq!(read(&bob_ring, &epoch1, &p).is_ok(), readable, "circle {circle}");
     }
-    // "Preview as Bob": Alice's keyring for circle 7 opens exactly what Bob's own keyring opens.
-    let preview = ReaderKeyring::for_circle(&root1, 7).unwrap();
+    // Close Friends (exclusive, CRYPTO.md 8.5): Bob (member, circle 7) reads it; Carol, though in a closer circle,
+    // does not; a Close Friends post is not readable through any chain key.
+    let close = |pid: u8| {
+        let s = seal_post_close_friends(&alice, &alice_id, &[pid; 16], &epoch1, &root1, &content("cf")).unwrap();
+        (s, [pid; 16])
+    };
+    assert!(
+        read(&bob_ring, &epoch1, &close(200)).is_ok(),
+        "member reads Close Friends"
+    );
+    assert!(
+        read(&carol_ring, &epoch1, &close(201)).is_err(),
+        "closer circle doesn't make you a Close Friend"
+    );
+    assert!(
+        read(&carol_ring, &epoch1, &post(&epoch1, &root1, 2, 202)).is_ok(),
+        "Carol still reads circle 2"
+    );
+    let chain_only = ReaderKeyring::new(&root1).unwrap(); // even C1's whole chain
+    assert!(
+        read(&chain_only, &epoch1, &close(203)).is_err(),
+        "no chain key opens Close Friends"
+    );
+
+    // "Preview as Bob": Alice's keyring for circle 7 (+ Close Friends) opens exactly what Bob's own keyring opens.
+    let preview = ReaderKeyring::for_circle(&root1, 7, true).unwrap();
     for circle in [1u8, 2, 6, 7, 8, 100] {
         let p = post(&epoch1, &root1, circle, 100 + circle);
         assert_eq!(
@@ -162,11 +194,19 @@ fn friends_circles_and_epoch_rotation() {
             "circle {circle}"
         );
     }
-    assert!(ReaderKeyring::for_circle(&root1, 0).is_err());
-    assert!(ReaderKeyring::for_circle(&root1, 101).is_err());
-    // Alice reads all her own posts.
+    assert!(read(&preview, &epoch1, &close(204)).is_ok());
+    assert!(read(
+        &ReaderKeyring::for_circle(&root1, 7, false).unwrap(),
+        &epoch1,
+        &close(205)
+    )
+    .is_err());
+    assert!(ReaderKeyring::for_circle(&root1, 0, false).is_err());
+    assert!(ReaderKeyring::for_circle(&root1, 101, false).is_err());
+    // Alice reads all her own posts, Close Friends included.
     let owner = ReaderKeyring::for_owner(&root1).unwrap();
     assert!(read(&owner, &epoch1, &post(&epoch1, &root1, 1, 50)).is_ok());
+    assert!(read(&owner, &epoch1, &close(206)).is_ok());
 
     // Move Bob 7 → 9: new epoch for everyone.
     let (epoch2, root2, profile2) = ([0xE2; 16], new_symmetric_key(), new_symmetric_key());
@@ -179,10 +219,16 @@ fn friends_circles_and_epoch_rotation() {
         &root2,
         9,
         &profile2,
+        false, // and out of Close Friends
     )
     .unwrap();
     let bob_key2 = open_friend_payload(&bob, &alice.x25519_pk, &alice_id, &bob_id, &epoch2, &to_bob2).unwrap();
-    let bob_ring2 = ReaderKeyring::new(&bob_key2.circle_key).unwrap();
+    let bob_ring2 = ReaderKeyring::with_exclusive(&bob_key2.circle_key, &bob_key2.exclusive_key).unwrap();
+    let new_close = seal_post_close_friends(&alice, &alice_id, &[92; 16], &epoch2, &root2, &content("cf2")).unwrap();
+    assert!(
+        read(&bob_ring2, &epoch2, &(new_close, [92; 16])).is_err(),
+        "removed from Close Friends: new Close Friends posts are closed"
+    );
 
     let new_c7 = post(&epoch2, &root2, 7, 70);
     assert!(

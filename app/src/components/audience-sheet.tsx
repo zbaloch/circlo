@@ -1,8 +1,9 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Modal, Pressable, ScrollView, View } from 'react-native';
 
-import type { AddressBook } from '@/lib/addressbook';
-import { audienceSize, labelOf, listedCircles } from '@/lib/circles';
+import { CircleBadge } from './circle-badge';
+import { CLOSE_FRIENDS, type AddressBook } from '@/lib/addressbook';
+import { audienceSize, labelOf, listedCircles, ONLY_ME } from '@/lib/circles';
 import { usePalette } from '@/theme/use-palette';
 import { Text } from '@/components/ui/text';
 
@@ -20,7 +21,10 @@ type Props = {
 
 export function audienceLine(book: AddressBook, circle: number): string {
   const n = audienceSize(book, circle);
-  return circle === 1 ? 'Only you' : `Visible to this circle and closer · ${n} ${n === 1 ? 'person' : 'people'}`;
+  const people = `${n} ${n === 1 ? 'person' : 'people'}`;
+  if (circle === ONLY_ME) return 'Only you';
+  if (circle === CLOSE_FRIENDS) return `Only your Close Friends · ${people}`;
+  return `Visible to this circle and closer · ${people}`;
 }
 
 /** Bottom sheet listing my circles by my own labels (PLAN.md 2A). Author-only: readers never see any of this. */
@@ -31,7 +35,7 @@ export function AudienceSheet({
   onSelect,
   onClose,
   title = 'Who can see this?',
-  circles = listedCircles(book),
+  circles = [...listedCircles(book), CLOSE_FRIENDS],
   describe = (c) => audienceLine(book, c),
 }: Props) {
   const palette = usePalette();
@@ -54,9 +58,7 @@ export function AudienceSheet({
                 onClose();
               }}
               className="flex-row items-center gap-3 px-5 py-3 active:bg-surface-raised dark:active:bg-surface-raised-dark">
-              <View className="h-9 w-9 items-center justify-center rounded-full bg-primary-soft dark:bg-primary-soft-dark">
-                <Text className="font-bold text-primary dark:text-primary-dark">{c}</Text>
-              </View>
+              <CircleBadge book={book} circle={c} />
               <View className="flex-1">
                 <Text className="text-base font-semibold text-ink dark:text-ink-dark">{labelOf(book, c)}</Text>
                 <Text className="text-sm text-muted dark:text-muted-dark">{describe(c)}</Text>

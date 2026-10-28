@@ -76,7 +76,7 @@ fn fixture() -> &'static Fixture {
             },
         )
         .unwrap();
-        let friend = seal_friend_payload(&alice, &bob.x25519_pk, &A, &B, &E, &root, 3, &[4; 32]).unwrap();
+        let friend = seal_friend_payload(&alice, &bob.x25519_pk, &A, &B, &E, &root, 3, &[4; 32], false).unwrap();
         let profile = seal_profile(&[4; 32], &A, &E, b"profile").unwrap();
         let blob = seal_user_blob(&[5; 32], BlobKind::AddressBook, &A, b"address book").unwrap();
         let export_key = vec![6u8; 64];

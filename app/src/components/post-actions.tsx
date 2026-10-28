@@ -18,9 +18,10 @@ export function authorName(account: Pick<StoredAccount, 'userId' | 'handle'>, bo
   return { name: c?.displayName || (c?.handle ? `@${c.handle}` : 'Friend'), handle: c?.handle };
 }
 
-/** The author-only audience badge ("Closest friends+"). Only ever computed for my own posts. Pure. */
+/** The author-only audience badge ("Kids+", "Close Friends"). Only ever computed for my own posts. Pure. */
 export function audienceBadge(book: Pick<AddressBook, 'labels'> | null, post: Pick<FeedPost, 'mine' | 'circle'>): string | undefined {
-  if (!post.mine || !post.circle || !book) return undefined;
+  if (!post.mine || post.circle === undefined || !book) return undefined;
+  // "Kids+": that circle and closer. Only me and Close Friends are exact audiences, so no "+".
   return `${labelOf(book, post.circle)}${post.circle > 1 ? '+' : ''}`;
 }
 

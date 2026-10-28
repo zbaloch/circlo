@@ -48,8 +48,8 @@ class SafetyFlowIT extends IntegrationTest {
         call("POST", "/v1/invites", Map.of("tokenHash", core.inviteTokenHash(token)), inviter.accessToken);
         call("POST", "/v1/invites/redeem", Map.of("token", token), other.accessToken);
         call("POST", "/v1/friends/requests", Map.of("toUserId", inviter.userId.toString(), "epochId", epoch(other).toString(),
-                "payload", Ids.random(160)), other.accessToken);
-        call("POST", "/v1/friends/" + other.userId + "/accept", Map.of("epochId", epoch(inviter).toString(), "payload", Ids.random(160)),
+                "payload", Ids.random(192)), other.accessToken);
+        call("POST", "/v1/friends/" + other.userId + "/accept", Map.of("epochId", epoch(inviter).toString(), "payload", Ids.random(192)),
                 inviter.accessToken);
     }
 
@@ -129,10 +129,10 @@ class SafetyFlowIT extends IntegrationTest {
         call("POST", "/v1/invites", Map.of("tokenHash", core.inviteTokenHash(token)), alice.accessToken);
         assertThat(call("POST", "/v1/invites/redeem", Map.of("token", token), mallory.accessToken).getStatusCode().value()).isEqualTo(404);
         assertThat(call("POST", "/v1/friends/requests", Map.of("toUserId", alice.userId.toString(), "epochId", epoch(mallory).toString(),
-                "payload", Ids.random(160)), mallory.accessToken).getStatusCode().value()).isEqualTo(404);
+                "payload", Ids.random(192)), mallory.accessToken).getStatusCode().value()).isEqualTo(404);
         // Alice can't accidentally re-add Mallory either until she unblocks.
         assertThat(call("POST", "/v1/friends/requests", Map.of("toUserId", mallory.userId.toString(), "epochId", epoch(alice).toString(),
-                "payload", Ids.random(160)), alice.accessToken).getStatusCode().value()).isEqualTo(404);
+                "payload", Ids.random(192)), alice.accessToken).getStatusCode().value()).isEqualTo(404);
 
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> blocks = http().get().uri("/v1/blocks").header("Authorization", "Bearer " + alice.accessToken).retrieve().body(List.class);

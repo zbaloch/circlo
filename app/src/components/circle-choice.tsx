@@ -3,12 +3,13 @@ import { useState } from 'react';
 import { Pressable, View } from 'react-native';
 
 import { AudienceSheet } from './audience-sheet';
+import { CircleBadge } from './circle-badge';
 import { Text } from '@/components/ui/text';
 import type { AddressBook } from '@/lib/addressbook';
 import { labelOf, listedCircles, MAX_CIRCLE, membersOf } from '@/lib/circles';
 import { usePalette } from '@/theme/use-palette';
 
-/** Circles a friend can be placed in: everything listed except 1 ("Me only"). */
+/** Chain circles a friend can be placed in: everything listed except Only me. Close Friends is a separate toggle. */
 export function friendCircles(book: AddressBook): number[] {
   return listedCircles(book).filter((n) => n >= 2);
 }
@@ -51,12 +52,10 @@ export function CircleChoice({ book, value, onChange, label = 'Add to circle' }:
     <>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={`${label}: circle ${value}, ${labelOf(book, value)}. Change`}
+        accessibilityLabel={`${label}: ${labelOf(book, value)}. Change`}
         onPress={() => setOpen(true)}
         className="flex-row items-center gap-3 rounded-xl bg-surface-raised px-3 py-2.5 active:opacity-70 dark:bg-surface-raised-dark">
-        <View className="h-8 w-8 items-center justify-center rounded-full bg-primary-soft dark:bg-primary-soft-dark">
-          <Text className="text-sm font-bold text-primary dark:text-primary-dark">{value}</Text>
-        </View>
+        <CircleBadge book={book} circle={value} small />
         <View className="flex-1">
           <Text className="text-xs text-muted dark:text-muted-dark">{label} · only you see this</Text>
           <Text className="font-semibold text-ink dark:text-ink-dark">{labelOf(book, value)}</Text>

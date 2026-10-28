@@ -3,16 +3,20 @@ import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
 
+import { CircleBadge } from '@/components/circle-badge';
 import { ErrorText } from '@/components/form';
 import { Screen } from '@/components/screen';
 import { describeError } from '@/lib/account';
-import { loadAddressBook, type AddressBook } from '@/lib/addressbook';
-import { audienceSize, labelOf, listedCircles, membersOf, nextCustomCircle, resumePendingRotation } from '@/lib/circles';
+import { CLOSE_FRIENDS, loadAddressBook, type AddressBook } from '@/lib/addressbook';
+import { audienceSize, labelOf, listedCircles, membersOf, nextCustomCircle, ONLY_ME, resumePendingRotation } from '@/lib/circles';
 import { useSession } from '@/lib/session';
 import { usePalette } from '@/theme/use-palette';
 import { Text } from '@/components/ui/text';
 
-/** Your circles, nearest first. Only you ever see these labels and who is in which circle. */
+/**
+ * Your circles, nearest first: Only me (level 0), then the nested circles, then Close Friends (exclusive). Only you
+ * ever see these labels and who is in which circle.
+ */
 export default function CirclesScreen() {
   const session = useSession();
   const palette = usePalette();
@@ -38,13 +42,19 @@ export default function CirclesScreen() {
     <Screen>
       <ScrollView contentContainerClassName="gap-2 p-4">
         <Text className="pb-2 text-muted dark:text-muted-dark">
-          A post to a circle is visible to that circle and every closer one. Moving someone is silent: nobody is told,
-          and Circlo can’t see it either.
+          A post to a circle is visible to that circle and every closer one. Close Friends is separate: only the people
+          in it see what you post there. Moving someone is silent: nobody is told, and Circlo can’t see it either.
         </Text>
         {book.pendingRotation ? <Text className="text-primary dark:text-primary-dark">Updating keys…</Text> : null}
         <ErrorText>{error}</ErrorText>
-        {listedCircles(book).map((n) => {
+        {[...listedCircles(book), CLOSE_FRIENDS].map((n) => {
           const members = membersOf(book, n).length;
+          const detail =
+            n === ONLY_ME
+              ? 'Only you'
+              : n === CLOSE_FRIENDS
+                ? `${members} ${members === 1 ? 'person' : 'people'} · only they see posts to it`
+                : `${members} in this circle · ${audienceSize(book, n)} can see posts to it`;
           return (
             <Pressable
               key={n}
@@ -52,14 +62,10 @@ export default function CirclesScreen() {
               accessibilityLabel={`${labelOf(book, n)}, ${members} people`}
               onPress={() => router.push({ pathname: '/circle/[n]', params: { n: String(n) } })}
               className="flex-row items-center gap-3 rounded-xl border border-border p-4 active:opacity-60 dark:border-border-dark">
-              <View className="h-9 w-9 items-center justify-center rounded-full bg-primary-soft dark:bg-primary-soft-dark">
-                <Text className="font-bold text-primary dark:text-primary-dark">{n}</Text>
-              </View>
+              <CircleBadge book={book} circle={n} />
               <View className="flex-1">
                 <Text className="text-base font-bold text-ink dark:text-ink-dark">{labelOf(book, n)}</Text>
-                <Text className="text-muted dark:text-muted-dark">
-                  {n === 1 ? 'Only you' : `${members} in this circle · ${audienceSize(book, n)} can see posts to it`}
-                </Text>
+                <Text className="text-muted dark:text-muted-dark">{detail}</Text>
               </View>
               <Ionicons name="chevron-forward" size={20} color={palette.muted} />
             </Pressable>

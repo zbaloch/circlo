@@ -9,7 +9,7 @@ import * as Core from '@circlo/core';
 import { api, ok } from '@/api/client';
 import type { components } from '@/api/schema';
 
-import { loadAddressBook, updateAddressBook, type AddressBook } from './addressbook';
+import { CLOSE_FRIENDS, loadAddressBook, updateAddressBook, type AddressBook } from './addressbook';
 import { fromB64, toB64, uuidFromRandom, uuidToBytes } from './bytes';
 import { ensureEpoch, refreshContact } from './friends';
 import type { StoredAccount } from './keystore';
@@ -53,7 +53,7 @@ export function validateDraft(d: Draft): string | null {
   if (chars > MAX_POST_CHARS) return `Posts can be up to ${MAX_POST_CHARS} characters.`;
   if (videos > 1 || (videos === 1 && images > 0)) return 'Add up to 4 photos or 1 video.';
   if (images > 4) return 'Add up to 4 photos or 1 video.';
-  if (!Number.isInteger(d.circle) || d.circle < 1 || d.circle > 100) return 'Choose who can see this.';
+  if (d.circle !== CLOSE_FRIENDS && (!Number.isInteger(d.circle) || d.circle < 1 || d.circle > 100)) return 'Choose who can see this.';
   return null;
 }
 
@@ -67,11 +67,11 @@ export async function publishPost(account: StoredAccount, draft: Draft, onProgre
     for (const m of draft.media) prepared.push(...(await prepare(m)));
     const uploaded = await encryptAndUpload(prepared, (f) => onProgress?.(f * 0.95));
     const postId = uuidFromRandom(Core.newSymmetricKey());
-    const sealed = Core.sealPost(identity(account), uuidToBytes(account.userId), uuidToBytes(postId), uuidToBytes(epoch.epochId), fromB64(epoch.root), draft.circle, {
-      text: draft.text,
-      createdAtMs: BigInt(Date.now()),
-      media: uploaded.map((u) => u.item),
-    });
+    const content = { text: draft.text, createdAtMs: BigInt(Date.now()), media: uploaded.map((u) => u.item) };
+    const ids = [identity(account), uuidToBytes(account.userId), uuidToBytes(postId), uuidToBytes(epoch.epochId), fromB64(epoch.root)] as const;
+    // Close Friends: sealed with the exclusive key (CRYPTO.md 8.5); the server can't tell it from any other post.
+    const sealed =
+      draft.circle === CLOSE_FRIENDS ? Core.sealPostCloseFriends(...ids, content) : Core.sealPost(...ids, draft.circle, content);
     ok(
       await api.POST('/v1/posts', {
         body: {
@@ -113,7 +113,8 @@ function keyringFor(account: StoredAccount, book: AddressBook, authorId: string,
     return mine ? Core.ReaderKeyring.forOwner(fromB64(mine.root)) : null;
   }
   const key = book.contacts[authorId]?.keys.find((k) => k.epochId === epochId);
-  return key ? new Core.ReaderKeyring(fromB64(key.circleKey)) : null;
+  // Their Close Friends slot opens their Close Friends posts only if I'm a member; otherwise it's filler that never matches.
+  return key ? Core.ReaderKeyring.withExclusive(fromB64(key.circleKey), key.exclusiveKey ? fromB64(key.exclusiveKey) : new ArrayBuffer(0)) : null;
 }
 
 /**
@@ -216,7 +217,8 @@ export async function previewAs(account: StoredAccount, friendId: string, before
   const posts = openRows(account, book, rows, (_author, epochId) => {
     const epoch = book.myEpochs.find((e) => e.epochId === epochId);
     const circle = epoch?.placements?.[friendId] ?? (epochId === current ? book.contacts[friendId]?.circle : undefined);
-    return epoch && circle ? Core.ReaderKeyring.forCircle(fromB64(epoch.root), circle) : null;
+    const close = epoch?.closeFriends?.includes(friendId) ?? (epochId === current && !!book.contacts[friendId]?.closeFriend);
+    return epoch && circle ? Core.ReaderKeyring.forCircle(fromB64(epoch.root), circle, close) : null;
   }).map((p) => ({ ...p, mine: false, circle: undefined }));
   return { posts, cursor: rows.length ? rows[rows.length - 1].createdAt : undefined, hasMore: rows.length === limit };
 }

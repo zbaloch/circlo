@@ -142,7 +142,8 @@ export function verifyIdentitySignature(userId: string, id: Identity) {
   Core.verifyIdentity(fromB64(id.ed25519Pub), uuidToBytes(userId), id.version, fromB64(id.x25519Pub), fromB64(id.signature));
 }
 
-export function friendPayload(account: StoredAccount, epoch: MyEpoch, toUserId: string, theirX25519: string, circle: number): string {
+/** My keys for one friend in one epoch: their circle key, and the Close Friends key if they're a member (CRYPTO.md 8.3). */
+export function friendPayload(account: StoredAccount, epoch: MyEpoch, toUserId: string, theirX25519: string, circle: number, closeFriend = false): string {
   return toB64(
     Core.sealFriendPayload(
       myIdentity(account),
@@ -153,6 +154,7 @@ export function friendPayload(account: StoredAccount, epoch: MyEpoch, toUserId: 
       fromB64(epoch.root),
       circle,
       fromB64(epoch.profileKey),
+      closeFriend,
     ),
   );
 }
@@ -256,7 +258,13 @@ export async function refreshContact(account: StoredAccount, userId: string): Pr
       if (contact.keys.some((k) => k.epochId === p.epochId)) continue;
       try {
         const key = Core.openFriendPayload(myIdentity(account), fromB64(contact.x25519), uuidToBytes(userId), uuidToBytes(account.userId), uuidToBytes(p.epochId!), fromB64(p.ciphertext!));
-        contact.keys.push({ epochId: p.epochId!, circleKey: toB64(key.circleKey), profileKey: toB64(key.profileKey) });
+        contact.keys.push({
+          epochId: p.epochId!,
+          circleKey: toB64(key.circleKey),
+          profileKey: toB64(key.profileKey),
+          // Their Close Friends slot: the real key only if I'm a member (I can't tell); absent in v1 payloads.
+          ...(key.exclusiveKey.byteLength ? { exclusiveKey: toB64(key.exclusiveKey) } : {}),
+        });
       } catch {
         // Not from the pinned identity (or tampered): ignore it.
       }

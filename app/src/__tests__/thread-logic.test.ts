@@ -31,8 +31,10 @@ const post = (over: Partial<FeedPost> = {}): FeedPost => ({
 describe('circle labels', () => {
   const book = { labels: {} };
   it('shows the audience badge only on my own posts', () => {
-    expect(audienceBadge(book, post({ mine: true, circle: 7 }))).toBe('Closest friends+');
-    expect(audienceBadge(book, post({ mine: true, circle: 1 }))).toBe('Me only');
+    expect(audienceBadge(book, post({ mine: true, circle: 40 }))).toBe('Kids+');
+    expect(audienceBadge(book, post({ mine: true, circle: 1 }))).toBe('Only me');
+    // Close Friends is an exact audience: no "+".
+    expect(audienceBadge(book, post({ mine: true, circle: 0 }))).toBe('Close Friends');
     // A friend's post never gets a badge, even if a circle somehow leaked into the object.
     expect(audienceBadge(book, post({ mine: false, circle: 7 }))).toBeUndefined();
     expect(audienceBadge(book, post({ mine: true }))).toBeUndefined();

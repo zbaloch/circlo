@@ -30,9 +30,10 @@ describe('validateDraft', () => {
     expect(validateDraft({ text: '', circle: 7, media: [vid, img] })).not.toBeNull();
   });
 
-  it('requires a circle from 1 to 100', () => {
-    expect(validateDraft({ text: 'a', circle: 0, media: [] })).not.toBeNull();
+  it('requires a circle from 1 to 100, or Close Friends', () => {
+    expect(validateDraft({ text: 'a', circle: -1, media: [] })).not.toBeNull();
     expect(validateDraft({ text: 'a', circle: 101, media: [] })).not.toBeNull();
+    expect(validateDraft({ text: 'a', circle: 0, media: [] })).toBeNull(); // Close Friends
     expect(validateDraft({ text: 'a', circle: 1, media: [] })).toBeNull();
     expect(validateDraft({ text: 'a', circle: 100, media: [] })).toBeNull();
   });

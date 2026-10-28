@@ -65,6 +65,18 @@ pub fn circle_key(root: &CircleKey, n: u8) -> Result<CircleKey> {
     Ok(k)
 }
 
+/// Exclusive circles supported in this version (1 = "Close Friends"). A payload carries one `X` (CRYPTO.md 8.3).
+pub const EXCLUSIVE_CIRCLES: u8 = 1;
+
+/// `X_i = HKDF(C1, "circlo/v1/exclusive-circle/<i>")` (CRYPTO.md section 8.5). Owner-side only: off the chain, so no
+/// `Ck` (k >= 2) leads to it. Used exactly like a chain key (wrap and ref sub-keys).
+pub fn exclusive_key(root: &CircleKey, i: u8) -> Result<CircleKey> {
+    if !(1..=EXCLUSIVE_CIRCLES).contains(&i) {
+        return Err(invalid("unknown exclusive circle"));
+    }
+    Ok(CircleKey(*hkdf32(&root.0, &format!("circlo/v1/exclusive-circle/{i}"))))
+}
+
 /// The keys a friend holding `Ck` can derive: `Ck, C(k+1), ...`, 100 steps (they don't know k).
 pub fn forward_keys(ck: &CircleKey) -> Vec<CircleKey> {
     let mut out = Vec::with_capacity(CIRCLES as usize);
@@ -103,6 +115,29 @@ mod tests {
                 );
             }
         }
+    }
+
+    /// Close Friends is off the chain: nothing any friend can derive from `Ck` (k >= 2) is `X_1`, nor its post tags.
+    #[test]
+    fn exclusive_key_is_unreachable_from_the_chain_and_fresh_per_epoch() {
+        let root = CircleKey::random_root();
+        let x = exclusive_key(&root, 1).unwrap();
+        for k in 2..=100u8 {
+            let derived = forward_keys(&circle_key(&root, k).unwrap());
+            assert!(
+                derived.iter().all(|d| d.as_bytes() != x.as_bytes()),
+                "C{k} must not lead to X1"
+            );
+            let (a, p) = ([1; 16], [2; 16]);
+            assert!(derived.iter().all(|d| !d.matches_ref(&a, &p, &x.key_ref(&a, &p))));
+        }
+        assert_ne!(x.as_bytes(), root.as_bytes());
+        assert_ne!(
+            x.as_bytes(),
+            exclusive_key(&CircleKey::random_root(), 1).unwrap().as_bytes()
+        );
+        assert!(exclusive_key(&root, 0).is_err());
+        assert!(exclusive_key(&root, 2).is_err());
     }
 
     #[test]

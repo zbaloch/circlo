@@ -16,9 +16,12 @@ export type MyEpoch = {
   createdAt: string;
   /** Author-only: the circle each friend was given keys for in this epoch (fixed: every move rotates the epoch). */
   placements?: Record<string, number>;
+  /** Author-only: who was given the Close Friends key (CRYPTO.md 8.5) in this epoch. */
+  closeFriends?: string[];
 };
 
-export type FriendKey = { epochId: string; circleKey: string; profileKey: string };
+/** Keys a friend gave me for one of their epochs. `exclusiveKey`: their Close Friends slot (real key or filler; absent for v1). */
+export type FriendKey = { epochId: string; circleKey: string; profileKey: string; exclusiveKey?: string };
 
 export type Contact = {
   /** Identity keys pinned at first contact (base64). A different key from the server triggers a warning. */
@@ -30,6 +33,8 @@ export type Contact = {
   identityChanged?: { ed25519: string; x25519: string; version: number };
   /** Author-only: the circle I placed this friend in (never shown to them). Phase 6 adds the UI. */
   circle: number;
+  /** Author-only: in my Close Friends (an exclusive circle, CRYPTO.md 8.5), on top of their chain circle. */
+  closeFriend?: boolean;
   keys: FriendKey[];
   /** Cached from their encrypted profile (display only). */
   displayName?: string;
@@ -48,17 +53,22 @@ export type AddressBook = {
   postCircles?: Record<string, number>;
   /** The composer's remembered audience. */
   lastCircle?: number;
+  /** Circle positions in use: 2 = defaults at 20/40/60/80/100 (CRYPTO.md 8.5). Older books are migrated once. */
+  circlesLayout?: 2;
   /** Authors whose posts I hide from my timeline (local preference; the server never learns it). */
   muted?: string[];
 };
 
-/** New friends start in the widest circle until the author places them (Phase 6). */
+/** New contacts start in the widest circle ("Everyone") until the author places them. */
 export const DEFAULT_CIRCLE = 100;
 
-/** Where accepting a request puts someone unless I pick another circle (owner decision 2026-10-28). */
-export const NEW_FRIEND_CIRCLE = 10;
+/** Where a new friend goes unless I pick another circle: "Friends" (owner decisions 2026-10-28). */
+export const NEW_FRIEND_CIRCLE = 80;
 
-const empty = (): AddressBook => ({ v: 1, myEpochs: [], contacts: {} });
+/** Audience value for a post to Close Friends: not a chain position (those are 1–100). */
+export const CLOSE_FRIENDS = 0;
+
+const empty = (): AddressBook => ({ v: 1, myEpochs: [], contacts: {}, circlesLayout: 2 });
 
 let cache: { book: AddressBook; version: number } | null = null;
 
@@ -134,7 +144,10 @@ export function compareIdentity(
 }
 
 /** Notes which circle a friend was given in an epoch (used by "Preview as…"). Call inside `updateAddressBook`. */
-export function recordPlacement(book: AddressBook, epochId: string, userId: string, circle: number) {
+export function recordPlacement(book: AddressBook, epochId: string, userId: string, circle: number, closeFriend = false) {
   const epoch = book.myEpochs.find((e) => e.epochId === epochId);
-  if (epoch) epoch.placements = { ...epoch.placements, [userId]: circle };
+  if (!epoch) return;
+  epoch.placements = { ...epoch.placements, [userId]: circle };
+  const others = (epoch.closeFriends ?? []).filter((id) => id !== userId);
+  epoch.closeFriends = closeFriend ? [...others, userId] : others;
 }

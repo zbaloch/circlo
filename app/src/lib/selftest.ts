@@ -61,13 +61,20 @@ export async function runQuickChecks(): Promise<CheckResult[]> {
   );
 
   results.push(
-    await timed('Circle 7 friend reads 7 and 9, not 5', () => {
-      const [alice, bob] = [Core.generateIdentity(), Core.generateIdentity()];
-      const [aliceId, bobId, epoch] = [id16(), id16(), id16()];
+    await timed('Circle 7 friend reads 7 and 9, not 5; Close Friends only for members', () => {
+      const [alice, bob, carol] = [Core.generateIdentity(), Core.generateIdentity(), Core.generateIdentity()];
+      const [aliceId, bobId, carolId, epoch] = [id16(), id16(), id16(), id16()];
       const root = Core.newSymmetricKey();
-      const payload = Core.sealFriendPayload(alice, bob.x25519Pk, aliceId, bobId, epoch, root, 7, Core.newSymmetricKey());
+      const payload = Core.sealFriendPayload(alice, bob.x25519Pk, aliceId, bobId, epoch, root, 7, Core.newSymmetricKey(), true);
       const key = Core.openFriendPayload(bob, alice.x25519Pk, aliceId, bobId, epoch, payload);
-      const ring = new Core.ReaderKeyring(key.circleKey);
+      const ring = Core.ReaderKeyring.withExclusive(key.circleKey, key.exclusiveKey);
+      const toCarol = Core.sealFriendPayload(alice, carol.x25519Pk, aliceId, carolId, epoch, root, 2, Core.newSymmetricKey(), false);
+      const carolKey = Core.openFriendPayload(carol, alice.x25519Pk, aliceId, carolId, epoch, toCarol);
+      const carolRing = Core.ReaderKeyring.withExclusive(carolKey.circleKey, carolKey.exclusiveKey);
+      check(toCarol.byteLength === payload.byteLength, 'membership changed the payload size');
+      const closePost = Core.sealPostCloseFriends(alice, aliceId, epoch, epoch, root, { text: 'cf', createdAtMs: BigInt(Date.now()), media: [] });
+      const opens = (r: Core.ReaderKeyringLike) => !fails(() => r.openPost(alice.ed25519Pk, aliceId, epoch, epoch, closePost.keyRef, closePost.headerCt));
+      check(opens(ring) && !opens(carolRing), 'Close Friends access wrong');
       const readable = (circle: number) => {
         const postId = id16();
         const content = { text: `to circle ${circle}`, createdAtMs: BigInt(Date.now()), media: [] };
@@ -151,7 +158,7 @@ export async function feedBenchmark(authors = 50, perAuthor = 10): Promise<Check
     const authorId = Core.newSymmetricKey().slice(0, 16);
     const epochId = Core.newSymmetricKey().slice(0, 16);
     const root = Core.newSymmetricKey();
-    const ring = Core.ReaderKeyring.forCircle(root, 7);
+    const ring = Core.ReaderKeyring.forCircle(root, 7, false);
     for (let i = 0; i < perAuthor; i++) {
       const postId = Core.newSymmetricKey().slice(0, 16);
       const s = Core.sealPost(id, authorId, postId, epochId, root, 5 + (i % 8), { text: `post ${a}/${i} `.repeat(8), createdAtMs: BigInt(Date.now()), media: [] });

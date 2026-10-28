@@ -1,6 +1,6 @@
 # Circlo cryptography specification
 
-> **Status: v1.1 — approved by the owner on 2026-10-25** (v1.1: where epoch secrets are stored, section 6.1; no change to primitives or formats) (owner delegated all design choices to "the most secure
+> **Status: v1.2 — owner request 2026-10-28** (v1.2: exclusive circles, section 8.5, and friend payload version 2, section 8.3; no new primitives. v1.1, approved 2026-10-25: where epoch secrets are stored, section 6.1) (owner delegated all design choices to "the most secure
 > option"). Section 14 lists every point where this spec deliberately goes beyond PLAN.md and why.
 > `core/` implements this document byte-for-byte. Any change requires editing this file first.
 > **An external cryptography audit is required before public launch.**
@@ -164,23 +164,46 @@ Because `key_ref` depends on `post_id`, two posts to the same circle have unrela
 by audience.
 
 ### 8.3 Friend payload (`friend_payloads.hpke_ciphertext`)
-Plaintext, **fixed 112 bytes for every friend**:
+Plaintext, **fixed 144 bytes for every friend** (version 2, v1.2 of this spec):
 ```
-version:u8 (=0x01) || reserved:15 zero bytes || epoch_id:16 || Ck:32 || profile_key:32 || reserved:16 zero bytes
+version:u8 (=0x02) || reserved:15 zero bytes || epoch_id:16 || Ck:32 || profile_key:32 || X:32 || reserved:16 zero bytes
 ```
+`X` is the epoch's exclusive-circle key (section 8.5) for members of that circle, and **32 random bytes for everyone
+else**. Both look the same, so neither the server nor the friend can tell whether a friend is a member (a member only
+finds out when such a post opens).
 HPKE mode **Auth** (sender authenticates with `id_x25519_sk`), recipient = friend's `id_x25519_pk`:
 ```
 info   = "circlo/v1/friend-payload"
-aad    = AAD("circlo/v1/friend-payload", from_user_id, to_user_id, epoch_id, 0x01)
-stored = enc:32 || ciphertext:112 || tag:16          (160 bytes for every friend)
+aad    = AAD("circlo/v1/friend-payload", from_user_id, to_user_id, epoch_id, 0x02)
+stored = enc:32 || ciphertext:144 || tag:16          (192 bytes for every friend)
 ```
 No circle number is included. The recipient derives forward from `Ck` (100 steps) and matches `key_ref`s.
+Version 1 payloads (112-byte plaintext without `X`, AAD version byte 0x01, 160 bytes stored) are still opened for
+epochs created before v1.2; every new payload is version 2.
 
 ### 8.4 Epochs: **every** circle change rotates
 Any change of any friend's circle (inward, outward, removal, unfriend) creates a new epoch: fresh `C1`, fresh
 `profile_key`, a new payload for **every** remaining friend, profile re-encrypted. Adding a brand-new friend gives
 them a payload for the current epoch. Rationale: if inward moves sent a single extra payload, the server would learn
 who was moved. Old posts keep their old epoch and stay readable to whoever could read them (nothing seen can be revoked).
+Joining or leaving an exclusive circle (section 8.5) is a circle change too, so it also rotates.
+
+### 8.5 Exclusive circles ("Close Friends")
+An exclusive circle is outside the chain: a post to it is readable by its members only, never by anyone in a chain
+circle (and members' chain position grants nothing here).
+```
+X_i = HKDF(C1, "circlo/v1/exclusive-circle/<i>")      i = 1 ("Close Friends"); owner-side only, like every Cn
+```
+`C1` never leaves the owner's devices, and the label differs from the chain step, so no `Ck` (k ≥ 2) yields any
+`X_i`. A fresh `C1` per epoch gives a fresh `X_i`. Members receive `X_1` in their payload (section 8.3); `X_i` is used
+exactly like a chain key: `wrap_key = HKDF(X_i, "circlo/v1/post-wrap")`, `ref_key = HKDF(X_i, "circlo/v1/post-ref")`.
+Posts to it use the same epoch and the same row format as any other post, so the server cannot tell them apart.
+A payload carries one exclusive key, so a friend can be in at most one exclusive circle until a later version adds
+slots.
+
+**Circle positions (app convention, no format change):** chain position 1 is "Only me". The default circles sit at
+positions 20 (Partner), 40 (Kids), 60 (Parents & siblings), 80 (Friends) and 100 (Everyone), leaving room for circles
+added between them later.
 
 ## 9. Posts, replies, likes
 
@@ -201,8 +224,10 @@ server row : posts(id = post_id, author_id, epoch_id, key_ref, header_ct, create
 ```
 
 ### 9.2 Read
-For a post in an epoch where the reader holds `Ck`: derive `Ck..C(k+99)`, compute each candidate `key_ref` for this
-`post_id`; on match unwrap `postKey`, open the header, verify `author_sig` with the author's pinned identity key.
+For a post in an epoch where the reader holds `Ck`: derive `Ck..C100`, add the payload's `X` (random for non-members:
+it simply never matches), compute each candidate `key_ref` for this `post_id`; on match unwrap `postKey`, open the
+header, verify `author_sig` with the author's pinned identity key. A post to exclusive circle `i` is sealed exactly
+as in 9.1 with `X_i` in place of `Cn`.
 Any failure → shown as unreadable (never partially rendered).
 
 ### 9.3 Replies
@@ -340,6 +365,7 @@ The server calls the core (JNI) for OPAQUE, HMAC and the push-token seal; it imp
 | A9 | Per-post `key_ref` (HMAC over `post_id`) | Fixed tags let the server group posts by audience |
 | A10 | Every circle change rotates the epoch | Single inward-move payloads would reveal who was moved |
 | A11 | Push tokens sealed with a server key outside the DB | A DB thief gets no device push tokens |
+| A12 | Exclusive circles (8.5) carried in a v2 friend payload with a random filler for non-members | "Close Friends": posts only its members can read, without revealing membership to the server or to other friends |
 
 ## 15. Known limitations
 

@@ -11,7 +11,7 @@ import { Avatar } from '@/components/avatar';
 import { CharRing } from '@/components/char-ring';
 import { ErrorText } from '@/components/form';
 import { describeError } from '@/lib/account';
-import { loadAddressBook, type AddressBook } from '@/lib/addressbook';
+import { CLOSE_FRIENDS, loadAddressBook, type AddressBook } from '@/lib/addressbook';
 import { labelOf } from '@/lib/circles';
 import { discardPicked, MAX_IMAGES, type PickedMedia } from '@/lib/media';
 import { enqueuePost } from '@/lib/outbox';
@@ -117,7 +117,7 @@ export default function ComposeScreen() {
                   accessibilityLabel={`Audience: ${labelOf(book, circle)}. ${audienceLine(book, circle)}`}
                   onPress={() => setSheet(true)}
                   className="flex-row items-center gap-1 self-start rounded-full border border-primary px-3 py-1 dark:border-primary-dark">
-                  <Ionicons name={circle === 1 ? 'lock-closed' : 'people'} size={14} color={palette.primary} />
+                  <Ionicons name={circle === 1 ? 'lock-closed' : circle === CLOSE_FRIENDS ? 'star' : 'people'} size={14} color={palette.primary} />
                   <Text className="text-sm font-bold text-primary dark:text-primary-dark">{labelOf(book, circle)}</Text>
                   <Ionicons name="chevron-down" size={14} color={palette.primary} />
                 </Pressable>

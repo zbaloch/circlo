@@ -57,8 +57,8 @@ describe('accepting a request', () => {
     }
   });
 
-  it('defaults new friends to circle 10', () => {
+  it('defaults new friends to the Friends circle', () => {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    expect(require('@/lib/addressbook').NEW_FRIEND_CIRCLE).toBe(10);
+    expect(require('@/lib/addressbook').NEW_FRIEND_CIRCLE).toBe(80);
   });
 });

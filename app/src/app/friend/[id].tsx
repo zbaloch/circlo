@@ -9,11 +9,12 @@ import { Button, ErrorText } from '@/components/form';
 import { ProfileFeed } from '@/components/profile-feed';
 import { describeError } from '@/lib/account';
 import { loadAddressBook, type AddressBook } from '@/lib/addressbook';
-import { labelOf, placeFriend, unfriend } from '@/lib/circles';
+import { labelOf, placeFriend, setCloseFriend, unfriend } from '@/lib/circles';
 import { blockUser } from '@/lib/safety';
 import { displayName, useConnections } from '@/lib/use-connections';
 import { usePalette } from '@/theme/use-palette';
 import { Text } from '@/components/ui/text';
+import { Toggle } from '@/components/ui/toggle';
 import { showAlert } from '@/lib/dialog';
 
 /**
@@ -84,6 +85,24 @@ export default function FriendScreen() {
             <Text className="text-base text-ink dark:text-ink-dark">
               In circle: <Text className="font-bold">{labelOf(book, contact.circle)}</Text>
             </Text>
+            <View className="flex-row items-center gap-3">
+              <Ionicons name="star" size={18} color={contact.closeFriend ? palette.primary : palette.muted} />
+              <View className="flex-1">
+                <Text className="text-base text-ink dark:text-ink-dark">Close Friends</Text>
+                <Text className="text-sm text-muted dark:text-muted-dark">Only Close Friends see what you post to Close Friends</Text>
+              </View>
+              <Toggle
+                accessibilityLabel="Close Friends"
+                value={!!contact.closeFriend}
+                disabled={busy}
+                onValueChange={(on) =>
+                  run(async () => {
+                    await setCloseFriend(account, c.userId, on);
+                    reloadBook();
+                  })
+                }
+              />
+            </View>
             <Button
               label={`Preview as ${displayName(c)}`}
               variant="outline"
