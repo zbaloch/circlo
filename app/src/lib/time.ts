@@ -10,3 +10,10 @@ export function relativeTime(ms: number, now = Date.now()): string {
   const month = d.toLocaleString('en', { month: 'short' });
   return d.getFullYear() === new Date(now).getFullYear() ? `${month} ${d.getDate()}` : `${month} ${d.getDate()}, ${d.getFullYear()}`;
 }
+
+/** The post detail line, X style: "9:01 AM · 28 Oct 2026". */
+export function fullTime(ms: number): string {
+  const d = new Date(ms);
+  const time = d.toLocaleTimeString('en', { hour: 'numeric', minute: '2-digit' });
+  return `${time} · ${d.getDate()} ${d.toLocaleString('en', { month: 'short' })} ${d.getFullYear()}`;
+}

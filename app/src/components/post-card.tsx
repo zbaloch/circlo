@@ -7,7 +7,7 @@ import { Avatar } from '@/components/avatar';
 import { MediaGrid } from '@/components/encrypted-media';
 import type { OutboxItem } from '@/lib/outbox';
 import type { FeedPost } from '@/lib/posts';
-import { relativeTime } from '@/lib/time';
+import { fullTime, relativeTime } from '@/lib/time';
 import { linkParts } from '@/lib/view-logic';
 import { usePalette } from '@/theme/use-palette';
 import { Text } from '@/components/ui/text';
@@ -24,6 +24,8 @@ type Props = {
   onLike?: () => void;
   onMore?: () => void;
   onMediaPress?: (index: number) => void;
+  /** Opens the author's profile (avatar or name). */
+  onAuthor?: () => void;
 };
 
 function Action({ icon, label, count, active, onPress }: { icon: ComponentProps<typeof Ionicons>['name']; label: string; count?: number; active?: boolean; onPress?: () => void }) {
@@ -37,14 +39,71 @@ function Action({ icon, label, count, active, onPress }: { icon: ComponentProps<
 }
 
 /** Post card (PLAN.md 2A). No repost action, deliberately: resharing would leak a post beyond its circle. */
-export function PostCard({ post, name, handle, audience, onOpen, onReply, onLike, onMore, onMediaPress }: Props) {
+/** Post text with tappable links. */
+export function PostText({ text, className }: { text: string; className: string }) {
+  return (
+    <Text className={className}>
+      {linkParts(text).map((part, i) =>
+        part.url ? (
+          <Text key={i} accessibilityRole="link" onPress={() => Linking.openURL(part.url!)} className="text-primary dark:text-primary-dark">
+            {part.text}
+          </Text>
+        ) : (
+          part.text
+        ),
+      )}
+    </Text>
+  );
+}
+
+/** The thread's main post, X style: author row, full-width text and media, the full time, then actions. */
+export function PostDetail({ post, name, handle, audience, onReply, onLike, onMore, onMediaPress, onAuthor }: Props) {
+  const palette = usePalette();
+  return (
+    <View className="gap-3 border-b border-border px-4 pb-1 pt-3 dark:border-border-dark">
+      <View className="flex-row items-center gap-3">
+        <Pressable accessibilityRole="button" accessibilityLabel={`${name}'s profile`} onPress={onAuthor} disabled={!onAuthor} className="flex-1 flex-row items-center gap-3 active:opacity-70">
+          <Avatar name={name} />
+          <View className="flex-1">
+            <Text numberOfLines={1} className="text-base font-bold text-ink dark:text-ink-dark">{name}</Text>
+            {handle ? <Text numberOfLines={1} className="text-[15px] text-muted dark:text-muted-dark">@{handle}</Text> : null}
+          </View>
+        </Pressable>
+        {onMore ? (
+          <Pressable accessibilityRole="button" accessibilityLabel="More options" onPress={onMore} hitSlop={8}>
+            <Ionicons name="ellipsis-horizontal" size={18} color={palette.muted} />
+          </Pressable>
+        ) : null}
+      </View>
+      {post.text ? <PostText text={post.text} className="text-[17px] leading-6 text-ink dark:text-ink-dark" /> : null}
+      {post.media.length ? <MediaGrid media={post.media} onPress={onMediaPress} /> : null}
+      <View className="flex-row flex-wrap items-center gap-2">
+        <Text className="text-[15px] text-muted dark:text-muted-dark">{fullTime(post.createdAtMs)}</Text>
+        {audience ? (
+          <View className="flex-row items-center gap-1">
+            <Ionicons name="lock-closed" size={12} color={palette.muted} />
+            <Text className="text-[15px] text-muted dark:text-muted-dark">{audience}</Text>
+          </View>
+        ) : null}
+      </View>
+      <View className="flex-row items-center gap-10 border-t border-border py-3 dark:border-border-dark">
+        <Action icon="chatbubble-outline" label={`Reply, ${post.replyCount} replies`} count={post.replyCount} onPress={onReply} />
+        <Action icon={post.likedByMe ? 'heart' : 'heart-outline'} label={post.likedByMe ? 'Unlike' : 'Like'} count={post.likeCount} active={post.likedByMe} onPress={onLike} />
+      </View>
+    </View>
+  );
+}
+
+export function PostCard({ post, name, handle, audience, onOpen, onReply, onLike, onMore, onMediaPress, onAuthor }: Props) {
   const palette = usePalette();
   return (
     <Pressable onPress={onOpen} disabled={!onOpen} className="flex-row gap-3 border-b border-border px-4 py-3 active:bg-surface-raised dark:border-border-dark dark:active:bg-surface-raised-dark">
-      <Avatar name={name} />
+      <Pressable accessibilityRole="button" accessibilityLabel={`${name}'s profile`} onPress={onAuthor} disabled={!onAuthor} className="self-start active:opacity-70">
+        <Avatar name={name} />
+      </Pressable>
       <View className="flex-1 gap-2">
         <View className="flex-row items-center gap-1">
-          <Text numberOfLines={1} className="shrink text-[15px] font-bold text-ink dark:text-ink-dark">
+          <Text numberOfLines={1} onPress={onAuthor} className="shrink text-[15px] font-bold text-ink dark:text-ink-dark">
             {name}
           </Text>
           {handle ? (
@@ -66,19 +125,7 @@ export function PostCard({ post, name, handle, audience, onOpen, onReply, onLike
             <Text className="text-xs text-muted dark:text-muted-dark">{audience}</Text>
           </View>
         ) : null}
-        {post.text ? (
-          <Text className="text-[15px] leading-5 text-ink dark:text-ink-dark">
-            {linkParts(post.text).map((part, i) =>
-              part.url ? (
-                <Text key={i} accessibilityRole="link" onPress={() => Linking.openURL(part.url!)} className="text-primary dark:text-primary-dark">
-                  {part.text}
-                </Text>
-              ) : (
-                part.text
-              ),
-            )}
-          </Text>
-        ) : null}
+        {post.text ? <PostText text={post.text} className="text-[15px] leading-5 text-ink dark:text-ink-dark" /> : null}
         {post.media.length ? <MediaGrid media={post.media} onPress={onMediaPress} /> : null}
         {onReply || onLike ? (
           <View className="flex-row items-center gap-10 pt-1">

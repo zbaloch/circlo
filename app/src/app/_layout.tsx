@@ -73,6 +73,7 @@ function Navigator() {
         <Drawer.Screen name="circle/[n]" options={{ title: 'Circle' }} />
         <Drawer.Screen name="compose" options={{ headerShown: false, swipeEnabled: false }} />
         <Drawer.Screen name="post/[id]" options={{ title: 'Post' }} />
+        <Drawer.Screen name="reply/[id]" options={{ headerShown: false, swipeEnabled: false }} />
         <Drawer.Screen name="viewer" options={{ headerShown: false, swipeEnabled: false }} />
         <Drawer.Screen name="preview/[id]" options={{ title: 'Preview' }} />
         <Drawer.Screen name="chat/[id]" options={{ title: 'Chat' }} />
