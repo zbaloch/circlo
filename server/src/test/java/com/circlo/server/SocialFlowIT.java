@@ -84,20 +84,20 @@ class SocialFlowIT extends IntegrationTest {
     }
 
     @Test
-    void strangersCannotSendRequestsUnlessTheTargetIsDiscoverable() {
+    void strangersCanOnlyConnectThroughAnInvite() {
         TestApp carol = new TestApp(this, "social_carol", "pw").register();
         TestApp dan = new TestApp(this, "social_dan", "pw").register();
         UUID danEpoch = epoch(dan);
         Map<String, Object> req = Map.of("toUserId", carol.userId.toString(), "epochId", danEpoch.toString(), "payload", Ids.random(160));
 
-        // Private by default: search finds nothing and requests are refused.
+        // There is no handle search, and without Carol's invite Dan's request is refused.
         assertThat(call("GET", "/v1/users/search?handle=social_carol", null, dan.accessToken).getStatusCode().value()).isEqualTo(404);
+        assertThat(call("PUT", "/v1/me/discoverable", Map.of("discoverable", true), carol.accessToken).getStatusCode().value())
+                .isEqualTo(404);
         assertThat(call("POST", "/v1/friends/requests", req, dan.accessToken).getStatusCode().value()).isEqualTo(403);
 
-        // Carol opts in: exact-match search works and so do requests.
-        call("PUT", "/v1/me/discoverable", Map.of("discoverable", true), carol.accessToken);
-        var found = call("GET", "/v1/users/search?handle=Social_Carol", null, dan.accessToken);
-        assertThat(found.getBody().get("userId")).isEqualTo(carol.userId.toString());
+        // Dan redeems Carol's invite (link or QR): now he can ask.
+        invite(carol, dan);
         assertThat(call("POST", "/v1/friends/requests", req, dan.accessToken).getStatusCode().value()).isEqualTo(201);
         assertThat(call("POST", "/v1/friends/requests", req, dan.accessToken).getStatusCode().value()).isEqualTo(409);
 

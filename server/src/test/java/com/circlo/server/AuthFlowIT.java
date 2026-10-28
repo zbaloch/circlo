@@ -115,6 +115,23 @@ class AuthFlowIT extends IntegrationTest {
         assertThat(call("POST", "/v1/auth/refresh", Map.of("refreshToken", old), null).getStatusCode().value()).isEqualTo(401);
     }
 
+    /** RFC 9700 section 4.14.2: reuse of a rotated refresh token means it leaked, so every session of the user ends. */
+    @Test
+    void reusingARotatedRefreshTokenRevokesAllSessions() {
+        TestApp a = new TestApp(this, "grace_reuse", "pw").register();
+        String old = a.refreshToken;
+        String current = (String) call("POST", "/v1/auth/refresh", Map.of("refreshToken", old), null)
+                .getBody().get("refreshToken");
+        assertThat(a.login("pw").getStatusCode().value()).isEqualTo(200);
+        String otherSession = a.refreshToken;
+
+        assertThat(call("POST", "/v1/auth/refresh", Map.of("refreshToken", old), null).getStatusCode().value()).isEqualTo(401);
+
+        assertThat(call("POST", "/v1/auth/refresh", Map.of("refreshToken", current), null).getStatusCode().value()).isEqualTo(401);
+        assertThat(call("POST", "/v1/auth/refresh", Map.of("refreshToken", otherSession), null).getStatusCode().value())
+                .isEqualTo(401);
+    }
+
     @Test
     void recoveryPhraseResetsThePassword() {
         TestApp a = new TestApp(this, "gina_recover", "forgotten password").register();

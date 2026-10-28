@@ -8,7 +8,7 @@ import QRCode from 'react-native-qrcode-svg';
 import { Avatar } from '@/components/avatar';
 import { Button, ErrorText, TextField } from '@/components/form';
 import { describeError } from '@/lib/account';
-import { acceptInvite, createInviteLink, InviteError, requestByHandle } from '@/lib/friends';
+import { acceptInvite, createInviteLink, InviteError } from '@/lib/friends';
 import { displayName, useConnections } from '@/lib/use-connections';
 import { usePalette } from '@/theme/use-palette';
 import { Text } from '@/components/ui/text';
@@ -17,14 +17,13 @@ function message(e: unknown) {
   return e instanceof InviteError ? e.message : describeError(e);
 }
 
-/** Find friends: share my invite (QR or link), use someone's invite, search by handle (opt-in), see friends. */
+/** Friends: share my invite (QR or link) or use someone's. Invites are the only way to connect; there is no search. */
 export default function SearchScreen() {
   const palette = usePalette();
   const { account, connections, refresh } = useConnections();
   const [link, setLink] = useState<string>();
   const [pasted, setPasted] = useState('');
-  const [handle, setHandle] = useState('');
-  const [busy, setBusy] = useState<'invite' | 'paste' | 'handle' | null>(null);
+  const [busy, setBusy] = useState<'invite' | 'paste' | null>(null);
   const [error, setError] = useState<string>();
   const [notice, setNotice] = useState<string>();
   const [refreshing, setRefreshing] = useState(false);
@@ -32,7 +31,7 @@ export default function SearchScreen() {
   if (!account) return null;
   const friends = (connections ?? []).filter((c) => c.status === 'accepted');
 
-  const run = async (kind: 'invite' | 'paste' | 'handle', fn: () => Promise<void>) => {
+  const run = async (kind: 'invite' | 'paste', fn: () => Promise<void>) => {
     setBusy(kind);
     setError(undefined);
     setNotice(undefined);
@@ -92,25 +91,6 @@ export default function SearchScreen() {
               await acceptInvite(account, pasted);
               setPasted('');
               setNotice('Friend request sent. You’ll see their profile once they accept.');
-              await refresh();
-            })
-          }
-        />
-      </View>
-
-      <View className="gap-3">
-        <Text className="text-lg font-bold text-ink dark:text-ink-dark">Find by handle</Text>
-        <TextField label="Handle" placeholder="exact handle" value={handle} onChangeText={setHandle} hint="Only finds people who turned on “Let people find me” in Settings." />
-        <Button
-          label="Send request"
-          variant="outline"
-          disabled={!handle}
-          loading={busy === 'handle'}
-          onPress={() =>
-            run('handle', async () => {
-              await requestByHandle(account, handle);
-              setHandle('');
-              setNotice('Friend request sent.');
               await refresh();
             })
           }

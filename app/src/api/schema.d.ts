@@ -582,102 +582,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/me/discoverable": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Whether others can find me by exact handle (off by default) */
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["Discoverable"];
-                    };
-                };
-            };
-        };
-        /** Opt in or out of handle search */
-        put: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": components["schemas"]["Discoverable"];
-                };
-            };
-            responses: {
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["Discoverable"];
-                    };
-                };
-            };
-        };
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/users/search": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Exact-match handle lookup; finds only users who opted in (others 404) */
-        get: {
-            parameters: {
-                query: {
-                    handle: string;
-                };
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["UserWithIdentity"];
-                    };
-                };
-                404: components["responses"]["Error"];
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/v1/invites": {
         parameters: {
             query?: never;
@@ -857,7 +761,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Send a friend request with my friend payload (after redeeming their invite, or if they are discoverable) */
+        /** Send a friend request with my friend payload; only after redeeming their invite (403 otherwise, there is no search) */
         post: {
             parameters: {
                 query?: never;
@@ -2599,9 +2503,6 @@ export interface components {
             ciphertext?: components["schemas"]["Bytes"];
             /** Format: date-time */
             createdAt?: string;
-        };
-        Discoverable: {
-            discoverable: boolean;
         };
         UserWithIdentity: {
             userId?: components["schemas"]["Id"];
