@@ -1,4 +1,4 @@
-import Ionicons from '@expo/vector-icons/Ionicons';
+import { Icon } from '@/components/ui/icon';
 import { Modal, Pressable, ScrollView, View } from 'react-native';
 
 import { CircleBadge } from './circle-badge';
@@ -63,7 +63,7 @@ export function AudienceSheet({
                 <Text className="text-base font-semibold text-ink dark:text-ink-dark">{labelOf(book, c)}</Text>
                 <Text className="text-sm text-muted dark:text-muted-dark">{describe(c)}</Text>
               </View>
-              {c === selected ? <Ionicons name="checkmark-circle" size={22} color={palette.primary} /> : null}
+              {c === selected ? <Icon name="checkmark-circle" size={22} color={palette.primary} /> : null}
             </Pressable>
           ))}
         </ScrollView>

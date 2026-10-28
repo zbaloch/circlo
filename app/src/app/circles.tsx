@@ -1,4 +1,4 @@
-import Ionicons from '@expo/vector-icons/Ionicons';
+import { Icon } from '@/components/ui/icon';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
@@ -67,7 +67,7 @@ export default function CirclesScreen() {
                 <Text className="text-base font-bold text-ink dark:text-ink-dark">{labelOf(book, n)}</Text>
                 <Text className="text-muted dark:text-muted-dark">{detail}</Text>
               </View>
-              <Ionicons name="chevron-forward" size={20} color={palette.muted} />
+              <Icon name="chevron-forward" size={20} color={palette.muted} />
             </Pressable>
           );
         })}

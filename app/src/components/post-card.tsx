@@ -1,5 +1,5 @@
-import Ionicons from '@expo/vector-icons/Ionicons';
-import { useEffect, type ComponentProps } from 'react';
+import { Icon, type IconName } from '@/components/ui/icon';
+import { useEffect } from 'react';
 import { Linking, Pressable, View } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 
@@ -28,11 +28,11 @@ type Props = {
   onAuthor?: () => void;
 };
 
-function Action({ icon, label, count, active, onPress }: { icon: ComponentProps<typeof Ionicons>['name']; label: string; count?: number; active?: boolean; onPress?: () => void }) {
+function Action({ icon, label, count, active, onPress }: { icon: IconName; label: string; count?: number; active?: boolean; onPress?: () => void }) {
   const palette = usePalette();
   return (
     <Pressable accessibilityRole="button" accessibilityLabel={label} accessibilityState={{ selected: active }} onPress={onPress} hitSlop={8} className="flex-row items-center gap-1">
-      <Ionicons name={icon} size={18} color={active ? palette.danger : palette.muted} />
+      <Icon name={icon} size={18} color={active ? palette.danger : palette.muted} />
       {count ? <Text className={active ? 'text-sm text-danger dark:text-danger-dark' : 'text-sm text-muted dark:text-muted-dark'}>{count}</Text> : null}
     </Pressable>
   );
@@ -71,7 +71,7 @@ export function PostDetail({ post, name, handle, audience, onReply, onLike, onMo
         </Pressable>
         {onMore ? (
           <Pressable accessibilityRole="button" accessibilityLabel="More options" onPress={onMore} hitSlop={8}>
-            <Ionicons name="ellipsis-horizontal" size={18} color={palette.muted} />
+            <Icon name="ellipsis-horizontal" size={18} color={palette.muted} />
           </Pressable>
         ) : null}
       </View>
@@ -81,7 +81,7 @@ export function PostDetail({ post, name, handle, audience, onReply, onLike, onMo
         <Text className="text-[15px] text-muted dark:text-muted-dark">{fullTime(post.createdAtMs)}</Text>
         {audience ? (
           <View className="flex-row items-center gap-1">
-            <Ionicons name="lock-closed" size={12} color={palette.muted} />
+            <Icon name="lock-closed" size={12} color={palette.muted} />
             <Text className="text-[15px] text-muted dark:text-muted-dark">{audience}</Text>
           </View>
         ) : null}
@@ -115,13 +115,13 @@ export function PostCard({ post, name, handle, audience, onOpen, onReply, onLike
           <View className="flex-1" />
           {onMore ? (
             <Pressable accessibilityRole="button" accessibilityLabel="More options" onPress={onMore} hitSlop={8}>
-              <Ionicons name="ellipsis-horizontal" size={18} color={palette.muted} />
+              <Icon name="ellipsis-horizontal" size={18} color={palette.muted} />
             </Pressable>
           ) : null}
         </View>
         {audience ? (
           <View className="flex-row items-center gap-1">
-            <Ionicons name="lock-closed" size={12} color={palette.muted} />
+            <Icon name="lock-closed" size={12} color={palette.muted} />
             <Text className="text-xs text-muted dark:text-muted-dark">{audience}</Text>
           </View>
         ) : null}

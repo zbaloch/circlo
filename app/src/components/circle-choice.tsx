@@ -1,4 +1,4 @@
-import Ionicons from '@expo/vector-icons/Ionicons';
+import { Icon } from '@/components/ui/icon';
 import { useState } from 'react';
 import { Pressable, View } from 'react-native';
 
@@ -60,7 +60,7 @@ export function CircleChoice({ book, value, onChange, label = 'Add to circle' }:
           <Text className="text-xs text-muted dark:text-muted-dark">{label} · only you see this</Text>
           <Text className="font-semibold text-ink dark:text-ink-dark">{labelOf(book, value)}</Text>
         </View>
-        <Ionicons name="chevron-down" size={18} color={palette.muted} />
+        <Icon name="chevron-down" size={18} color={palette.muted} />
       </Pressable>
       <CirclePickerSheet visible={open} book={book} selected={value} onSelect={onChange} onClose={() => setOpen(false)} />
     </>

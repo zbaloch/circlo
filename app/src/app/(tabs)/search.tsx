@@ -1,4 +1,4 @@
-import Ionicons from '@expo/vector-icons/Ionicons';
+import { Icon } from '@/components/ui/icon';
 import * as Clipboard from 'expo-clipboard';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
@@ -208,7 +208,7 @@ export default function SearchScreen() {
                 <Text className="font-bold text-ink dark:text-ink-dark">{c.profile ? displayName(c) : 'Request sent'}</Text>
                 <Text className="text-muted dark:text-muted-dark">Waiting for them to accept</Text>
               </View>
-              <Ionicons name="time-outline" size={20} color={palette.muted} />
+              <Icon name="time-outline" size={20} color={palette.muted} />
             </View>
           ))}
         </View>
@@ -234,9 +234,9 @@ export default function SearchScreen() {
               {f.profile?.handle ? <Text className="text-muted dark:text-muted-dark">@{f.profile.handle}</Text> : null}
             </View>
             {f.identityChanged ? (
-              <Ionicons name="warning" size={20} color={palette.danger} accessibilityLabel="Security keys changed" />
+              <Icon name="warning" size={20} color={palette.danger} accessibilityLabel="Security keys changed" />
             ) : f.verified ? (
-              <Ionicons name="shield-checkmark" size={20} color={palette.primary} accessibilityLabel="Verified" />
+              <Icon name="shield-checkmark" size={20} color={palette.primary} accessibilityLabel="Verified" />
             ) : null}
           </Pressable>
         ))}
@@ -280,7 +280,7 @@ export default function SearchScreen() {
             {scanner.status === 'accepted' ? 'You’re now friends.' : 'Accept their request to become friends.'}
           </Text>
         </View>
-        <Ionicons name="checkmark-circle" size={26} color={palette.primary} />
+        <Icon name="checkmark-circle" size={26} color={palette.primary} />
       </View>
       {scanner.status === 'incoming' ? (
         <>
@@ -300,7 +300,7 @@ export default function SearchScreen() {
         <QRCode value={invite.link} size={200} />
       </View>
       <View className="flex-row items-center gap-2">
-        <Ionicons name="hourglass-outline" size={16} color={palette.muted} />
+        <Icon name="hourglass-outline" size={16} color={palette.muted} />
         <Text className="text-sm text-muted dark:text-muted-dark">Waiting for someone to use it…</Text>
       </View>
       <Text selectable accessibilityLabel="Invite link" className="text-center text-sm text-muted dark:text-muted-dark">

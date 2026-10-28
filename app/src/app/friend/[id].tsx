@@ -1,6 +1,6 @@
-import Ionicons from '@expo/vector-icons/Ionicons';
+import { Icon, type IconName } from '@/components/ui/icon';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
-import { useCallback, useState, type ComponentProps } from 'react';
+import { useCallback, useState } from 'react';
 import { Modal, Pressable, ScrollView, View } from 'react-native';
 
 import { Avatar } from '@/components/avatar';
@@ -76,9 +76,9 @@ export default function FriendScreen() {
         accessibilityLabel={`${labelOf(book, contact.circle)}${contact.closeFriend ? ', Close Friends' : ''}. Change`}
         onPress={() => setOpen(true)}
         className="flex-row items-center gap-1.5 rounded-full border border-border px-4 py-2 active:bg-surface-raised dark:border-border-dark dark:active:bg-surface-raised-dark">
-        {contact.closeFriend ? <Ionicons name="star" size={14} color={palette.primary} /> : null}
+        {contact.closeFriend ? <Icon name="star" size={14} color={palette.primary} /> : null}
         <Text className="text-[15px] font-bold text-ink dark:text-ink-dark">{labelOf(book, contact.circle)}</Text>
-        {busy ? <Spinner /> : <Ionicons name="chevron-down" size={16} color={palette.ink} />}
+        {busy ? <Spinner /> : <Icon name="chevron-down" size={16} color={palette.ink} />}
       </Pressable>
     ) : null;
 
@@ -138,9 +138,9 @@ function SafetyLine({ connection: c }: { connection: Connection }) {
   }
   return (
     <Pressable accessibilityRole="button" onPress={go} className="flex-row items-center gap-1.5 self-start active:opacity-60">
-      <Ionicons name={c.verified ? 'shield-checkmark' : 'shield-outline'} size={16} color={c.verified ? palette.primary : palette.muted} />
+      <Icon name={c.verified ? 'shield-checkmark' : 'shield-outline'} size={16} color={c.verified ? palette.primary : palette.muted} />
       <Text className="text-[15px] text-muted dark:text-muted-dark">{c.verified ? 'Verified in person' : 'Not verified'}</Text>
-      <Ionicons name="chevron-forward" size={14} color={palette.muted} />
+      <Icon name="chevron-forward" size={14} color={palette.muted} />
     </Pressable>
   );
 }
@@ -162,9 +162,9 @@ type SheetProps = {
 /** One sheet for everything about my relationship with this friend. Only I ever see it. */
 function FriendSheet({ visible, name, book, contact, busy, onClose, onMove, onCloseFriend, onPreview, onSafety, onRemove }: SheetProps) {
   const palette = usePalette();
-  const row = (icon: ComponentProps<typeof Ionicons>['name'], label: string, onPress: () => void, danger = false) => (
+  const row = (icon: IconName, label: string, onPress: () => void, danger = false) => (
     <Pressable accessibilityRole="button" onPress={onPress} disabled={busy} className="flex-row items-center gap-3 px-5 py-3.5 active:bg-surface-raised dark:active:bg-surface-raised-dark">
-      <Ionicons name={icon} size={20} color={danger ? palette.danger : palette.ink} />
+      <Icon name={icon} size={20} color={danger ? palette.danger : palette.ink} />
       <Text className={`text-base ${danger ? 'font-semibold text-danger dark:text-danger-dark' : 'text-ink dark:text-ink-dark'}`}>{label}</Text>
     </Pressable>
   );
@@ -180,7 +180,7 @@ function FriendSheet({ visible, name, book, contact, busy, onClose, onMove, onCl
           {busy ? <Spinner /> : null}
         </View>
         <View className="flex-row items-center gap-1.5 px-5 pb-2">
-          <Ionicons name="lock-closed" size={12} color={palette.muted} />
+          <Icon name="lock-closed" size={12} color={palette.muted} />
           <Text className="text-sm text-muted dark:text-muted-dark">Only you see this. {name} is never told.</Text>
         </View>
         <ScrollView>
@@ -198,12 +198,12 @@ function FriendSheet({ visible, name, book, contact, busy, onClose, onMove, onCl
                 <Text className="text-base text-ink dark:text-ink-dark">{labelOf(book, n)}</Text>
                 <Text className="text-sm text-muted dark:text-muted-dark">{placementLine(book, n)}</Text>
               </View>
-              {n === contact.circle ? <Ionicons name="checkmark-circle" size={22} color={palette.primary} /> : null}
+              {n === contact.circle ? <Icon name="checkmark-circle" size={22} color={palette.primary} /> : null}
             </Pressable>
           ))}
           <View className="mx-5 my-2 h-px bg-border dark:bg-border-dark" />
           <View className="flex-row items-center gap-3 px-5 py-2.5">
-            <Ionicons name="star" size={20} color={contact.closeFriend ? palette.primary : palette.muted} />
+            <Icon name="star" size={20} color={contact.closeFriend ? palette.primary : palette.muted} />
             <View className="flex-1">
               <Text className="text-base text-ink dark:text-ink-dark">Close Friends</Text>
               <Text className="text-sm text-muted dark:text-muted-dark">Also see what you share with Close Friends</Text>

@@ -1,12 +1,10 @@
-import Ionicons from '@expo/vector-icons/Ionicons';
+import { Icon, type IconName } from '@/components/ui/icon';
 import type { BottomTabBarProps } from 'expo-router/tabs';
-import type { ComponentProps } from 'react';
 import { Pressable, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { usePalette } from '@/theme/use-palette';
 
-type IconName = ComponentProps<typeof Ionicons>['name'];
 export type TabSpec = { name: string; label: string; icon: IconName; iconActive: IconName };
 
 /**
@@ -42,7 +40,7 @@ export function TabBar({
               onLongPress={() => emitter.emit({ type: 'tabLongPress', target: route.key })}
               className="flex-1 items-center justify-center active:opacity-60">
               <View>
-                <Ionicons name={focused ? tab.iconActive : tab.icon} size={26} color={focused ? palette.ink : palette.muted} />
+                <Icon name={focused ? tab.iconActive : tab.icon} size={26} color={focused ? palette.ink : palette.muted} />
                 {dots[tab.name] ? (
                   <View className="absolute -right-0.5 top-0 h-3 w-3 rounded-full border-2 border-surface bg-primary dark:border-surface-dark dark:bg-primary-dark" />
                 ) : null}

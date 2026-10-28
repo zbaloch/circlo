@@ -1,4 +1,4 @@
-import Ionicons from '@expo/vector-icons/Ionicons';
+import { Icon } from '@/components/ui/icon';
 import { Image } from 'expo-image';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import type React from 'react';
@@ -27,7 +27,7 @@ export function EncryptedImage({ media, className, fit = 'cover' }: { media: Upl
   if (uri) return <Image source={{ uri }} className={className} contentFit={fit} accessibilityIgnoresInvertColors />;
   return (
     <View className={`items-center justify-center bg-surface-raised dark:bg-surface-raised-dark ${className}`}>
-      {failed ? <Ionicons name="lock-closed" size={22} color={palette.muted} accessibilityLabel="Couldn't decrypt" /> : <Spinner />}
+      {failed ? <Icon name="lock-closed" size={22} color={palette.muted} accessibilityLabel="Couldn't decrypt" /> : <Spinner />}
     </View>
   );
 }
@@ -54,7 +54,7 @@ export function EncryptedVideo({ video, poster, className }: { video: UploadedMe
       {poster ? <EncryptedImage media={poster} className={className} /> : <View className={`bg-black ${className}`} />}
       <View className="absolute inset-0 items-center justify-center">
         <View className="h-14 w-14 items-center justify-center rounded-full bg-black/60">
-          <Ionicons name="play" size={28} color="#FFFFFF" />
+          <Icon name="play" size={28} color="#FFFFFF" />
         </View>
       </View>
     </Pressable>

@@ -1,4 +1,4 @@
-import Ionicons from '@expo/vector-icons/Ionicons';
+import { Icon } from '@/components/ui/icon';
 import { View } from 'react-native';
 
 import { Text } from '@/components/ui/text';
@@ -14,7 +14,7 @@ export function CircleBadge({ book, circle, small = false }: { book: AddressBook
   return (
     <View className={`${box} items-center justify-center rounded-full bg-primary-soft dark:bg-primary-soft-dark`}>
       {icon ? (
-        <Ionicons name={icon} size={small ? 15 : 17} color={palette.primary} />
+        <Icon name={icon} size={small ? 15 : 17} color={palette.primary} />
       ) : (
         <Text className={`font-bold text-primary dark:text-primary-dark ${small ? 'text-sm' : ''}`}>{levelOf(book, circle)}</Text>
       )}

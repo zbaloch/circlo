@@ -1,4 +1,4 @@
-import Ionicons from '@expo/vector-icons/Ionicons';
+import { Icon } from '@/components/ui/icon';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
@@ -103,7 +103,7 @@ export default function ReplyScreen() {
                 {isVideo ? (
                   <View className="absolute inset-0 items-center justify-center">
                     <View className="h-8 w-8 items-center justify-center rounded-full bg-black/50">
-                      <Ionicons name="play" size={16} color="#FFFFFF" />
+                      <Icon name="play" size={16} color="#FFFFFF" />
                     </View>
                   </View>
                 ) : null}

@@ -1,4 +1,4 @@
-import Ionicons from '@expo/vector-icons/Ionicons';
+import { Icon } from '@/components/ui/icon';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
@@ -118,9 +118,9 @@ export default function ComposeScreen() {
                   accessibilityLabel={`Audience: ${labelOf(book, circle)}. ${audienceLine(book, circle)}`}
                   onPress={() => setSheet(true)}
                   className="flex-row items-center gap-1 self-start rounded-full border border-primary px-3 py-1 dark:border-primary-dark">
-                  <Ionicons name={circle === 1 ? 'lock-closed' : circle === CLOSE_FRIENDS ? 'star' : 'people'} size={14} color={palette.primary} />
+                  <Icon name={circle === 1 ? 'lock-closed' : circle === CLOSE_FRIENDS ? 'star' : 'people'} size={14} color={palette.primary} />
                   <Text className="text-sm font-bold text-primary dark:text-primary-dark">{labelOf(book, circle)}</Text>
-                  <Ionicons name="chevron-down" size={14} color={palette.primary} />
+                  <Icon name="chevron-down" size={14} color={palette.primary} />
                 </Pressable>
               ) : null}
               <TextInput
@@ -144,7 +144,7 @@ export default function ComposeScreen() {
                   <Image source={{ uri: m.uri }} className="h-28 w-28 rounded-2xl bg-surface-raised dark:bg-surface-raised-dark" contentFit="cover" />
                   {m.type === 'video' ? (
                     <View className="absolute bottom-1 left-1 rounded-full bg-black/60 px-2 py-0.5">
-                      <Ionicons name="videocam" size={14} color="#FFFFFF" />
+                      <Icon name="videocam" size={14} color="#FFFFFF" />
                     </View>
                   ) : null}
                   <Pressable
@@ -155,7 +155,7 @@ export default function ComposeScreen() {
                       setMedia(media.filter((_, j) => j !== i));
                     }}
                     className="absolute right-1 top-1 h-7 w-7 items-center justify-center rounded-full bg-black/60">
-                    <Ionicons name="close" size={16} color="#FFFFFF" />
+                    <Icon name="close" size={16} color="#FFFFFF" />
                   </Pressable>
                   {i > 0 ? (
                     <Pressable
@@ -163,7 +163,7 @@ export default function ComposeScreen() {
                       accessibilityLabel="Move earlier"
                       onPress={() => setMedia([...media.slice(0, i - 1), m, media[i - 1], ...media.slice(i + 1)])}
                       className="absolute left-1 top-1 h-7 w-7 items-center justify-center rounded-full bg-black/60">
-                      <Ionicons name="chevron-back" size={16} color="#FFFFFF" />
+                      <Icon name="chevron-back" size={16} color="#FFFFFF" />
                     </Pressable>
                   ) : null}
                 </View>
@@ -175,10 +175,10 @@ export default function ComposeScreen() {
 
         <View className="flex-row items-center gap-5 border-t border-border px-4 py-3 dark:border-border-dark">
           <Pressable accessibilityRole="button" accessibilityLabel="Add photos or video" disabled={!canAdd} onPress={() => pick(false)} className={canAdd ? '' : 'opacity-40'}>
-            <Ionicons name="image-outline" size={24} color={palette.primary} />
+            <Icon name="image-outline" size={24} color={palette.primary} />
           </Pressable>
           <Pressable accessibilityRole="button" accessibilityLabel="Take a photo" disabled={!canAdd} onPress={() => pick(true)} className={canAdd ? '' : 'opacity-40'}>
-            <Ionicons name="camera-outline" size={24} color={palette.primary} />
+            <Icon name="camera-outline" size={24} color={palette.primary} />
           </Pressable>
           <View className="flex-1" />
           <CharRing used={used} limit={MAX_POST_CHARS} />
