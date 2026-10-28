@@ -12,6 +12,10 @@ type Props = {
   selected: number;
   onSelect: (circle: number) => void;
   onClose: () => void;
+  /** Defaults are for choosing a post's audience; placing a friend passes its own. */
+  title?: string;
+  circles?: number[];
+  describe?: (circle: number) => string;
 };
 
 export function audienceLine(book: AddressBook, circle: number): string {
@@ -20,7 +24,16 @@ export function audienceLine(book: AddressBook, circle: number): string {
 }
 
 /** Bottom sheet listing my circles by my own labels (PLAN.md 2A). Author-only: readers never see any of this. */
-export function AudienceSheet({ visible, book, selected, onSelect, onClose }: Props) {
+export function AudienceSheet({
+  visible,
+  book,
+  selected,
+  onSelect,
+  onClose,
+  title = 'Who can see this?',
+  circles = listedCircles(book),
+  describe = (c) => audienceLine(book, c),
+}: Props) {
   const palette = usePalette();
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
@@ -29,9 +42,9 @@ export function AudienceSheet({ visible, book, selected, onSelect, onClose }: Pr
         <View className="items-center py-3">
           <View className="h-1 w-10 rounded-full bg-border dark:bg-border-dark" />
         </View>
-        <Text className="px-5 pb-2 text-xl font-bold text-ink dark:text-ink-dark">Who can see this?</Text>
+        <Text className="px-5 pb-2 text-xl font-bold text-ink dark:text-ink-dark">{title}</Text>
         <ScrollView>
-          {listedCircles(book).map((c) => (
+          {circles.map((c) => (
             <Pressable
               key={c}
               accessibilityRole="radio"
@@ -46,7 +59,7 @@ export function AudienceSheet({ visible, book, selected, onSelect, onClose }: Pr
               </View>
               <View className="flex-1">
                 <Text className="text-base font-semibold text-ink dark:text-ink-dark">{labelOf(book, c)}</Text>
-                <Text className="text-sm text-muted dark:text-muted-dark">{audienceLine(book, c)}</Text>
+                <Text className="text-sm text-muted dark:text-muted-dark">{describe(c)}</Text>
               </View>
               {c === selected ? <Ionicons name="checkmark-circle" size={22} color={palette.primary} /> : null}
             </Pressable>

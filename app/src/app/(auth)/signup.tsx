@@ -42,14 +42,14 @@ export default function SignupScreen() {
 
   return (
     <AuthScreen>
-      <Title subtitle="Your handle is how friends find you. There’s no email or phone number, and your password never leaves this phone.">
+      <Title subtitle="Your handle is what your friends see. No one can search you with it though. There’s no email or phone number, and your password never leaves this phone.">
         Create your account
       </Title>
       <TextField label="Handle" placeholder="e.g. sam_k" value={handle} onChangeText={setHandle} maxLength={30} />
       <TextField label="Password" secureTextEntry value={password} onChangeText={setPassword} textContentType="newPassword" />
       <TextField label="Confirm password" secureTextEntry value={confirm} onChangeText={setConfirm} textContentType="newPassword" />
       <ErrorText>{error}</ErrorText>
-      <Button label="Continue" onPress={submit} loading={busy} />
+      <Button size="lg" label="Continue" onPress={submit} loading={busy} />
     </AuthScreen>
   );
 }

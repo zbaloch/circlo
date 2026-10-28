@@ -9,8 +9,17 @@ import { usePalette } from '@/theme/use-palette';
 type IconName = ComponentProps<typeof Ionicons>['name'];
 export type TabSpec = { name: string; label: string; icon: IconName; iconActive: IconName };
 
-/** Icon-only bottom bar (X style): hairline top border, filled icon for the current tab, same on iOS and Android. */
-export function TabBar({ state, emitter, navigateToTab, tabs }: BottomTabBarProps & { tabs: TabSpec[] }) {
+/**
+ * Icon-only bottom bar (X style): hairline top border, filled icon for the current tab, same on iOS and Android.
+ * `dots` marks tabs with something new (a small primary dot on the icon).
+ */
+export function TabBar({
+  state,
+  emitter,
+  navigateToTab,
+  tabs,
+  dots = {},
+}: BottomTabBarProps & { tabs: TabSpec[]; dots?: Partial<Record<string, boolean>> }) {
   const palette = usePalette();
   return (
     <SafeAreaView edges={['bottom']} className="border-t border-border bg-surface dark:border-border-dark dark:bg-surface-dark">
@@ -27,12 +36,17 @@ export function TabBar({ state, emitter, navigateToTab, tabs }: BottomTabBarProp
             <Pressable
               key={route.key}
               accessibilityRole="tab"
-              accessibilityLabel={tab.label}
+              accessibilityLabel={dots[tab.name] ? `${tab.label}, new` : tab.label}
               accessibilityState={{ selected: focused }}
               onPress={onPress}
               onLongPress={() => emitter.emit({ type: 'tabLongPress', target: route.key })}
               className="flex-1 items-center justify-center active:opacity-60">
-              <Ionicons name={focused ? tab.iconActive : tab.icon} size={26} color={focused ? palette.ink : palette.muted} />
+              <View>
+                <Ionicons name={focused ? tab.iconActive : tab.icon} size={26} color={focused ? palette.ink : palette.muted} />
+                {dots[tab.name] ? (
+                  <View className="absolute -right-0.5 top-0 h-3 w-3 rounded-full border-2 border-surface bg-primary dark:border-surface-dark dark:bg-primary-dark" />
+                ) : null}
+              </View>
             </Pressable>
           );
         })}

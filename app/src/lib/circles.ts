@@ -7,7 +7,7 @@ import * as Core from '@circlo/core';
 
 import { api, ApiError, ok } from '@/api/client';
 
-import { DEFAULT_CIRCLE, loadAddressBook, recordPlacement, updateAddressBook, type AddressBook, type MyEpoch } from './addressbook';
+import { loadAddressBook, recordPlacement, updateAddressBook, type AddressBook, type MyEpoch } from './addressbook';
 import { toB64, uuidFromRandom } from './bytes';
 import { friendPayload, loadMyProfile, saveMyProfile } from './friends';
 import type { StoredAccount } from './keystore';
@@ -142,11 +142,13 @@ async function finishRotation(account: StoredAccount): Promise<void> {
 
   // Everyone who gets my keys: accepted friends and my pending requests. Changed identities wait for re-verification.
   const recipients = ok(await api.GET('/v1/friends')).filter((f) => f.status !== 'incoming');
-  const payloads = recipients.flatMap((f) => {
+  // Each payload is wrapped for the circle in this snapshot; that's the circle recorded below.
+  const wrapped = recipients.flatMap((f) => {
     const c = book.contacts[f.userId!];
     if (!c || c.identityChanged) return [];
-    return [{ toUserId: f.userId!, epochId: epoch.epochId, ciphertext: friendPayload(account, epoch, f.userId!, c.x25519, c.circle) }];
+    return [{ toUserId: f.userId!, circle: c.circle, ciphertext: friendPayload(account, epoch, f.userId!, c.x25519, c.circle) }];
   });
+  const payloads = wrapped.map(({ toUserId, ciphertext }) => ({ toUserId, epochId: epoch.epochId, ciphertext }));
   for (let i = 0; i < payloads.length; i += 200) {
     ok(await api.PUT('/v1/friend-payloads/batch', { body: { payloads: payloads.slice(i, i + 200) } }));
   }
@@ -155,10 +157,16 @@ async function finishRotation(account: StoredAccount): Promise<void> {
   const profile = await loadMyProfile(account);
   if (profile) await saveMyProfile(account, profile);
 
+  let movedMeanwhile = false;
   await updateAddressBook(account, (b) => {
-    for (const p of payloads) recordPlacement(b, epoch.epochId, p.toUserId, b.contacts[p.toUserId]?.circle ?? DEFAULT_CIRCLE);
+    for (const p of wrapped) {
+      recordPlacement(b, epoch.epochId, p.toUserId, p.circle);
+      if ((b.contacts[p.toUserId]?.circle ?? p.circle) !== p.circle) movedMeanwhile = true;
+    }
     if (b.pendingRotation?.epochId === epoch.epochId) delete b.pendingRotation;
   });
+  // Someone was moved while this ran: their keys in this epoch are for the old circle, so rotate again.
+  if (movedMeanwhile) await rotateEpoch(account);
 }
 
 async function withRetry(job: () => Promise<void>, attempts = 3): Promise<void> {

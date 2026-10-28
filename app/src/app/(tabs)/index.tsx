@@ -18,16 +18,53 @@ import { syncMessaging } from '@/lib/messaging';
 import { dismissPost, retryPost, useOutbox } from '@/lib/outbox';
 import { onPushActivity, registerForPush } from '@/lib/push';
 import type { FeedPost } from '@/lib/posts';
+import type { Connection } from '@/lib/friends';
 import { useSession } from '@/lib/session';
+import { useConnections } from '@/lib/use-connections';
 import { Text } from '@/components/ui/text';
 import { Spinner } from '@/components/ui/spinner';
 
 const NEW_POSTS_INTERVAL = 60_000;
 
 /** Home timeline (PLAN.md 2A): FlashList, pull-to-refresh, infinite scroll, "New posts" pill, header hides on scroll. */
+/** The empty timeline nudges the next useful step: invite someone, answer a request, or post first. */
+function HomeEmptyState({ connections }: { connections: Connection[] | null }) {
+  const friends = (connections ?? []).filter((c) => c.status === 'accepted').length;
+  const requests = (connections ?? []).filter((c) => c.status === 'incoming').length;
+  if (friends > 0) {
+    return (
+      <EmptyState
+        title="No posts yet"
+        body={`You have ${friends} ${friends === 1 ? 'friend' : 'friends'}. When they share something with you, it shows up here. Why not start? Only the circles you choose can read it.`}
+        actionLabel="Write a post"
+        onAction={() => router.push('/compose')}
+      />
+    );
+  }
+  if (requests > 0) {
+    return (
+      <EmptyState
+        title="Someone wants to connect"
+        body="Accept their request to start sharing. You choose which circle they join."
+        actionLabel="Review request"
+        onAction={() => router.navigate({ pathname: '/search', params: { section: 'friends' } })}
+      />
+    );
+  }
+  return (
+    <EmptyState
+      title="Your timeline is quiet"
+      body="Posts from friends appear here. Only people in the circles you choose can read what you share."
+      actionLabel="Invite your first friend"
+      onAction={() => router.navigate({ pathname: '/search', params: { section: 'invite' } })}
+    />
+  );
+}
+
 export default function HomeScreen() {
   const session = useSession();
   const account = session.status === 'signedIn' ? session.account : null;
+  const { connections } = useConnections();
   const outbox = useOutbox();
   const feed = useFeed();
   const [book, setBook] = useState<AddressBook | null>(null);
@@ -118,12 +155,7 @@ export default function HomeScreen() {
         ListEmptyComponent={
           pending.length || !feed.loaded ? undefined : (
             <View className="h-[560px]">
-              <EmptyState
-                title="Your timeline is quiet"
-                body="Posts from friends appear here. Only people in the circles you choose can read what you share."
-                actionLabel="Invite your first friend"
-                onAction={() => router.push('/search')}
-              />
+              <HomeEmptyState connections={connections} />
             </View>
           )
         }
@@ -144,8 +176,8 @@ export default function HomeScreen() {
                 showPendingPosts();
                 list.current?.scrollToOffset({ offset: 0, animated: true });
               }}
-              className="rounded-full bg-primary px-4 py-2 shadow-lg active:bg-primary-pressed dark:bg-primary-dark">
-              <Text className="font-bold text-white">
+              className="rounded-full bg-primary px-4 py-2 shadow-lg active:bg-primary-pressed dark:bg-primary-dark dark:active:bg-primary-pressed-dark">
+              <Text className="font-bold text-on-primary dark:text-on-primary-dark">
                 ↑ {feed.pending.length} new {feed.pending.length === 1 ? 'post' : 'posts'}
               </Text>
             </Pressable>

@@ -59,9 +59,9 @@ export default function ConfirmPhraseScreen() {
       ))}
       <ErrorText>{error}</ErrorText>
       {expired ? (
-        <Button label="Start again" onPress={() => router.replace('/signup')} />
+        <Button size="lg" label="Start again" onPress={() => router.replace('/signup')} />
       ) : (
-        <Button label="Finish" onPress={submit} loading={busy} />
+        <Button size="lg" label="Finish" onPress={submit} loading={busy} />
       )}
     </AuthScreen>
   );

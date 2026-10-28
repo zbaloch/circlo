@@ -36,8 +36,8 @@ export default function DevScreen() {
             accessibilityRole="button"
             disabled={running}
             onPress={() => run(runQuickChecks)}
-            className="flex-1 items-center rounded-full bg-primary py-3 active:bg-primary-pressed dark:bg-primary-dark">
-            <Text className="font-bold text-white">Run checks</Text>
+            className="flex-1 items-center rounded-full bg-primary py-3 active:bg-primary-pressed dark:bg-primary-dark dark:active:bg-primary-pressed-dark">
+            <Text className="font-bold text-on-primary dark:text-on-primary-dark">Run checks</Text>
           </Pressable>
           <Pressable
             accessibilityRole="button"
