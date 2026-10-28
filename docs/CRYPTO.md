@@ -186,6 +186,8 @@ Any change of any friend's circle (inward, outward, removal, unfriend) creates a
 `profile_key`, a new payload for **every** remaining friend, profile re-encrypted. Adding a brand-new friend gives
 them a payload for the current epoch. Rationale: if inward moves sent a single extra payload, the server would learn
 who was moved. Old posts keep their old epoch and stay readable to whoever could read them (nothing seen can be revoked).
+The reverse holds too: moving someone closer opens only what is posted from then on, never earlier posts (owner
+decision 2026-10-29: past posts keep the audience they were shared with).
 Joining or leaving an exclusive circle (section 8.5) is a circle change too, so it also rotates.
 
 ### 8.5 Exclusive circles ("Close Friends")
