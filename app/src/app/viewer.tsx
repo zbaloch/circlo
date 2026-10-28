@@ -1,4 +1,4 @@
-import Ionicons from '@expo/vector-icons/Ionicons';
+import { Icon } from '@/components/ui/icon';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useState } from 'react';
@@ -77,7 +77,7 @@ export default function ViewerScreen() {
       />
       <SafeAreaView edges={['top']} className="absolute left-0 right-0 top-0 flex-row items-center justify-between px-3">
         <Pressable accessibilityRole="button" accessibilityLabel="Close" onPress={() => router.back()} className="h-11 w-11 items-center justify-center rounded-full bg-black/50">
-          <Ionicons name="close" size={26} color="#FFFFFF" />
+          <Icon name="close" size={26} color="#FFFFFF" />
         </Pressable>
         {state.media.length > 1 ? (
           <Text className="rounded-full bg-black/50 px-3 py-1 text-white">

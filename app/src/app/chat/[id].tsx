@@ -1,8 +1,9 @@
-import Ionicons from '@expo/vector-icons/Ionicons';
+import { Icon } from '@/components/ui/icon';
 import * as ImagePicker from 'expo-image-picker';
 import { router, useFocusEffect, useLocalSearchParams, useNavigation } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { FlatList, KeyboardAvoidingView, Modal, Platform, Pressable, View } from 'react-native';
+import { FlatList, Modal, Pressable, View } from 'react-native';
+import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Avatar } from '@/components/avatar';
@@ -55,7 +56,7 @@ export default function ChatScreen() {
       title,
       headerRight: () => (
         <Pressable accessibilityRole="button" accessibilityLabel="People in this chat" onPress={() => setMembers(true)} className="px-4">
-          <Ionicons name="people-outline" size={22} color={palette.ink} />
+          <Icon name="people-outline" size={22} color={palette.ink} />
         </Pressable>
       ),
     });
@@ -127,7 +128,7 @@ export default function ChatScreen() {
 
   return (
     <SafeAreaView edges={['bottom']} className="flex-1 bg-surface dark:bg-surface-dark">
-      <KeyboardAvoidingView className="flex-1" behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={90}>
+      <KeyboardAvoidingView className="flex-1" behavior="padding" keyboardVerticalOffset={90}>
         {conv.unverified ? (
           <Text className="bg-danger/10 px-4 py-2 text-sm text-danger dark:text-danger-dark">
             Someone’s security keys in this chat don’t match what you verified. Sending is paused until you check their safety number.
@@ -175,7 +176,7 @@ export default function ChatScreen() {
         />
         <View className="flex-row items-end gap-2 border-t border-border px-3 py-2 dark:border-border-dark">
           <Pressable accessibilityRole="button" accessibilityLabel="Attach photos or video" disabled={!canSend || sending} onPress={attach} className={`h-10 w-10 items-center justify-center ${!canSend || sending ? 'opacity-40' : ''}`}>
-            <Ionicons name="image-outline" size={24} color={palette.primary} />
+            <Icon name="image-outline" size={24} color={palette.primary} />
           </Pressable>
           <TextInput
             accessibilityLabel="Message"
@@ -194,7 +195,7 @@ export default function ChatScreen() {
             disabled={!canSend || !text.trim() || sending}
             onPress={() => send()}
             className={`h-10 w-10 items-center justify-center rounded-full bg-primary dark:bg-primary-dark ${!canSend || !text.trim() || sending ? 'opacity-50' : ''}`}>
-            {sending ? <Spinner tone="onPrimary" /> : <Ionicons name="arrow-up" size={20} color={palette.onPrimary} />}
+            {sending ? <Spinner tone="onPrimary" /> : <Icon name="arrow-up" size={20} color={palette.onPrimary} />}
           </Pressable>
         </View>
       </KeyboardAvoidingView>

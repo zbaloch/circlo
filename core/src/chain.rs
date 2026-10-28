@@ -65,6 +65,18 @@ pub fn circle_key(root: &CircleKey, n: u8) -> Result<CircleKey> {
     Ok(k)
 }
 
+/// Circles (CRYPTO.md 8.5): up to 8 per author, each with its own key `X_i`; a payload carries one slot per circle.
+pub const EXCLUSIVE_CIRCLES: u8 = 8;
+
+/// `X_i = HKDF(C1, "circlo/v1/exclusive-circle/<i>")` (CRYPTO.md section 8.5). Owner-side only: off the chain, so no
+/// `Ck` (k >= 2) leads to it. Used exactly like a chain key (wrap and ref sub-keys).
+pub fn exclusive_key(root: &CircleKey, i: u8) -> Result<CircleKey> {
+    if !(1..=EXCLUSIVE_CIRCLES).contains(&i) {
+        return Err(invalid("unknown exclusive circle"));
+    }
+    Ok(CircleKey(*hkdf32(&root.0, &format!("circlo/v1/exclusive-circle/{i}"))))
+}
+
 /// The keys a friend holding `Ck` can derive: `Ck, C(k+1), ...`, 100 steps (they don't know k).
 pub fn forward_keys(ck: &CircleKey) -> Vec<CircleKey> {
     let mut out = Vec::with_capacity(CIRCLES as usize);
@@ -103,6 +115,46 @@ mod tests {
                 );
             }
         }
+    }
+
+    /// Circles are off the chain: nothing any friend can derive from `Ck` (k >= 2) is any `X_i`, nor its post tags;
+    /// the 8 circle keys are all different, and fresh per epoch.
+    #[test]
+    fn circle_keys_are_unreachable_from_the_chain_distinct_and_fresh_per_epoch() {
+        let root = CircleKey::random_root();
+        let xs: Vec<CircleKey> = (1..=EXCLUSIVE_CIRCLES)
+            .map(|i| exclusive_key(&root, i).unwrap())
+            .collect();
+        let (a, p) = ([1; 16], [2; 16]);
+        for k in 2..=100u8 {
+            let derived = forward_keys(&circle_key(&root, k).unwrap());
+            for (i, x) in xs.iter().enumerate() {
+                assert!(
+                    derived.iter().all(|d| d.as_bytes() != x.as_bytes()),
+                    "C{k} must not lead to X{}",
+                    i + 1
+                );
+                assert!(derived.iter().all(|d| !d.matches_ref(&a, &p, &x.key_ref(&a, &p))));
+            }
+        }
+        for i in 0..xs.len() {
+            assert_ne!(xs[i].as_bytes(), root.as_bytes());
+            for j in i + 1..xs.len() {
+                assert_ne!(
+                    xs[i].as_bytes(),
+                    xs[j].as_bytes(),
+                    "X{} and X{} must differ",
+                    i + 1,
+                    j + 1
+                );
+            }
+        }
+        assert_ne!(
+            xs[0].as_bytes(),
+            exclusive_key(&CircleKey::random_root(), 1).unwrap().as_bytes()
+        );
+        assert!(exclusive_key(&root, 0).is_err());
+        assert!(exclusive_key(&root, EXCLUSIVE_CIRCLES + 1).is_err());
     }
 
     #[test]

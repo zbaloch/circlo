@@ -1,7 +1,6 @@
-import Ionicons from '@expo/vector-icons/Ionicons';
+import { Icon, type IconName } from '@/components/ui/icon';
 import type { DrawerContentComponentProps } from 'expo-router/drawer';
 import { router, type Href } from 'expo-router';
-import type { ComponentProps } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -11,7 +10,7 @@ import { usePalette } from '@/theme/use-palette';
 import { Avatar } from './avatar';
 import { Text } from '@/components/ui/text';
 
-type Item = { label: string; icon: ComponentProps<typeof Ionicons>['name']; href: Href };
+type Item = { label: string; icon: IconName; href: Href };
 
 export const DRAWER_ITEMS: Item[] = [
   { label: 'Profile', icon: 'person-outline', href: '/profile' },
@@ -46,7 +45,7 @@ export function AppDrawer({ navigation }: DrawerContentComponentProps) {
           accessibilityRole="button"
           onPress={() => go(item.href)}
           className="flex-row items-center gap-4 py-4 active:opacity-60">
-          <Ionicons name={item.icon} size={24} color={palette.ink} />
+          <Icon name={item.icon} size={24} color={palette.ink} />
           <Text className="text-xl font-bold text-ink dark:text-ink-dark">{item.label}</Text>
         </Pressable>
       ))}
@@ -57,7 +56,7 @@ export function AppDrawer({ navigation }: DrawerContentComponentProps) {
           void session.signOut();
         }}
         className="flex-row items-center gap-4 border-t border-border py-4 dark:border-border-dark">
-        <Ionicons name="log-out-outline" size={24} color={palette.danger} />
+        <Icon name="log-out-outline" size={24} color={palette.danger} />
         <Text className="text-xl font-bold text-danger dark:text-danger-dark">Log out</Text>
       </Pressable>
     </ScrollView>

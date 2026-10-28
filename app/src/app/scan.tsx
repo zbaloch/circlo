@@ -12,8 +12,8 @@ import { Text } from '@/components/ui/text';
 
 /** Scans an invite QR, a friend's safety-number QR, or a new device's link code (Devices: Link a new device). */
 export default function ScanScreen() {
-  // `circle`: where to put the person whose invite I scan (chosen on Friends > Got an invite?; default 10).
-  const { safetyFor, circle } = useLocalSearchParams<{ safetyFor?: string; circle?: string }>();
+  // `circles`: the circle ids (comma-separated) for the person whose invite I scan, chosen on Friends > Got an invite?.
+  const { safetyFor, circles } = useLocalSearchParams<{ safetyFor?: string; circles?: string }>();
   const session = useSession();
   const [permission, requestPermission] = useCameraPermissions();
   const [status, setStatus] = useState<string>();
@@ -53,7 +53,7 @@ export default function ScanScreen() {
           setError('These safety numbers don’t match. Don’t mark this friend as verified.');
         }
       } else {
-        await acceptInvite(account, data, circle ? Number(circle) : undefined);
+        await acceptInvite(account, data, circles ? circles.split(',').filter(Boolean).map(Number) : []);
         setStatus('Friend request sent. You’ll see their profile once they accept.');
       }
     } catch (e) {

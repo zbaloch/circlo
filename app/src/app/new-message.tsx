@@ -1,4 +1,4 @@
-import Ionicons from '@expo/vector-icons/Ionicons';
+import { Icon } from '@/components/ui/icon';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { FlatList, Pressable, View } from 'react-native';
@@ -72,7 +72,7 @@ export default function NewMessageScreen() {
                 <Text className="text-base font-semibold text-ink dark:text-ink-dark">{name}</Text>
                 {handle ? <Text className="text-muted dark:text-muted-dark">@{handle}</Text> : null}
               </View>
-              <Ionicons name={on ? 'checkmark-circle' : 'ellipse-outline'} size={24} color={on ? palette.primary : palette.muted} />
+              <Icon name={on ? 'checkmark-circle' : 'ellipse-outline'} size={24} color={on ? palette.primary : palette.muted} />
             </Pressable>
           );
         }}

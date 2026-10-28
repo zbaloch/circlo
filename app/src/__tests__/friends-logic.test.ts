@@ -45,20 +45,3 @@ describe('identity pinning', () => {
     expect(compareIdentity(pinned, { ed25519: 'ZZZ', x25519: 'BBB' })).toBe('changed');
   });
 });
-
-describe('accepting a request', () => {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const { acceptRequest } = require('@/lib/friends') as typeof import('@/lib/friends');
-  const account = { userId: 'me' } as Parameters<typeof acceptRequest>[0];
-
-  it('only places friends in circles 2–100 (circle 1 is "Me only")', async () => {
-    for (const bad of [0, 1, 101, 2.5]) {
-      await expect(acceptRequest(account, 'them', bad)).rejects.toThrow('invalid circle');
-    }
-  });
-
-  it('defaults new friends to circle 10', () => {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    expect(require('@/lib/addressbook').NEW_FRIEND_CIRCLE).toBe(10);
-  });
-});

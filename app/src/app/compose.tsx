@@ -1,9 +1,10 @@
-import Ionicons from '@expo/vector-icons/Ionicons';
+import { Icon } from '@/components/ui/icon';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, View } from 'react-native';
+import { Pressable, ScrollView, View } from 'react-native';
+import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AudienceSheet, audienceLine } from '@/components/audience-sheet';
@@ -11,11 +12,11 @@ import { Avatar } from '@/components/avatar';
 import { CharRing } from '@/components/char-ring';
 import { ErrorText } from '@/components/form';
 import { describeError } from '@/lib/account';
-import { loadAddressBook, type AddressBook } from '@/lib/addressbook';
-import { labelOf } from '@/lib/circles';
+import { loadAddressBook, type AddressBook, type Audience } from '@/lib/addressbook';
+import { audienceLabel, ONLY_ME } from '@/lib/circles';
 import { discardPicked, MAX_IMAGES, type PickedMedia } from '@/lib/media';
 import { enqueuePost } from '@/lib/outbox';
-import { defaultCircle, MAX_POST_CHARS, validateDraft } from '@/lib/posts';
+import { defaultAudience, MAX_POST_CHARS, validateDraft } from '@/lib/posts';
 import { useSession } from '@/lib/session';
 import { usePalette } from '@/theme/use-palette';
 import { Text, TextInput } from '@/components/ui/text';
@@ -37,7 +38,7 @@ export default function ComposeScreen() {
   const account = session.status === 'signedIn' ? session.account : null;
   const palette = usePalette();
   const [book, setBook] = useState<AddressBook | null>(null);
-  const [circle, setCircle] = useState(1);
+  const [audience, setAudience] = useState<Audience>(ONLY_ME);
   const [text, setText] = useState('');
   const [media, setMedia] = useState<PickedMedia[]>([]);
   const [sheet, setSheet] = useState(false);
@@ -48,7 +49,7 @@ export default function ComposeScreen() {
     loadAddressBook(account).then(
       (b) => {
         setBook(b);
-        setCircle(defaultCircle(b));
+        setAudience(defaultAudience(b));
       },
       (e) => setError(describeError(e)),
     );
@@ -56,9 +57,9 @@ export default function ComposeScreen() {
 
   const hasVideo = media.some((m) => m.type === 'video');
   const canAdd = !hasVideo && media.length < MAX_IMAGES;
-  const draft = { text: text.trim(), circle, media };
+  const draft = { text: text.trim(), audience, media };
   const used = [...text].length;
-  const postable = validateDraft(draft) === null;
+  const postable = !!book && validateDraft(draft, book) === null;
 
   const pick = async (camera: boolean) => {
     setError(undefined);
@@ -86,7 +87,7 @@ export default function ComposeScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-surface dark:bg-surface-dark">
-      <KeyboardAvoidingView className="flex-1" behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <KeyboardAvoidingView className="flex-1" behavior="padding">
         <View className="flex-row items-center justify-between px-4 py-2">
           <Pressable
             accessibilityRole="button"
@@ -114,12 +115,16 @@ export default function ComposeScreen() {
               {book ? (
                 <Pressable
                   accessibilityRole="button"
-                  accessibilityLabel={`Audience: ${labelOf(book, circle)}. ${audienceLine(book, circle)}`}
+                  accessibilityLabel={`Audience: ${audienceLabel(book, audience)}. ${audienceLine(book, audience)}`}
                   onPress={() => setSheet(true)}
                   className="flex-row items-center gap-1 self-start rounded-full border border-primary px-3 py-1 dark:border-primary-dark">
-                  <Ionicons name={circle === 1 ? 'lock-closed' : 'people'} size={14} color={palette.primary} />
-                  <Text className="text-sm font-bold text-primary dark:text-primary-dark">{labelOf(book, circle)}</Text>
-                  <Ionicons name="chevron-down" size={14} color={palette.primary} />
+                  <Icon
+                    name={audience.kind === 'onlyMe' ? 'lock-closed' : audience.kind === 'everyone' ? 'globe-outline' : 'people'}
+                    size={14}
+                    color={palette.primary}
+                  />
+                  <Text className="text-sm font-bold text-primary dark:text-primary-dark">{audienceLabel(book, audience)}</Text>
+                  <Icon name="chevron-down" size={14} color={palette.primary} />
                 </Pressable>
               ) : null}
               <TextInput
@@ -132,7 +137,7 @@ export default function ComposeScreen() {
                 onChangeText={setText}
                 className="min-h-24 text-lg text-ink dark:text-ink-dark"
               />
-              {book ? <Text className="text-sm text-muted dark:text-muted-dark">{audienceLine(book, circle)}</Text> : null}
+              {book ? <Text className="text-sm text-muted dark:text-muted-dark">{audienceLine(book, audience)}</Text> : null}
             </View>
           </View>
 
@@ -143,7 +148,7 @@ export default function ComposeScreen() {
                   <Image source={{ uri: m.uri }} className="h-28 w-28 rounded-2xl bg-surface-raised dark:bg-surface-raised-dark" contentFit="cover" />
                   {m.type === 'video' ? (
                     <View className="absolute bottom-1 left-1 rounded-full bg-black/60 px-2 py-0.5">
-                      <Ionicons name="videocam" size={14} color="#FFFFFF" />
+                      <Icon name="videocam" size={14} color="#FFFFFF" />
                     </View>
                   ) : null}
                   <Pressable
@@ -154,7 +159,7 @@ export default function ComposeScreen() {
                       setMedia(media.filter((_, j) => j !== i));
                     }}
                     className="absolute right-1 top-1 h-7 w-7 items-center justify-center rounded-full bg-black/60">
-                    <Ionicons name="close" size={16} color="#FFFFFF" />
+                    <Icon name="close" size={16} color="#FFFFFF" />
                   </Pressable>
                   {i > 0 ? (
                     <Pressable
@@ -162,7 +167,7 @@ export default function ComposeScreen() {
                       accessibilityLabel="Move earlier"
                       onPress={() => setMedia([...media.slice(0, i - 1), m, media[i - 1], ...media.slice(i + 1)])}
                       className="absolute left-1 top-1 h-7 w-7 items-center justify-center rounded-full bg-black/60">
-                      <Ionicons name="chevron-back" size={16} color="#FFFFFF" />
+                      <Icon name="chevron-back" size={16} color="#FFFFFF" />
                     </Pressable>
                   ) : null}
                 </View>
@@ -174,16 +179,16 @@ export default function ComposeScreen() {
 
         <View className="flex-row items-center gap-5 border-t border-border px-4 py-3 dark:border-border-dark">
           <Pressable accessibilityRole="button" accessibilityLabel="Add photos or video" disabled={!canAdd} onPress={() => pick(false)} className={canAdd ? '' : 'opacity-40'}>
-            <Ionicons name="image-outline" size={24} color={palette.primary} />
+            <Icon name="image-outline" size={24} color={palette.primary} />
           </Pressable>
           <Pressable accessibilityRole="button" accessibilityLabel="Take a photo" disabled={!canAdd} onPress={() => pick(true)} className={canAdd ? '' : 'opacity-40'}>
-            <Ionicons name="camera-outline" size={24} color={palette.primary} />
+            <Icon name="camera-outline" size={24} color={palette.primary} />
           </Pressable>
           <View className="flex-1" />
           <CharRing used={used} limit={MAX_POST_CHARS} />
         </View>
       </KeyboardAvoidingView>
-      {book ? <AudienceSheet visible={sheet} book={book} selected={circle} onSelect={setCircle} onClose={() => setSheet(false)} /> : null}
+      {book ? <AudienceSheet visible={sheet} book={book} selected={audience} onSelect={setAudience} onClose={() => setSheet(false)} /> : null}
     </SafeAreaView>
   );
 }

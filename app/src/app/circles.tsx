@@ -1,18 +1,24 @@
-import Ionicons from '@expo/vector-icons/Ionicons';
+import { Icon } from '@/components/ui/icon';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
 
+import { AudienceBadge, CircleBadge } from '@/components/circle-badge';
 import { ErrorText } from '@/components/form';
 import { Screen } from '@/components/screen';
 import { describeError } from '@/lib/account';
-import { loadAddressBook, type AddressBook } from '@/lib/addressbook';
-import { audienceSize, labelOf, listedCircles, membersOf, nextCustomCircle, resumePendingRotation } from '@/lib/circles';
+import { loadAddressBook, MAX_CIRCLES, type AddressBook } from '@/lib/addressbook';
+import { circleDefs, membersOf, nextCircleId, ONLY_ME, resumePendingRotation, TO_EVERYONE } from '@/lib/circles';
 import { useSession } from '@/lib/session';
 import { usePalette } from '@/theme/use-palette';
 import { Text } from '@/components/ui/text';
 
-/** Your circles, nearest first. Only you ever see these labels and who is in which circle. */
+const people = (n: number) => `${n} ${n === 1 ? 'person' : 'people'}`;
+
+/**
+ * Your circles: Only me and Everyone, then the circles you made (up to 8). A post to a circle reaches only the people
+ * in it; someone can be in any number of circles. Only you ever see circle names and who is in them.
+ */
 export default function CirclesScreen() {
   const session = useSession();
   const palette = usePalette();
@@ -32,47 +38,58 @@ export default function CirclesScreen() {
   );
 
   if (!account || !book) return <Screen>{error ? <ErrorText>{error}</ErrorText> : null}</Screen>;
-  const custom = nextCustomCircle(book);
+  const canAdd = nextCircleId(book) !== null;
+  const row = 'flex-row items-center gap-3 rounded-xl border border-border p-4 dark:border-border-dark';
 
   return (
     <Screen>
       <ScrollView contentContainerClassName="gap-2 p-4">
         <Text className="pb-2 text-muted dark:text-muted-dark">
-          A post to a circle is visible to that circle and every closer one. Moving someone is silent: nobody is told,
-          and Circlo can’t see it either.
+          Posts to a circle are seen only by the people in it. Put someone in as many circles as you like; changes are
+          silent: nobody is told, and Circlo can’t see them either.
         </Text>
         {book.pendingRotation ? <Text className="text-primary dark:text-primary-dark">Updating keys…</Text> : null}
         <ErrorText>{error}</ErrorText>
-        {listedCircles(book).map((n) => {
-          const members = membersOf(book, n).length;
-          return (
-            <Pressable
-              key={n}
-              accessibilityRole="button"
-              accessibilityLabel={`${labelOf(book, n)}, ${members} people`}
-              onPress={() => router.push({ pathname: '/circle/[n]', params: { n: String(n) } })}
-              className="flex-row items-center gap-3 rounded-xl border border-border p-4 active:opacity-60 dark:border-border-dark">
-              <View className="h-9 w-9 items-center justify-center rounded-full bg-primary-soft dark:bg-primary-soft-dark">
-                <Text className="font-bold text-primary dark:text-primary-dark">{n}</Text>
-              </View>
-              <View className="flex-1">
-                <Text className="text-base font-bold text-ink dark:text-ink-dark">{labelOf(book, n)}</Text>
-                <Text className="text-muted dark:text-muted-dark">
-                  {n === 1 ? 'Only you' : `${members} in this circle · ${audienceSize(book, n)} can see posts to it`}
-                </Text>
-              </View>
-              <Ionicons name="chevron-forward" size={20} color={palette.muted} />
-            </Pressable>
-          );
-        })}
-        {custom ? (
+        <View className={row}>
+          <AudienceBadge book={book} audience={ONLY_ME} />
+          <View className="flex-1">
+            <Text className="text-base font-bold text-ink dark:text-ink-dark">Only me</Text>
+            <Text className="text-muted dark:text-muted-dark">Only you</Text>
+          </View>
+        </View>
+        <View className={row}>
+          <AudienceBadge book={book} audience={TO_EVERYONE} />
+          <View className="flex-1">
+            <Text className="text-base font-bold text-ink dark:text-ink-dark">Everyone</Text>
+            <Text className="text-muted dark:text-muted-dark">All your friends · {people(Object.keys(book.contacts).length)}</Text>
+          </View>
+        </View>
+        <Text className="pt-4 text-xs font-semibold uppercase text-muted dark:text-muted-dark">Your circles</Text>
+        {circleDefs(book).map((c) => (
+          <Pressable
+            key={c.id}
+            accessibilityRole="button"
+            accessibilityLabel={`${c.name}, ${people(membersOf(book, c.id).length)}`}
+            onPress={() => router.push({ pathname: '/circle/[n]', params: { n: String(c.id) } })}
+            className={`${row} active:opacity-60`}>
+            <CircleBadge book={book} id={c.id} />
+            <View className="flex-1">
+              <Text className="text-base font-bold text-ink dark:text-ink-dark">{c.name}</Text>
+              <Text className="text-muted dark:text-muted-dark">{people(membersOf(book, c.id).length)} · only they see posts to it</Text>
+            </View>
+            <Icon name="chevron-forward" size={20} color={palette.muted} />
+          </Pressable>
+        ))}
+        {canAdd ? (
           <Pressable
             accessibilityRole="button"
-            onPress={() => router.push({ pathname: '/circle/[n]', params: { n: String(custom) } })}
+            onPress={() => router.push({ pathname: '/circle/[n]', params: { n: 'new' } })}
             className="items-center rounded-xl border border-dashed border-border p-4 active:opacity-60 dark:border-border-dark">
-            <Text className="font-bold text-primary dark:text-primary-dark">Add a custom circle</Text>
+            <Text className="font-bold text-primary dark:text-primary-dark">New circle</Text>
           </Pressable>
-        ) : null}
+        ) : (
+          <Text className="text-center text-muted dark:text-muted-dark">You can have up to {MAX_CIRCLES} circles.</Text>
+        )}
       </ScrollView>
     </Screen>
   );

@@ -38,9 +38,12 @@ const retryable = new WeakMap<Request, Request>();
 const auth: Middleware = {
   onRequest({ request }) {
     if (request.headers.has('Authorization')) return request; // an explicit token (e.g. recovery scope)
-    if (accessToken) request.headers.set('Authorization', `Bearer ${accessToken}`);
+    const path = new URL(request.url).pathname;
+    // Login, refresh and recovery are public: never send the (possibly expired) session token with them.
+    const publicAuth = path.startsWith('/v1/auth/') && !path.startsWith('/v1/auth/password');
+    if (accessToken && !publicAuth) request.headers.set('Authorization', `Bearer ${accessToken}`);
     // Session calls (not login/refresh themselves) can be retried once after renewing an expired or missing token.
-    if (refresher && !new URL(request.url).pathname.startsWith('/v1/auth/')) retryable.set(request, request.clone());
+    if (refresher && !path.startsWith('/v1/auth/')) retryable.set(request, request.clone());
     return request;
   },
   async onResponse({ request, response }) {

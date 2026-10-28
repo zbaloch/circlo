@@ -3,7 +3,7 @@ import { useState } from 'react';
 
 import { updateAddressBook, type AddressBook } from '@/lib/addressbook';
 import { ActionSheet, type SheetAction } from '@/components/action-sheet';
-import { labelOf } from '@/lib/circles';
+import { audienceLabel } from '@/lib/circles';
 import { getPost, openViewer, putPost, removePost } from '@/lib/feed-store';
 import type { StoredAccount } from '@/lib/keystore';
 import { deletePost, type FeedPost } from '@/lib/posts';
@@ -18,10 +18,16 @@ export function authorName(account: Pick<StoredAccount, 'userId' | 'handle'>, bo
   return { name: c?.displayName || (c?.handle ? `@${c.handle}` : 'Friend'), handle: c?.handle };
 }
 
-/** The author-only audience badge ("Closest friends+"). Only ever computed for my own posts. Pure. */
-export function audienceBadge(book: Pick<AddressBook, 'labels'> | null, post: Pick<FeedPost, 'mine' | 'circle'>): string | undefined {
-  if (!post.mine || !post.circle || !book) return undefined;
-  return `${labelOf(book, post.circle)}${post.circle > 1 ? '+' : ''}`;
+/** An author's profile: mine, or a friend's page with their posts. */
+export function openProfile(account: { userId: string } | null, userId: string) {
+  if (account && userId === account.userId) router.push('/profile');
+  else router.push({ pathname: '/friend/[id]', params: { id: userId } });
+}
+
+/** The author-only audience badge ("Everyone", "Family, Kids"). Only ever computed for my own posts. Pure. */
+export function audienceBadge(book: Pick<AddressBook, 'circleDefs'> | null, post: Pick<FeedPost, 'mine' | 'audience'>): string | undefined {
+  if (!post.mine || !post.audience || !book) return undefined;
+  return audienceLabel(book, post.audience);
 }
 
 /** Posts from authors I muted are hidden locally (the server never learns about mutes). Pure. */
@@ -95,7 +101,9 @@ export function usePostActions(account: StoredAccount | null, book: AddressBook 
       ...(account ? authorName(account, book, post.authorId) : { name: '' }),
       audience: audienceBadge(book, post),
       onOpen: opts.inThread ? undefined : open,
-      onReply: opts.inThread ? undefined : () => router.push({ pathname: '/post/[id]', params: { id: post.postId, reply: '1' } }),
+      // X style: the reply icon opens the reply composer, with the post shown above it.
+      onReply: () => router.push({ pathname: '/reply/[id]', params: { id: post.postId } }),
+      onAuthor: () => openProfile(account, post.authorId),
       onLike: () => like(post),
       onMore: () => more(post),
       onMediaPress: (index: number) => {

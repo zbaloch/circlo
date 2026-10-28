@@ -28,13 +28,15 @@ const post = (over: Partial<FeedPost> = {}): FeedPost => ({
   ...over,
 });
 
-describe('circle labels', () => {
-  const book = { labels: {} };
+describe('audience badges', () => {
+  const book = { circleDefs: [{ id: 2, name: 'Family' }, { id: 3, name: 'Kids' }] };
   it('shows the audience badge only on my own posts', () => {
-    expect(audienceBadge(book, post({ mine: true, circle: 7 }))).toBe('Closest friends+');
-    expect(audienceBadge(book, post({ mine: true, circle: 1 }))).toBe('Me only');
-    // A friend's post never gets a badge, even if a circle somehow leaked into the object.
-    expect(audienceBadge(book, post({ mine: false, circle: 7 }))).toBeUndefined();
+    expect(audienceBadge(book, post({ mine: true, audience: { kind: 'circles', ids: [3] } }))).toBe('Kids');
+    expect(audienceBadge(book, post({ mine: true, audience: { kind: 'circles', ids: [3, 2] } }))).toBe('Family, Kids');
+    expect(audienceBadge(book, post({ mine: true, audience: { kind: 'onlyMe' } }))).toBe('Only me');
+    expect(audienceBadge(book, post({ mine: true, audience: { kind: 'everyone' } }))).toBe('Everyone');
+    // A friend's post never gets a badge, even if an audience somehow leaked into the object.
+    expect(audienceBadge(book, post({ mine: false, audience: { kind: 'circles', ids: [2] } }))).toBeUndefined();
     expect(audienceBadge(book, post({ mine: true }))).toBeUndefined();
   });
 });

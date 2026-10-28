@@ -1,4 +1,4 @@
-import Ionicons from '@expo/vector-icons/Ionicons';
+import { Icon } from '@/components/ui/icon';
 import { router, useNavigation } from 'expo-router';
 import type { ReactNode } from 'react';
 import { Pressable, View } from 'react-native';
@@ -38,7 +38,7 @@ export function BackButton() {
       hitSlop={8}
       onPress={() => (navigation.canGoBack() ? navigation.goBack() : router.replace('/'))}
       className="h-9 w-9 items-center justify-center rounded-full active:bg-surface-raised dark:active:bg-surface-raised-dark">
-      <Ionicons name="arrow-back" size={22} color={palette.ink} />
+      <Icon name="arrow-back" size={22} color={palette.ink} />
     </Pressable>
   );
 }

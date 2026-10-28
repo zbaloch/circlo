@@ -31,8 +31,8 @@ class ThreadFlowIT extends IntegrationTest {
         call("POST", "/v1/invites", Map.of("tokenHash", core.inviteTokenHash(token)), inviter.accessToken);
         call("POST", "/v1/invites/redeem", Map.of("token", token), other.accessToken);
         call("POST", "/v1/friends/requests", Map.of("toUserId", inviter.userId.toString(), "epochId", epoch(other).toString(),
-                "payload", Ids.random(160)), other.accessToken);
-        call("POST", "/v1/friends/" + other.userId + "/accept", Map.of("epochId", inviterEpoch.toString(), "payload", Ids.random(160)),
+                "payload", Ids.random(416)), other.accessToken);
+        call("POST", "/v1/friends/" + other.userId + "/accept", Map.of("epochId", inviterEpoch.toString(), "payload", Ids.random(416)),
                 inviter.accessToken);
     }
 

@@ -16,6 +16,8 @@ import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.security.oauth2.jwt.JwtValidators;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
+import org.springframework.security.oauth2.server.resource.web.BearerTokenResolver;
+import org.springframework.security.oauth2.server.resource.web.DefaultBearerTokenResolver;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.www.BasicAuthenticationFilter;
 
@@ -51,8 +53,22 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/v1/backups/recovery").hasAnyAuthority("SCOPE_full", "SCOPE_recovery")
                         .requestMatchers("/v1/auth/password/**").hasAnyAuthority("SCOPE_full", "SCOPE_recovery")
                         .anyRequest().hasAuthority("SCOPE_full"))
-                .oauth2ResourceServer(o -> o.jwt(j -> {}));
+                .oauth2ResourceServer(o -> o.bearerTokenResolver(publicEndpointsIgnoreBearer()).jwt(j -> {}));
         return http.build();
+    }
+
+    /**
+     * The public auth endpoints and the device-link pickup ignore any Bearer header. Clients refresh because their
+     * access token expired, so it may still be attached; validating it would answer 401 before the endpoint runs
+     * and look like a revoked session. The password endpoints are excluded: they authenticate with a token.
+     */
+    static BearerTokenResolver publicEndpointsIgnoreBearer() {
+        DefaultBearerTokenResolver standard = new DefaultBearerTokenResolver();
+        return request -> {
+            String uri = request.getRequestURI();
+            boolean publicAuth = uri.startsWith("/v1/auth/") && !uri.startsWith("/v1/auth/password");
+            return publicAuth || uri.startsWith("/v1/device-links/") ? null : standard.resolve(request);
+        };
     }
 
     @Bean

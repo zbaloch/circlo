@@ -552,6 +552,8 @@ Rate limiting. **Do not log request bodies or IPs.**
 **Done when:** two test users become friends and see each other's decrypted profiles. The server DB contains no names.
 
 ### Phase 6: Circles
+> Superseded in part by CRYPTO.md v1.3 (owner decision 2026-10-29): circles are now independent, not nested. Only me and Everyone are built in; each author has up to 8 circles (starters Close Friends, Family, Kids, Work), a friend can be in any number, and a post can go to several circles at once. See PROGRESS.md decisions log.
+
 - Address-book blob holding circles 1–100, editable labels (defaults: 1 Me, 2 Spouse, 3–4 Kids, 5 Parents & siblings, 6 Extended family, 7 Closest friends, 8 Neighbourhood, 9 Work, 10 Faded contacts, 11–100 unnamed).
 - Assigning a friend to circle *k* sends them `Ck`.
 - Moving a friend outward, or removing them, creates a new epoch and re-wraps keys for everyone, in a background job with retry.

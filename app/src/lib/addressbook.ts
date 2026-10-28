@@ -16,9 +16,23 @@ export type MyEpoch = {
   createdAt: string;
   /** Author-only: the circle each friend was given keys for in this epoch (fixed: every move rotates the epoch). */
   placements?: Record<string, number>;
+  /** Author-only: who was given the Close Friends key in this epoch (v1.2 epochs only). */
+  closeFriends?: string[];
+  /** Author-only: the circle ids each friend was given keys for in this epoch (v1.3 epochs). */
+  circles?: Record<string, number[]>;
 };
 
-export type FriendKey = { epochId: string; circleKey: string; profileKey: string };
+/** Who a post is for (CRYPTO.md 8.6): only me, all my friends, or one or more of my circles. */
+export type Audience = { kind: 'onlyMe' } | { kind: 'everyone' } | { kind: 'circles'; ids: number[] };
+
+/** One of my circles: an id 1–8 (its key slot) and the name only I see. */
+export type CircleDef = { id: number; name: string };
+
+/**
+ * Keys a friend gave me for one of their epochs. `circleKeys`: their circle slots, concatenated (base64; real keys for
+ * circles I'm in, filler for the rest, and I can't tell which). `exclusiveKey`: the single slot of a v1.2 payload.
+ */
+export type FriendKey = { epochId: string; circleKey: string; profileKey: string; circleKeys?: string; exclusiveKey?: string };
 
 export type Contact = {
   /** Identity keys pinned at first contact (base64). A different key from the server triggers a warning. */
@@ -28,8 +42,12 @@ export type Contact = {
   verified: boolean;
   /** Set when the server starts publishing different identity keys; cleared only after re-verification. */
   identityChanged?: { ed25519: string; x25519: string; version: number };
-  /** Author-only: the circle I placed this friend in (never shown to them). Phase 6 adds the UI. */
+  /** The chain key position they're given: Everyone (2) from v1.3; their nested circle in older layouts. */
   circle: number;
+  /** Author-only: the circles (ids) I put this friend in. Never shown to them. */
+  circles?: number[];
+  /** Older layout (v1.2): in Close Friends. Migrated into `circles`. */
+  closeFriend?: boolean;
   keys: FriendKey[];
   /** Cached from their encrypted profile (display only). */
   displayName?: string;
@@ -40,25 +58,39 @@ export type AddressBook = {
   v: 1;
   myEpochs: MyEpoch[];
   contacts: Record<string, Contact>;
-  /** Author-only circle names (1–100). Missing entries fall back to DEFAULT_LABELS. Never leaves this device unencrypted. */
+  /** Older layouts: names for nested circle positions. Dropped by the v1.3 migration. */
   labels?: Record<string, string>;
+  /** My circles (author-only). Missing until the v1.3 migration; then the starter circles. */
+  circleDefs?: CircleDef[];
   /** A rotation that started but hasn't finished re-wrapping for everyone; resumed automatically. */
   pendingRotation?: { epochId: string; startedAt: string };
-  /** Author-only: which circle each of my posts went to (the post header deliberately doesn't say). */
+  /** Older layouts: which nested circle each of my posts went to. Dropped by the v1.3 migration. */
   postCircles?: Record<string, number>;
-  /** The composer's remembered audience. */
+  /** Author-only: who each of my posts went to (the post itself deliberately doesn't say). */
+  postAudiences?: Record<string, Audience>;
+  /** Older layouts: the composer's remembered circle. */
   lastCircle?: number;
+  /** The composer's remembered audience. */
+  lastAudience?: Audience;
+  /** Circle layout: 3 = independent circles (CRYPTO.md 8.6). Older books are migrated once. */
+  circlesLayout?: 2 | 3;
   /** Authors whose posts I hide from my timeline (local preference; the server never learns it). */
   muted?: string[];
 };
 
-/** New friends start in the widest circle until the author places them (Phase 6). */
-export const DEFAULT_CIRCLE = 100;
+/** The chain position every friend gets from v1.3: the Everyone key (CRYPTO.md 8.6). */
+export const EVERYONE = 2;
 
-/** Where accepting a request puts someone unless I pick another circle (owner decision 2026-10-28). */
-export const NEW_FRIEND_CIRCLE = 10;
+/** Starter circles (owner decision 2026-10-29). Close Friends keeps id 1, as before. */
+export const STARTER_CIRCLES: CircleDef[] = [
+  { id: 1, name: 'Close Friends' },
+  { id: 2, name: 'Family' },
+  { id: 3, name: 'Kids' },
+  { id: 4, name: 'Work' },
+];
+export const MAX_CIRCLES = 8;
 
-const empty = (): AddressBook => ({ v: 1, myEpochs: [], contacts: {} });
+const empty = (): AddressBook => ({ v: 1, myEpochs: [], contacts: {}, circlesLayout: 3, circleDefs: STARTER_CIRCLES });
 
 let cache: { book: AddressBook; version: number } | null = null;
 
@@ -133,8 +165,10 @@ export function compareIdentity(
   return contact.ed25519 === fetched.ed25519 && contact.x25519 === fetched.x25519 ? 'same' : 'changed';
 }
 
-/** Notes which circle a friend was given in an epoch (used by "Preview as…"). Call inside `updateAddressBook`. */
-export function recordPlacement(book: AddressBook, epochId: string, userId: string, circle: number) {
+/** Records which keys a friend was given in an epoch (used by "See what they can see"). Call inside `updateAddressBook`. */
+export function recordPlacement(book: AddressBook, epochId: string, userId: string, circles: number[]) {
   const epoch = book.myEpochs.find((e) => e.epochId === epochId);
-  if (epoch) epoch.placements = { ...epoch.placements, [userId]: circle };
+  if (!epoch) return;
+  epoch.placements = { ...epoch.placements, [userId]: EVERYONE };
+  epoch.circles = { ...epoch.circles, [userId]: [...circles].sort((a, b) => a - b) };
 }

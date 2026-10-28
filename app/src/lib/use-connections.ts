@@ -60,6 +60,12 @@ export function refreshConnections(account: StoredAccount): Promise<void> {
   return inflight;
 }
 
+/** On sign-out: drop the shared connections and this account's "seen requests" list from the device. */
+export async function forgetConnections(userId: string): Promise<void> {
+  set({ owner: null, connections: null, error: undefined, seen: null });
+  await SecureStore.deleteItemAsync(seenKey(userId), OPTIONS);
+}
+
 /** Incoming requests I haven't looked at yet (none until the seen list has loaded, so the dot never flashes). */
 export function unseenRequestIds(connections: Connection[] | null, seen: ReadonlySet<string> | null): string[] {
   if (!connections || !seen) return [];

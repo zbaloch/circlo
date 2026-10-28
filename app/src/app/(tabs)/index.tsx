@@ -45,7 +45,7 @@ function HomeEmptyState({ connections }: { connections: Connection[] | null }) {
     return (
       <EmptyState
         title="Someone wants to connect"
-        body="Accept their request to start sharing. You choose which circle they join."
+        body="Accept their request to start sharing. You choose which circles they’re in."
         actionLabel="Review request"
         onAction={() => router.navigate({ pathname: '/search', params: { section: 'friends' } })}
       />

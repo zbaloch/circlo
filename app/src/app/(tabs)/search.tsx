@@ -1,16 +1,15 @@
-import Ionicons from '@expo/vector-icons/Ionicons';
+import { Icon } from '@/components/ui/icon';
 import * as Clipboard from 'expo-clipboard';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { Pressable, RefreshControl, ScrollView, Share, View } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
 
-import { CircleChoice } from '@/components/circle-choice';
+import { CircleChoice , circlesLine } from '@/components/circle-choice';
 import { Avatar } from '@/components/avatar';
 import { Button, ErrorText, TextField } from '@/components/form';
 import { describeError } from '@/lib/account';
-import { loadAddressBook, NEW_FRIEND_CIRCLE, type AddressBook } from '@/lib/addressbook';
-import { labelOf } from '@/lib/circles';
+import { loadAddressBook, type AddressBook } from '@/lib/addressbook';
 import { acceptInvite, acceptRequest, createInviteLink, declineRequest, InviteError, type Connection } from '@/lib/friends';
 import { displayName, markRequestsSeen, useConnections } from '@/lib/use-connections';
 import { usePalette } from '@/theme/use-palette';
@@ -54,12 +53,12 @@ export default function SearchScreen() {
   const [error, setError] = useState<string>();
   const [notice, setNotice] = useState<string>();
   const [refreshing, setRefreshing] = useState(false);
-  // Where each request will go when accepted (author-only; defaults to NEW_FRIEND_CIRCLE).
+  // The circles each request goes into when accepted (author-only; none by default: they see Everyone posts).
   const [book, setBook] = useState<AddressBook | null>(null);
-  const [placement, setPlacement] = useState<Record<string, number>>({});
-  const circleFor = (userId: string) => placement[userId] ?? NEW_FRIEND_CIRCLE;
-  // Where someone whose invite I use goes (author-only; defaults to NEW_FRIEND_CIRCLE).
-  const [joinCircle, setJoinCircle] = useState(NEW_FRIEND_CIRCLE);
+  const [placement, setPlacement] = useState<Record<string, number[]>>({});
+  const circlesFor = (userId: string) => placement[userId] ?? [];
+  // The circles someone whose invite I use goes into (author-only; none by default).
+  const [joinCircles, setJoinCircles] = useState<number[]>([]);
 
   useFocusEffect(
     useCallback(() => {
@@ -109,7 +108,7 @@ export default function SearchScreen() {
   const requestActions = (c: Connection) => (
     <View className="gap-3">
       {book ? (
-        <CircleChoice book={book} value={circleFor(c.userId)} onChange={(n) => setPlacement((p) => ({ ...p, [c.userId]: n }))} />
+        <CircleChoice book={book} value={circlesFor(c.userId)} onChange={(ids) => setPlacement((p) => ({ ...p, [c.userId]: ids }))} />
       ) : null}
       <View className="flex-row gap-3">
         <View className="flex-1">
@@ -118,10 +117,10 @@ export default function SearchScreen() {
             loading={busy === `accept:${c.userId}`}
             disabled={!!busy}
             onPress={() => run(`accept:${c.userId}`, async () => {
-              const circle = circleFor(c.userId);
-              await acceptRequest(account, c.userId, circle);
+              const circles = circlesFor(c.userId);
+              await acceptRequest(account, c.userId, circles);
               await refresh();
-              if (book) setNotice(`You and ${displayName(c)} are now friends, in ${labelOf(book, circle)}.`);
+              if (book) setNotice(`You and ${displayName(c)} are now friends${circles.length ? `, in ${circlesLine(book, circles)}` : ''}.`);
               else setNotice(`You and ${displayName(c)} are now friends.`);
             })}
           />
@@ -208,7 +207,7 @@ export default function SearchScreen() {
                 <Text className="font-bold text-ink dark:text-ink-dark">{c.profile ? displayName(c) : 'Request sent'}</Text>
                 <Text className="text-muted dark:text-muted-dark">Waiting for them to accept</Text>
               </View>
-              <Ionicons name="time-outline" size={20} color={palette.muted} />
+              <Icon name="time-outline" size={20} color={palette.muted} />
             </View>
           ))}
         </View>
@@ -234,9 +233,9 @@ export default function SearchScreen() {
               {f.profile?.handle ? <Text className="text-muted dark:text-muted-dark">@{f.profile.handle}</Text> : null}
             </View>
             {f.identityChanged ? (
-              <Ionicons name="warning" size={20} color={palette.danger} accessibilityLabel="Security keys changed" />
+              <Icon name="warning" size={20} color={palette.danger} accessibilityLabel="Security keys changed" />
             ) : f.verified ? (
-              <Ionicons name="shield-checkmark" size={20} color={palette.primary} accessibilityLabel="Verified" />
+              <Icon name="shield-checkmark" size={20} color={palette.primary} accessibilityLabel="Verified" />
             ) : null}
           </Pressable>
         ))}
@@ -247,10 +246,10 @@ export default function SearchScreen() {
   const joinSection = (
     <>
       <Text className="text-muted dark:text-muted-dark">
-        Scan the QR code a friend shows you, or paste the invite link they sent. Choose their circle first; they’ll get your request to accept.
+        Scan the QR code a friend shows you, or paste the invite link they sent. Choose their circles first if you like; they’ll get your request to accept.
       </Text>
-      {book ? <CircleChoice book={book} value={joinCircle} onChange={setJoinCircle} label="Put them in circle" /> : null}
-      <Button label="Scan QR code" onPress={() => router.push({ pathname: '/scan', params: { circle: String(joinCircle) } })} />
+      {book ? <CircleChoice book={book} value={joinCircles} onChange={setJoinCircles} /> : null}
+      <Button label="Scan QR code" onPress={() => router.push({ pathname: '/scan', params: { circles: joinCircles.join(',') } })} />
       <TextField label="Or paste an invite link" placeholder="https://circlo.com/i/…" value={pasted} onChangeText={setPasted} />
       <Button
         label="Send friend request"
@@ -259,7 +258,7 @@ export default function SearchScreen() {
         loading={busy === 'paste'}
         onPress={() =>
           run('paste', async () => {
-            await acceptInvite(account, pasted, joinCircle);
+            await acceptInvite(account, pasted, joinCircles);
             setPasted('');
             setNotice('Friend request sent. You’ll see their profile once they accept.');
             await refresh();
@@ -280,7 +279,7 @@ export default function SearchScreen() {
             {scanner.status === 'accepted' ? 'You’re now friends.' : 'Accept their request to become friends.'}
           </Text>
         </View>
-        <Ionicons name="checkmark-circle" size={26} color={palette.primary} />
+        <Icon name="checkmark-circle" size={26} color={palette.primary} />
       </View>
       {scanner.status === 'incoming' ? (
         <>
@@ -300,7 +299,7 @@ export default function SearchScreen() {
         <QRCode value={invite.link} size={200} />
       </View>
       <View className="flex-row items-center gap-2">
-        <Ionicons name="hourglass-outline" size={16} color={palette.muted} />
+        <Icon name="hourglass-outline" size={16} color={palette.muted} />
         <Text className="text-sm text-muted dark:text-muted-dark">Waiting for someone to use it…</Text>
       </View>
       <Text selectable accessibilityLabel="Invite link" className="text-center text-sm text-muted dark:text-muted-dark">

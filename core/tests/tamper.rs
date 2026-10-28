@@ -63,7 +63,16 @@ fn fixture() -> &'static Fixture {
             created_at_ms: 5,
             media: vec![],
         };
-        let post = seal_post(&alice, &A, &P, &E, &root, 3, &content).unwrap();
+        let post = seal_post(
+            &alice,
+            &A,
+            &P,
+            &E,
+            &root,
+            Audience::Circles { ids: vec![1, 3] },
+            &content,
+        )
+        .unwrap();
         let reply = seal_reply(
             &post.post_key,
             &bob,
@@ -76,7 +85,7 @@ fn fixture() -> &'static Fixture {
             },
         )
         .unwrap();
-        let friend = seal_friend_payload(&alice, &bob.x25519_pk, &A, &B, &E, &root, 3, &[4; 32]).unwrap();
+        let friend = seal_friend_payload(&alice, &bob.x25519_pk, &A, &B, &E, &root, &[4; 32], &[1, 3]).unwrap();
         let profile = seal_profile(&[4; 32], &A, &E, b"profile").unwrap();
         let blob = seal_user_blob(&[5; 32], BlobKind::AddressBook, &A, b"address book").unwrap();
         let export_key = vec![6u8; 64];
@@ -122,12 +131,23 @@ fn fixture() -> &'static Fixture {
 proptest! {
     #![proptest_config(ProptestConfig::with_cases(256))]
 
+    /// Tampering never yields different content: the post either fails to open or opens exactly as the author
+    /// sealed it (unused filler slots and the row's tag, unused since v1.3, carry nothing a reader relies on).
     #[test]
     fn post_header(t in tamper()) {
         let f = fixture();
         let ring = ReaderKeyring::for_owner(&f.root).unwrap();
-        prop_assert!(ring.open_post(&f.alice.ed25519_pk, &A, &P, &E, &f.post.key_ref, &apply(&f.post.header_ct, &t)).is_err());
-        prop_assert!(ring.open_post(&f.alice.ed25519_pk, &A, &P, &E, &apply(&f.post.key_ref, &t), &f.post.header_ct).is_err());
+        let original = ring.open_post(&f.alice.ed25519_pk, &A, &P, &E, &f.post.key_ref, &f.post.header_ct).unwrap();
+        for o in [
+            ring.open_post(&f.alice.ed25519_pk, &A, &P, &E, &f.post.key_ref, &apply(&f.post.header_ct, &t)),
+            ring.open_post(&f.alice.ed25519_pk, &A, &P, &E, &apply(&f.post.key_ref, &t), &f.post.header_ct),
+        ]
+        .into_iter()
+        .flatten()
+        {
+            prop_assert_eq!(o.content.text, original.content.text.clone());
+            prop_assert_eq!(o.post_key, original.post_key.clone());
+        }
     }
 
     #[test]

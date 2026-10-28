@@ -4,11 +4,13 @@ import { VideoView } from 'expo-video';
 import { cssInterop } from 'nativewind';
 import { Animated } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 // Let third-party components take NativeWind `className` (styling rule: classes, not inline styles).
 cssInterop(GestureHandlerRootView, { className: 'style' });
 cssInterop(SafeAreaView, { className: 'style' });
+cssInterop(KeyboardAvoidingView, { className: 'style' });
 cssInterop(Image, { className: 'style' });
 cssInterop(CameraView, { className: 'style' });
 cssInterop(VideoView, { className: 'style' });
