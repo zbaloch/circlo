@@ -2,6 +2,7 @@ import { Tabs } from 'expo-router';
 
 import { DrawerAvatarButton, HeaderBar } from '@/components/ui/header';
 import { TabBar, type TabSpec } from '@/components/ui/tab-bar';
+import { useConnectionsSync, useHasUnseenRequests } from '@/lib/use-connections';
 
 export const TABS: TabSpec[] = [
   { name: 'index', label: 'Home', icon: 'home-outline', iconActive: 'home' },
@@ -12,9 +13,11 @@ export const TABS: TabSpec[] = [
 
 /** Bottom tab bar with icons only (PLAN.md 2A). Labels exist for screen readers. Same on iOS and Android. */
 export default function TabLayout() {
+  useConnectionsSync();
+  const unseenRequests = useHasUnseenRequests();
   return (
     <Tabs
-      tabBar={(props) => <TabBar {...props} tabs={TABS} />}
+      tabBar={(props) => <TabBar {...props} tabs={TABS} dots={{ notifications: unseenRequests }} />}
       screenOptions={{ header: ({ options }) => <HeaderBar title={options.title} left={<DrawerAvatarButton />} /> }}>
       {TABS.map((t) => (
         <Tabs.Screen

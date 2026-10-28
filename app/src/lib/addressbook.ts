@@ -55,6 +55,9 @@ export type AddressBook = {
 /** New friends start in the widest circle until the author places them (Phase 6). */
 export const DEFAULT_CIRCLE = 100;
 
+/** Where accepting a request puts someone unless I pick another circle (owner decision 2026-10-28). */
+export const NEW_FRIEND_CIRCLE = 10;
+
 const empty = (): AddressBook => ({ v: 1, myEpochs: [], contacts: {} });
 
 let cache: { book: AddressBook; version: number } | null = null;
@@ -63,32 +66,51 @@ export function resetAddressBookCache() {
   cache = null;
 }
 
-export async function loadAddressBook(account: StoredAccount): Promise<AddressBook> {
-  if (cache) return cache.book;
+/** The book and the server version it was read at, together, so an edit is always saved against its own base. */
+async function loadSnapshot(account: StoredAccount): Promise<{ book: AddressBook; version: number }> {
+  if (cache) return cache;
   const res = await api.GET('/v1/blobs/{kind}', { params: { path: { kind: 'address_book' } } });
   if (res.response.status === 404) {
     cache = { book: empty(), version: 0 };
-    return cache.book;
+    return cache;
   }
   const blob = ok(res);
   const plain = Core.openUserBlob(fromB64(account.dataKey), Core.BlobKind.AddressBook, uuidToBytes(account.userId), fromB64(blob.ciphertext));
   cache = { book: JSON.parse(new TextDecoder().decode(plain)) as AddressBook, version: blob.version };
-  return cache.book;
+  return cache;
 }
 
-/** Applies `change` to the latest address book and saves it (retries once if another device wrote first). */
-export async function updateAddressBook(account: StoredAccount, change: (b: AddressBook) => void): Promise<AddressBook> {
-  for (let attempt = 0; attempt < 2; attempt++) {
-    const book = JSON.parse(JSON.stringify(await loadAddressBook(account))) as AddressBook;
+export async function loadAddressBook(account: StoredAccount): Promise<AddressBook> {
+  return (await loadSnapshot(account)).book;
+}
+
+// Writes from this device run one at a time: a move, a rotation and a background sync never interleave.
+let writes: Promise<unknown> = Promise.resolve();
+
+/**
+ * Applies `change` to the latest address book and saves it. The save names the version the change was based on,
+ * so the server refuses it (409) if anything else was saved in between; the change is then re-applied to the newer
+ * book instead of overwriting it.
+ */
+export function updateAddressBook(account: StoredAccount, change: (b: AddressBook) => void): Promise<AddressBook> {
+  const run = writes.then(() => saveChange(account, change));
+  writes = run.catch(() => {});
+  return run;
+}
+
+async function saveChange(account: StoredAccount, change: (b: AddressBook) => void): Promise<AddressBook> {
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const base = await loadSnapshot(account);
+    const book = JSON.parse(JSON.stringify(base.book)) as AddressBook;
     change(book);
-    const version = (cache?.version ?? 0) + 1;
+    const version = base.version + 1;
     const ciphertext = Core.sealUserBlob(fromB64(account.dataKey), Core.BlobKind.AddressBook, uuidToBytes(account.userId), utf8(JSON.stringify(book)));
     const res = await api.PUT('/v1/blobs/{kind}', {
       params: { path: { kind: 'address_book' } },
       body: { ciphertext: toB64(ciphertext), version },
     });
-    if (res.response.status === 409 && attempt === 0) {
-      cache = null; // another device saved first: reload and re-apply
+    if (res.response.status === 409) {
+      cache = null; // something else saved first: reload and re-apply
       continue;
     }
     ok(res);

@@ -11,6 +11,7 @@ import {
   currentEpoch,
   DEFAULT_CIRCLE,
   loadAddressBook,
+  NEW_FRIEND_CIRCLE,
   recordPlacement,
   updateAddressBook,
   type AddressBook,
@@ -117,7 +118,9 @@ export async function createInviteLink(account: StoredAccount): Promise<string> 
 export class InviteError extends Error {}
 
 /** Redeems an invite, checks the inviter's keys against the link's fingerprint, then sends a friend request. */
-export async function acceptInvite(account: StoredAccount, link: string): Promise<string> {
+/** Redeems an invite (link or QR) and sends my request, placing them in `circle` (2–100). */
+export async function acceptInvite(account: StoredAccount, link: string, circle: number = NEW_FRIEND_CIRCLE): Promise<string> {
+  assertFriendCircle(circle);
   const parsed = parseInviteLink(link);
   if (!parsed) throw new InviteError('That isn’t a Circlo invite link.');
   const res = await api.POST('/v1/invites/redeem', { body: { token: toB64(parsed.token) } });
@@ -131,7 +134,7 @@ export async function acceptInvite(account: StoredAccount, link: string): Promis
     throw new InviteError('This invite doesn’t match the keys Circlo returned. Don’t continue; ask your friend to show their code in person.');
   }
   verifyIdentitySignature(inviter.userId!, identity);
-  await sendRequest(account, inviter.userId!, identity);
+  await sendRequest(account, inviter.userId!, identity, circle);
   return inviter.userId!;
 }
 
@@ -162,15 +165,23 @@ async function pin(account: StoredAccount, userId: string, id: Identity) {
   });
 }
 
-async function sendRequest(account: StoredAccount, toUserId: string, identity: Identity) {
+function assertFriendCircle(circle: number) {
+  if (!Number.isInteger(circle) || circle < 2 || circle > 100) throw new Error('invalid circle');
+}
+
+/** Sends my request with my keys for `circle`, and records where I placed them (author-only). */
+async function sendRequest(account: StoredAccount, toUserId: string, identity: Identity, circle: number) {
   const epoch = await ensureEpoch(account);
   await pin(account, toUserId, identity);
   ok(
     await api.POST('/v1/friends/requests', {
-      body: { toUserId, epochId: epoch.epochId, payload: friendPayload(account, epoch, toUserId, identity.x25519Pub, DEFAULT_CIRCLE) },
+      body: { toUserId, epochId: epoch.epochId, payload: friendPayload(account, epoch, toUserId, identity.x25519Pub, circle) },
     }),
   );
-  await updateAddressBook(account, (b) => recordPlacement(b, epoch.epochId, toUserId, DEFAULT_CIRCLE));
+  await updateAddressBook(account, (b) => {
+    if (b.contacts[toUserId]) b.contacts[toUserId].circle = circle;
+    recordPlacement(b, epoch.epochId, toUserId, circle);
+  });
 }
 
 // ---------------- requests and friends ----------------
@@ -254,17 +265,22 @@ export async function refreshContact(account: StoredAccount, userId: string): Pr
   return book.contacts[userId];
 }
 
-export async function acceptRequest(account: StoredAccount, userId: string): Promise<void> {
+/** Accepts a request and places them in `circle` (2–100; circle 1 is "Me only"). Their key payload is for that circle. */
+export async function acceptRequest(account: StoredAccount, userId: string, circle: number = NEW_FRIEND_CIRCLE): Promise<void> {
+  assertFriendCircle(circle);
   const contact = await refreshContact(account, userId);
   if (!contact || contact.identityChanged) throw new InviteError('This person’s security keys changed. Verify them before accepting.');
   const epoch = await ensureEpoch(account);
   ok(
     await api.POST('/v1/friends/{userId}/accept', {
       params: { path: { userId } },
-      body: { epochId: epoch.epochId, payload: friendPayload(account, epoch, userId, contact.x25519, contact.circle) },
+      body: { epochId: epoch.epochId, payload: friendPayload(account, epoch, userId, contact.x25519, circle) },
     }),
   );
-  await updateAddressBook(account, (b) => recordPlacement(b, epoch.epochId, userId, contact.circle));
+  await updateAddressBook(account, (b) => {
+    if (b.contacts[userId]) b.contacts[userId].circle = circle;
+    recordPlacement(b, epoch.epochId, userId, circle);
+  });
 }
 
 export async function declineRequest(userId: string): Promise<void> {

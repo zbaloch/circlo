@@ -33,7 +33,7 @@ export default function RecoveryPhraseScreen() {
         Your account is created when you confirm these words on the next screen. If you stop before then, nothing is
         saved and you can simply sign up again.
       </Text>
-      <Button label="I’ve written it down" onPress={() => router.push('/confirm-phrase')} />
+      <Button size="lg" label="I’ve written it down" onPress={() => router.push('/confirm-phrase')} />
     </AuthScreen>
   );
 }

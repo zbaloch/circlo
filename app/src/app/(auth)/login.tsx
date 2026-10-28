@@ -34,7 +34,7 @@ export default function LoginScreen() {
       <TextField label="Handle" value={handle} onChangeText={setHandle} textContentType="username" />
       <TextField label="Password" secureTextEntry value={password} onChangeText={setPassword} textContentType="password" />
       <ErrorText>{error}</ErrorText>
-      <Button label="Log in" onPress={submit} loading={busy} disabled={!handle || !password} />
+      <Button size="lg" label="Log in" onPress={submit} loading={busy} disabled={!handle || !password} />
       <Pressable accessibilityRole="link" onPress={() => router.push('/recover')} className="items-center py-2">
         <Text className="font-semibold text-primary dark:text-primary-dark">Forgot password? Use your recovery phrase</Text>
       </Pressable>

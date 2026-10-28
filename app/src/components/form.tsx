@@ -32,7 +32,11 @@ type ButtonProps = {
   disabled?: boolean;
   /** primary: brand pill; outline: secondary; danger: destructive actions (red). */
   variant?: 'primary' | 'outline' | 'danger';
+  /** md (40): buttons inside content, the default. lg (48): the main call to action on sign-in/onboarding screens. */
+  size?: 'md' | 'lg';
 };
+
+const SIZE = { md: 'min-h-[40px] px-4', lg: 'min-h-[48px] px-5' };
 
 const BUTTON: Record<NonNullable<ButtonProps['variant']>, { box: string; text: string }> = {
   primary: { box: 'bg-primary active:bg-primary-pressed dark:bg-primary-dark dark:active:bg-primary-pressed-dark', text: 'text-on-primary dark:text-on-primary-dark' },
@@ -41,7 +45,7 @@ const BUTTON: Record<NonNullable<ButtonProps['variant']>, { box: string; text: s
 };
 
 /** Pill button (X style), the same on iOS and Android. */
-export function Button({ label, onPress, loading = false, disabled = false, variant = 'primary' }: ButtonProps) {
+export function Button({ label, onPress, loading = false, disabled = false, variant = 'primary', size = 'md' }: ButtonProps) {
   const off = disabled || loading;
   const v = BUTTON[variant];
   return (
@@ -50,7 +54,9 @@ export function Button({ label, onPress, loading = false, disabled = false, vari
       accessibilityState={{ disabled: off, busy: loading }}
       disabled={off}
       onPress={onPress}
-      className={`min-h-[48px] items-center justify-center rounded-full px-5 ${v.box} ${off ? 'opacity-50' : ''}`}>
+      // Medium buttons keep a 48-point touch target.
+      hitSlop={size === 'md' ? 4 : undefined}
+      className={`items-center justify-center rounded-full ${SIZE[size]} ${v.box} ${off ? 'opacity-50' : ''}`}>
       {loading ? <Spinner tone={variant === 'outline' ? 'default' : 'onPrimary'} /> : <Text className={`text-[15px] font-bold ${v.text}`}>{label}</Text>}
     </Pressable>
   );

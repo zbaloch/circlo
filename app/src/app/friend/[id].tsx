@@ -4,11 +4,12 @@ import { useCallback, useState } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
 
 import { Avatar } from '@/components/avatar';
+import { CirclePickerSheet } from '@/components/circle-choice';
 import { Button, ErrorText } from '@/components/form';
 import { ProfileFeed } from '@/components/profile-feed';
 import { describeError } from '@/lib/account';
 import { loadAddressBook, type AddressBook } from '@/lib/addressbook';
-import { labelOf, listedCircles, placeFriend, unfriend } from '@/lib/circles';
+import { labelOf, placeFriend, unfriend } from '@/lib/circles';
 import { blockUser } from '@/lib/safety';
 import { displayName, useConnections } from '@/lib/use-connections';
 import { usePalette } from '@/theme/use-palette';
@@ -88,33 +89,20 @@ export default function FriendScreen() {
               variant="outline"
               onPress={() => router.push({ pathname: '/preview/[id]', params: { id: c.userId } })}
             />
-            {picking ? (
-              <View className="gap-1">
-                {listedCircles(book)
-                  .filter((n) => n >= 2)
-                  .map((n) => (
-                    <Pressable
-                      key={n}
-                      accessibilityRole="button"
-                      disabled={busy}
-                      onPress={() =>
-                        run(async () => {
-                          await placeFriend(account, c.userId, n);
-                          setPicking(false);
-                          reloadBook();
-                        })
-                      }
-                      className={`flex-row items-center justify-between rounded-lg px-3 py-3 active:opacity-60 ${n === contact.circle ? 'bg-primary-soft dark:bg-primary-soft-dark' : ''}`}>
-                      <Text className="text-ink dark:text-ink-dark">
-                        {n}. {labelOf(book, n)}
-                      </Text>
-                      {n === contact.circle ? <Ionicons name="checkmark" size={18} color={palette.primary} /> : null}
-                    </Pressable>
-                  ))}
-              </View>
-            ) : (
-              <Button label="Move to another circle" variant="outline" loading={busy} onPress={() => setPicking(true)} />
-            )}
+            <Button label="Move to another circle" variant="outline" loading={busy} onPress={() => setPicking(true)} />
+            <CirclePickerSheet
+              visible={picking}
+              book={book}
+              title={`Move ${displayName(c)} to…`}
+              selected={contact.circle}
+              onSelect={(n) =>
+                run(async () => {
+                  await placeFriend(account, c.userId, n);
+                  reloadBook();
+                })
+              }
+              onClose={() => setPicking(false)}
+            />
             <Pressable
               accessibilityRole="button"
               disabled={busy}
