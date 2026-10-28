@@ -1,80 +1,90 @@
-import { CLOSE_FRIENDS, NEW_FRIEND_CIRCLE, type Contact } from '@/lib/addressbook';
+import { MAX_CIRCLES, STARTER_CIRCLES, type Contact } from '@/lib/addressbook';
 import {
+  audienceLabel,
   audienceSize,
-  isValidFriendCircle,
-  labelOf,
-  levelOf,
-  listedCircles,
+  circleDefs,
+  circleName,
+  circlesOf,
   membersOf,
-  migratedCircle,
-  nextCustomCircle,
+  migratedCircles,
+  nextCircleId,
+  validAudience,
 } from '@/lib/circles';
 
-const friend = (circle: number, closeFriend = false): Contact => ({
+const friend = (circles: number[] = [], legacy: Partial<Contact> = {}): Contact => ({
   ed25519: 'e',
   x25519: 'x',
   identityVersion: 1,
   verified: false,
-  circle,
-  closeFriend,
+  circle: 2,
+  circles,
   keys: [],
+  ...legacy,
 });
 
-describe('circles', () => {
-  // Defaults at 20/40/60/80/100; "Book club" is a circle I added between Friends and Everyone.
+describe('circles (independent, v1.3)', () => {
+  // Starter circles: 1 Close Friends, 2 Family, 3 Kids, 4 Work; 6 is one I added.
   const book = {
-    labels: { '40': 'The kids', '90': 'Book club' },
-    contacts: { a: friend(20), b: friend(80, true), c: friend(80), d: friend(90, true), e: friend(100) },
+    circleDefs: [...STARTER_CIRCLES, { id: 6, name: 'Book club' }],
+    contacts: { a: friend([1, 2]), b: friend([2]), c: friend([3]), d: friend(), e: friend([6, 7]) },
   };
 
-  it('uses the default labels unless renamed; Only me is level 0', () => {
-    expect(labelOf(book, 1)).toBe('Only me');
-    expect(labelOf(book, 20)).toBe('My person');
-    expect(labelOf(book, 40)).toBe('The kids');
-    expect(labelOf(book, 60)).toBe('Parents & siblings');
-    expect(labelOf(book, 80)).toBe('Friends');
-    expect(labelOf(book, 100)).toBe('Everyone');
-    expect(labelOf(book, 90)).toBe('Book club');
-    expect(labelOf(book, CLOSE_FRIENDS)).toBe('Close Friends');
-    expect(labelOf(book, 55)).toBe('Circle 55');
+  it('starts with Close Friends, Family, Kids and Work', () => {
+    expect(circleDefs({}).map((c) => c.name)).toEqual(['Close Friends', 'Family', 'Kids', 'Work']);
+    expect(circleName(book, 6)).toBe('Book club');
   });
 
-  it('shows levels in order: Only me 0, then 1, 2, 3… with added circles slotted in', () => {
-    expect(listedCircles(book)).toEqual([1, 20, 40, 60, 80, 90, 100]);
-    expect([1, 20, 40, 60, 80, 90, 100].map((n) => levelOf(book, n))).toEqual([0, 1, 2, 3, 4, 5, 6]);
-    const plain = { contacts: {} };
-    expect(listedCircles(plain)).toEqual([1, 20, 40, 60, 80, 100]);
-    expect(levelOf(plain, 100)).toBe(5);
+  it('a friend can be in any number of circles; deleted circles are ignored', () => {
+    expect(circlesOf(book, book.contacts.a)).toEqual([1, 2]);
+    expect(circlesOf(book, book.contacts.e)).toEqual([6]); // 7 doesn't exist
+    expect(membersOf(book, 2).sort()).toEqual(['a', 'b']);
+    expect(membersOf(book, 4)).toEqual([]);
   });
 
-  it('a post to a circle reaches it and every closer one; Close Friends reaches only its members', () => {
-    expect(audienceSize(book, 1)).toBe(0);
-    expect(audienceSize(book, 20)).toBe(1);
-    expect(audienceSize(book, 80)).toBe(3);
-    expect(audienceSize(book, 100)).toBe(5);
-    expect(membersOf(book, 80).sort()).toEqual(['b', 'c']);
-    expect(membersOf(book, CLOSE_FRIENDS).sort()).toEqual(['b', 'd']);
-    // Close Friends is not "closer than" anything: "My person" (a) isn't in it.
-    expect(audienceSize(book, CLOSE_FRIENDS)).toBe(2);
+  it('a circle reaches only its members; several circles reach each member once; Everyone reaches all friends', () => {
+    expect(audienceSize(book, { kind: 'onlyMe' })).toBe(0);
+    expect(audienceSize(book, { kind: 'everyone' })).toBe(5);
+    expect(audienceSize(book, { kind: 'circles', ids: [3] })).toBe(1);
+    // Family is not "closer than" Kids: nesting is gone.
+    expect(audienceSize(book, { kind: 'circles', ids: [2] })).toBe(2);
+    expect(audienceSize(book, { kind: 'circles', ids: [1, 2] })).toBe(2);
+    expect(audienceSize(book, { kind: 'circles', ids: [1, 2, 3, 6] })).toBe(4);
   });
 
-  it('adds new circles between Friends and Everyone', () => {
-    expect(nextCustomCircle(book)).toBe(81);
-    expect(nextCustomCircle({ contacts: {} })).toBe(81);
+  it('labels audiences for the author', () => {
+    expect(audienceLabel(book, { kind: 'onlyMe' })).toBe('Only me');
+    expect(audienceLabel(book, { kind: 'everyone' })).toBe('Everyone');
+    expect(audienceLabel(book, { kind: 'circles', ids: [3, 2] })).toBe('Family, Kids');
+    expect(audienceLabel(book, { kind: 'circles', ids: [6, 1, 2] })).toBe('Close Friends +2');
   });
 
-  it('friends can be placed in positions 2–100 only (not Only me, not Close Friends)', () => {
-    expect(isValidFriendCircle(1)).toBe(false);
-    expect(isValidFriendCircle(CLOSE_FRIENDS)).toBe(false);
-    expect(isValidFriendCircle(2)).toBe(true);
-    expect(isValidFriendCircle(100)).toBe(true);
-    expect(isValidFriendCircle(101)).toBe(false);
-    expect(isValidFriendCircle(7.5)).toBe(false);
-    expect(NEW_FRIEND_CIRCLE).toBe(80);
+  it('only accepts audiences of existing circles, at least one, no repeats', () => {
+    expect(validAudience(book, { kind: 'onlyMe' })).toBe(true);
+    expect(validAudience(book, { kind: 'everyone' })).toBe(true);
+    expect(validAudience(book, { kind: 'circles', ids: [1, 6] })).toBe(true);
+    expect(validAudience(book, { kind: 'circles', ids: [] })).toBe(false);
+    expect(validAudience(book, { kind: 'circles', ids: [5] })).toBe(false);
+    expect(validAudience(book, { kind: 'circles', ids: [2, 2] })).toBe(false);
   });
 
-  it('moves the old 1–10 layout to the new positions', () => {
-    // Me only, Spouse, Kids, Kids, Parents & siblings, Extended family, Closest friends, Neighbourhood, Work, Faded, custom
-    expect([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 37].map(migratedCircle)).toEqual([1, 20, 40, 40, 60, 60, 80, 80, 80, 100, 100]);
+  it('new circles take the lowest free id, up to 8', () => {
+    expect(nextCircleId(book)).toBe(5);
+    const full = { circleDefs: Array.from({ length: MAX_CIRCLES }, (_, i) => ({ id: i + 1, name: `c${i}` })) };
+    expect(nextCircleId(full)).toBeNull();
+  });
+
+  it('moves nested circles into independent ones (owner decision 2026-10-29)', () => {
+    const v2 = (circle: number, closeFriend = false) => migratedCircles({ circle, closeFriend }, 2);
+    expect(v2(20)).toEqual([1, 2]); // My person → Close Friends + Family
+    expect(v2(40)).toEqual([3]); // Kids
+    expect(v2(60)).toEqual([2]); // Parents & siblings → Family
+    expect(v2(80)).toEqual([]); // Friends → Everyone only
+    expect(v2(100)).toEqual([]);
+    expect(v2(90)).toEqual([]); // a custom circle between Friends and Everyone
+    expect(v2(80, true)).toEqual([1]); // Close Friends members stay
+    expect(v2(40, true)).toEqual([1, 3]);
+    // The first layout (1–10): Spouse, Kids, Kids, Parents & siblings, Extended family, Closest friends…
+    const v1 = (circle: number) => migratedCircles({ circle }, undefined);
+    expect([2, 3, 4, 5, 6, 7, 10].map(v1)).toEqual([[1, 2], [3], [3], [2], [2], [], []]);
   });
 });

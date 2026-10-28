@@ -12,11 +12,11 @@ import { Avatar } from '@/components/avatar';
 import { CharRing } from '@/components/char-ring';
 import { ErrorText } from '@/components/form';
 import { describeError } from '@/lib/account';
-import { CLOSE_FRIENDS, loadAddressBook, type AddressBook } from '@/lib/addressbook';
-import { labelOf } from '@/lib/circles';
+import { loadAddressBook, type AddressBook, type Audience } from '@/lib/addressbook';
+import { audienceLabel, ONLY_ME } from '@/lib/circles';
 import { discardPicked, MAX_IMAGES, type PickedMedia } from '@/lib/media';
 import { enqueuePost } from '@/lib/outbox';
-import { defaultCircle, MAX_POST_CHARS, validateDraft } from '@/lib/posts';
+import { defaultAudience, MAX_POST_CHARS, validateDraft } from '@/lib/posts';
 import { useSession } from '@/lib/session';
 import { usePalette } from '@/theme/use-palette';
 import { Text, TextInput } from '@/components/ui/text';
@@ -38,7 +38,7 @@ export default function ComposeScreen() {
   const account = session.status === 'signedIn' ? session.account : null;
   const palette = usePalette();
   const [book, setBook] = useState<AddressBook | null>(null);
-  const [circle, setCircle] = useState(1);
+  const [audience, setAudience] = useState<Audience>(ONLY_ME);
   const [text, setText] = useState('');
   const [media, setMedia] = useState<PickedMedia[]>([]);
   const [sheet, setSheet] = useState(false);
@@ -49,7 +49,7 @@ export default function ComposeScreen() {
     loadAddressBook(account).then(
       (b) => {
         setBook(b);
-        setCircle(defaultCircle(b));
+        setAudience(defaultAudience(b));
       },
       (e) => setError(describeError(e)),
     );
@@ -57,9 +57,9 @@ export default function ComposeScreen() {
 
   const hasVideo = media.some((m) => m.type === 'video');
   const canAdd = !hasVideo && media.length < MAX_IMAGES;
-  const draft = { text: text.trim(), circle, media };
+  const draft = { text: text.trim(), audience, media };
   const used = [...text].length;
-  const postable = validateDraft(draft) === null;
+  const postable = !!book && validateDraft(draft, book) === null;
 
   const pick = async (camera: boolean) => {
     setError(undefined);
@@ -115,11 +115,15 @@ export default function ComposeScreen() {
               {book ? (
                 <Pressable
                   accessibilityRole="button"
-                  accessibilityLabel={`Audience: ${labelOf(book, circle)}. ${audienceLine(book, circle)}`}
+                  accessibilityLabel={`Audience: ${audienceLabel(book, audience)}. ${audienceLine(book, audience)}`}
                   onPress={() => setSheet(true)}
                   className="flex-row items-center gap-1 self-start rounded-full border border-primary px-3 py-1 dark:border-primary-dark">
-                  <Icon name={circle === 1 ? 'lock-closed' : circle === CLOSE_FRIENDS ? 'star' : 'people'} size={14} color={palette.primary} />
-                  <Text className="text-sm font-bold text-primary dark:text-primary-dark">{labelOf(book, circle)}</Text>
+                  <Icon
+                    name={audience.kind === 'onlyMe' ? 'lock-closed' : audience.kind === 'everyone' ? 'globe-outline' : 'people'}
+                    size={14}
+                    color={palette.primary}
+                  />
+                  <Text className="text-sm font-bold text-primary dark:text-primary-dark">{audienceLabel(book, audience)}</Text>
                   <Icon name="chevron-down" size={14} color={palette.primary} />
                 </Pressable>
               ) : null}
@@ -133,7 +137,7 @@ export default function ComposeScreen() {
                 onChangeText={setText}
                 className="min-h-24 text-lg text-ink dark:text-ink-dark"
               />
-              {book ? <Text className="text-sm text-muted dark:text-muted-dark">{audienceLine(book, circle)}</Text> : null}
+              {book ? <Text className="text-sm text-muted dark:text-muted-dark">{audienceLine(book, audience)}</Text> : null}
             </View>
           </View>
 
@@ -184,7 +188,7 @@ export default function ComposeScreen() {
           <CharRing used={used} limit={MAX_POST_CHARS} />
         </View>
       </KeyboardAvoidingView>
-      {book ? <AudienceSheet visible={sheet} book={book} selected={circle} onSelect={setCircle} onClose={() => setSheet(false)} /> : null}
+      {book ? <AudienceSheet visible={sheet} book={book} selected={audience} onSelect={setAudience} onClose={() => setSheet(false)} /> : null}
     </SafeAreaView>
   );
 }

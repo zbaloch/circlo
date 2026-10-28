@@ -3,7 +3,7 @@ import { useState } from 'react';
 
 import { updateAddressBook, type AddressBook } from '@/lib/addressbook';
 import { ActionSheet, type SheetAction } from '@/components/action-sheet';
-import { labelOf } from '@/lib/circles';
+import { audienceLabel } from '@/lib/circles';
 import { getPost, openViewer, putPost, removePost } from '@/lib/feed-store';
 import type { StoredAccount } from '@/lib/keystore';
 import { deletePost, type FeedPost } from '@/lib/posts';
@@ -18,17 +18,16 @@ export function authorName(account: Pick<StoredAccount, 'userId' | 'handle'>, bo
   return { name: c?.displayName || (c?.handle ? `@${c.handle}` : 'Friend'), handle: c?.handle };
 }
 
-/** The author-only audience badge ("Kids+", "Close Friends"). Only ever computed for my own posts. Pure. */
 /** An author's profile: mine, or a friend's page with their posts. */
 export function openProfile(account: { userId: string } | null, userId: string) {
   if (account && userId === account.userId) router.push('/profile');
   else router.push({ pathname: '/friend/[id]', params: { id: userId } });
 }
 
-export function audienceBadge(book: Pick<AddressBook, 'labels'> | null, post: Pick<FeedPost, 'mine' | 'circle'>): string | undefined {
-  if (!post.mine || post.circle === undefined || !book) return undefined;
-  // "Kids+": that circle and closer. Only me and Close Friends are exact audiences, so no "+".
-  return `${labelOf(book, post.circle)}${post.circle > 1 ? '+' : ''}`;
+/** The author-only audience badge ("Everyone", "Family, Kids"). Only ever computed for my own posts. Pure. */
+export function audienceBadge(book: Pick<AddressBook, 'circleDefs'> | null, post: Pick<FeedPost, 'mine' | 'audience'>): string | undefined {
+  if (!post.mine || !post.audience || !book) return undefined;
+  return audienceLabel(book, post.audience);
 }
 
 /** Posts from authors I muted are hidden locally (the server never learns about mutes). Pure. */

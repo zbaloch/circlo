@@ -35,8 +35,8 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 public class SocialController {
 
-    /** Friend payload version 2 (CRYPTO.md 8.3): 192 bytes for every friend, whatever the circle or membership. */
-    static final int PAYLOAD_LEN = 192;
+    /** Friend payload version 3 (CRYPTO.md 8.3): 416 bytes for every friend, whatever their circles. */
+    static final int PAYLOAD_LEN = 416;
     static final Duration INVITE_TTL = Duration.ofDays(7);
     static final int MAX_ACTIVE_INVITES = 20;
 

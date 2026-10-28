@@ -652,9 +652,8 @@ const DEFINITIONS = {
         FfiType.RustBuffer,
         FfiType.RustBuffer,
         FfiType.RustBuffer,
-        FfiType.UInt8,
         FfiType.RustBuffer,
-        FfiType.Int8,
+        FfiType.RustBuffer,
       ],
       ret: FfiType.RustBuffer,
       hasRustCallStatus: true,
@@ -672,18 +671,6 @@ const DEFINITIONS = {
     uniffi_circlo_core_fn_func_seal_post: {
       args: [
         FfiType.RustBuffer,
-        FfiType.RustBuffer,
-        FfiType.RustBuffer,
-        FfiType.RustBuffer,
-        FfiType.RustBuffer,
-        FfiType.UInt8,
-        FfiType.RustBuffer,
-      ],
-      ret: FfiType.RustBuffer,
-      hasRustCallStatus: true,
-    },
-    uniffi_circlo_core_fn_func_seal_post_close_friends: {
-      args: [
         FfiType.RustBuffer,
         FfiType.RustBuffer,
         FfiType.RustBuffer,
@@ -955,8 +942,8 @@ const DEFINITIONS = {
       ret: FfiType.RustBuffer,
       hasRustCallStatus: true,
     },
-    uniffi_circlo_core_fn_constructor_readerkeyring_for_circle: {
-      args: [FfiType.RustBuffer, FfiType.UInt8, FfiType.Int8],
+    uniffi_circlo_core_fn_constructor_readerkeyring_for_friend: {
+      args: [FfiType.RustBuffer, FfiType.UInt8, FfiType.RustBuffer],
       ret: FfiType.Handle,
       hasRustCallStatus: true,
     },
@@ -970,7 +957,7 @@ const DEFINITIONS = {
       ret: FfiType.Handle,
       hasRustCallStatus: true,
     },
-    uniffi_circlo_core_fn_constructor_readerkeyring_with_exclusive: {
+    uniffi_circlo_core_fn_constructor_readerkeyring_with_circles: {
       args: [FfiType.RustBuffer, FfiType.RustBuffer],
       ret: FfiType.Handle,
       hasRustCallStatus: true,
@@ -1223,11 +1210,6 @@ const DEFINITIONS = {
       ret: FfiType.UInt16,
       hasRustCallStatus: false,
     },
-    uniffi_circlo_core_checksum_func_seal_post_close_friends: {
-      args: [],
-      ret: FfiType.UInt16,
-      hasRustCallStatus: false,
-    },
     uniffi_circlo_core_checksum_func_seal_profile: {
       args: [],
       ret: FfiType.UInt16,
@@ -1423,7 +1405,7 @@ const DEFINITIONS = {
       ret: FfiType.UInt16,
       hasRustCallStatus: false,
     },
-    uniffi_circlo_core_checksum_constructor_readerkeyring_for_circle: {
+    uniffi_circlo_core_checksum_constructor_readerkeyring_for_friend: {
       args: [],
       ret: FfiType.UInt16,
       hasRustCallStatus: false,
@@ -1438,7 +1420,7 @@ const DEFINITIONS = {
       ret: FfiType.UInt16,
       hasRustCallStatus: false,
     },
-    uniffi_circlo_core_checksum_constructor_readerkeyring_with_exclusive: {
+    uniffi_circlo_core_checksum_constructor_readerkeyring_with_circles: {
       args: [],
       ret: FfiType.UInt16,
       hasRustCallStatus: false,
@@ -1893,9 +1875,8 @@ interface NativeModuleInterface {
     toUser: Uint8Array,
     epochId: Uint8Array,
     epochRoot: Uint8Array,
-    circle: number,
     profileKey: Uint8Array,
-    closeFriend: number,
+    circles: Uint8Array,
     uniffi_out_err: UniffiRustCallStatus,
   ): Uint8Array;
   uniffi_circlo_core_fn_func_seal_local(
@@ -1916,16 +1897,7 @@ interface NativeModuleInterface {
     postId: Uint8Array,
     epochId: Uint8Array,
     epochRoot: Uint8Array,
-    circle: number,
-    content: Uint8Array,
-    uniffi_out_err: UniffiRustCallStatus,
-  ): Uint8Array;
-  uniffi_circlo_core_fn_func_seal_post_close_friends(
-    author: Uint8Array,
-    authorId: Uint8Array,
-    postId: Uint8Array,
-    epochId: Uint8Array,
-    epochRoot: Uint8Array,
+    audience: Uint8Array,
     content: Uint8Array,
     uniffi_out_err: UniffiRustCallStatus,
   ): Uint8Array;
@@ -2160,10 +2132,10 @@ interface NativeModuleInterface {
     uniffiSelf: bigint,
     uniffi_out_err: UniffiRustCallStatus,
   ): Uint8Array;
-  uniffi_circlo_core_fn_constructor_readerkeyring_for_circle(
+  uniffi_circlo_core_fn_constructor_readerkeyring_for_friend(
     epochRoot: Uint8Array,
     circle: number,
-    closeFriend: number,
+    circles: Uint8Array,
     uniffi_out_err: UniffiRustCallStatus,
   ): bigint;
   uniffi_circlo_core_fn_constructor_readerkeyring_for_owner(
@@ -2174,9 +2146,9 @@ interface NativeModuleInterface {
     circleKey: Uint8Array,
     uniffi_out_err: UniffiRustCallStatus,
   ): bigint;
-  uniffi_circlo_core_fn_constructor_readerkeyring_with_exclusive(
+  uniffi_circlo_core_fn_constructor_readerkeyring_with_circles(
     circleKey: Uint8Array,
-    exclusiveKey: Uint8Array,
+    circleKeys: Uint8Array,
     uniffi_out_err: UniffiRustCallStatus,
   ): bigint;
   uniffi_circlo_core_fn_method_readerkeyring_open_post(
@@ -2236,7 +2208,6 @@ interface NativeModuleInterface {
   uniffi_circlo_core_checksum_func_seal_local(): number;
   uniffi_circlo_core_checksum_func_seal_password_backup(): number;
   uniffi_circlo_core_checksum_func_seal_post(): number;
-  uniffi_circlo_core_checksum_func_seal_post_close_friends(): number;
   uniffi_circlo_core_checksum_func_seal_profile(): number;
   uniffi_circlo_core_checksum_func_seal_push_token(): number;
   uniffi_circlo_core_checksum_func_seal_recovery_backup(): number;
@@ -2276,10 +2247,10 @@ interface NativeModuleInterface {
   uniffi_circlo_core_checksum_method_playbacksession_next_range(): number;
   uniffi_circlo_core_checksum_method_playbacksession_supply(): number;
   uniffi_circlo_core_checksum_method_playbacksession_url(): number;
-  uniffi_circlo_core_checksum_constructor_readerkeyring_for_circle(): number;
+  uniffi_circlo_core_checksum_constructor_readerkeyring_for_friend(): number;
   uniffi_circlo_core_checksum_constructor_readerkeyring_for_owner(): number;
   uniffi_circlo_core_checksum_constructor_readerkeyring_new(): number;
-  uniffi_circlo_core_checksum_constructor_readerkeyring_with_exclusive(): number;
+  uniffi_circlo_core_checksum_constructor_readerkeyring_with_circles(): number;
   uniffi_circlo_core_checksum_method_readerkeyring_open_post(): number;
   // Codegen call sites use these via `nativeModule().rustbuffer_alloc(...)`
   // and `nativeModule().rustbuffer_free(...)`. The runtime's registered

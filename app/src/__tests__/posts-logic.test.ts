@@ -1,5 +1,6 @@
 import { kindName, matchMedia, type PickedMedia } from '@/lib/media';
-import { defaultCircle, validateDraft } from '@/lib/posts';
+import { STARTER_CIRCLES } from '@/lib/addressbook';
+import { defaultAudience, validateDraft, type Draft } from '@/lib/posts';
 import { relativeTime } from '@/lib/time';
 
 // Native modules don't load under jest; these tests cover the pure logic only.
@@ -11,38 +12,43 @@ jest.mock('expo-video-thumbnails', () => ({}));
 const img: PickedMedia = { uri: 'file:///a.jpg', type: 'image', width: 10, height: 10 };
 const vid: PickedMedia = { uri: 'file:///a.mp4', type: 'video', width: 10, height: 10 };
 
+const book = { circleDefs: STARTER_CIRCLES };
+const check = (d: Omit<Draft, 'audience'> & { audience?: Draft['audience'] }) => validateDraft({ audience: { kind: 'everyone' }, ...d }, book);
+
 describe('validateDraft', () => {
   it('needs text or media, at most 500 characters', () => {
-    expect(validateDraft({ text: '', circle: 7, media: [] })).toMatch(/Write something/);
-    expect(validateDraft({ text: 'hi', circle: 7, media: [] })).toBeNull();
-    expect(validateDraft({ text: '', circle: 7, media: [img] })).toBeNull();
-    expect(validateDraft({ text: 'x'.repeat(500), circle: 7, media: [] })).toBeNull();
-    expect(validateDraft({ text: 'x'.repeat(501), circle: 7, media: [] })).toMatch(/500/);
+    expect(check({ text: '', media: [] })).toMatch(/Write something/);
+    expect(check({ text: 'hi', media: [] })).toBeNull();
+    expect(check({ text: '', media: [img] })).toBeNull();
+    expect(check({ text: 'x'.repeat(500), media: [] })).toBeNull();
+    expect(check({ text: 'x'.repeat(501), media: [] })).toMatch(/500/);
     // Counted in characters, not UTF-16 units: 500 emoji are fine.
-    expect(validateDraft({ text: '😀'.repeat(500), circle: 7, media: [] })).toBeNull();
+    expect(check({ text: '😀'.repeat(500), media: [] })).toBeNull();
   });
 
   it('allows up to 4 photos or exactly 1 video', () => {
-    expect(validateDraft({ text: '', circle: 7, media: [img, img, img, img] })).toBeNull();
-    expect(validateDraft({ text: '', circle: 7, media: [img, img, img, img, img] })).not.toBeNull();
-    expect(validateDraft({ text: '', circle: 7, media: [vid] })).toBeNull();
-    expect(validateDraft({ text: '', circle: 7, media: [vid, vid] })).not.toBeNull();
-    expect(validateDraft({ text: '', circle: 7, media: [vid, img] })).not.toBeNull();
+    expect(check({ text: '', media: [img, img, img, img] })).toBeNull();
+    expect(check({ text: '', media: [img, img, img, img, img] })).not.toBeNull();
+    expect(check({ text: '', media: [vid] })).toBeNull();
+    expect(check({ text: '', media: [vid, vid] })).not.toBeNull();
+    expect(check({ text: '', media: [vid, img] })).not.toBeNull();
   });
 
-  it('requires a circle from 1 to 100, or Close Friends', () => {
-    expect(validateDraft({ text: 'a', circle: -1, media: [] })).not.toBeNull();
-    expect(validateDraft({ text: 'a', circle: 101, media: [] })).not.toBeNull();
-    expect(validateDraft({ text: 'a', circle: 0, media: [] })).toBeNull(); // Close Friends
-    expect(validateDraft({ text: 'a', circle: 1, media: [] })).toBeNull();
-    expect(validateDraft({ text: 'a', circle: 100, media: [] })).toBeNull();
+  it('needs an audience: Only me, Everyone, or existing circles', () => {
+    expect(check({ text: 'a', media: [], audience: { kind: 'onlyMe' } })).toBeNull();
+    expect(check({ text: 'a', media: [], audience: { kind: 'everyone' } })).toBeNull();
+    expect(check({ text: 'a', media: [], audience: { kind: 'circles', ids: [1, 3] } })).toBeNull();
+    expect(check({ text: 'a', media: [], audience: { kind: 'circles', ids: [] } })).not.toBeNull();
+    expect(check({ text: 'a', media: [], audience: { kind: 'circles', ids: [7] } })).not.toBeNull();
   });
 });
 
-describe('defaultCircle', () => {
-  it('remembers the last circle, and starts at "Me only" so nothing is shared by accident', () => {
-    expect(defaultCircle({})).toBe(1);
-    expect(defaultCircle({ lastCircle: 7 })).toBe(7);
+describe('defaultAudience', () => {
+  it('remembers my last choice, and starts at Only me so nothing is shared by accident', () => {
+    expect(defaultAudience(book)).toEqual({ kind: 'onlyMe' });
+    expect(defaultAudience({ ...book, lastAudience: { kind: 'circles', ids: [2, 3] } })).toEqual({ kind: 'circles', ids: [2, 3] });
+    // A remembered circle that was deleted falls back to Only me.
+    expect(defaultAudience({ ...book, lastAudience: { kind: 'circles', ids: [7] } })).toEqual({ kind: 'onlyMe' });
   });
 });
 

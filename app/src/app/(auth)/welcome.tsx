@@ -10,12 +10,12 @@ import { usePalette } from '@/theme/use-palette';
 
 type Point = { icon: IconName; title: string; body: string };
 
-// Circles are nested: a friend in a closer layer can read everything shared with the layers around them.
+// Circles are independent: a post to a circle reaches only its members (CRYPTO.md 8.6).
 const POINTS: Point[] = [
   {
-    icon: 'layers-outline',
-    title: 'Share in layers',
-    body: 'Place each friend in a layer, from your closest people outward. Post to a layer and everyone in it, and everyone closer, can read it. No one further out can.',
+    icon: 'people-outline',
+    title: 'Share with your circles',
+    body: 'Put friends in circles like Family, Kids or Close Friends. Post to one or more circles and only the people in them can read it, or share with Everyone, or keep it for yourself.',
   },
   {
     icon: 'lock-closed-outline',

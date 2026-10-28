@@ -9,9 +9,8 @@ import { api, ok } from '@/api/client';
 import {
   compareIdentity,
   currentEpoch,
-  DEFAULT_CIRCLE,
+  EVERYONE,
   loadAddressBook,
-  NEW_FRIEND_CIRCLE,
   recordPlacement,
   updateAddressBook,
   type AddressBook,
@@ -117,10 +116,8 @@ export async function createInviteLink(account: StoredAccount): Promise<string> 
 
 export class InviteError extends Error {}
 
-/** Redeems an invite, checks the inviter's keys against the link's fingerprint, then sends a friend request. */
-/** Redeems an invite (link or QR) and sends my request, placing them in `circle` (2–100). */
-export async function acceptInvite(account: StoredAccount, link: string, circle: number = NEW_FRIEND_CIRCLE): Promise<string> {
-  assertFriendCircle(circle);
+/** Redeems an invite (link or QR), checks the inviter's keys against the link's fingerprint, then sends my request with them in `circles`. */
+export async function acceptInvite(account: StoredAccount, link: string, circles: number[] = []): Promise<string> {
   const parsed = parseInviteLink(link);
   if (!parsed) throw new InviteError('That isn’t a Circlo invite link.');
   const res = await api.POST('/v1/invites/redeem', { body: { token: toB64(parsed.token) } });
@@ -134,7 +131,7 @@ export async function acceptInvite(account: StoredAccount, link: string, circle:
     throw new InviteError('This invite doesn’t match the keys Circlo returned. Don’t continue; ask your friend to show their code in person.');
   }
   verifyIdentitySignature(inviter.userId!, identity);
-  await sendRequest(account, inviter.userId!, identity, circle);
+  await sendRequest(account, inviter.userId!, identity, circles);
   return inviter.userId!;
 }
 
@@ -142,8 +139,8 @@ export function verifyIdentitySignature(userId: string, id: Identity) {
   Core.verifyIdentity(fromB64(id.ed25519Pub), uuidToBytes(userId), id.version, fromB64(id.x25519Pub), fromB64(id.signature));
 }
 
-/** My keys for one friend in one epoch: their circle key, and the Close Friends key if they're a member (CRYPTO.md 8.3). */
-export function friendPayload(account: StoredAccount, epoch: MyEpoch, toUserId: string, theirX25519: string, circle: number, closeFriend = false): string {
+/** My keys for one friend in one epoch: the Everyone key, and the key of each of my circles they're in (CRYPTO.md 8.3). */
+export function friendPayload(account: StoredAccount, epoch: MyEpoch, toUserId: string, theirX25519: string, circles: number[]): string {
   return toB64(
     Core.sealFriendPayload(
       myIdentity(account),
@@ -152,9 +149,8 @@ export function friendPayload(account: StoredAccount, epoch: MyEpoch, toUserId: 
       uuidToBytes(toUserId),
       uuidToBytes(epoch.epochId),
       fromB64(epoch.root),
-      circle,
       fromB64(epoch.profileKey),
-      closeFriend,
+      Uint8Array.from(circles).buffer,
     ),
   );
 }
@@ -162,27 +158,23 @@ export function friendPayload(account: StoredAccount, epoch: MyEpoch, toUserId: 
 async function pin(account: StoredAccount, userId: string, id: Identity) {
   await updateAddressBook(account, (b) => {
     if (!b.contacts[userId]) {
-      b.contacts[userId] = { ed25519: id.ed25519Pub, x25519: id.x25519Pub, identityVersion: id.version, verified: false, circle: DEFAULT_CIRCLE, keys: [] };
+      b.contacts[userId] = { ed25519: id.ed25519Pub, x25519: id.x25519Pub, identityVersion: id.version, verified: false, circle: EVERYONE, keys: [] };
     }
   });
 }
 
-function assertFriendCircle(circle: number) {
-  if (!Number.isInteger(circle) || circle < 2 || circle > 100) throw new Error('invalid circle');
-}
-
-/** Sends my request with my keys for `circle`, and records where I placed them (author-only). */
-async function sendRequest(account: StoredAccount, toUserId: string, identity: Identity, circle: number) {
+/** Sends my request with my keys for `circles`, and records which circles I put them in (author-only). */
+async function sendRequest(account: StoredAccount, toUserId: string, identity: Identity, circles: number[]) {
   const epoch = await ensureEpoch(account);
   await pin(account, toUserId, identity);
   ok(
     await api.POST('/v1/friends/requests', {
-      body: { toUserId, epochId: epoch.epochId, payload: friendPayload(account, epoch, toUserId, identity.x25519Pub, circle) },
+      body: { toUserId, epochId: epoch.epochId, payload: friendPayload(account, epoch, toUserId, identity.x25519Pub, circles) },
     }),
   );
   await updateAddressBook(account, (b) => {
-    if (b.contacts[toUserId]) b.contacts[toUserId].circle = circle;
-    recordPlacement(b, epoch.epochId, toUserId, circle);
+    if (b.contacts[toUserId]) b.contacts[toUserId].circles = circles;
+    recordPlacement(b, epoch.epochId, toUserId, circles);
   });
 }
 
@@ -246,7 +238,7 @@ export async function refreshContact(account: StoredAccount, userId: string): Pr
     const c = b.contacts[userId];
     const verdict = compareIdentity(c, { ed25519: id.ed25519Pub, x25519: id.x25519Pub });
     if (verdict === 'new') {
-      b.contacts[userId] = { ed25519: id.ed25519Pub, x25519: id.x25519Pub, identityVersion: id.version, verified: false, circle: DEFAULT_CIRCLE, keys: [] };
+      b.contacts[userId] = { ed25519: id.ed25519Pub, x25519: id.x25519Pub, identityVersion: id.version, verified: false, circle: EVERYONE, keys: [] };
     } else if (verdict === 'changed') {
       // Never silently trust new keys: keep the pin, flag the change, drop verification.
       c!.identityChanged = { ed25519: id.ed25519Pub, x25519: id.x25519Pub, version: id.version };
@@ -262,8 +254,8 @@ export async function refreshContact(account: StoredAccount, userId: string): Pr
           epochId: p.epochId!,
           circleKey: toB64(key.circleKey),
           profileKey: toB64(key.profileKey),
-          // Their Close Friends slot: the real key only if I'm a member (I can't tell); absent in v1 payloads.
-          ...(key.exclusiveKey.byteLength ? { exclusiveKey: toB64(key.exclusiveKey) } : {}),
+          // Their circle slots: real keys for circles I'm in, filler for the rest (I can't tell which); none in v1.
+          ...(key.circleKeys.byteLength ? { circleKeys: toB64(key.circleKeys) } : {}),
         });
       } catch {
         // Not from the pinned identity (or tampered): ignore it.
@@ -273,21 +265,20 @@ export async function refreshContact(account: StoredAccount, userId: string): Pr
   return book.contacts[userId];
 }
 
-/** Accepts a request and places them in `circle` (2–100; circle 1 is "Me only"). Their key payload is for that circle. */
-export async function acceptRequest(account: StoredAccount, userId: string, circle: number = NEW_FRIEND_CIRCLE): Promise<void> {
-  assertFriendCircle(circle);
+/** Accepts a request and puts them in `circles` (none: they see Everyone posts only). */
+export async function acceptRequest(account: StoredAccount, userId: string, circles: number[] = []): Promise<void> {
   const contact = await refreshContact(account, userId);
   if (!contact || contact.identityChanged) throw new InviteError('This person’s security keys changed. Verify them before accepting.');
   const epoch = await ensureEpoch(account);
   ok(
     await api.POST('/v1/friends/{userId}/accept', {
       params: { path: { userId } },
-      body: { epochId: epoch.epochId, payload: friendPayload(account, epoch, userId, contact.x25519, circle) },
+      body: { epochId: epoch.epochId, payload: friendPayload(account, epoch, userId, contact.x25519, circles) },
     }),
   );
   await updateAddressBook(account, (b) => {
-    if (b.contacts[userId]) b.contacts[userId].circle = circle;
-    recordPlacement(b, epoch.epochId, userId, circle);
+    if (b.contacts[userId]) b.contacts[userId].circles = circles;
+    recordPlacement(b, epoch.epochId, userId, circles);
   });
 }
 

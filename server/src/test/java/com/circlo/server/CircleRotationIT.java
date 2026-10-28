@@ -31,14 +31,14 @@ class CircleRotationIT extends IntegrationTest {
         call("POST", "/v1/invites", Map.of("tokenHash", core.inviteTokenHash(token)), inviter.accessToken);
         call("POST", "/v1/invites/redeem", Map.of("token", token), other.accessToken);
         call("POST", "/v1/friends/requests", Map.of("toUserId", inviter.userId.toString(), "epochId", otherEpoch.toString(),
-                "payload", Ids.random(192)), other.accessToken);
+                "payload", Ids.random(416)), other.accessToken);
         assertThat(call("POST", "/v1/friends/" + other.userId + "/accept",
-                Map.of("epochId", inviterEpoch.toString(), "payload", Ids.random(192)), inviter.accessToken).getStatusCode().value())
+                Map.of("epochId", inviterEpoch.toString(), "payload", Ids.random(416)), inviter.accessToken).getStatusCode().value())
                 .isEqualTo(200);
     }
 
     private static Map<String, Object> item(TestApp to, UUID epoch) {
-        return Map.of("toUserId", to.userId.toString(), "epochId", epoch.toString(), "ciphertext", Ids.random(192));
+        return Map.of("toUserId", to.userId.toString(), "epochId", epoch.toString(), "ciphertext", Ids.random(416));
     }
 
     @Test
@@ -55,7 +55,7 @@ class CircleRotationIT extends IntegrationTest {
         byte[] daveInvite = Ids.random(32);
         call("POST", "/v1/invites", Map.of("tokenHash", core.inviteTokenHash(daveInvite)), dave.accessToken);
         call("POST", "/v1/invites/redeem", Map.of("token", daveInvite), alice.accessToken);
-        call("POST", "/v1/friends/requests", Map.of("toUserId", dave.userId.toString(), "epochId", e1.toString(), "payload", Ids.random(192)),
+        call("POST", "/v1/friends/requests", Map.of("toUserId", dave.userId.toString(), "epochId", e1.toString(), "payload", Ids.random(416)),
                 alice.accessToken);
 
         UUID e2 = epoch(alice);
@@ -72,7 +72,7 @@ class CircleRotationIT extends IntegrationTest {
         // Server-side, every friend's payload looks the same: identical length whatever their circle.
         List<Integer> sizes = jdbc.queryForList(
                 "SELECT LENGTH(hpke_ciphertext) FROM friend_payloads WHERE from_user = ?", Integer.class, (Object) Ids.bytes(alice.userId));
-        assertThat(sizes).isNotEmpty().allMatch(s -> s == 192);
+        assertThat(sizes).isNotEmpty().allMatch(s -> s == 416);
 
         // Bob now sees both epochs' payloads from Alice.
         assertThat(payloads(bob, alice.userId)).hasSize(2);

@@ -12,7 +12,10 @@ use zeroize::Zeroizing;
 use crate::backup::{self, BackupPayload, EpochSecrets};
 use crate::blob;
 pub use crate::blob::BlobKind;
-use crate::chain::{circle_key, exclusive_key, forward_keys, CircleKey};
+use crate::chain::{circle_key, exclusive_key, forward_keys, CircleKey, EXCLUSIVE_CIRCLES};
+
+/// The chain position given to every friend from CRYPTO.md v1.3 on: the Everyone key `E = C2` (8.6).
+pub const EVERYONE: u8 = 2;
 use crate::error::{fixed, invalid, CoreError, Result};
 use crate::friend::{self, FriendPayload};
 use crate::identity::{self, Identity};
@@ -146,8 +149,9 @@ pub struct ReceivedFriendKey {
     pub epoch_id: Vec<u8>,
     pub circle_key: Vec<u8>,
     pub profile_key: Vec<u8>,
-    /// The exclusive-circle key slot (CRYPTO.md 8.5): `X` for members, random filler otherwise; empty for a v1 payload.
-    pub exclusive_key: Vec<u8>,
+    /// The circle-key slots (CRYPTO.md 8.5), 32 bytes each, concatenated: real keys for my circles, filler for the
+    /// rest (indistinguishable). 8 slots for a v3 payload, 1 for v2, none for v1.
+    pub circle_keys: Vec<u8>,
 }
 
 #[derive(uniffi::Record)]
@@ -340,6 +344,19 @@ pub fn new_symmetric_key() -> Vec<u8> {
 
 // ---------------- circles, friends, posts ----------------
 
+/// Circle ids (1..=8, no repeats) as given by the app, checked.
+fn circle_ids(ids: &[u8]) -> Result<Vec<u8>> {
+    let mut seen = [false; EXCLUSIVE_CIRCLES as usize + 1];
+    for &i in ids {
+        if !(1..=EXCLUSIVE_CIRCLES).contains(&i) || std::mem::replace(&mut seen[i as usize], true) {
+            return Err(invalid("circle ids must be 1..=8, no repeats"));
+        }
+    }
+    Ok(ids.to_vec())
+}
+
+/// My keys for one friend in one epoch (CRYPTO.md 8.3, v3): the Everyone key, my profile key, and the key of each
+/// circle in `circles` (ids 1..=8); every other slot gets random filler, so the size never depends on membership.
 #[uniffi::export]
 pub fn seal_friend_payload(
     sender: &IdentityKeys,
@@ -348,21 +365,24 @@ pub fn seal_friend_payload(
     to_user: &[u8],
     epoch_id: &[u8],
     epoch_root: &[u8],
-    circle: u8,
     profile_key: &[u8],
-    close_friend: bool,
+    circles: &[u8],
 ) -> Result<Vec<u8>> {
     let root = CircleKey::from_bytes(key32(epoch_root, "epoch_root")?);
+    let ids = circle_ids(circles)?;
     let payload = FriendPayload {
         epoch_id: id16(epoch_id, "epoch_id")?,
-        circle_key: circle_key(&root, circle)?,
+        circle_key: circle_key(&root, EVERYONE)?,
         profile_key: Zeroizing::new(key32(profile_key, "profile_key")?),
-        // Members of Close Friends get X1; everyone else gets random filler of the same size (CRYPTO.md 8.3).
-        exclusive_key: if close_friend {
-            Some(exclusive_key(&root, 1)?)
-        } else {
-            None
-        },
+        circle_keys: (1..=EXCLUSIVE_CIRCLES)
+            .map(|i| {
+                if ids.contains(&i) {
+                    exclusive_key(&root, i).map(Some)
+                } else {
+                    Ok(None)
+                }
+            })
+            .collect::<Result<_>>()?,
     };
     friend::seal(
         &sender.load()?,
@@ -394,10 +414,27 @@ pub fn open_friend_payload(
         epoch_id: p.epoch_id.to_vec(),
         circle_key: p.circle_key.as_bytes().to_vec(),
         profile_key: p.profile_key.to_vec(),
-        exclusive_key: p.exclusive_key.map(|x| x.as_bytes().to_vec()).unwrap_or_default(),
+        circle_keys: p
+            .circle_keys
+            .iter()
+            .flatten()
+            .flat_map(|k| k.as_bytes().to_vec())
+            .collect(),
     })
 }
 
+/// Who a post is for (CRYPTO.md 8.6).
+#[derive(uniffi::Enum)]
+pub enum Audience {
+    /// Only me (C1).
+    OnlyMe,
+    /// All my friends (E = C2).
+    Everyone,
+    /// One or more circles (ids 1..=8): only their members.
+    Circles { ids: Vec<u8> },
+}
+
+/// Seals a post for its audience: 8 key slots, filler for the unused ones, so the server can't tell the audience.
 #[uniffi::export]
 pub fn seal_post(
     author: &IdentityKeys,
@@ -405,26 +442,24 @@ pub fn seal_post(
     post_id: &[u8],
     epoch_id: &[u8],
     epoch_root: &[u8],
-    circle: u8,
+    audience: Audience,
     content: &PostContent,
 ) -> Result<SealedPost> {
-    let ck = circle_key(&CircleKey::from_bytes(key32(epoch_root, "epoch_root")?), circle)?;
-    seal_post_with(author, author_id, post_id, epoch_id, &ck, content)
-}
-
-/// A post to Close Friends (exclusive circle 1, CRYPTO.md 8.5): sealed with `X1` instead of a chain key, otherwise
-/// identical to any other post.
-#[uniffi::export]
-pub fn seal_post_close_friends(
-    author: &IdentityKeys,
-    author_id: &[u8],
-    post_id: &[u8],
-    epoch_id: &[u8],
-    epoch_root: &[u8],
-    content: &PostContent,
-) -> Result<SealedPost> {
-    let x = exclusive_key(&CircleKey::from_bytes(key32(epoch_root, "epoch_root")?), 1)?;
-    seal_post_with(author, author_id, post_id, epoch_id, &x, content)
+    let root = CircleKey::from_bytes(key32(epoch_root, "epoch_root")?);
+    let keys = match audience {
+        Audience::OnlyMe => vec![root],
+        Audience::Everyone => vec![circle_key(&root, EVERYONE)?],
+        Audience::Circles { ids } => {
+            let ids = circle_ids(&ids)?;
+            if ids.is_empty() {
+                return Err(invalid("choose at least one circle"));
+            }
+            ids.iter()
+                .map(|&i| exclusive_key(&root, i))
+                .collect::<Result<Vec<_>>>()?
+        }
+    };
+    seal_post_with(author, author_id, post_id, epoch_id, &keys, content)
 }
 
 fn seal_post_with(
@@ -432,7 +467,7 @@ fn seal_post_with(
     author_id: &[u8],
     post_id: &[u8],
     epoch_id: &[u8],
-    ck: &CircleKey,
+    audience: &[CircleKey],
     content: &PostContent,
 ) -> Result<SealedPost> {
     let id = author.load()?;
@@ -441,7 +476,7 @@ fn seal_post_with(
         &id16(author_id, "author_id")?,
         &id16(post_id, "post_id")?,
         &id16(epoch_id, "epoch_id")?,
-        ck,
+        audience,
         &content.to_header()?,
     )?;
     Ok(SealedPost {
@@ -466,34 +501,39 @@ impl ReaderKeyring {
         }))
     }
 
-    /// A friend's keyring from their payload: forward keys from `Ck`, plus the exclusive-circle slot `X` (empty for
-    /// a version 1 payload). For a non-member `X` is random filler and simply never matches a post.
+    /// A friend's keyring from their payload: forward keys from `Ck`/`E`, plus every circle slot (32-byte keys,
+    /// concatenated; empty for a v1 payload). Filler slots simply never match a post.
     #[uniffi::constructor]
-    pub fn with_exclusive(circle_key: &[u8], exclusive_key: &[u8]) -> Result<Arc<Self>> {
+    pub fn with_circles(circle_key: &[u8], circle_keys: &[u8]) -> Result<Arc<Self>> {
+        if circle_keys.len() % 32 != 0 {
+            return Err(invalid("circle_keys must be whole 32-byte keys"));
+        }
         let mut keys = forward_keys(&CircleKey::from_bytes(key32(circle_key, "circle_key")?));
-        if !exclusive_key.is_empty() {
-            keys.push(CircleKey::from_bytes(key32(exclusive_key, "exclusive_key")?));
+        for k in circle_keys.chunks(32) {
+            keys.push(CircleKey::from_bytes(k.try_into().expect("32 bytes")));
         }
         Ok(Arc::new(ReaderKeyring { keys }))
     }
 
-    /// Owner's own keyring: from the epoch root (C1) plus Close Friends, so they can read all their own posts.
+    /// Owner's own keyring: from the epoch root (C1) plus all 8 circle keys, so they can read all their own posts.
     #[uniffi::constructor]
     pub fn for_owner(epoch_root: &[u8]) -> Result<Arc<Self>> {
         let root = CircleKey::from_bytes(key32(epoch_root, "epoch_root")?);
         let mut keys = forward_keys(&root);
-        keys.push(exclusive_key(&root, 1)?);
+        for i in 1..=EXCLUSIVE_CIRCLES {
+            keys.push(exclusive_key(&root, i)?);
+        }
         Ok(Arc::new(ReaderKeyring { keys }))
     }
 
-    /// The owner's view as a friend in `circle` sees it ("Preview as…"): the same `Cn` that friend was given, plus
-    /// `X1` if they're in Close Friends.
+    /// The owner's view as a friend sees it ("See what they can see"): the chain key that friend was given
+    /// (`EVERYONE` from v1.3 on), plus the keys of the circles they're in.
     #[uniffi::constructor]
-    pub fn for_circle(epoch_root: &[u8], circle: u8, close_friend: bool) -> Result<Arc<Self>> {
+    pub fn for_friend(epoch_root: &[u8], circle: u8, circles: &[u8]) -> Result<Arc<Self>> {
         let root = CircleKey::from_bytes(key32(epoch_root, "epoch_root")?);
         let mut keys = forward_keys(&circle_key(&root, circle)?);
-        if close_friend {
-            keys.push(exclusive_key(&root, 1)?);
+        for i in circle_ids(circles)? {
+            keys.push(exclusive_key(&root, i)?);
         }
         Ok(Arc::new(ReaderKeyring { keys }))
     }

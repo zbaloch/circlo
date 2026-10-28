@@ -9,6 +9,7 @@
   "chain.C7.wrap_key": "96d9c5ee0dc94e616a2357f8aafd3b0c767731f2c7eb8eed7b8e9bd6923408de",
   "chain.C9": "adcb3a8eb4440604444c9a04704c1edacdacdcc259ec49c2b7ab072a984a49ef",
   "chain.X1(close-friends)": "c9937b080b148aec515a2b134b9243c9822dc50d65887b4524f223087535506b",
+  "chain.X8": "435d14eed160bc516a43afdb75e2642f5fe145a7f6f7330945e7e9302d52e967",
   "envelope(key=07*32,nonce=24*24,label=circlo/v1/profile,fields=a1*16|e1*16,pt=hello)": "01242424242424242424242424242424242424242424242424398d8a93d2e361b72a3f81ed1ae718de141634090e",
   "fingerprint(ed=22pk,x=21pk)": "a6bc5e0b528f2ae6a9eb1ffa6e1ca977",
   "handle_lookup(key=11*32,handle=Alice_Test)": "b8b9fd0117ca9a99cfa4698873b4e358cb51cc9df82485a021d5ce8b42654c8d",

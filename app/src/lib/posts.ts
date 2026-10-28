@@ -1,15 +1,16 @@
 /**
  * Posts (PLAN.md Phase 7, CRYPTO.md section 8). The header (text, media keys, mime types, sizes) is sealed by the core
- * under a per-post key derived from my circle chain; the server sees only an opaque header, a key ref that reveals
- * neither the circle nor which posts share an audience, and random object keys. The circle a post went to is kept
- * only in my encrypted address book, so only I ever see it.
+ * under a per-post key wrapped for its audience (CRYPTO.md 8.6, 9.1); the server sees only an opaque header, a random key
+ * ref and random object keys, so it can't tell who a post is for or which posts share an audience. Who a post went to
+ * is kept only in my encrypted address book, so only I ever see it.
  */
 import * as Core from '@circlo/core';
 
 import { api, ok } from '@/api/client';
 import type { components } from '@/api/schema';
 
-import { CLOSE_FRIENDS, loadAddressBook, updateAddressBook, type AddressBook } from './addressbook';
+import { EVERYONE, loadAddressBook, updateAddressBook, type AddressBook, type Audience } from './addressbook';
+import { circlesOf, coreAudience, ONLY_ME, validAudience } from './circles';
 import { fromB64, toB64, uuidFromRandom, uuidToBytes } from './bytes';
 import { ensureEpoch, refreshContact } from './friends';
 import type { StoredAccount } from './keystore';
@@ -17,7 +18,7 @@ import { discardPicked, discardPrepared, encryptAndUpload, matchMedia, prepare, 
 
 export const MAX_POST_CHARS = 500;
 
-export type Draft = { text: string; circle: number; media: PickedMedia[] };
+export type Draft = { text: string; audience: Audience; media: PickedMedia[] };
 
 export type FeedPost = {
   postId: string;
@@ -26,8 +27,8 @@ export type FeedPost = {
   text: string;
   media: UploadedMedia[];
   mine: boolean;
-  /** Author-only: the circle my own post went to. Never set for other people's posts. */
-  circle?: number;
+  /** Author-only: who my own post went to. Never set for other people's posts. */
+  audience?: Audience;
   epochId: string;
   /** Memory only: opens this post's replies. Never stored or sent anywhere. */
   postKey: ArrayBuffer;
@@ -45,7 +46,7 @@ function identity(a: StoredAccount): Core.IdentityKeys {
 }
 
 /** Pure validation shared by the composer and publish. Returns an error message or null. */
-export function validateDraft(d: Draft): string | null {
+export function validateDraft(d: Draft, book: Pick<AddressBook, 'circleDefs'>): string | null {
   const chars = [...d.text].length;
   const images = d.media.filter((m) => m.type === 'image').length;
   const videos = d.media.filter((m) => m.type === 'video').length;
@@ -53,13 +54,13 @@ export function validateDraft(d: Draft): string | null {
   if (chars > MAX_POST_CHARS) return `Posts can be up to ${MAX_POST_CHARS} characters.`;
   if (videos > 1 || (videos === 1 && images > 0)) return 'Add up to 4 photos or 1 video.';
   if (images > 4) return 'Add up to 4 photos or 1 video.';
-  if (d.circle !== CLOSE_FRIENDS && (!Number.isInteger(d.circle) || d.circle < 1 || d.circle > 100)) return 'Choose who can see this.';
+  if (!validAudience(book, d.audience)) return 'Choose who can see this.';
   return null;
 }
 
 /** Prepares, encrypts and uploads media, then seals and creates the post. Returns the new post id. */
 export async function publishPost(account: StoredAccount, draft: Draft, onProgress?: (fraction: number) => void): Promise<string> {
-  const problem = validateDraft(draft);
+  const problem = validateDraft(draft, await loadAddressBook(account));
   if (problem) throw new Error(problem);
   const epoch = await ensureEpoch(account);
   const prepared = [];
@@ -68,10 +69,16 @@ export async function publishPost(account: StoredAccount, draft: Draft, onProgre
     const uploaded = await encryptAndUpload(prepared, (f) => onProgress?.(f * 0.95));
     const postId = uuidFromRandom(Core.newSymmetricKey());
     const content = { text: draft.text, createdAtMs: BigInt(Date.now()), media: uploaded.map((u) => u.item) };
-    const ids = [identity(account), uuidToBytes(account.userId), uuidToBytes(postId), uuidToBytes(epoch.epochId), fromB64(epoch.root)] as const;
-    // Close Friends: sealed with the exclusive key (CRYPTO.md 8.5); the server can't tell it from any other post.
-    const sealed =
-      draft.circle === CLOSE_FRIENDS ? Core.sealPostCloseFriends(...ids, content) : Core.sealPost(...ids, draft.circle, content);
+    // Every post has the same 8 key slots, whatever its audience: the server can't tell one audience from another.
+    const sealed = Core.sealPost(
+      identity(account),
+      uuidToBytes(account.userId),
+      uuidToBytes(postId),
+      uuidToBytes(epoch.epochId),
+      fromB64(epoch.root),
+      coreAudience(draft.audience),
+      content,
+    );
     ok(
       await api.POST('/v1/posts', {
         body: {
@@ -86,8 +93,8 @@ export async function publishPost(account: StoredAccount, draft: Draft, onProgre
       }),
     );
     await updateAddressBook(account, (b) => {
-      b.postCircles = { ...b.postCircles, [postId]: draft.circle };
-      b.lastCircle = draft.circle;
+      b.postAudiences = { ...b.postAudiences, [postId]: draft.audience };
+      b.lastAudience = draft.audience;
     });
     onProgress?.(1);
     discardPicked(draft.media); // kept until success so a failed upload can be retried
@@ -100,21 +107,22 @@ export async function publishPost(account: StoredAccount, draft: Draft, onProgre
 export async function deletePost(account: StoredAccount, postId: string): Promise<void> {
   ok(await api.DELETE('/v1/posts/{postId}', { params: { path: { postId } } }));
   await updateAddressBook(account, (b) => {
-    if (b.postCircles) delete b.postCircles[postId];
+    if (b.postAudiences) delete b.postAudiences[postId];
   });
 }
 
 type Keyring = Core.ReaderKeyringLike | null;
 
-/** The keys I hold for an author's epoch: my own chain root, or the circle key a friend gave me. */
+/** The keys I hold for an author's epoch: my own chain root, or the keys a friend gave me. */
 function keyringFor(account: StoredAccount, book: AddressBook, authorId: string, epochId: string): Keyring {
   if (authorId === account.userId) {
     const mine = book.myEpochs.find((e) => e.epochId === epochId);
     return mine ? Core.ReaderKeyring.forOwner(fromB64(mine.root)) : null;
   }
   const key = book.contacts[authorId]?.keys.find((k) => k.epochId === epochId);
-  // Their Close Friends slot opens their Close Friends posts only if I'm a member; otherwise it's filler that never matches.
-  return key ? Core.ReaderKeyring.withExclusive(fromB64(key.circleKey), key.exclusiveKey ? fromB64(key.exclusiveKey) : new ArrayBuffer(0)) : null;
+  // Their circle slots open posts to circles I'm in; the rest is filler that never matches.
+  const slots = key?.circleKeys ?? key?.exclusiveKey;
+  return key ? Core.ReaderKeyring.withCircles(fromB64(key.circleKey), slots ? fromB64(slots) : new ArrayBuffer(0)) : null;
 }
 
 /**
@@ -149,7 +157,7 @@ function openRows(account: StoredAccount, book: AddressBook, rows: PostRow[], ke
       text: opened.content.text,
       media,
       mine,
-      circle: mine ? book.postCircles?.[row.postId] : undefined,
+      audience: mine ? book.postAudiences?.[row.postId] : undefined,
       postKey: opened.postKey,
       readToken: Core.postReadToken(opened.postKey),
       replyCount: 0,
@@ -207,8 +215,8 @@ export async function fetchAuthorPosts(account: StoredAccount, authorId: string,
 }
 
 /**
- * "Preview as…": my posts exactly as `friendId` can open them, using the circle key they were given in each epoch
- * (ReaderKeyring.forCircle). Epochs where they got no keys (before we were friends) open nothing, just as for them.
+ * "See what they can see": my posts exactly as `friendId` can open them, with the keys they were given in each epoch
+ * (ReaderKeyring.forFriend). Epochs where they got no keys (before we were friends) open nothing, just as for them.
  */
 export async function previewAs(account: StoredAccount, friendId: string, before?: string, limit = 50): Promise<Page> {
   const book = await loadAddressBook(account);
@@ -216,14 +224,16 @@ export async function previewAs(account: StoredAccount, friendId: string, before
   const rows = ok(await api.GET('/v1/users/{userId}/posts', { params: { path: { userId: account.userId }, query: { before, limit } } }));
   const posts = openRows(account, book, rows, (_author, epochId) => {
     const epoch = book.myEpochs.find((e) => e.epochId === epochId);
-    const circle = epoch?.placements?.[friendId] ?? (epochId === current ? book.contacts[friendId]?.circle : undefined);
-    const close = epoch?.closeFriends?.includes(friendId) ?? (epochId === current && !!book.contacts[friendId]?.closeFriend);
-    return epoch && circle ? Core.ReaderKeyring.forCircle(fromB64(epoch.root), circle, close) : null;
-  }).map((p) => ({ ...p, mine: false, circle: undefined }));
+    const contact = epochId === current ? book.contacts[friendId] : undefined;
+    const circle = epoch?.placements?.[friendId] ?? (contact ? EVERYONE : undefined);
+    // v1.3 epochs record their circles; v1.2 epochs had one circle (Close Friends, id 1).
+    const circles = epoch?.circles?.[friendId] ?? (epoch?.closeFriends?.includes(friendId) ? [1] : contact ? circlesOf(book, contact) : []);
+    return epoch && circle ? Core.ReaderKeyring.forFriend(fromB64(epoch.root), circle, Uint8Array.from(circles).buffer) : null;
+  }).map((p) => ({ ...p, mine: false, audience: undefined }));
   return { posts, cursor: rows.length ? rows[rows.length - 1].createdAt : undefined, hasMore: rows.length === limit };
 }
 
-/** Default audience for the composer: the last circle I posted to; before my first post, "Me only" (nothing is shared by accident). */
-export function defaultCircle(book: Pick<AddressBook, 'lastCircle'>): number {
-  return book.lastCircle ?? 1;
+/** Default audience for the composer: my last choice (if still valid); before my first post, Only me (nothing is shared by accident). */
+export function defaultAudience(book: Pick<AddressBook, 'lastAudience' | 'circleDefs'>): Audience {
+  return book.lastAudience && validAudience(book, book.lastAudience) ? book.lastAudience : ONLY_ME;
 }

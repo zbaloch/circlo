@@ -5,15 +5,14 @@ import { Modal, Pressable, ScrollView, View } from 'react-native';
 
 import { Avatar } from '@/components/avatar';
 import { CircleBadge } from '@/components/circle-badge';
-import { friendCircles, placementLine } from '@/components/circle-choice';
+import { memberLine } from '@/components/circle-choice';
 import { ErrorText } from '@/components/form';
 import { ProfileFeed } from '@/components/profile-feed';
 import { Spinner } from '@/components/ui/spinner';
 import { Text } from '@/components/ui/text';
-import { Toggle } from '@/components/ui/toggle';
 import { describeError } from '@/lib/account';
 import { loadAddressBook, type AddressBook, type Contact } from '@/lib/addressbook';
-import { labelOf, placeFriend, setCloseFriend, unfriend } from '@/lib/circles';
+import { audienceLabel, circleDefs, circlesOf, setCircles, unfriend } from '@/lib/circles';
 import { showAlert } from '@/lib/dialog';
 import type { Connection } from '@/lib/friends';
 import { blockUser } from '@/lib/safety';
@@ -22,8 +21,8 @@ import { usePalette } from '@/theme/use-palette';
 
 /**
  * A friend's profile, decrypted on this device, laid out like X / Bluesky: banner, avatar, name, bio, posts.
- * Everything about MY relationship with them (their circle, Close Friends, removing them) sits behind one button
- * beside the avatar showing their circle. It is author-only: they are never told and never see a label (PLAN.md 2A).
+ * Everything about MY relationship with them (their circles, removing them) sits behind one button beside the avatar
+ * showing their circles. It is author-only: they are never told and never see a label (PLAN.md 2A).
  */
 export default function FriendScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -68,16 +67,17 @@ export default function FriendScreen() {
       ],
     );
 
-  // The button beside the avatar: their circle, with a star if they're in Close Friends.
+  // The button beside the avatar: their circles ("Everyone" if none: they see my Everyone posts).
+  const theirCircles = contact && book ? circlesOf(book, contact) : [];
+  const circlesText = book ? audienceLabel(book, theirCircles.length ? { kind: 'circles', ids: theirCircles } : { kind: 'everyone' }) : '';
   const circleButton =
     contact && book ? (
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={`${labelOf(book, contact.circle)}${contact.closeFriend ? ', Close Friends' : ''}. Change`}
+        accessibilityLabel={`Circles: ${circlesText}. Change`}
         onPress={() => setOpen(true)}
         className="flex-row items-center gap-1.5 rounded-full border border-border px-4 py-2 active:bg-surface-raised dark:border-border-dark dark:active:bg-surface-raised-dark">
-        {contact.closeFriend ? <Icon name="star" size={14} color={palette.primary} /> : null}
-        <Text className="text-[15px] font-bold text-ink dark:text-ink-dark">{labelOf(book, contact.circle)}</Text>
+        <Text className="text-[15px] font-bold text-ink dark:text-ink-dark">{circlesText}</Text>
         {busy ? <Spinner /> : <Icon name="chevron-down" size={16} color={palette.ink} />}
       </Pressable>
     ) : null;
@@ -94,8 +94,13 @@ export default function FriendScreen() {
           contact={contact}
           busy={busy}
           onClose={() => setOpen(false)}
-          onMove={(n) => run(async () => { await placeFriend(account, c.userId, n); reloadBook(); })}
-          onCloseFriend={(on) => run(async () => { await setCloseFriend(account, c.userId, on); if (account) setBook(await loadAddressBook(account)); })}
+          onToggle={(id, on) =>
+            run(async () => {
+              const current = circlesOf(book, contact);
+              await setCircles(account, c.userId, on ? [...current, id] : current.filter((x) => x !== id));
+              reloadBook();
+            })
+          }
           onPreview={() => { setOpen(false); router.push({ pathname: '/preview/[id]', params: { id: c.userId } }); }}
           onSafety={() => { setOpen(false); router.push({ pathname: '/safety/[id]', params: { id: c.userId } }); }}
           onRemove={remove}
@@ -152,15 +157,14 @@ type SheetProps = {
   contact: Contact;
   busy: boolean;
   onClose: () => void;
-  onMove: (circle: number) => void;
-  onCloseFriend: (on: boolean) => void;
+  onToggle: (circle: number, on: boolean) => void;
   onPreview: () => void;
   onSafety: () => void;
   onRemove: () => void;
 };
 
 /** One sheet for everything about my relationship with this friend. Only I ever see it. */
-function FriendSheet({ visible, name, book, contact, busy, onClose, onMove, onCloseFriend, onPreview, onSafety, onRemove }: SheetProps) {
+function FriendSheet({ visible, name, book, contact, busy, onClose, onToggle, onPreview, onSafety, onRemove }: SheetProps) {
   const palette = usePalette();
   const row = (icon: IconName, label: string, onPress: () => void, danger = false) => (
     <Pressable accessibilityRole="button" onPress={onPress} disabled={busy} className="flex-row items-center gap-3 px-5 py-3.5 active:bg-surface-raised dark:active:bg-surface-raised-dark">
@@ -184,32 +188,29 @@ function FriendSheet({ visible, name, book, contact, busy, onClose, onMove, onCl
           <Text className="text-sm text-muted dark:text-muted-dark">Only you see this. {name} is never told.</Text>
         </View>
         <ScrollView>
-          <Text className="px-5 pb-1 pt-2 text-sm font-bold uppercase text-muted dark:text-muted-dark">Circle</Text>
-          {friendCircles(book).map((n) => (
-            <Pressable
-              key={n}
-              accessibilityRole="radio"
-              accessibilityState={{ selected: n === contact.circle }}
-              disabled={busy || n === contact.circle}
-              onPress={() => onMove(n)}
-              className="flex-row items-center gap-3 px-5 py-2.5 active:bg-surface-raised dark:active:bg-surface-raised-dark">
-              <CircleBadge book={book} circle={n} small />
-              <View className="flex-1">
-                <Text className="text-base text-ink dark:text-ink-dark">{labelOf(book, n)}</Text>
-                <Text className="text-sm text-muted dark:text-muted-dark">{placementLine(book, n)}</Text>
-              </View>
-              {n === contact.circle ? <Icon name="checkmark-circle" size={22} color={palette.primary} /> : null}
-            </Pressable>
-          ))}
-          <View className="mx-5 my-2 h-px bg-border dark:bg-border-dark" />
-          <View className="flex-row items-center gap-3 px-5 py-2.5">
-            <Icon name="star" size={20} color={contact.closeFriend ? palette.primary : palette.muted} />
-            <View className="flex-1">
-              <Text className="text-base text-ink dark:text-ink-dark">Close Friends</Text>
-              <Text className="text-sm text-muted dark:text-muted-dark">Also see what you share with Close Friends</Text>
-            </View>
-            <Toggle accessibilityLabel="Close Friends" value={!!contact.closeFriend} disabled={busy} onValueChange={onCloseFriend} />
-          </View>
+          <Text className="px-5 pb-1 pt-2 text-sm font-bold uppercase text-muted dark:text-muted-dark">Circles</Text>
+          <Text className="px-5 pb-1 text-sm text-muted dark:text-muted-dark">
+            {name} sees your Everyone posts, plus posts to the circles you put them in.
+          </Text>
+          {circleDefs(book).map((c) => {
+            const on = circlesOf(book, contact).includes(c.id);
+            return (
+              <Pressable
+                key={c.id}
+                accessibilityRole="checkbox"
+                accessibilityState={{ checked: on }}
+                disabled={busy}
+                onPress={() => onToggle(c.id, !on)}
+                className="flex-row items-center gap-3 px-5 py-2.5 active:bg-surface-raised dark:active:bg-surface-raised-dark">
+                <CircleBadge book={book} id={c.id} small />
+                <View className="flex-1">
+                  <Text className="text-base text-ink dark:text-ink-dark">{c.name}</Text>
+                  <Text className="text-sm text-muted dark:text-muted-dark">{memberLine(book, c.id)}</Text>
+                </View>
+                <Icon name={on ? 'checkbox' : 'square-outline'} size={22} color={on ? palette.primary : palette.muted} />
+              </Pressable>
+            );
+          })}
           <View className="mx-5 my-2 h-px bg-border dark:bg-border-dark" />
           {row('eye-outline', `See what ${name} can see`, onPreview)}
           {row('shield-checkmark-outline', 'Safety number', onSafety)}

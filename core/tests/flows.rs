@@ -96,14 +96,15 @@ fn content(text: &str) -> PostContent {
     }
 }
 
-/// Phase 5–6 criteria (crypto level): friends exchange keys; circle 7 reads 7 and 9 not 5;
-/// after moving 7 → 9 (new epoch) the friend can't read new circle-7 posts; payloads are identical in size.
+/// CRYPTO.md v1.3 audiences: friends exchange keys; Everyone reaches every friend; a circle reaches only its members
+/// (whatever else they're in); Only me reaches nobody; payloads are identical in size; removing someone from a circle
+/// (new epoch) closes new posts to it, while what they could already read stays readable.
 #[test]
 fn friends_circles_and_epoch_rotation() {
     let (alice_id, bob_id, carol_id) = ([0xA1; 16], [0xB0; 16], [0xC0; 16]);
     let (alice, bob, carol) = (generate_identity(), generate_identity(), generate_identity());
 
-    // Alice's epoch 1: Bob in circle 7, Carol in circle 2.
+    // Alice's epoch 1: Bob in Close Friends (1) and Family (2); Carol in no circle (Everyone only).
     let (epoch1, root1, profile1) = ([0xE1; 16], new_symmetric_key(), new_symmetric_key());
     let to_bob = seal_friend_payload(
         &alice,
@@ -112,9 +113,8 @@ fn friends_circles_and_epoch_rotation() {
         &bob_id,
         &epoch1,
         &root1,
-        7,
         &profile1,
-        true, // Bob is in Close Friends
+        &[1, 2],
     )
     .unwrap();
     let to_carol = seal_friend_payload(
@@ -124,22 +124,44 @@ fn friends_circles_and_epoch_rotation() {
         &carol_id,
         &epoch1,
         &root1,
-        2,
         &profile1,
-        false,
+        &[],
     )
     .unwrap();
     assert_eq!(
         to_bob.len(),
         to_carol.len(),
-        "server can't tell circles or Close Friends membership apart by size"
+        "the server can't tell circle membership by size"
     );
+    assert!(seal_friend_payload(
+        &alice,
+        &bob.x25519_pk,
+        &alice_id,
+        &bob_id,
+        &epoch1,
+        &root1,
+        &profile1,
+        &[9]
+    )
+    .is_err());
+    assert!(seal_friend_payload(
+        &alice,
+        &bob.x25519_pk,
+        &alice_id,
+        &bob_id,
+        &epoch1,
+        &root1,
+        &profile1,
+        &[1, 1]
+    )
+    .is_err());
 
     let bob_key = open_friend_payload(&bob, &alice.x25519_pk, &alice_id, &bob_id, &epoch1, &to_bob).unwrap();
     assert_eq!(bob_key.profile_key, profile1);
-    let bob_ring = ReaderKeyring::with_exclusive(&bob_key.circle_key, &bob_key.exclusive_key).unwrap();
+    assert_eq!(bob_key.circle_keys.len(), 8 * 32);
+    let bob_ring = ReaderKeyring::with_circles(&bob_key.circle_key, &bob_key.circle_keys).unwrap();
     let carol_key = open_friend_payload(&carol, &alice.x25519_pk, &alice_id, &carol_id, &epoch1, &to_carol).unwrap();
-    let carol_ring = ReaderKeyring::with_exclusive(&carol_key.circle_key, &carol_key.exclusive_key).unwrap();
+    let carol_ring = ReaderKeyring::with_circles(&carol_key.circle_key, &carol_key.circle_keys).unwrap();
 
     // Profile readable with the shared profile key.
     let prof = seal_profile(&profile1, &alice_id, &epoch1, b"{\"displayName\":\"Alice\"}").unwrap();
@@ -148,67 +170,74 @@ fn friends_circles_and_epoch_rotation() {
         b"{\"displayName\":\"Alice\"}"
     );
 
-    let post = |epoch: &[u8], root: &[u8], circle: u8, pid: u8| {
-        let s = seal_post(&alice, &alice_id, &[pid; 16], epoch, root, circle, &content("hi")).unwrap();
+    let post = |epoch: &[u8], root: &[u8], audience: Audience, pid: u8| {
+        let s = seal_post(&alice, &alice_id, &[pid; 16], epoch, root, audience, &content("hi")).unwrap();
         (s, [pid; 16])
     };
     let read = |ring: &ReaderKeyring, epoch: &[u8], (s, pid): &(SealedPost, [u8; 16])| {
         ring.open_post(&alice.ed25519_pk, &alice_id, pid, epoch, &s.key_ref, &s.header_ct)
     };
+    let circles = |ids: &[u8]| Audience::Circles { ids: ids.to_vec() };
 
-    for (circle, readable) in [(5u8, false), (7, true), (9, true)] {
-        let p = post(&epoch1, &root1, circle, circle);
-        assert_eq!(read(&bob_ring, &epoch1, &p).is_ok(), readable, "circle {circle}");
+    // (audience, Bob reads, Carol reads)
+    let cases = [
+        (Audience::Everyone, true, true, 1u8),
+        (circles(&[1]), true, false, 2),
+        (circles(&[2, 3]), true, false, 3),
+        (circles(&[3, 4]), false, false, 4),
+        (Audience::OnlyMe, false, false, 5),
+    ];
+    let mut sizes = vec![];
+    for (audience, bob_reads, carol_reads, pid) in cases {
+        let p = post(&epoch1, &root1, audience, pid);
+        sizes.push(p.0.header_ct.len());
+        assert_eq!(read(&bob_ring, &epoch1, &p).is_ok(), bob_reads, "post {pid}: Bob");
+        assert_eq!(read(&carol_ring, &epoch1, &p).is_ok(), carol_reads, "post {pid}: Carol");
     }
-    // Close Friends (exclusive, CRYPTO.md 8.5): Bob (member, circle 7) reads it; Carol, though in a closer circle,
-    // does not; a Close Friends post is not readable through any chain key.
-    let close = |pid: u8| {
-        let s = seal_post_close_friends(&alice, &alice_id, &[pid; 16], &epoch1, &root1, &content("cf")).unwrap();
-        (s, [pid; 16])
-    };
     assert!(
-        read(&bob_ring, &epoch1, &close(200)).is_ok(),
-        "member reads Close Friends"
+        sizes.windows(2).all(|w| w[0] == w[1]),
+        "every audience looks the same size"
     );
-    assert!(
-        read(&carol_ring, &epoch1, &close(201)).is_err(),
-        "closer circle doesn't make you a Close Friend"
-    );
-    assert!(
-        read(&carol_ring, &epoch1, &post(&epoch1, &root1, 2, 202)).is_ok(),
-        "Carol still reads circle 2"
-    );
-    let chain_only = ReaderKeyring::new(&root1).unwrap(); // even C1's whole chain
-    assert!(
-        read(&chain_only, &epoch1, &close(203)).is_err(),
-        "no chain key opens Close Friends"
-    );
+    assert!(seal_post(
+        &alice,
+        &alice_id,
+        &[9; 16],
+        &epoch1,
+        &root1,
+        circles(&[]),
+        &content("x")
+    )
+    .is_err());
 
-    // "Preview as Bob": Alice's keyring for circle 7 (+ Close Friends) opens exactly what Bob's own keyring opens.
-    let preview = ReaderKeyring::for_circle(&root1, 7, true).unwrap();
-    for circle in [1u8, 2, 6, 7, 8, 100] {
-        let p = post(&epoch1, &root1, circle, 100 + circle);
+    // "See what Bob can see": Alice's keyring for Bob opens exactly what Bob's own keyring opens.
+    let preview = ReaderKeyring::for_friend(&root1, EVERYONE, &[1, 2]).unwrap();
+    for (n, audience) in [
+        Audience::Everyone,
+        circles(&[1]),
+        circles(&[2]),
+        circles(&[4]),
+        Audience::OnlyMe,
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let p = post(&epoch1, &root1, audience, 100 + n as u8);
         assert_eq!(
             read(&preview, &epoch1, &p).is_ok(),
             read(&bob_ring, &epoch1, &p).is_ok(),
-            "circle {circle}"
+            "audience {n}"
         );
     }
-    assert!(read(&preview, &epoch1, &close(204)).is_ok());
-    assert!(read(
-        &ReaderKeyring::for_circle(&root1, 7, false).unwrap(),
-        &epoch1,
-        &close(205)
-    )
-    .is_err());
-    assert!(ReaderKeyring::for_circle(&root1, 0, false).is_err());
-    assert!(ReaderKeyring::for_circle(&root1, 101, false).is_err());
-    // Alice reads all her own posts, Close Friends included.
+    // Alice reads all her own posts.
     let owner = ReaderKeyring::for_owner(&root1).unwrap();
-    assert!(read(&owner, &epoch1, &post(&epoch1, &root1, 1, 50)).is_ok());
-    assert!(read(&owner, &epoch1, &close(206)).is_ok());
+    for (n, audience) in [Audience::Everyone, circles(&[8]), Audience::OnlyMe]
+        .into_iter()
+        .enumerate()
+    {
+        assert!(read(&owner, &epoch1, &post(&epoch1, &root1, audience, 120 + n as u8)).is_ok());
+    }
 
-    // Move Bob 7 → 9: new epoch for everyone.
+    // Bob leaves Close Friends: new epoch for everyone.
     let (epoch2, root2, profile2) = ([0xE2; 16], new_symmetric_key(), new_symmetric_key());
     let to_bob2 = seal_friend_payload(
         &alice,
@@ -217,34 +246,29 @@ fn friends_circles_and_epoch_rotation() {
         &bob_id,
         &epoch2,
         &root2,
-        9,
         &profile2,
-        false, // and out of Close Friends
+        &[2],
     )
     .unwrap();
     let bob_key2 = open_friend_payload(&bob, &alice.x25519_pk, &alice_id, &bob_id, &epoch2, &to_bob2).unwrap();
-    let bob_ring2 = ReaderKeyring::with_exclusive(&bob_key2.circle_key, &bob_key2.exclusive_key).unwrap();
-    let new_close = seal_post_close_friends(&alice, &alice_id, &[92; 16], &epoch2, &root2, &content("cf2")).unwrap();
+    let bob_ring2 = ReaderKeyring::with_circles(&bob_key2.circle_key, &bob_key2.circle_keys).unwrap();
     assert!(
-        read(&bob_ring2, &epoch2, &(new_close, [92; 16])).is_err(),
-        "removed from Close Friends: new Close Friends posts are closed"
-    );
-
-    let new_c7 = post(&epoch2, &root2, 7, 70);
-    assert!(
-        read(&bob_ring2, &epoch2, &new_c7).is_err(),
-        "moved outward: new circle-7 posts are closed"
+        read(&bob_ring2, &epoch2, &post(&epoch2, &root2, circles(&[1]), 70)).is_err(),
+        "removed: new posts closed"
     );
     assert!(
-        read(&bob_ring, &epoch2, &new_c7).is_err(),
+        read(&bob_ring, &epoch2, &post(&epoch2, &root2, circles(&[2]), 71)).is_err(),
         "old epoch key doesn't open new epoch"
     );
-    assert!(read(&bob_ring2, &epoch2, &post(&epoch2, &root2, 9, 90)).is_ok());
-    // Old posts he already had access to stay readable (no revocation of the past).
-    assert!(read(&bob_ring, &epoch1, &post(&epoch1, &root1, 7, 71)).is_ok());
+    assert!(
+        read(&bob_ring2, &epoch2, &post(&epoch2, &root2, circles(&[2]), 72)).is_ok(),
+        "still in Family"
+    );
+    // What he could already read stays readable (no revocation of the past).
+    assert!(read(&bob_ring, &epoch1, &post(&epoch1, &root1, circles(&[1]), 73)).is_ok());
 
     // Replies: readable by anyone who can read the post.
-    let (sealed, pid) = post(&epoch2, &root2, 9, 91);
+    let (sealed, pid) = post(&epoch2, &root2, Audience::Everyone, 91);
     let opened = read(&bob_ring2, &epoch2, &(sealed, pid)).unwrap();
     let reply = ReplyContent {
         text: "👋".into(),

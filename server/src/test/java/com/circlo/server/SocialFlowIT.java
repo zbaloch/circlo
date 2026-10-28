@@ -56,7 +56,7 @@ class SocialFlowIT extends IntegrationTest {
         assertThat(call("GET", "/v1/users/" + alice.userId + "/profile", null, bob.accessToken).getStatusCode().value()).isEqualTo(404);
 
         assertThat(invite(alice, bob)).isEqualTo(alice.userId);
-        byte[] bobToAlice = Ids.random(192);
+        byte[] bobToAlice = Ids.random(416);
         var req = call("POST", "/v1/friends/requests",
                 Map.of("toUserId", alice.userId.toString(), "epochId", bobEpoch.toString(), "payload", bobToAlice), bob.accessToken);
         assertThat(req.getStatusCode().value()).isEqualTo(201);
@@ -68,7 +68,7 @@ class SocialFlowIT extends IntegrationTest {
         assertThat(b64(call("GET", "/v1/users/" + bob.userId + "/profile", null, alice.accessToken).getBody().get("ciphertext")))
                 .isEqualTo(bobProfile);
 
-        byte[] aliceToBob = Ids.random(192);
+        byte[] aliceToBob = Ids.random(416);
         assertThat(call("POST", "/v1/friends/" + bob.userId + "/accept",
                 Map.of("epochId", aliceEpoch.toString(), "payload", aliceToBob), alice.accessToken).getStatusCode().value()).isEqualTo(200);
         assertThat(friends(alice)).containsExactly(Map.entry(bob.userId.toString(), "accepted"));
@@ -88,7 +88,7 @@ class SocialFlowIT extends IntegrationTest {
         TestApp carol = new TestApp(this, "social_carol", "pw").register();
         TestApp dan = new TestApp(this, "social_dan", "pw").register();
         UUID danEpoch = epoch(dan);
-        Map<String, Object> req = Map.of("toUserId", carol.userId.toString(), "epochId", danEpoch.toString(), "payload", Ids.random(192));
+        Map<String, Object> req = Map.of("toUserId", carol.userId.toString(), "epochId", danEpoch.toString(), "payload", Ids.random(416));
 
         // There is no handle search, and without Carol's invite Dan's request is refused.
         assertThat(call("GET", "/v1/users/search?handle=social_carol", null, dan.accessToken).getStatusCode().value()).isEqualTo(404);
@@ -113,19 +113,19 @@ class SocialFlowIT extends IntegrationTest {
         TestApp b = new TestApp(this, "social_gina", "pw").register();
         UUID e = epoch(a);
         invite(b, a);
-        // Payloads must be exactly 192 bytes (version 2; the old 160 is refused for new writes, so sizes never mix);
+        // Payloads must be exactly 416 bytes (version 3; older sizes are refused for new writes, so sizes never mix);
         // epochs must be mine; my own invite can't be redeemed.
-        for (int size : new int[] {159, 160, 191, 193}) {
+        for (int size : new int[] {160, 192, 415, 417}) {
             assertThat(call("POST", "/v1/friends/requests", Map.of("toUserId", b.userId.toString(), "epochId", e.toString(), "payload", Ids.random(size)),
                     a.accessToken).getStatusCode().value()).as("size %d", size).isEqualTo(400);
         }
-        assertThat(call("POST", "/v1/friends/requests", Map.of("toUserId", b.userId.toString(), "epochId", Ids.newId().toString(), "payload", Ids.random(192)),
+        assertThat(call("POST", "/v1/friends/requests", Map.of("toUserId", b.userId.toString(), "epochId", Ids.newId().toString(), "payload", Ids.random(416)),
                 a.accessToken).getBody()).isEqualTo(Map.of("error", "unknown_epoch"));
         byte[] token = Ids.random(32);
         call("POST", "/v1/invites", Map.of("tokenHash", core.inviteTokenHash(token)), a.accessToken);
         assertThat(call("POST", "/v1/invites/redeem", Map.of("token", token), a.accessToken).getBody()).isEqualTo(Map.of("error", "own_invite"));
         // Payload re-wraps (PUT) are only for accepted friends.
-        assertThat(call("PUT", "/v1/friend-payloads", Map.of("toUserId", b.userId.toString(), "epochId", e.toString(), "ciphertext", Ids.random(192)),
+        assertThat(call("PUT", "/v1/friend-payloads", Map.of("toUserId", b.userId.toString(), "epochId", e.toString(), "ciphertext", Ids.random(416)),
                 a.accessToken).getStatusCode().value()).isEqualTo(403);
     }
 
