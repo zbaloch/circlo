@@ -10,6 +10,8 @@ const pinning = require('./plugins/pinning').pinningFromEnv(process.env);
 // Brand and surface colours come from the design tokens, so native assets match the app.
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { colors } = require('./src/theme/tokens');
+// Store builds need a higher build number each time; the release workflow passes its run number.
+const buildNumber = process.env.CIRCLO_BUILD_NUMBER;
 
 const config: ExpoConfig = {
   name: 'Circlo',
@@ -21,6 +23,7 @@ const config: ExpoConfig = {
   userInterfaceStyle: 'automatic',
   ios: {
     bundleIdentifier: 'com.circlo.app',
+    ...(buildNumber ? { buildNumber } : {}),
     // Brand pack (ios/AppIcon.appiconset): the dotted "o" on white, plus dark and tinted (iOS 18) variants.
     icon: {
       light: './assets/images/icon.png',
@@ -34,6 +37,7 @@ const config: ExpoConfig = {
   },
   android: {
     package: 'com.circlo.app',
+    ...(buildNumber ? { versionCode: Number(buildNumber) } : {}),
     adaptiveIcon: {
       backgroundColor: colors.brand.background,
       foregroundImage: './assets/images/adaptive-icon-foreground.png',

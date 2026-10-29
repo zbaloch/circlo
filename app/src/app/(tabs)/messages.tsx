@@ -62,7 +62,7 @@ export default function MessagesScreen() {
         ListEmptyComponent={
           refreshing ? undefined : (
             <View className="h-[520px]">
-              <EmptyState title="No messages" body="Messages are end-to-end encrypted. Start a chat with someone or a group." />
+              <EmptyState icon="chatbubble-outline" title="No messages" body="Messages are end-to-end encrypted. Start a chat with someone or a group." />
             </View>
           )
         }

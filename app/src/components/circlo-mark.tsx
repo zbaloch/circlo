@@ -25,7 +25,7 @@ function useBrand() {
   return dark ? { ink: '#FFFFFF', dot: colors.brand['accent-dark'] } : { ink: colors.brand.ink, dot: colors.brand.accent };
 }
 
-/** The dotted "o" alone, where only a square fits (empty states, small spaces). */
+/** The dotted "o" alone, where only a square fits. */
 export function CircloSymbol({ size = 'sm' }: { size?: 'sm' | 'lg' }) {
   const { ink, dot } = useBrand();
   const px = PIXELS[size];

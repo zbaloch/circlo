@@ -50,7 +50,7 @@ export default function ThreadScreen() {
   if (!post) {
     return (
       <View className="flex-1 bg-surface dark:bg-surface-dark">
-        <EmptyState title="Post not available" body="It may have been deleted, or it isn’t shared with you." />
+        <EmptyState icon="eye-off-outline" title="Post not available" body="It may have been deleted, or it isn’t shared with you." />
       </View>
     );
   }

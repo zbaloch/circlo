@@ -80,6 +80,7 @@ function Navigator() {
         <Drawer.Screen name="new-message" options={{ title: 'New message' }} />
         <Drawer.Screen name="link-confirm" options={{ title: 'Link a device' }} />
         <Drawer.Screen name="report/[id]" options={{ title: 'Report' }} />
+        <Drawer.Screen name="enable-notifications" options={{ headerShown: false, swipeEnabled: false }} />
       </Drawer.Protected>
     </Drawer>
   );

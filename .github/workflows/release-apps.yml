@@ -1,0 +1,204 @@
+name: release-apps
+
+# Builds signed store binaries: Android (.aab for Play, .apk to install directly) on Linux and iOS (.ipa) on macOS.
+# Runs only when started by hand (Actions → release-apps → Run workflow), and every job uses the protected `release`
+# environment, so its secrets are never available to pull requests or forks. Secrets are masked in the public logs.
+# Artifacts of a public repo can be downloaded by anyone, so the binaries are uploaded encrypted with
+# ARTIFACT_PASSPHRASE (decrypt: gpg -d circlo.apk.gpg > circlo.apk). The iOS build can also go straight to TestFlight.
+
+on:
+  workflow_dispatch:
+    inputs:
+      platform:
+        description: Which apps to build
+        type: choice
+        options: [both, android, ios]
+        default: both
+      testflight:
+        description: Upload the iOS build to TestFlight
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-apps
+  cancel-in-progress: false
+
+env:
+  # A higher build number for every store upload (app.config.ts).
+  CIRCLO_BUILD_NUMBER: ${{ github.run_number }}
+  APP_VARIANT: production
+
+jobs:
+  android:
+    if: inputs.platform != 'ios'
+    runs-on: ubuntu-latest
+    environment: release
+    timeout-minutes: 90
+    # From the `release` environment, so only available to jobs that use it. Pins (two or more, comma-separated) or
+    # CIRCLO_ALLOW_UNPINNED=1 for beta builds (plugins/pinning.js).
+    env:
+      EXPO_PUBLIC_API_URL: ${{ secrets.CIRCLO_API_URL }}
+      CIRCLO_PIN_SHA256: ${{ secrets.CIRCLO_PIN_SHA256 }}
+      CIRCLO_ALLOW_UNPINNED: ${{ vars.CIRCLO_ALLOW_UNPINNED }}
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+      - uses: actions/setup-java@v6.1.0
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+          targets: aarch64-linux-android, x86_64-linux-android
+      - uses: Swatinem/rust-cache@v2.9.3
+        with:
+          workspaces: core
+      - run: cargo install cargo-ndk --locked
+      - name: Install app dependencies
+        working-directory: app
+        run: |
+          npm ci
+          (cd modules/circlo-core && npm ci)
+      - name: Build the Rust core for Android
+        working-directory: app/modules/circlo-core
+        env:
+          ANDROID_NDK_HOME: ${{ env.ANDROID_NDK_LATEST_HOME }}
+        run: npm run ubrn:android:release
+      - name: Generate the Android project
+        working-directory: app
+        run: npx expo prebuild --platform android --clean --no-install
+      - name: Build signed .aab and .apk
+        working-directory: app/android
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          keystore="$RUNNER_TEMP/upload.jks"
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$keystore"
+          ./gradlew --no-daemon bundleRelease assembleRelease \
+            -Pandroid.injected.signing.store.file="$keystore" \
+            -Pandroid.injected.signing.store.password="$KEYSTORE_PASSWORD" \
+            -Pandroid.injected.signing.key.alias="$KEY_ALIAS" \
+            -Pandroid.injected.signing.key.password="$KEY_PASSWORD"
+          rm -f "$keystore"
+      - name: Encrypt the binaries
+        env:
+          ARTIFACT_PASSPHRASE: ${{ secrets.ARTIFACT_PASSPHRASE }}
+        run: |
+          mkdir -p out
+          cp app/android/app/build/outputs/bundle/release/app-release.aab "out/circlo-${CIRCLO_BUILD_NUMBER}.aab"
+          cp app/android/app/build/outputs/apk/release/app-release.apk "out/circlo-${CIRCLO_BUILD_NUMBER}.apk"
+          for f in out/*; do
+            printf '%s' "$ARTIFACT_PASSPHRASE" | gpg --batch --yes --pinentry-mode loopback --passphrase-fd 0 \
+              --symmetric --cipher-algo AES256 -o "$f.gpg" "$f"
+            rm "$f"
+          done
+      - uses: actions/upload-artifact@v4.6.2
+        with:
+          name: circlo-android-${{ github.run_number }}
+          path: out/*.gpg
+          retention-days: 7
+
+  ios:
+    if: inputs.platform != 'android'
+    runs-on: macos-latest
+    environment: release
+    timeout-minutes: 120
+    # From the `release` environment, so only available to jobs that use it. Pins (two or more, comma-separated) or
+    # CIRCLO_ALLOW_UNPINNED=1 for beta builds (plugins/pinning.js).
+    env:
+      EXPO_PUBLIC_API_URL: ${{ secrets.CIRCLO_API_URL }}
+      CIRCLO_PIN_SHA256: ${{ secrets.CIRCLO_PIN_SHA256 }}
+      CIRCLO_ALLOW_UNPINNED: ${{ vars.CIRCLO_ALLOW_UNPINNED }}
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+          targets: aarch64-apple-ios, aarch64-apple-ios-sim, x86_64-apple-ios
+      - uses: Swatinem/rust-cache@v2.9.3
+        with:
+          workspaces: core
+      - name: Install app dependencies
+        working-directory: app
+        run: |
+          npm ci
+          (cd modules/circlo-core && npm ci)
+      - name: Build the Rust core for iOS
+        working-directory: app/modules/circlo-core
+        run: npm run ubrn:ios:release
+      - name: Generate the iOS project
+        working-directory: app
+        run: npx expo prebuild --platform ios --clean
+      - name: App Store Connect API key
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+        run: |
+          mkdir -p ~/.appstoreconnect/private_keys
+          printf '%s' "$ASC_KEY_P8" > ~/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8
+      # Automatic signing with the API key: Xcode fetches or creates the distribution certificate and profile, so no
+      # certificate or profile is stored anywhere (the key needs the Admin role in App Store Connect).
+      - name: Archive and export a signed .ipa
+        working-directory: app/ios
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          key=~/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8
+          auth=(-allowProvisioningUpdates -authenticationKeyPath "$key" -authenticationKeyID "$ASC_KEY_ID" -authenticationKeyIssuerID "$ASC_ISSUER_ID")
+          xcodebuild -workspace Circlo.xcworkspace -scheme Circlo -configuration Release \
+            -destination generic/platform=iOS -archivePath "$RUNNER_TEMP/Circlo.xcarchive" \
+            "${auth[@]}" DEVELOPMENT_TEAM="$APPLE_TEAM_ID" CODE_SIGN_STYLE=Automatic archive
+          cat > "$RUNNER_TEMP/ExportOptions.plist" <<EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0"><dict>
+            <key>method</key><string>app-store-connect</string>
+            <key>teamID</key><string>${APPLE_TEAM_ID}</string>
+            <key>signingStyle</key><string>automatic</string>
+            <key>destination</key><string>export</string>
+          </dict></plist>
+          EOF
+          xcodebuild -exportArchive -archivePath "$RUNNER_TEMP/Circlo.xcarchive" \
+            -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" -exportPath "$RUNNER_TEMP/export" "${auth[@]}"
+      - name: Upload to TestFlight
+        if: inputs.testflight
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+        run: xcrun altool --upload-app --type ios --file "$RUNNER_TEMP"/export/*.ipa --apiKey "$ASC_KEY_ID" --apiIssuer "$ASC_ISSUER_ID"
+      - name: Encrypt the binary
+        env:
+          ARTIFACT_PASSPHRASE: ${{ secrets.ARTIFACT_PASSPHRASE }}
+        run: |
+          command -v gpg >/dev/null || brew install gnupg
+          mkdir -p out
+          cp "$RUNNER_TEMP"/export/*.ipa "out/circlo-${CIRCLO_BUILD_NUMBER}.ipa"
+          printf '%s' "$ARTIFACT_PASSPHRASE" | gpg --batch --yes --pinentry-mode loopback --passphrase-fd 0 \
+            --symmetric --cipher-algo AES256 -o "out/circlo-${CIRCLO_BUILD_NUMBER}.ipa.gpg" "out/circlo-${CIRCLO_BUILD_NUMBER}.ipa"
+          rm "out/circlo-${CIRCLO_BUILD_NUMBER}.ipa"
+      - name: Remove the API key
+        if: always()
+        run: rm -rf ~/.appstoreconnect
+      - uses: actions/upload-artifact@v4.6.2
+        with:
+          name: circlo-ios-${{ github.run_number }}
+          path: out/*.gpg
+          retention-days: 7
