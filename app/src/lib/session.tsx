@@ -9,6 +9,7 @@ import { clearMediaCache } from './media';
 import { clearMessaging } from './messaging';
 import { resetPush } from './push';
 import { clearOutbox } from './outbox';
+import { forgetConnections } from './use-connections';
 
 type State = { status: 'loading' } | { status: 'signedOut' } | { status: 'signedIn'; account: StoredAccount };
 
@@ -18,6 +19,27 @@ type Session = State & {
 };
 
 const SessionContext = createContext<Session | null>(null);
+
+/**
+ * Removes everything the account left on this device: keys, chats, decrypted media, queued posts, caches and local
+ * preferences. Used by sign-out and when the server ends the session, so both leave nothing behind for the next account.
+ */
+async function wipeDevice() {
+  const current = await loadAccount();
+  await clearAccount();
+  setAccessToken(null);
+  resetAddressBookCache();
+  clearOutbox();
+  clearFeed();
+  resetPush();
+  if (current) await forgetConnections(current.userId).catch(() => {});
+  await clearMessaging().catch(() => {});
+  try {
+    clearMediaCache(); // decrypted photos must not outlive the session
+  } catch {
+    // best effort: the OS may already have purged the cache
+  }
+}
 
 /** Rotates the stored refresh token for a fresh in-memory access token. */
 async function refresh(account: StoredAccount) {
@@ -44,7 +66,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       } catch (e) {
         if (e instanceof ApiError && e.status === 401) {
           // Session revoked (e.g. password changed elsewhere): log in again; the keys come back from the backup.
-          await clearAccount();
+          await wipeDevice();
           if (!cancelled) setState({ status: 'signedOut' });
         } else if (!cancelled) {
           // Offline: keys are on the device, so stay signed in and retry the session later.
@@ -77,8 +99,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       } catch (e) {
         if (e instanceof ApiError && e.status === 401) {
           // The session was revoked elsewhere: sign in again (keys come back from the backup).
-          await clearAccount();
-          setAccessToken(null);
+          await wipeDevice();
           setState({ status: 'signedOut' });
         }
         return null;
@@ -93,18 +114,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     if (current) {
       await api.DELETE('/v1/devices/{deviceId}', { params: { path: { deviceId: current.deviceId } } }).catch(() => undefined);
     }
-    await clearAccount();
-    setAccessToken(null);
-    resetAddressBookCache();
-    clearOutbox();
-    clearFeed();
-    resetPush();
-    await clearMessaging().catch(() => {});
-    try {
-      clearMediaCache(); // decrypted photos must not outlive the session
-    } catch {
-      // best effort: the OS may already have purged the cache
-    }
+    await wipeDevice();
     setState({ status: 'signedOut' });
   }, []);
 

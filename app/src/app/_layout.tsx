@@ -14,6 +14,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import { View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { KeyboardProvider } from 'react-native-keyboard-controller';
 
 import { AppDrawer } from '@/components/app-drawer';
 import { DialogHost } from '@/components/ui/dialog-host';
@@ -66,17 +67,19 @@ function Navigator() {
         <Drawer.Screen name="recovery" options={{ title: 'Recovery phrase' }} />
         <Drawer.Screen name="dev" options={{ title: 'Crypto self-test' }} />
         <Drawer.Screen name="edit-profile" options={{ title: 'Edit profile' }} />
-        <Drawer.Screen name="friend/[id]" options={{ title: 'Friend' }} />
+        <Drawer.Screen name="friend/[id]" options={{ title: 'Profile' }} />
         <Drawer.Screen name="safety/[id]" options={{ title: 'Safety number' }} />
         <Drawer.Screen name="scan" options={{ title: 'Scan code' }} />
         <Drawer.Screen name="circle/[n]" options={{ title: 'Circle' }} />
         <Drawer.Screen name="compose" options={{ headerShown: false, swipeEnabled: false }} />
         <Drawer.Screen name="post/[id]" options={{ title: 'Post' }} />
+        <Drawer.Screen name="reply/[id]" options={{ headerShown: false, swipeEnabled: false }} />
         <Drawer.Screen name="viewer" options={{ headerShown: false, swipeEnabled: false }} />
-        <Drawer.Screen name="preview/[id]" options={{ title: 'Preview' }} />
+        <Drawer.Screen name="preview/[id]" options={{ title: 'What they can see' }} />
         <Drawer.Screen name="chat/[id]" options={{ title: 'Chat' }} />
         <Drawer.Screen name="new-message" options={{ title: 'New message' }} />
         <Drawer.Screen name="link-confirm" options={{ title: 'Link a device' }} />
+        <Drawer.Screen name="report/[id]" options={{ title: 'Report' }} />
       </Drawer.Protected>
     </Drawer>
   );
@@ -99,6 +102,8 @@ export default function RootLayout() {
 
   return (
     <GestureHandlerRootView className="flex-1">
+      {/* Keyboard handling that works with Android's edge-to-edge layout (where window resizing no longer happens). */}
+      <KeyboardProvider>
       <ThemeProvider value={theme}>
         <SessionProvider>
           <Navigator />
@@ -106,6 +111,7 @@ export default function RootLayout() {
         </SessionProvider>
         <StatusBar style="auto" />
       </ThemeProvider>
+      </KeyboardProvider>
     </GestureHandlerRootView>
   );
 }

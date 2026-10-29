@@ -61,20 +61,28 @@ export async function runQuickChecks(): Promise<CheckResult[]> {
   );
 
   results.push(
-    await timed('Circle 7 friend reads 7 and 9, not 5', () => {
-      const [alice, bob] = [Core.generateIdentity(), Core.generateIdentity()];
-      const [aliceId, bobId, epoch] = [id16(), id16(), id16()];
+    await timed('Circle members read their circles; everyone reads Everyone; nobody else reads Only me', () => {
+      const [alice, bob, carol] = [Core.generateIdentity(), Core.generateIdentity(), Core.generateIdentity()];
+      const [aliceId, bobId, carolId, epoch] = [id16(), id16(), id16(), id16()];
       const root = Core.newSymmetricKey();
-      const payload = Core.sealFriendPayload(alice, bob.x25519Pk, aliceId, bobId, epoch, root, 7, Core.newSymmetricKey());
-      const key = Core.openFriendPayload(bob, alice.x25519Pk, aliceId, bobId, epoch, payload);
-      const ring = new Core.ReaderKeyring(key.circleKey);
-      const readable = (circle: number) => {
+      const ringFor = (who: Core.IdentityKeys, whoId: ArrayBuffer, circles: number[]) => {
+        const payload = Core.sealFriendPayload(alice, who.x25519Pk, aliceId, whoId, epoch, root, Core.newSymmetricKey(), Uint8Array.from(circles).buffer);
+        const key = Core.openFriendPayload(who, alice.x25519Pk, aliceId, whoId, epoch, payload);
+        return { payload, ring: Core.ReaderKeyring.withCircles(key.circleKey, key.circleKeys) };
+      };
+      const bobRing = ringFor(bob, bobId, [2, 5]);
+      const carolRing = ringFor(carol, carolId, []);
+      check(bobRing.payload.byteLength === carolRing.payload.byteLength, 'membership changed the payload size');
+      const readable = (ring: Core.ReaderKeyringLike, audience: Core.Audience) => {
         const postId = id16();
-        const content = { text: `to circle ${circle}`, createdAtMs: BigInt(Date.now()), media: [] };
-        const s = Core.sealPost(alice, aliceId, postId, epoch, root, circle, content);
+        const s = Core.sealPost(alice, aliceId, postId, epoch, root, audience, { text: 'hi', createdAtMs: BigInt(Date.now()), media: [] });
         return !fails(() => ring.openPost(alice.ed25519Pk, aliceId, postId, epoch, s.keyRef, s.headerCt));
       };
-      check(readable(7) && readable(9) && !readable(5), 'circle access wrong');
+      const circles = (...ids: number[]) => new Core.Audience.Circles({ ids: Uint8Array.from(ids).buffer });
+      check(readable(bobRing.ring, circles(5)) && readable(bobRing.ring, circles(1, 2)) && !readable(bobRing.ring, circles(3)), 'circle access wrong');
+      check(readable(carolRing.ring, new Core.Audience.Everyone()) && !readable(carolRing.ring, circles(2)), 'Everyone access wrong');
+      check(!readable(bobRing.ring, new Core.Audience.OnlyMe()), 'Only me opened for a friend');
+      const payload = bobRing.payload;
       return `payload ${payload.byteLength} bytes`;
     }),
   );
@@ -141,8 +149,8 @@ export async function streamFile(megabytes: number): Promise<CheckResult> {
 }
 
 /**
- * Phase 8 feed benchmark: 50 authors × 10 posts sealed at circles 5–12, opened with the keyring a friend in circle 7
- * holds (exactly what the timeline does per row, including the failed trial decryptions for posts not meant for them).
+ * Phase 8 feed benchmark: 50 authors × 10 posts to a mix of audiences, opened with the keyring a friend in circles 2
+ * and 5 holds (exactly what the timeline does per row, including the failed trial decryptions for posts not meant for them).
  */
 export async function feedBenchmark(authors = 50, perAuthor = 10): Promise<CheckResult> {
   const sealed: { pk: ArrayBuffer; author: ArrayBuffer; post: ArrayBuffer; epoch: ArrayBuffer; keyRef: ArrayBuffer; headerCt: ArrayBuffer; ring: Core.ReaderKeyringLike }[] = [];
@@ -151,10 +159,11 @@ export async function feedBenchmark(authors = 50, perAuthor = 10): Promise<Check
     const authorId = Core.newSymmetricKey().slice(0, 16);
     const epochId = Core.newSymmetricKey().slice(0, 16);
     const root = Core.newSymmetricKey();
-    const ring = Core.ReaderKeyring.forCircle(root, 7);
+    const ring = Core.ReaderKeyring.forFriend(root, 2, Uint8Array.from([2, 5]).buffer);
+    const audiences = [new Core.Audience.Everyone(), new Core.Audience.OnlyMe(), ...[1, 2, 3, 4, 5, 6].map((c) => new Core.Audience.Circles({ ids: Uint8Array.from([c]).buffer }))];
     for (let i = 0; i < perAuthor; i++) {
       const postId = Core.newSymmetricKey().slice(0, 16);
-      const s = Core.sealPost(id, authorId, postId, epochId, root, 5 + (i % 8), { text: `post ${a}/${i} `.repeat(8), createdAtMs: BigInt(Date.now()), media: [] });
+      const s = Core.sealPost(id, authorId, postId, epochId, root, audiences[i % audiences.length], { text: `post ${a}/${i} `.repeat(8), createdAtMs: BigInt(Date.now()), media: [] });
       sealed.push({ pk: id.ed25519Pk, author: authorId, post: postId, epoch: epochId, keyRef: s.keyRef, headerCt: s.headerCt, ring });
     }
   }
@@ -166,11 +175,12 @@ export async function feedBenchmark(authors = 50, perAuthor = 10): Promise<Check
         s.ring.openPost(s.pk, s.author, s.post, s.epoch, s.keyRef, s.headerCt);
         opened++;
       } catch {
-        // not for circle 7
+        // not for this friend
       }
     }
     const ms = Date.now() - start;
-    const expected = authors * Array.from({ length: perAuthor }, (_, i) => 5 + (i % 8)).filter((c) => c >= 7).length;
+    // Everyone, circle 2 and circle 5 (audiences 0, 3 and 6 of 8) are readable.
+    const expected = authors * Array.from({ length: perAuthor }, (_, i) => i % 8).filter((k) => k === 0 || k === 3 || k === 6).length;
     check(opened === expected, `opened ${opened}, expected ${expected}`);
     return `${opened} readable, ${sealed.length - opened} skipped, ${ms} ms total (${(ms / sealed.length).toFixed(2)} ms/post)`;
   });

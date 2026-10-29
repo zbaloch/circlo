@@ -35,7 +35,7 @@ export default function EditProfileScreen() {
 
   return (
     <AuthScreen>
-      <Title subtitle="Encrypted on this phone. Only your friends can read it; Circlo can’t.">Edit profile</Title>
+      <Title subtitle="Encrypted on this phone. Only your people can read it; Circlo can’t.">Edit profile</Title>
       <TextField label="Display name" value={displayName} onChangeText={setDisplayName} maxLength={50} autoCapitalize="words" />
       <TextField label="Bio" value={bio} onChangeText={setBio} maxLength={160} multiline />
       <ErrorText>{error}</ErrorText>

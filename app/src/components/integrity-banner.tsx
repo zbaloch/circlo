@@ -1,4 +1,4 @@
-import Ionicons from '@expo/vector-icons/Ionicons';
+import { Icon } from '@/components/ui/icon';
 import { Pressable, View } from 'react-native';
 
 import { useIntegrityWarning } from '@/lib/device-integrity';
@@ -12,10 +12,10 @@ export function IntegrityBanner() {
   if (!message || dismissed) return null;
   return (
     <View accessibilityRole="alert" className="mx-4 my-2 flex-row gap-3 rounded-2xl border border-danger p-3 dark:border-danger-dark">
-      <Ionicons name="warning-outline" size={20} color={palette.danger} />
+      <Icon name="warning-outline" size={20} color={palette.danger} />
       <Text className="flex-1 text-sm text-ink dark:text-ink-dark">{message}</Text>
       <Pressable accessibilityRole="button" accessibilityLabel="Dismiss warning" onPress={dismiss} hitSlop={8}>
-        <Ionicons name="close" size={20} color={palette.muted} />
+        <Icon name="close" size={20} color={palette.muted} />
       </Pressable>
     </View>
   );

@@ -652,7 +652,7 @@ const DEFINITIONS = {
         FfiType.RustBuffer,
         FfiType.RustBuffer,
         FfiType.RustBuffer,
-        FfiType.UInt8,
+        FfiType.RustBuffer,
         FfiType.RustBuffer,
       ],
       ret: FfiType.RustBuffer,
@@ -675,7 +675,7 @@ const DEFINITIONS = {
         FfiType.RustBuffer,
         FfiType.RustBuffer,
         FfiType.RustBuffer,
-        FfiType.UInt8,
+        FfiType.RustBuffer,
         FfiType.RustBuffer,
       ],
       ret: FfiType.RustBuffer,
@@ -704,6 +704,17 @@ const DEFINITIONS = {
     uniffi_circlo_core_fn_func_seal_reply: {
       args: [
         FfiType.RustBuffer,
+        FfiType.RustBuffer,
+        FfiType.RustBuffer,
+        FfiType.RustBuffer,
+        FfiType.RustBuffer,
+        FfiType.RustBuffer,
+      ],
+      ret: FfiType.RustBuffer,
+      hasRustCallStatus: true,
+    },
+    uniffi_circlo_core_fn_func_seal_report: {
+      args: [
         FfiType.RustBuffer,
         FfiType.RustBuffer,
         FfiType.RustBuffer,
@@ -942,8 +953,8 @@ const DEFINITIONS = {
       ret: FfiType.RustBuffer,
       hasRustCallStatus: true,
     },
-    uniffi_circlo_core_fn_constructor_readerkeyring_for_circle: {
-      args: [FfiType.RustBuffer, FfiType.UInt8],
+    uniffi_circlo_core_fn_constructor_readerkeyring_for_friend: {
+      args: [FfiType.RustBuffer, FfiType.UInt8, FfiType.RustBuffer],
       ret: FfiType.Handle,
       hasRustCallStatus: true,
     },
@@ -954,6 +965,11 @@ const DEFINITIONS = {
     },
     uniffi_circlo_core_fn_constructor_readerkeyring_new: {
       args: [FfiType.RustBuffer],
+      ret: FfiType.Handle,
+      hasRustCallStatus: true,
+    },
+    uniffi_circlo_core_fn_constructor_readerkeyring_with_circles: {
+      args: [FfiType.RustBuffer, FfiType.RustBuffer],
       ret: FfiType.Handle,
       hasRustCallStatus: true,
     },
@@ -1225,6 +1241,11 @@ const DEFINITIONS = {
       ret: FfiType.UInt16,
       hasRustCallStatus: false,
     },
+    uniffi_circlo_core_checksum_func_seal_report: {
+      args: [],
+      ret: FfiType.UInt16,
+      hasRustCallStatus: false,
+    },
     uniffi_circlo_core_checksum_func_seal_user_blob: {
       args: [],
       ret: FfiType.UInt16,
@@ -1400,7 +1421,7 @@ const DEFINITIONS = {
       ret: FfiType.UInt16,
       hasRustCallStatus: false,
     },
-    uniffi_circlo_core_checksum_constructor_readerkeyring_for_circle: {
+    uniffi_circlo_core_checksum_constructor_readerkeyring_for_friend: {
       args: [],
       ret: FfiType.UInt16,
       hasRustCallStatus: false,
@@ -1411,6 +1432,11 @@ const DEFINITIONS = {
       hasRustCallStatus: false,
     },
     uniffi_circlo_core_checksum_constructor_readerkeyring_new: {
+      args: [],
+      ret: FfiType.UInt16,
+      hasRustCallStatus: false,
+    },
+    uniffi_circlo_core_checksum_constructor_readerkeyring_with_circles: {
       args: [],
       ret: FfiType.UInt16,
       hasRustCallStatus: false,
@@ -1865,8 +1891,8 @@ interface NativeModuleInterface {
     toUser: Uint8Array,
     epochId: Uint8Array,
     epochRoot: Uint8Array,
-    circle: number,
     profileKey: Uint8Array,
+    circles: Uint8Array,
     uniffi_out_err: UniffiRustCallStatus,
   ): Uint8Array;
   uniffi_circlo_core_fn_func_seal_local(
@@ -1887,7 +1913,7 @@ interface NativeModuleInterface {
     postId: Uint8Array,
     epochId: Uint8Array,
     epochRoot: Uint8Array,
-    circle: number,
+    audience: Uint8Array,
     content: Uint8Array,
     uniffi_out_err: UniffiRustCallStatus,
   ): Uint8Array;
@@ -1917,6 +1943,14 @@ interface NativeModuleInterface {
     replyId: Uint8Array,
     replierId: Uint8Array,
     reply: Uint8Array,
+    uniffi_out_err: UniffiRustCallStatus,
+  ): Uint8Array;
+  uniffi_circlo_core_fn_func_seal_report(
+    moderationPublicKey: Uint8Array,
+    reporter: Uint8Array,
+    reporterId: Uint8Array,
+    reportId: Uint8Array,
+    content: Uint8Array,
     uniffi_out_err: UniffiRustCallStatus,
   ): Uint8Array;
   uniffi_circlo_core_fn_func_seal_user_blob(
@@ -2122,9 +2156,10 @@ interface NativeModuleInterface {
     uniffiSelf: bigint,
     uniffi_out_err: UniffiRustCallStatus,
   ): Uint8Array;
-  uniffi_circlo_core_fn_constructor_readerkeyring_for_circle(
+  uniffi_circlo_core_fn_constructor_readerkeyring_for_friend(
     epochRoot: Uint8Array,
     circle: number,
+    circles: Uint8Array,
     uniffi_out_err: UniffiRustCallStatus,
   ): bigint;
   uniffi_circlo_core_fn_constructor_readerkeyring_for_owner(
@@ -2133,6 +2168,11 @@ interface NativeModuleInterface {
   ): bigint;
   uniffi_circlo_core_fn_constructor_readerkeyring_new(
     circleKey: Uint8Array,
+    uniffi_out_err: UniffiRustCallStatus,
+  ): bigint;
+  uniffi_circlo_core_fn_constructor_readerkeyring_with_circles(
+    circleKey: Uint8Array,
+    circleKeys: Uint8Array,
     uniffi_out_err: UniffiRustCallStatus,
   ): bigint;
   uniffi_circlo_core_fn_method_readerkeyring_open_post(
@@ -2196,6 +2236,7 @@ interface NativeModuleInterface {
   uniffi_circlo_core_checksum_func_seal_push_token(): number;
   uniffi_circlo_core_checksum_func_seal_recovery_backup(): number;
   uniffi_circlo_core_checksum_func_seal_reply(): number;
+  uniffi_circlo_core_checksum_func_seal_report(): number;
   uniffi_circlo_core_checksum_func_seal_user_blob(): number;
   uniffi_circlo_core_checksum_func_sign_device_certificate(): number;
   uniffi_circlo_core_checksum_func_sign_identity(): number;
@@ -2231,9 +2272,10 @@ interface NativeModuleInterface {
   uniffi_circlo_core_checksum_method_playbacksession_next_range(): number;
   uniffi_circlo_core_checksum_method_playbacksession_supply(): number;
   uniffi_circlo_core_checksum_method_playbacksession_url(): number;
-  uniffi_circlo_core_checksum_constructor_readerkeyring_for_circle(): number;
+  uniffi_circlo_core_checksum_constructor_readerkeyring_for_friend(): number;
   uniffi_circlo_core_checksum_constructor_readerkeyring_for_owner(): number;
   uniffi_circlo_core_checksum_constructor_readerkeyring_new(): number;
+  uniffi_circlo_core_checksum_constructor_readerkeyring_with_circles(): number;
   uniffi_circlo_core_checksum_method_readerkeyring_open_post(): number;
   // Codegen call sites use these via `nativeModule().rustbuffer_alloc(...)`
   // and `nativeModule().rustbuffer_free(...)`. The runtime's registered

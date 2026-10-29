@@ -1,0 +1,14 @@
+:root {
+  --circlo-ink: #101828;          /* gray-900: letters + ring on light */
+  --circlo-dot: #0EA5E9;      /* sky-500: the dot on light */
+  --circlo-bg: #FFFFFF;
+  --circlo-link: #0284C7;     /* sky-600 */
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --circlo-ink: #FFFFFF;
+    --circlo-dot: #38BDF8;    /* sky-400 */
+    --circlo-bg: #030712;       /* gray-950 */
+    --circlo-link: #38BDF8;
+  }
+}

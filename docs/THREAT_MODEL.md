@@ -84,6 +84,10 @@ circle numbers, circle labels, group names.
 16. **Messaging metadata:** the delivery service sees which devices are in which group, when messages are sent, and
     their padded sizes (MLS framing also shows epoch and whether a message is a commit). It never sees names,
     membership plaintext beyond device ids, or content.
+17. **Reports reveal what was reported:** a report makes the reported post (text, photos, author) readable to whoever
+    holds the moderation secret key, by the reporter's choice. The server stores only ciphertext and learns that a
+    user sent a report, when, and its size. A leaked moderation key exposes every stored report: keep it offline, and
+    rotate it (new keygen, new `CIRCLO_MODERATION_PUBLIC_KEY`) if in doubt.
 
 ## Out of scope (for now)
 

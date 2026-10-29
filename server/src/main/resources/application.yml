@@ -14,9 +14,15 @@ spring:
 server:
   port: ${CIRCLO_SERVER_PORT:8080}
   # No access log: we never record IPs or request lines.
+  # Client address for rate limits behind a reverse proxy: Tomcat's RemoteIpValve takes X-Forwarded-For only from
+  # proxies matching CIRCLO_TRUSTED_PROXIES (a regex of proxy IPs). Empty (the default) trusts no proxy, so clients
+  # can't spoof their address. See docs/HARDENING.md, "Rate limiting".
+  forward-headers-strategy: native
   tomcat:
     accesslog:
       enabled: false
+    remoteip:
+      internal-proxies: ${CIRCLO_TRUSTED_PROXIES:}
 
 circlo:
   core:
@@ -32,6 +38,10 @@ circlo:
     fcm:
       project-id: ${CIRCLO_FCM_PROJECT_ID:}
       service-account: ${CIRCLO_FCM_SERVICE_ACCOUNT:}
+  # Operator's moderation public key (core CLI: circlo-moderation keygen). The secret half stays offline. Empty = the
+  # app hides Report.
+  moderation:
+    public-key: ${CIRCLO_MODERATION_PUBLIC_KEY:}
   auth:
     access-ttl: 15m
     refresh-ttl: 30d

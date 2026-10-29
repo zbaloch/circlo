@@ -10,7 +10,7 @@
 
 use std::collections::HashMap;
 use std::fs::{File, OpenOptions};
-use std::io::{BufRead, BufReader, Read, Seek, SeekFrom, Write};
+use std::io::{Read, Seek, SeekFrom, Write};
 use std::net::{Ipv4Addr, TcpListener, TcpStream};
 use std::path::PathBuf;
 use std::sync::{Arc, Condvar, Mutex};
@@ -230,38 +230,33 @@ impl Server {
 
     fn handle(&self, stream: TcpStream) -> std::io::Result<()> {
         stream.set_read_timeout(Some(Duration::from_secs(30)))?;
-        let mut reader = BufReader::new(stream.try_clone()?);
+        let mut reader = stream.try_clone()?;
         let mut out = stream;
-        let mut head = Vec::new();
-        let (mut method, mut path, mut range) = (String::new(), String::new(), None);
-        loop {
-            let mut line = String::new();
-            if reader.read_line(&mut line)? == 0 {
+        let mut head = Vec::with_capacity(1024);
+        let mut buf = [0u8; 1024];
+        let request = loop {
+            match parse_request(&head) {
+                Parsed::Complete(r) => break r,
+                Parsed::Invalid => return respond(&mut out, "400 Bad Request", &[]),
+                Parsed::Partial if head.len() >= MAX_HEAD => {
+                    return respond(&mut out, "431 Request Header Fields Too Large", &[])
+                }
+                Parsed::Partial => {}
+            }
+            let want = (MAX_HEAD - head.len()).min(buf.len());
+            let n = reader.read(&mut buf[..want])?;
+            if n == 0 {
                 return Ok(());
             }
-            head.extend_from_slice(line.as_bytes());
-            if head.len() > MAX_HEAD {
-                return respond(&mut out, "431 Request Header Fields Too Large", &[]);
-            }
-            let line = line.trim_end();
-            if line.is_empty() {
-                break;
-            }
-            if method.is_empty() {
-                let mut parts = line.split(' ');
-                method = parts.next().unwrap_or_default().to_owned();
-                path = parts.next().unwrap_or_default().to_owned();
-            } else if let Some((k, v)) = line.split_once(':') {
-                if k.eq_ignore_ascii_case("range") {
-                    range = Some(v.trim().to_owned());
-                }
-            }
-        }
-        if method != "GET" && method != "HEAD" {
-            return respond(&mut out, "405 Method Not Allowed", &[]);
-        }
-        let token = path.strip_prefix('/').unwrap_or_default();
-        let Some(session) = self.sessions.lock().unwrap().get(token).cloned() else {
+            head.extend_from_slice(&buf[..n]);
+        };
+        let head_only = match request.method {
+            Method::Get => false,
+            Method::Head => true,
+            Method::Other => return respond(&mut out, "405 Method Not Allowed", &[]),
+        };
+        let range = request.range;
+        let Some(session) = self.sessions.lock().unwrap().get(&request.token).cloned() else {
             return respond(&mut out, "404 Not Found", &[]);
         };
         let len = session.content_len;
@@ -290,7 +285,7 @@ impl Server {
             if partial { "206 Partial Content" } else { "200 OK" },
             &headers,
         )?;
-        if method == "HEAD" || start == end {
+        if head_only || start == end {
             return Ok(());
         }
         let chunk = CHUNK as u64;
@@ -319,8 +314,63 @@ fn respond(out: &mut TcpStream, status: &str, headers: &[(&str, String)]) -> std
     out.write_all(head.as_bytes())
 }
 
+#[derive(Debug, PartialEq, Eq)]
+pub enum Method {
+    Get,
+    Head,
+    Other,
+}
+
+/// What the loopback server needs from a request head.
+#[derive(Debug, PartialEq, Eq)]
+pub struct Request {
+    pub method: Method,
+    pub token: String,
+    pub range: Option<String>,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub enum Parsed {
+    Complete(Request),
+    Partial,
+    Invalid,
+}
+
+const MAX_HEADERS: usize = 32;
+
+/// Parses an HTTP/1.x request head with `httparse`. Pure, so it can be fuzzed (fuzz target `playback_request`).
+pub fn parse_request(head: &[u8]) -> Parsed {
+    let mut headers = [httparse::EMPTY_HEADER; MAX_HEADERS];
+    let mut req = httparse::Request::new(&mut headers);
+    match req.parse(head) {
+        Ok(httparse::Status::Complete(_)) => {}
+        Ok(httparse::Status::Partial) => return Parsed::Partial,
+        Err(_) => return Parsed::Invalid,
+    }
+    let (Some(method), Some(path)) = (req.method, req.path) else {
+        return Parsed::Invalid;
+    };
+    let method = match method {
+        "GET" => Method::Get,
+        "HEAD" => Method::Head,
+        _ => Method::Other,
+    };
+    let mut ranges = req.headers.iter().filter(|h| h.name.eq_ignore_ascii_case("range"));
+    let range = match (ranges.next(), ranges.next()) {
+        (None, _) => None,
+        (Some(h), None) => match std::str::from_utf8(h.value) {
+            Ok(v) => Some(v.trim().to_owned()),
+            Err(_) => return Parsed::Invalid,
+        },
+        // Duplicate Range headers are ambiguous: refuse rather than pick one.
+        (Some(_), Some(_)) => return Parsed::Invalid,
+    };
+    let token = path.strip_prefix('/').unwrap_or_default().to_owned();
+    Parsed::Complete(Request { method, token, range })
+}
+
 /// Parses a single `bytes=` range against `len`; returns `[start, end)` or `None` if unsatisfiable.
-pub(crate) fn parse_range(header: &str, len: u64) -> Option<(u64, u64)> {
+pub fn parse_range(header: &str, len: u64) -> Option<(u64, u64)> {
     let spec = header.strip_prefix("bytes=")?;
     if spec.contains(',') {
         return None;
@@ -444,5 +494,63 @@ mod tests {
         session.supply(0, &ct).unwrap();
         assert_eq!(session.chunk(0).unwrap_err(), CoreError::DecryptionFailed);
         assert_eq!(session.chunk(1).unwrap().len(), CHUNK);
+    }
+
+    #[test]
+    fn request_heads() {
+        let ok = parse_request(b"GET /abc HTTP/1.1\r\nHost: x\r\nrange:  bytes=0-9 \r\n\r\n");
+        assert_eq!(
+            ok,
+            Parsed::Complete(Request {
+                method: Method::Get,
+                token: "abc".into(),
+                range: Some("bytes=0-9".into())
+            })
+        );
+        assert!(matches!(
+            parse_request(b"HEAD /t HTTP/1.1\r\n\r\n"),
+            Parsed::Complete(Request {
+                method: Method::Head,
+                range: None,
+                ..
+            })
+        ));
+        assert!(matches!(
+            parse_request(b"POST /t HTTP/1.1\r\n\r\n"),
+            Parsed::Complete(Request {
+                method: Method::Other,
+                ..
+            })
+        ));
+        assert_eq!(parse_request(b"GET /t HTTP/1.1\r\nHost: x\r\n"), Parsed::Partial);
+        assert_eq!(parse_request(b""), Parsed::Partial);
+        assert_eq!(
+            parse_request(b"GET /t HTTP/1.1\r\nRange: bytes=0-1\r\nRange: bytes=5-9\r\n\r\n"),
+            Parsed::Invalid
+        );
+        assert_eq!(parse_request(b"GET /t HTTP/1.1\r\nBad Header\r\n\r\n"), Parsed::Invalid);
+        assert_eq!(parse_request(b"\x00\x01garbage\r\n\r\n"), Parsed::Invalid);
+        let many: String = (0..40).map(|i| format!("X-{i}: y\r\n")).collect();
+        assert_eq!(
+            parse_request(format!("GET /t HTTP/1.1\r\n{many}\r\n").as_bytes()),
+            Parsed::Invalid
+        );
+    }
+
+    #[test]
+    fn malformed_and_oversized_requests_get_errors() {
+        let server = Server::shared().unwrap();
+        let send = |req: &[u8]| {
+            let mut s = TcpStream::connect(("127.0.0.1", server.port)).unwrap();
+            s.write_all(req).unwrap();
+            let mut resp = Vec::new();
+            let _ = s.read_to_end(&mut resp);
+            String::from_utf8_lossy(&resp).into_owned()
+        };
+        assert!(send(b"GET /t HTTP/1.1\r\nBad Header\r\n\r\n").starts_with("HTTP/1.1 400"));
+        assert!(send(b"DELETE /t HTTP/1.1\r\n\r\n").starts_with("HTTP/1.1 405"));
+        assert!(send(b"GET /unknown HTTP/1.1\r\n\r\n").starts_with("HTTP/1.1 404"));
+        let huge = format!("GET /t HTTP/1.1\r\nX: {}\r\n\r\n", "a".repeat(MAX_HEAD));
+        assert!(send(huge.as_bytes()).starts_with("HTTP/1.1 431"));
     }
 }

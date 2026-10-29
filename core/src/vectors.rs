@@ -3,7 +3,7 @@
 
 use std::collections::BTreeMap;
 
-use crate::chain::{circle_key, CircleKey};
+use crate::chain::{circle_key, exclusive_key, CircleKey};
 use crate::envelope::seal_with_nonce;
 use crate::identity::Identity;
 use crate::padding::padme;
@@ -27,6 +27,8 @@ fn compute() -> BTreeMap<String, String> {
     let c7 = circle_key(&root, 7).unwrap();
     put("chain.C7.wrap_key", &*c7.wrap_key());
     put("chain.C7.ref_key", &*c7.ref_key());
+    put("chain.X1(close-friends)", exclusive_key(&root, 1).unwrap().as_bytes());
+    put("chain.X8", exclusive_key(&root, 8).unwrap().as_bytes());
     put(
         "chain.C7.key_ref(author=a1*16,post=50*16)",
         &c7.key_ref(&[0xA1; 16], &[0x50; 16]),

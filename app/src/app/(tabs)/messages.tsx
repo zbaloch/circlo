@@ -1,5 +1,5 @@
 import { router, useFocusEffect } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { FlatList, Pressable, RefreshControl, View } from 'react-native';
 
 import { Avatar } from '@/components/avatar';
@@ -8,6 +8,7 @@ import { Fab } from '@/components/fab';
 import { authorName } from '@/components/post-actions';
 import { Screen } from '@/components/screen';
 import { loadAddressBook, type AddressBook } from '@/lib/addressbook';
+import { refreshBlocked, useBlocked, visibleConversations } from '@/lib/blocks';
 import { syncMessaging, unreadCount, useConversations, type Conversation } from '@/lib/messaging';
 import { useSession } from '@/lib/session';
 import { relativeTime } from '@/lib/time';
@@ -18,7 +19,9 @@ import { Text } from '@/components/ui/text';
 export default function MessagesScreen() {
   const session = useSession();
   const account = session.status === 'signedIn' ? session.account : null;
-  const conversations = useConversations();
+  const blocked = useBlocked();
+  const all = useConversations();
+  const conversations = useMemo(() => visibleConversations(all, blocked), [all, blocked]);
   const [book, setBook] = useState<AddressBook | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string>();
@@ -28,6 +31,7 @@ export default function MessagesScreen() {
     setRefreshing(true);
     try {
       setBook(await loadAddressBook(account));
+      await refreshBlocked().catch(() => undefined);
       await syncMessaging(account);
       setError(undefined);
     } catch {
@@ -58,7 +62,7 @@ export default function MessagesScreen() {
         ListEmptyComponent={
           refreshing ? undefined : (
             <View className="h-[520px]">
-              <EmptyState title="No messages" body="Messages are end-to-end encrypted. Start a chat with a friend or a group." />
+              <EmptyState title="No messages" body="Messages are end-to-end encrypted. Start a chat with someone or a group." />
             </View>
           )
         }
@@ -84,7 +88,7 @@ export default function MessagesScreen() {
               </View>
               {unread ? (
                 <View className="min-w-6 items-center rounded-full bg-primary px-2 py-0.5 dark:bg-primary-dark">
-                  <Text className="text-xs font-bold text-white">{unread}</Text>
+                  <Text className="text-xs font-bold text-on-primary dark:text-on-primary-dark">{unread}</Text>
                 </View>
               ) : null}
             </Pressable>

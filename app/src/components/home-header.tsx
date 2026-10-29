@@ -1,10 +1,10 @@
 import { View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { CircloMark } from './circlo-mark';
+import { CircloWordmark } from './circlo-mark';
 import { DrawerAvatarButton } from './ui/header';
 
-/** Home header: your avatar (opens the drawer) on the left, Circlo mark centred. */
+/** Home header: your avatar (opens the drawer) on the left, the Circlo wordmark centred. */
 export function HomeHeader() {
   return (
     <SafeAreaView edges={['top']} className="border-b border-border bg-surface dark:border-border-dark dark:bg-surface-dark">
@@ -13,7 +13,7 @@ export function HomeHeader() {
           <DrawerAvatarButton />
         </View>
         <View className="flex-1 items-center">
-          <CircloMark />
+          <CircloWordmark height={24} />
         </View>
         <View className="w-10" />
       </View>

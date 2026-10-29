@@ -34,7 +34,7 @@ export default function SafetyScreen() {
       <Text className="text-center text-muted dark:text-muted-dark">
         {contact.identityChanged
           ? 'Their keys changed. Check this new number with them in person or on a call you trust.'
-          : 'If this number matches the one on your friend’s phone, nobody is intercepting your connection.'}
+          : 'If this number matches the one on their phone, nobody is intercepting your connection.'}
       </Text>
       <View className="flex-row flex-wrap justify-center gap-3" accessibilityLabel={`Safety number ${sn.groups.join(' ')}`}>
         {sn.groups.map((g, i) => (

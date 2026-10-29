@@ -100,8 +100,8 @@ class DevicesFlowIT extends IntegrationTest {
         call("POST", "/v1/invites", Map.of("tokenHash", core.inviteTokenHash(token)), inviter.accessToken);
         call("POST", "/v1/invites/redeem", Map.of("token", token), other.accessToken);
         call("POST", "/v1/friends/requests", Map.of("toUserId", inviter.userId.toString(), "epochId", epoch(other).toString(),
-                "payload", Ids.random(160)), other.accessToken);
-        call("POST", "/v1/friends/" + other.userId + "/accept", Map.of("epochId", epoch(inviter).toString(), "payload", Ids.random(160)),
+                "payload", Ids.random(416)), other.accessToken);
+        call("POST", "/v1/friends/" + other.userId + "/accept", Map.of("epochId", epoch(inviter).toString(), "payload", Ids.random(416)),
                 inviter.accessToken);
     }
 
@@ -289,5 +289,13 @@ class DevicesFlowIT extends IntegrationTest {
         for (String leak : List.of("secret", "dinner", "push_bob", "push_alice", bobApp.userId.toString(), Ids.uuid(group).toString())) {
             assertThat(everything).doesNotContain(leak);
         }
+
+        // Once Alice blocks Bob, his messages in their old chat no longer wake her phone.
+        assertThat(call("POST", "/v1/blocks/" + bobApp.userId, null, aliceApp.accessToken).getStatusCode().value()).isEqualTo(200);
+        Thread.sleep(300);
+        PUSHES.clear();
+        post(bob, group, TestClientNative.mlsEncrypt(bob.mls(), group, "still here".getBytes(StandardCharsets.UTF_8)), List.of(), null);
+        Thread.sleep(500);
+        assertThat(PUSHES).isEmpty();
     }
 }

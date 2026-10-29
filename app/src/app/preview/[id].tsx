@@ -45,7 +45,7 @@ export default function PreviewScreen() {
         <FlatList
           data={posts}
           keyExtractor={(p) => p.postId}
-          ListEmptyComponent={<EmptyState title="Nothing to see" body="None of your recent posts reach this friend's circle." />}
+          ListEmptyComponent={<EmptyState title="Nothing to see" body="None of your recent posts reach this person's circle." />}
           renderItem={({ item }) => <PostCard post={item} name={me.name} handle={me.handle} />}
         />
       )}

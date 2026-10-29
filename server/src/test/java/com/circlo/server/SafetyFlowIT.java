@@ -20,7 +20,7 @@ import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import software.amazon.awssdk.services.s3.S3Client;
 
-/** Phase 11: read tokens gate replies/likes/counts; blocks; account deletion leaves no trace. */
+/** Phase 11: read tokens gate replies/likes/counts; blocks; sealed reports; account deletion leaves no trace. */
 class SafetyFlowIT extends IntegrationTest {
 
     @Autowired
@@ -48,8 +48,8 @@ class SafetyFlowIT extends IntegrationTest {
         call("POST", "/v1/invites", Map.of("tokenHash", core.inviteTokenHash(token)), inviter.accessToken);
         call("POST", "/v1/invites/redeem", Map.of("token", token), other.accessToken);
         call("POST", "/v1/friends/requests", Map.of("toUserId", inviter.userId.toString(), "epochId", epoch(other).toString(),
-                "payload", Ids.random(160)), other.accessToken);
-        call("POST", "/v1/friends/" + other.userId + "/accept", Map.of("epochId", epoch(inviter).toString(), "payload", Ids.random(160)),
+                "payload", Ids.random(416)), other.accessToken);
+        call("POST", "/v1/friends/" + other.userId + "/accept", Map.of("epochId", epoch(inviter).toString(), "payload", Ids.random(416)),
                 inviter.accessToken);
     }
 
@@ -129,15 +129,37 @@ class SafetyFlowIT extends IntegrationTest {
         call("POST", "/v1/invites", Map.of("tokenHash", core.inviteTokenHash(token)), alice.accessToken);
         assertThat(call("POST", "/v1/invites/redeem", Map.of("token", token), mallory.accessToken).getStatusCode().value()).isEqualTo(404);
         assertThat(call("POST", "/v1/friends/requests", Map.of("toUserId", alice.userId.toString(), "epochId", epoch(mallory).toString(),
-                "payload", Ids.random(160)), mallory.accessToken).getStatusCode().value()).isEqualTo(404);
+                "payload", Ids.random(416)), mallory.accessToken).getStatusCode().value()).isEqualTo(404);
         // Alice can't accidentally re-add Mallory either until she unblocks.
         assertThat(call("POST", "/v1/friends/requests", Map.of("toUserId", mallory.userId.toString(), "epochId", epoch(alice).toString(),
-                "payload", Ids.random(160)), alice.accessToken).getStatusCode().value()).isEqualTo(404);
+                "payload", Ids.random(416)), alice.accessToken).getStatusCode().value()).isEqualTo(404);
 
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> blocks = http().get().uri("/v1/blocks").header("Authorization", "Bearer " + alice.accessToken).retrieve().body(List.class);
         assertThat(blocks).extracting(b -> b.get("userId")).containsExactly(mallory.userId.toString());
         assertThat(call("DELETE", "/v1/blocks/" + mallory.userId, null, alice.accessToken).getStatusCode().value()).isEqualTo(200);
+    }
+
+    @Test
+    void reportsAreStoredSealedUnderTheirId() {
+        TestApp alice = new TestApp(this, "rp_alice", "pw").register();
+        UUID reportId = Ids.newId();
+        byte[] sealed = Ids.random(500); // sealed on the phone to the moderation key; opaque to the server
+        Map<String, Object> report = Map.of("reportId", reportId.toString(), "sealed", sealed);
+        assertThat(call("POST", "/v1/reports", report, alice.accessToken).getStatusCode().value()).isEqualTo(201);
+        byte[] stored = jdbc.queryForObject("SELECT sealed FROM reports WHERE id = ? AND reporter_id = ?", byte[].class,
+                Ids.bytes(reportId), Ids.bytes(alice.userId));
+        assertThat(stored).isEqualTo(sealed);
+        // The id is bound into the sealed report's AAD: it can't be reused, and tiny or missing payloads are refused.
+        assertThat(call("POST", "/v1/reports", report, alice.accessToken).getStatusCode().value()).isEqualTo(409);
+        assertThat(call("POST", "/v1/reports", Map.of("reportId", Ids.newId().toString(), "sealed", Ids.random(10)), alice.accessToken)
+                .getStatusCode().value()).isEqualTo(400);
+        assertThat(call("POST", "/v1/reports", Map.of("sealed", sealed), alice.accessToken).getStatusCode().value()).isEqualTo(400);
+        assertThat(call("POST", "/v1/reports", report, null).getStatusCode().value()).isEqualTo(401);
+
+        var cfg = call("GET", "/v1/config", null, alice.accessToken);
+        assertThat(cfg.getStatusCode().value()).isEqualTo(200);
+        assertThat(cfg.getBody()).containsKey("moderationPublicKey");
     }
 
     @SuppressWarnings("unchecked")
@@ -148,7 +170,7 @@ class SafetyFlowIT extends IntegrationTest {
         befriend(alice, bob);
         byte[] uid = Ids.bytes(alice.userId);
 
-        // Alice leaves a footprint: a post with media, a like, a block.
+        // Alice leaves a footprint: a post with media, a like, a report, a block.
         byte[] photo = Ids.random(3000);
         var slots = (List<Map<String, Object>>) (Object) http().post().uri("/v1/media/uploads").header("Authorization", "Bearer " + alice.accessToken)
                 .contentType(MediaType.APPLICATION_JSON).body(Map.of("sizes", List.of(photo.length))).retrieve().body(List.class);
@@ -162,6 +184,7 @@ class SafetyFlowIT extends IntegrationTest {
         body.put("readTokenHash", core.readTokenHash(readToken));
         assertThat(call("POST", "/v1/posts", body, alice.accessToken).getStatusCode().value()).isEqualTo(201);
         withToken("PUT", "/v1/posts/" + postId + "/like", null, bob.accessToken, readToken);
+        call("POST", "/v1/reports", Map.of("reportId", Ids.newId().toString(), "sealed", Ids.random(100)), alice.accessToken);
 
         // Wrong confirmation is refused; the right one deletes everything.
         assertThat(call("DELETE", "/v1/account", Map.of("handle", "someone_else"), alice.accessToken).getStatusCode().value()).isEqualTo(400);

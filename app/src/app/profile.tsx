@@ -49,7 +49,7 @@ export default function ProfileScreen() {
               {hexGroups(fingerprint(account))}
             </Text>
             <Text className="text-sm text-muted dark:text-muted-dark">
-              The same on every device you log in to. Your name and bio are encrypted so only your friends can see them.
+              The same on every device you log in to. Your name and bio are encrypted so only your people can see them.
             </Text>
           </View>
         }

@@ -1,0 +1,23 @@
+{
+  "ink": "#101828",
+  "white": "#FFFFFF",
+  "darkBackground": "#030712",
+  "sky500": "#0EA5E9",
+  "sky400": "#38BDF8",
+  "sky600": "#0284C7",
+  "tailwind": {
+    "ink": "gray-900",
+    "darkBackground": "gray-950",
+    "dotLight": "sky-500",
+    "dotDark": "sky-400",
+    "linkText": "sky-600"
+  },
+  "usage": {
+    "ink": "letters and ring of the logo on light backgrounds; body text",
+    "white": "letters and ring on dark backgrounds; light backgrounds, icon tile, light splash",
+    "darkBackground": "dark-mode splash and dark backgrounds",
+    "sky500": "the dot on light backgrounds; filled buttons",
+    "sky400": "the dot on dark backgrounds; accents in dark mode",
+    "sky600": "links and accent text on white (4.1:1)"
+  }
+}

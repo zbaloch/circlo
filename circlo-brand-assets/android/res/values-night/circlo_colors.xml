@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Dark-mode overrides: splash and in-app logo colours -->
+<resources>
+    <color name="splash_background">#030712</color>
+    <color name="circlo_logo_ink">#FFFFFF</color>
+    <color name="circlo_logo_dot">#38BDF8</color>
+</resources>

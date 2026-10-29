@@ -1,4 +1,4 @@
-import { audienceBadge, authorName, visiblePosts } from '@/components/post-actions';
+import { audienceBadge, authorName } from '@/components/post-actions';
 import { mergeIds } from '@/lib/feed-store';
 import type { FeedPost } from '@/lib/posts';
 import { toggledLike, validateReply } from '@/lib/thread';
@@ -28,30 +28,27 @@ const post = (over: Partial<FeedPost> = {}): FeedPost => ({
   ...over,
 });
 
-describe('circle labels', () => {
-  const book = { labels: {} };
+describe('audience badges', () => {
+  const book = { circleDefs: [{ id: 2, name: 'Family' }, { id: 3, name: 'Kids' }] };
   it('shows the audience badge only on my own posts', () => {
-    expect(audienceBadge(book, post({ mine: true, circle: 7 }))).toBe('Closest friends+');
-    expect(audienceBadge(book, post({ mine: true, circle: 1 }))).toBe('Me only');
-    // A friend's post never gets a badge, even if a circle somehow leaked into the object.
-    expect(audienceBadge(book, post({ mine: false, circle: 7 }))).toBeUndefined();
+    expect(audienceBadge(book, post({ mine: true, audience: { kind: 'circles', ids: [3] } }))).toBe('Kids');
+    expect(audienceBadge(book, post({ mine: true, audience: { kind: 'circles', ids: [3, 2] } }))).toBe('Family, Kids');
+    expect(audienceBadge(book, post({ mine: true, audience: { kind: 'onlyMe' } }))).toBe('Only me');
+    expect(audienceBadge(book, post({ mine: true, audience: { kind: 'everyone' } }))).toBe('Everyone');
+    // A friend's post never gets a badge, even if an audience somehow leaked into the object.
+    expect(audienceBadge(book, post({ mine: false, audience: { kind: 'circles', ids: [2] } }))).toBeUndefined();
     expect(audienceBadge(book, post({ mine: true }))).toBeUndefined();
   });
 });
 
-describe('author names and mutes', () => {
+describe('author names', () => {
   const account = { userId: 'me', handle: 'zaheer' };
-  const book = { contacts: { b: { displayName: 'Bob', handle: 'bob' } as never, c: { handle: 'carol' } as never }, muted: ['c'] };
+  const book = { contacts: { b: { displayName: 'Bob', handle: 'bob' } as never, c: { handle: 'carol' } as never } };
   it('names me, friends by profile, and strangers neutrally', () => {
     expect(authorName(account, book, 'me').name).toBe('zaheer');
     expect(authorName(account, book, 'b')).toEqual({ name: 'Bob', handle: 'bob' });
     expect(authorName(account, book, 'c').name).toBe('@carol');
-    expect(authorName(account, book, 'x').name).toBe('Friend');
-  });
-  it('hides muted authors locally', () => {
-    const list = [post({ postId: '1', authorId: 'b' }), post({ postId: '2', authorId: 'c' })];
-    expect(visiblePosts(book, list).map((p) => p.postId)).toEqual(['1']);
-    expect(visiblePosts(null, list)).toHaveLength(2);
+    expect(authorName(account, book, 'x').name).toBe('Someone');
   });
 });
 

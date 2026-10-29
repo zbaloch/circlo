@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200" role="img" aria-label="Circlo">
+<title>Circlo</title>
+<path d="M0 100a100 100 0 1 0 200 0a100 100 0 1 0 -200 0ZM35.96 100a64.04 64.04 0 1 0 128.09 0a64.04 64.04 0 1 0 -128.09 0Z" fill="#FFFFFF" fill-rule="evenodd"/>
+<circle cx="100" cy="100" r="31.46" fill="#FFFFFF"/>
+</svg>

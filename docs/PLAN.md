@@ -543,7 +543,7 @@ Rate limiting. **Do not log request bodies or IPs.**
 **Done when:** you can sign up on device A, log in on device B, and both hold the same identity.
 
 ### Phase 5: Friends
-- Invite by QR code or link (token plus inviter public-key fingerprint), and handle search by `handle_hash`.
+- Invite by QR code or link (token plus inviter public-key fingerprint). No handle search: invites are the only way to connect (owner decision 2026-10-28).
 - Friend request, then accept.
 - Both sides exchange `profileKey` and their current `Ck` via `friend_payloads`.
 - Safety-number screen for verification.
@@ -552,6 +552,8 @@ Rate limiting. **Do not log request bodies or IPs.**
 **Done when:** two test users become friends and see each other's decrypted profiles. The server DB contains no names.
 
 ### Phase 6: Circles
+> Superseded in part by CRYPTO.md v1.3 (owner decision 2026-10-29): circles are now independent, not nested. Only me and Everyone are built in; each author has up to 8 circles (starters Close Friends, Family, Kids, Work), a friend can be in any number, and a post can go to several circles at once. See PROGRESS.md decisions log.
+
 - Address-book blob holding circles 1–100, editable labels (defaults: 1 Me, 2 Spouse, 3–4 Kids, 5 Parents & siblings, 6 Extended family, 7 Closest friends, 8 Neighbourhood, 9 Work, 10 Faded contacts, 11–100 unnamed).
 - Assigning a friend to circle *k* sends them `Ck`.
 - Moving a friend outward, or removing them, creates a new epoch and re-wraps keys for everyone, in a background job with retry.
@@ -610,9 +612,9 @@ On the device:
 **Done when:** linking and revoking work, and a push payload captured in tests contains no content or names.
 
 ### Phase 11: Safety, abuse, legal
-- ~~In-app report: the reporter's device sends decrypted content plus a signed context to a moderation endpoint.~~
-  *Removed by owner decision (2026-10-27): posts are shared between people who know each other; block and mute instead.*
-- Block and mute.
+- In-app report: the reporter's device sends decrypted content plus a signed context to a moderation endpoint.
+  *Removed 2026-10-27, reinstated by owner decision 2026-10-29: sealed to the operator's moderation key (CRYPTO.md 13c).*
+- Block (mute removed 2026-10-29). Report and block are reachable from posts, profiles and chat messages.
 - Account deletion, which deletes all blobs and rows.
 - Data-export of your own content (decrypted on the device).
 
@@ -654,6 +656,6 @@ On the device:
 
 ## 6. Open decisions for you
 
-1. Should handles be searchable at all, or invite-only (more private)?
+1. Should handles be searchable at all, or invite-only (more private)? **Decided 2026-10-28: invite-only, no search.**
 2. Web client later: Next.js plus the core compiled to WASM, with the code-delivery risk noted earlier.
 3. **License** (needed before the first public push). Common choice for E2EE apps is **AGPL-3.0** for the whole repo (Signal does this): anyone running a modified server must publish their changes. Alternatives: Apache-2.0 or MIT (most permissive; others can build closed products on your code). Pick one and Claude Code adds the `LICENSE` file.

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="ic_launcher_background">#FFFFFF</color>
+    <color name="splash_background">#FFFFFF</color>
+    <color name="circlo_logo_ink">#101828</color>
+    <color name="circlo_logo_dot">#0EA5E9</color>
+    <color name="circlo_sky_500">#0EA5E9</color>
+    <color name="circlo_sky_400">#38BDF8</color>
+    <color name="circlo_sky_600">#0284C7</color>
+</resources>

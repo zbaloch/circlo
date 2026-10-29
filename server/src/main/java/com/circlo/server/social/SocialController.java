@@ -1,11 +1,8 @@
 package com.circlo.server.social;
 
-import com.circlo.server.config.ServerSecrets;
-import com.circlo.server.crypto.CoreException;
 import com.circlo.server.crypto.CircloCore;
 import com.circlo.server.web.ApiException;
 import com.circlo.server.web.Ids;
-import com.circlo.server.web.RateLimiter;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
@@ -31,29 +28,26 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Friends: invites, handle search (opt-in), requests, friend key payloads, epochs, encrypted profiles and the
+ * Friends: invites (the only way to connect; there is no search), requests, friend key payloads, epochs, encrypted profiles and the
  * encrypted address book. The server relays ciphertext and enforces who may send what to whom; it never sees names,
  * profiles, circle numbers or keys.
  */
 @RestController
 public class SocialController {
 
-    static final int PAYLOAD_LEN = 160;
+    /** Friend payload version 3 (CRYPTO.md 8.3): 416 bytes for every friend, whatever their circles. */
+    static final int PAYLOAD_LEN = 416;
     static final Duration INVITE_TTL = Duration.ofDays(7);
     static final int MAX_ACTIVE_INVITES = 20;
 
     private final JdbcTemplate jdbc;
     private final CircloCore core;
-    private final ServerSecrets secrets;
-    private final RateLimiter limiter;
 
     private final com.circlo.server.push.PushService push;
 
-    public SocialController(JdbcTemplate jdbc, CircloCore core, ServerSecrets secrets, RateLimiter limiter, com.circlo.server.push.PushService push) {
+    public SocialController(JdbcTemplate jdbc, CircloCore core, com.circlo.server.push.PushService push) {
         this.jdbc = jdbc;
         this.core = core;
-        this.secrets = secrets;
-        this.limiter = limiter;
         this.push = push;
     }
 
@@ -95,39 +89,6 @@ public class SocialController {
             return "blocked";
         }
         return java.util.Arrays.equals((byte[]) rows.get(0).get("user_a"), me) ? "outgoing" : "incoming";
-    }
-
-    // ---------- discoverability and search ----------
-
-    public record Discoverable(boolean discoverable) {}
-
-    @PutMapping("/v1/me/discoverable")
-    public Discoverable setDiscoverable(@AuthenticationPrincipal Jwt jwt, @RequestBody Discoverable d) {
-        jdbc.update("UPDATE users SET discoverable = ? WHERE id = ?", d.discoverable(), me(jwt));
-        return d;
-    }
-
-    @GetMapping("/v1/me/discoverable")
-    public Discoverable getDiscoverable(@AuthenticationPrincipal Jwt jwt) {
-        return new Discoverable(Boolean.TRUE.equals(
-                jdbc.queryForObject("SELECT discoverable FROM users WHERE id = ?", Boolean.class, (Object) me(jwt))));
-    }
-
-    /** Exact-match lookup; finds only users who opted in. Unknown and private handles both return 404. */
-    @GetMapping("/v1/users/search")
-    public UserWithIdentity search(@AuthenticationPrincipal Jwt jwt, @RequestParam("handle") String handle) {
-        if (!limiter.tryAcquire("search", me(jwt), 30, 60_000)) {
-            throw new ApiException(HttpStatus.TOO_MANY_REQUESTS, "rate_limited");
-        }
-        byte[] lookup;
-        try {
-            lookup = core.handleLookup(secrets.handleKey(), handle);
-        } catch (CoreException e) {
-            throw ApiException.notFound();
-        }
-        byte[] userId = jdbc.query("SELECT id FROM users WHERE handle_lookup = ? AND status = 'active' AND discoverable = TRUE",
-                (rs, i) -> rs.getBytes(1), (Object) lookup).stream().findFirst().orElseThrow(ApiException::notFound);
-        return new UserWithIdentity(Ids.uuid(userId), identityOf(userId));
     }
 
     // ---------- invites ----------
@@ -212,10 +173,9 @@ public class SocialController {
         if (java.util.Arrays.equals(me, to) || !isActive(to) || com.circlo.server.safety.SafetyController.blockedEitherWay(jdbc, me, to)) {
             throw ApiException.notFound();
         }
+        // The only way to connect is the target's own invite (link or QR) that I redeemed: there is no search.
         boolean invitedMe = !jdbc.queryForList("SELECT 1 FROM invites WHERE inviter_id = ? AND redeemed_by = ?", to, me).isEmpty();
-        boolean discoverable = Boolean.TRUE.equals(
-                jdbc.queryForObject("SELECT discoverable FROM users WHERE id = ?", Boolean.class, (Object) to));
-        if (!invitedMe && !discoverable) {
+        if (!invitedMe) {
             throw ApiException.forbidden();
         }
         if (com.circlo.server.safety.SafetyController.blockedEitherWay(jdbc, me, to)) {

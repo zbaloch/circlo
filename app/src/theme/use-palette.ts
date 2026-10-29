@@ -8,6 +8,7 @@ export function usePalette() {
   return {
     dark,
     primary: dark ? colors.primary.dark : colors.primary.DEFAULT,
+    onPrimary: dark ? colors['on-primary'].dark : colors['on-primary'].DEFAULT,
     surface: dark ? colors.surface.dark : colors.surface.DEFAULT,
     ink: dark ? colors.ink.dark : colors.ink.DEFAULT,
     muted: dark ? colors.muted.dark : colors.muted.DEFAULT,

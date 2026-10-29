@@ -115,6 +115,39 @@ class AuthFlowIT extends IntegrationTest {
         assertThat(call("POST", "/v1/auth/refresh", Map.of("refreshToken", old), null).getStatusCode().value()).isEqualTo(401);
     }
 
+    /**
+     * A refresh happens because the access token expired, and clients may still send that token: a stale or invalid
+     * Bearer header must never block the public auth endpoints (it used to: 401 before the endpoint ran).
+     */
+    @Test
+    void staleBearerHeaderDoesNotBlockRefresh() {
+        TestApp a = new TestApp(this, "harry_stale", "pw").register();
+        var r = http().post().uri("/v1/auth/refresh")
+                .header("Authorization", "Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ4IiwiZXhwIjoxfQ.expired")
+                .contentType(org.springframework.http.MediaType.APPLICATION_JSON).body(Map.of("refreshToken", a.refreshToken))
+                .retrieve().onStatus(s -> true, (req, res) -> {}).toBodilessEntity();
+        assertThat(r.getStatusCode().value()).isEqualTo(200);
+        // Protected endpoints still reject a bad token.
+        assertThat(call("GET", "/v1/friends", null, "not-a-jwt").getStatusCode().value()).isEqualTo(401);
+    }
+
+    /** RFC 9700 section 4.14.2: reuse of a rotated refresh token means it leaked, so every session of the user ends. */
+    @Test
+    void reusingARotatedRefreshTokenRevokesAllSessions() {
+        TestApp a = new TestApp(this, "grace_reuse", "pw").register();
+        String old = a.refreshToken;
+        String current = (String) call("POST", "/v1/auth/refresh", Map.of("refreshToken", old), null)
+                .getBody().get("refreshToken");
+        assertThat(a.login("pw").getStatusCode().value()).isEqualTo(200);
+        String otherSession = a.refreshToken;
+
+        assertThat(call("POST", "/v1/auth/refresh", Map.of("refreshToken", old), null).getStatusCode().value()).isEqualTo(401);
+
+        assertThat(call("POST", "/v1/auth/refresh", Map.of("refreshToken", current), null).getStatusCode().value()).isEqualTo(401);
+        assertThat(call("POST", "/v1/auth/refresh", Map.of("refreshToken", otherSession), null).getStatusCode().value())
+                .isEqualTo(401);
+    }
+
     @Test
     void recoveryPhraseResetsThePassword() {
         TestApp a = new TestApp(this, "gina_recover", "forgotten password").register();

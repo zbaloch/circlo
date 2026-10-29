@@ -7,6 +7,9 @@ const isDev = process.env.APP_VARIANT !== 'production';
 // Release builds pin the API host's keys; host and pins come from EAS environment variables (plugins/pinning.js).
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const pinning = require('./plugins/pinning').pinningFromEnv(process.env);
+// Brand and surface colours come from the design tokens, so native assets match the app.
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const { colors } = require('./src/theme/tokens');
 
 const config: ExpoConfig = {
   name: 'Circlo',
@@ -18,6 +21,12 @@ const config: ExpoConfig = {
   userInterfaceStyle: 'automatic',
   ios: {
     bundleIdentifier: 'com.circlo.app',
+    // Brand pack (ios/AppIcon.appiconset): the dotted "o" on white, plus dark and tinted (iOS 18) variants.
+    icon: {
+      light: './assets/images/icon.png',
+      dark: './assets/images/icon-ios-dark.png',
+      tinted: './assets/images/icon-ios-tinted.png',
+    },
     supportsTablet: false,
     config: { usesNonExemptEncryption: false },
     // Loopback is needed in every build: encrypted video plays through the core's 127.0.0.1 server.
@@ -26,9 +35,9 @@ const config: ExpoConfig = {
   android: {
     package: 'com.circlo.app',
     adaptiveIcon: {
-      backgroundColor: '#0B3B36',
-      foregroundImage: './assets/images/android-icon-foreground.png',
-      monochromeImage: './assets/images/android-icon-monochrome.png',
+      backgroundColor: colors.brand.background,
+      foregroundImage: './assets/images/adaptive-icon-foreground.png',
+      monochromeImage: './assets/images/adaptive-icon-monochrome.png',
     },
     predictiveBackGestureEnabled: false,
   },
@@ -51,13 +60,16 @@ const config: ExpoConfig = {
     ],
     ['expo-video', { supportsPictureInPicture: false, supportsBackgroundPlayback: false }],
     // Push carries no content; FCM/APNs credentials come from EAS, never the repo.
-    ['expo-notifications', { color: '#0E8C7F' }],
+    ['expo-notifications', { icon: './assets/images/notification-icon.png', color: colors.brand.accent }],
+    // The wordmark: gray-900 with a sky-500 dot on white; white with a sky-400 dot on gray-950 in dark mode.
     [
       'expo-splash-screen',
       {
-        backgroundColor: '#0B3B36',
-        image: './assets/images/splash-icon.png',
-        imageWidth: 96,
+        backgroundColor: colors.brand.background,
+        image: './assets/images/splash-wordmark.png',
+        imageWidth: 180,
+        resizeMode: 'contain',
+        dark: { backgroundColor: colors.brand['background-dark'], image: './assets/images/splash-wordmark-dark.png' },
       },
     ],
   ],

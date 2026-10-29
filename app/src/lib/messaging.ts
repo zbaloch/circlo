@@ -246,7 +246,7 @@ export async function startChat(account: StoredAccount, userIds: string[]): Prom
   ok(await api.POST('/v1/mls/groups', { params: dev(), body: { groupId } }));
   c.createGroup(uuidToBytes(groupId));
   const kps = (await claim([...userIds, account.userId])).filter((k) => k.deviceId !== account.deviceId);
-  if (!kps.some((k) => k.userId !== account.userId)) throw new Error('Your friend hasn’t set up messaging yet. Ask them to open Circlo.');
+  if (!kps.some((k) => k.userId !== account.userId)) throw new Error('They haven’t set up messaging yet. Ask them to open Circlo.');
   await commit(account, groupId, () => ({ out: c.addMembers(uuidToBytes(groupId), kps.map((k) => fromB64(k.keyPackage))), add: kps.map((k) => k.deviceId) }));
   const h = await loadHistory();
   const conv: Conversation = { groupId, members: [], cursor: 0, readSeq: 0, active: true, unverified: false, messages: [], updatedAtMs: Date.now() };

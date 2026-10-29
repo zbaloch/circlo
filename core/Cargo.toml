@@ -37,6 +37,8 @@ zeroize = { version = "1", features = ["derive"] }
 
 # Encoding / plumbing
 ciborium = "0.2"
+# Request parsing for the loopback video server (playback.rs): the parser hyper uses.
+httparse = "1"
 unicode-normalization = "0.1"
 thiserror = "2"
 uniffi = "0.31"

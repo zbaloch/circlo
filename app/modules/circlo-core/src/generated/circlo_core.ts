@@ -1188,6 +1188,10 @@ export function safetyNumber(
   }
 }
 
+/**
+ * My keys for one friend in one epoch (CRYPTO.md 8.3, v3): the Everyone key, my profile key, and the key of each
+ * circle in `circles` (ids 1..=8); every other slot gets random filler, so the size never depends on membership.
+ */
 export function sealFriendPayload(
   sender: IdentityKeys,
   recipientX25519Pk: ArrayBuffer,
@@ -1195,8 +1199,8 @@ export function sealFriendPayload(
   toUser: ArrayBuffer,
   epochId: ArrayBuffer,
   epochRoot: ArrayBuffer,
-  circle: number,
   profileKey: ArrayBuffer,
+  circles: ArrayBuffer,
 ): ArrayBuffer /*throws*/ {
   const __rb: Uint8Array = uniffiCaller.rustCallWithError(
     /*liftError:*/ FfiConverterTypeCoreError.lift.bind(
@@ -1222,11 +1226,11 @@ export function sealFriendPayload(
           epochRoot,
           nativeModule().rustbuffer_alloc,
         ),
-        FfiConverterUInt8.lower(circle, nativeModule().rustbuffer_alloc),
         FfiConverterArrayBuffer.lower(
           profileKey,
           nativeModule().rustbuffer_alloc,
         ),
+        FfiConverterArrayBuffer.lower(circles, nativeModule().rustbuffer_alloc),
         callStatus,
       );
     },
@@ -1303,13 +1307,16 @@ export function sealPasswordBackup(
   }
 }
 
+/**
+ * Seals a post for its audience: 8 key slots, filler for the unused ones, so the server can't tell the audience.
+ */
 export function sealPost(
   author: IdentityKeys,
   authorId: ArrayBuffer,
   postId: ArrayBuffer,
   epochId: ArrayBuffer,
   epochRoot: ArrayBuffer,
-  circle: number,
+  audience: Audience,
   content: PostContent,
 ): SealedPost /*throws*/ {
   const __rb: Uint8Array = uniffiCaller.rustCallWithError(
@@ -1332,7 +1339,10 @@ export function sealPost(
           epochRoot,
           nativeModule().rustbuffer_alloc,
         ),
-        FfiConverterUInt8.lower(circle, nativeModule().rustbuffer_alloc),
+        FfiConverterTypeAudience.lower(
+          audience,
+          nativeModule().rustbuffer_alloc,
+        ),
         FfiConverterTypePostContent.lower(
           content,
           nativeModule().rustbuffer_alloc,
@@ -1470,6 +1480,52 @@ export function sealReply(
           reply,
           nativeModule().rustbuffer_alloc,
         ),
+        callStatus,
+      );
+    },
+    /*liftString:*/ FfiConverterString.lift.bind(FfiConverterString),
+  );
+  try {
+    return FfiConverterArrayBuffer.lift(__rb);
+  } finally {
+    nativeModule().rustbuffer_free(__rb);
+  }
+}
+
+/**
+ * Signs and seals a report for the operator's moderation key, as report `report_id`; the server only ever stores the
+ * ciphertext.
+ */
+export function sealReport(
+  moderationPublicKey: ArrayBuffer,
+  reporter: IdentityKeys,
+  reporterId: ArrayBuffer,
+  reportId: ArrayBuffer,
+  content: ArrayBuffer,
+): ArrayBuffer /*throws*/ {
+  const __rb: Uint8Array = uniffiCaller.rustCallWithError(
+    /*liftError:*/ FfiConverterTypeCoreError.lift.bind(
+      FfiConverterTypeCoreError,
+    ),
+    /*caller:*/ (callStatus) => {
+      return nativeModule().uniffi_circlo_core_fn_func_seal_report(
+        FfiConverterArrayBuffer.lower(
+          moderationPublicKey,
+          nativeModule().rustbuffer_alloc,
+        ),
+        FfiConverterTypeIdentityKeys.lower(
+          reporter,
+          nativeModule().rustbuffer_alloc,
+        ),
+        FfiConverterArrayBuffer.lower(
+          reporterId,
+          nativeModule().rustbuffer_alloc,
+        ),
+        FfiConverterArrayBuffer.lower(
+          reportId,
+          nativeModule().rustbuffer_alloc,
+        ),
+        FfiConverterArrayBuffer.lower(content, nativeModule().rustbuffer_alloc),
         callStatus,
       );
     },
@@ -2586,6 +2642,11 @@ export type ReceivedFriendKey = {
   epochId: ArrayBuffer;
   circleKey: ArrayBuffer;
   profileKey: ArrayBuffer;
+  /**
+   * The circle-key slots (CRYPTO.md 8.5), 32 bytes each, concatenated: real keys for my circles, filler for the
+   * rest (indistinguishable). 8 slots for a v3 payload, 1 for v2, none for v1.
+   */
+  circleKeys: ArrayBuffer;
 };
 
 /**
@@ -2613,18 +2674,21 @@ const FfiConverterTypeReceivedFriendKey = (() => {
         epochId: FfiConverterArrayBuffer.readFromCursor(c),
         circleKey: FfiConverterArrayBuffer.readFromCursor(c),
         profileKey: FfiConverterArrayBuffer.readFromCursor(c),
+        circleKeys: FfiConverterArrayBuffer.readFromCursor(c),
       };
     }
     writeIntoCursor(value: TypeName, c: Cursor): void {
       FfiConverterArrayBuffer.writeIntoCursor(value.epochId, c);
       FfiConverterArrayBuffer.writeIntoCursor(value.circleKey, c);
       FfiConverterArrayBuffer.writeIntoCursor(value.profileKey, c);
+      FfiConverterArrayBuffer.writeIntoCursor(value.circleKeys, c);
     }
     allocationSize(value: TypeName): number {
       return (
         FfiConverterArrayBuffer.allocationSize(value.epochId) +
         FfiConverterArrayBuffer.allocationSize(value.circleKey) +
-        FfiConverterArrayBuffer.allocationSize(value.profileKey)
+        FfiConverterArrayBuffer.allocationSize(value.profileKey) +
+        FfiConverterArrayBuffer.allocationSize(value.circleKeys)
       );
     }
   }
@@ -2855,6 +2919,176 @@ const FfiConverterTypeSigningKeyPair = (() => {
         FfiConverterArrayBuffer.allocationSize(value.secretKey) +
         FfiConverterArrayBuffer.allocationSize(value.publicKey)
       );
+    }
+  }
+  return new FFIConverter();
+})();
+
+// Enum: Audience
+export enum Audience_Tags {
+  OnlyMe = "OnlyMe",
+  Everyone = "Everyone",
+  Circles = "Circles",
+}
+/**
+ * Who a post is for (CRYPTO.md 8.6).
+ */
+export const Audience = (() => {
+  type OnlyMe__interface = {
+    tag: Audience_Tags.OnlyMe;
+  };
+  /**
+   * Only me (C1).
+   */
+  class OnlyMe_ extends UniffiEnum implements OnlyMe__interface {
+    /**
+     * @private
+     * This field is private and should not be used, use `tag` instead.
+     */
+    readonly [uniffiTypeNameSymbol] = "Audience";
+    readonly tag = Audience_Tags.OnlyMe;
+    constructor() {
+      super("Audience", "OnlyMe");
+    }
+
+    static new(): OnlyMe_ {
+      return new OnlyMe_();
+    }
+
+    static instanceOf(obj: any): obj is OnlyMe_ {
+      return obj.tag === Audience_Tags.OnlyMe;
+    }
+  }
+
+  type Everyone__interface = {
+    tag: Audience_Tags.Everyone;
+  };
+  /**
+   * All my friends (E = C2).
+   */
+  class Everyone_ extends UniffiEnum implements Everyone__interface {
+    /**
+     * @private
+     * This field is private and should not be used, use `tag` instead.
+     */
+    readonly [uniffiTypeNameSymbol] = "Audience";
+    readonly tag = Audience_Tags.Everyone;
+    constructor() {
+      super("Audience", "Everyone");
+    }
+
+    static new(): Everyone_ {
+      return new Everyone_();
+    }
+
+    static instanceOf(obj: any): obj is Everyone_ {
+      return obj.tag === Audience_Tags.Everyone;
+    }
+  }
+
+  type Circles__interface = {
+    tag: Audience_Tags.Circles;
+    inner: Readonly<{ ids: ArrayBuffer }>;
+  };
+  /**
+   * One or more circles (ids 1..=8): only their members.
+   */
+  class Circles_ extends UniffiEnum implements Circles__interface {
+    /**
+     * @private
+     * This field is private and should not be used, use `tag` instead.
+     */
+    readonly [uniffiTypeNameSymbol] = "Audience";
+    readonly tag = Audience_Tags.Circles;
+    readonly inner: Readonly<{ ids: ArrayBuffer }>;
+    constructor(inner: { ids: ArrayBuffer }) {
+      super("Audience", "Circles");
+
+      this.inner = Object.freeze(inner);
+    }
+    static new(inner: { ids: ArrayBuffer }): Circles_ {
+      return new Circles_(inner);
+    }
+
+    static instanceOf(obj: any): obj is Circles_ {
+      return obj.tag === Audience_Tags.Circles;
+    }
+  }
+
+  function instanceOf(obj: any): obj is Audience {
+    return obj[uniffiTypeNameSymbol] === "Audience";
+  }
+
+  return Object.freeze({
+    instanceOf,
+    OnlyMe: OnlyMe_,
+    Everyone: Everyone_,
+    Circles: Circles_,
+  });
+})();
+/**
+ * Who a post is for (CRYPTO.md 8.6).
+ */
+export type Audience = InstanceType<
+  (typeof Audience)["OnlyMe" | "Everyone" | "Circles"]
+>;
+
+// FfiConverter for enum Audience
+const FfiConverterTypeAudience = (() => {
+  type TypeName = Audience;
+  class FFIConverter extends AbstractFfiConverterByteArray<TypeName> {
+    readFromCursor(c: Cursor): TypeName {
+      switch (c.readI32()) {
+        case 1:
+          return new Audience.OnlyMe();
+        case 2:
+          return new Audience.Everyone();
+        case 3:
+          return new Audience.Circles({
+            ids: FfiConverterArrayBuffer.readFromCursor(c),
+          });
+        default:
+          throw new UniffiInternalError.UnexpectedEnumCase();
+      }
+    }
+    writeIntoCursor(value: TypeName, c: Cursor): void {
+      switch (value.tag) {
+        case Audience_Tags.OnlyMe: {
+          c.writeI32(1);
+          return;
+        }
+        case Audience_Tags.Everyone: {
+          c.writeI32(2);
+          return;
+        }
+        case Audience_Tags.Circles: {
+          c.writeI32(3);
+          const inner = value.inner;
+          FfiConverterArrayBuffer.writeIntoCursor(inner.ids, c);
+          return;
+        }
+        default:
+          // Throwing from here means that Audience_Tags hasn't matched an ordinal.
+          throw new UniffiInternalError.UnexpectedEnumCase();
+      }
+    }
+    allocationSize(value: TypeName): number {
+      switch (value.tag) {
+        case Audience_Tags.OnlyMe: {
+          return 4;
+        }
+        case Audience_Tags.Everyone: {
+          return 4;
+        }
+        case Audience_Tags.Circles: {
+          const inner = value.inner;
+          let size = 4;
+          size += FfiConverterArrayBuffer.allocationSize(inner.ids);
+          return size;
+        }
+        default:
+          throw new UniffiInternalError.UnexpectedEnumCase();
+      }
     }
   }
   return new FFIConverter();
@@ -4736,11 +4970,13 @@ export class ReaderKeyring
   }
 
   /**
-   * The owner's view as a friend in `circle` sees it ("Preview as…"): the same `Cn` that friend was given.
+   * The owner's view as a friend sees it ("See what they can see"): the chain key that friend was given
+   * (`EVERYONE` from v1.3 on), plus the keys of the circles they're in.
    */
-  static forCircle(
+  static forFriend(
     epochRoot: ArrayBuffer,
     circle: number,
+    circles: ArrayBuffer,
   ): ReaderKeyringLike /*throws*/ {
     return FfiConverterTypeReaderKeyring.lift(
       uniffiCaller.rustCallWithError(
@@ -4748,12 +4984,16 @@ export class ReaderKeyring
           FfiConverterTypeCoreError,
         ),
         /*caller:*/ (callStatus) => {
-          return nativeModule().uniffi_circlo_core_fn_constructor_readerkeyring_for_circle(
+          return nativeModule().uniffi_circlo_core_fn_constructor_readerkeyring_for_friend(
             FfiConverterArrayBuffer.lower(
               epochRoot,
               nativeModule().rustbuffer_alloc,
             ),
             FfiConverterUInt8.lower(circle, nativeModule().rustbuffer_alloc),
+            FfiConverterArrayBuffer.lower(
+              circles,
+              nativeModule().rustbuffer_alloc,
+            ),
             callStatus,
           );
         },
@@ -4763,7 +5003,7 @@ export class ReaderKeyring
   }
 
   /**
-   * Owner's own keyring: from the epoch root (C1), so they can read all their own posts.
+   * Owner's own keyring: from the epoch root (C1) plus all 8 circle keys, so they can read all their own posts.
    */
   static forOwner(epochRoot: ArrayBuffer): ReaderKeyringLike /*throws*/ {
     return FfiConverterTypeReaderKeyring.lift(
@@ -4775,6 +5015,37 @@ export class ReaderKeyring
           return nativeModule().uniffi_circlo_core_fn_constructor_readerkeyring_for_owner(
             FfiConverterArrayBuffer.lower(
               epochRoot,
+              nativeModule().rustbuffer_alloc,
+            ),
+            callStatus,
+          );
+        },
+        /*liftString:*/ FfiConverterString.lift.bind(FfiConverterString),
+      ),
+    );
+  }
+
+  /**
+   * A friend's keyring from their payload: forward keys from `Ck`/`E`, plus every circle slot (32-byte keys,
+   * concatenated; empty for a v1 payload). Filler slots simply never match a post.
+   */
+  static withCircles(
+    circleKey: ArrayBuffer,
+    circleKeys: ArrayBuffer,
+  ): ReaderKeyringLike /*throws*/ {
+    return FfiConverterTypeReaderKeyring.lift(
+      uniffiCaller.rustCallWithError(
+        /*liftError:*/ FfiConverterTypeCoreError.lift.bind(
+          FfiConverterTypeCoreError,
+        ),
+        /*caller:*/ (callStatus) => {
+          return nativeModule().uniffi_circlo_core_fn_constructor_readerkeyring_with_circles(
+            FfiConverterArrayBuffer.lower(
+              circleKey,
+              nativeModule().rustbuffer_alloc,
+            ),
+            FfiConverterArrayBuffer.lower(
+              circleKeys,
               nativeModule().rustbuffer_alloc,
             ),
             callStatus,
@@ -5297,7 +5568,7 @@ function uniffiEnsureInitialized() {
   }
   if (
     nativeModule().uniffi_circlo_core_checksum_func_seal_friend_payload() !==
-    58295
+    32704
   ) {
     throw new UniffiInternalError.ApiChecksumMismatch(
       "uniffi_circlo_core_checksum_func_seal_friend_payload",
@@ -5316,7 +5587,7 @@ function uniffiEnsureInitialized() {
       "uniffi_circlo_core_checksum_func_seal_password_backup",
     );
   }
-  if (nativeModule().uniffi_circlo_core_checksum_func_seal_post() !== 14186) {
+  if (nativeModule().uniffi_circlo_core_checksum_func_seal_post() !== 3717) {
     throw new UniffiInternalError.ApiChecksumMismatch(
       "uniffi_circlo_core_checksum_func_seal_post",
     );
@@ -5346,6 +5617,11 @@ function uniffiEnsureInitialized() {
   if (nativeModule().uniffi_circlo_core_checksum_func_seal_reply() !== 852) {
     throw new UniffiInternalError.ApiChecksumMismatch(
       "uniffi_circlo_core_checksum_func_seal_reply",
+    );
+  }
+  if (nativeModule().uniffi_circlo_core_checksum_func_seal_report() !== 4311) {
+    throw new UniffiInternalError.ApiChecksumMismatch(
+      "uniffi_circlo_core_checksum_func_seal_report",
     );
   }
   if (
@@ -5625,16 +5901,16 @@ function uniffiEnsureInitialized() {
     );
   }
   if (
-    nativeModule().uniffi_circlo_core_checksum_constructor_readerkeyring_for_circle() !==
-    50597
+    nativeModule().uniffi_circlo_core_checksum_constructor_readerkeyring_for_friend() !==
+    25507
   ) {
     throw new UniffiInternalError.ApiChecksumMismatch(
-      "uniffi_circlo_core_checksum_constructor_readerkeyring_for_circle",
+      "uniffi_circlo_core_checksum_constructor_readerkeyring_for_friend",
     );
   }
   if (
     nativeModule().uniffi_circlo_core_checksum_constructor_readerkeyring_for_owner() !==
-    57932
+    61115
   ) {
     throw new UniffiInternalError.ApiChecksumMismatch(
       "uniffi_circlo_core_checksum_constructor_readerkeyring_for_owner",
@@ -5646,6 +5922,14 @@ function uniffiEnsureInitialized() {
   ) {
     throw new UniffiInternalError.ApiChecksumMismatch(
       "uniffi_circlo_core_checksum_constructor_readerkeyring_new",
+    );
+  }
+  if (
+    nativeModule().uniffi_circlo_core_checksum_constructor_readerkeyring_with_circles() !==
+    45808
+  ) {
+    throw new UniffiInternalError.ApiChecksumMismatch(
+      "uniffi_circlo_core_checksum_constructor_readerkeyring_with_circles",
     );
   }
   if (
@@ -5661,6 +5945,7 @@ function uniffiEnsureInitialized() {
 export default Object.freeze({
   initialize: uniffiEnsureInitialized,
   converters: {
+    FfiConverterTypeAudience,
     FfiConverterTypeBlobKind,
     FfiConverterTypeByteRange,
     FfiConverterTypeChatContent,

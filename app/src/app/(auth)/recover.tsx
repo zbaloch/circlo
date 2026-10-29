@@ -60,7 +60,7 @@ export default function RecoverScreen() {
       <TextField label="New password" secureTextEntry value={password} onChangeText={setPassword} textContentType="newPassword" />
       <TextField label="Confirm new password" secureTextEntry value={confirm} onChangeText={setConfirm} textContentType="newPassword" />
       <ErrorText>{error}</ErrorText>
-      <Button label="Recover" onPress={submit} loading={busy} />
+      <Button size="lg" label="Recover" onPress={submit} loading={busy} />
     </AuthScreen>
   );
 }
