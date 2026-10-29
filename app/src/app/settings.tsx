@@ -10,13 +10,14 @@ import { loadAddressBook, type AddressBook } from '@/lib/addressbook';
 import { refreshBlocked, unblockUser, useBlocked } from '@/lib/blocks';
 import { LINKS, openLink } from '@/lib/links';
 import { useIntegrityWarning } from '@/lib/device-integrity';
+import { enablePush, pushPermission, type PushPermission } from '@/lib/push';
 import { deleteAccount, exportMyData } from '@/lib/safety';
 import { useSession } from '@/lib/session';
 import { usePalette } from '@/theme/use-palette';
 import { Text, TextInput } from '@/components/ui/text';
 import { showAlert } from '@/lib/dialog';
 
-/** Settings: privacy, blocked people, export my data, delete my account, and Circlo's terms, privacy and support. */
+/** Settings: notifications, privacy, blocked people, export my data, delete my account, and Circlo's terms, privacy and support. */
 export default function SettingsScreen() {
   const session = useSession();
   const account = session.status === 'signedIn' ? session.account : null;
@@ -28,10 +29,12 @@ export default function SettingsScreen() {
   const [exporting, setExporting] = useState<string | null>(null);
   const [confirm, setConfirm] = useState('');
   const [deleting, setDeleting] = useState(false);
+  const [push, setPush] = useState<PushPermission | null>(null);
 
   useFocusEffect(
     useCallback(() => {
       refreshBlocked().catch((e) => setError(describeError(e)));
+      pushPermission().then(setPush, () => {});
       if (account) loadAddressBook(account).then(setBook, () => {});
     }, [account]),
   );
@@ -71,6 +74,20 @@ export default function SettingsScreen() {
 
   return (
     <ScrollView className="flex-1 bg-surface dark:bg-surface-dark" contentContainerClassName="pb-10" keyboardShouldPersistTaps="handled">
+      <Section title="Notifications">
+        {push === 'on' ? <Row title="Notifications are on" subtitle={PUSH_NOTE} /> : null}
+        {push === 'ask' || push === 'blocked' ? (
+          <Row title="Notifications are off" subtitle={push === 'blocked' ? `Turn them on in your phone’s settings. ${PUSH_NOTE}` : PUSH_NOTE}>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => enablePush(account).then(setPush, (e) => setError(describeError(e)))}
+              className="rounded-full bg-primary px-4 py-1.5 active:bg-primary-pressed dark:bg-primary-dark dark:active:bg-primary-pressed-dark">
+              <Text className="text-sm font-bold text-on-primary dark:text-on-primary-dark">{push === 'blocked' ? 'Open settings' : 'Turn on'}</Text>
+            </Pressable>
+          </Row>
+        ) : null}
+      </Section>
+
       <Section title="Privacy">
         <Row title="Only people you invite can add you" subtitle="No one can search for you. People connect by scanning your QR code or opening your invite link." />
         {integrity.message ? <Row title="Device security" subtitle={integrity.message} danger /> : null}
@@ -126,6 +143,8 @@ export default function SettingsScreen() {
     </ScrollView>
   );
 }
+
+const PUSH_NOTE = 'They only say there’s something new, never who or what.';
 
 /** A settings group: small heading, rows separated by a hairline (X style). */
 function Section({ title, children }: { title: string; children: ReactNode }) {
