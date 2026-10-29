@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024" role="img" aria-label="Circlo app icon">
+<title>Circlo app icon</title>
+<rect x="0" y="0" width="1024" height="1024" rx="0" fill="#FFFFFF"/>
+<path d="M204.8 512a307.2 307.2 0 1 0 614.4 0a307.2 307.2 0 1 0 -614.4 0ZM315.25 512a196.75 196.75 0 1 0 393.49 0a196.75 196.75 0 1 0 -393.49 0Z" fill="#101828" fill-rule="evenodd"/>
+<circle cx="512" cy="512" r="96.65" fill="#0EA5E9"/>
+</svg>

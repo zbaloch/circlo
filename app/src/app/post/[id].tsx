@@ -93,7 +93,7 @@ export default function ThreadScreen() {
           ListEmptyComponent={replies ? <Text className="px-4 py-6 text-center text-muted dark:text-muted-dark">No replies yet.</Text> : undefined}
           renderItem={({ item }) => {
             const who = authorName(account, book, item.authorId);
-            const name = item.mine || book?.contacts[item.authorId] ? who.name : 'A friend of the author';
+            const name = item.mine || book?.contacts[item.authorId] ? who.name : 'Someone the author knows';
             return (
               <Pressable
                 onLongPress={item.mine || post.mine ? () => removeReply(item) : undefined}

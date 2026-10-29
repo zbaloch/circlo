@@ -10,9 +10,11 @@ import { Avatar } from '@/components/avatar';
 import { MediaGrid } from '@/components/encrypted-media';
 import { authorName } from '@/components/post-actions';
 import { loadAddressBook, type AddressBook } from '@/lib/addressbook';
+import { blockUser, refreshBlocked, useBlocked, visibleMessages } from '@/lib/blocks';
 import { openViewer } from '@/lib/feed-store';
 import { discardPicked, discardPrepared, encryptAndUpload, MAX_IMAGES, prepare, type PickedMedia } from '@/lib/media';
 import { markRead, removePerson, sendMessage, syncMessaging, useConversations, type ChatMessage } from '@/lib/messaging';
+import { loadModerationKey } from '@/lib/report';
 import { useSession } from '@/lib/session';
 import { chatTitle, dayLabel } from '@/lib/view-logic';
 import { usePalette } from '@/theme/use-palette';
@@ -35,6 +37,8 @@ export default function ChatScreen() {
   const [sending, setSending] = useState(false);
   const [members, setMembers] = useState(false);
   const [hidden, setHidden] = useState<Set<number>>(new Set());
+  const [canReport, setCanReport] = useState(false);
+  const blocked = useBlocked();
   const list = useRef<FlatList<Row>>(null);
 
   const sync = useCallback(() => {
@@ -43,6 +47,8 @@ export default function ChatScreen() {
   useFocusEffect(
     useCallback(() => {
       if (account) loadAddressBook(account).then(setBook, () => {});
+      refreshBlocked().catch(() => {});
+      loadModerationKey().then((k) => setCanReport(!!k), () => setCanReport(false));
       sync();
       const timer = setInterval(sync, 5_000); // while the chat is open
       return () => clearInterval(timer);
@@ -76,7 +82,7 @@ export default function ChatScreen() {
   const rows: Row[] = [];
   let lastDay = '';
   let lastSender = '';
-  for (const m of conv.messages) {
+  for (const m of visibleMessages(conv.messages, blocked)) {
     if (hidden.has(m.seq)) continue;
     const day = dayLabel(m.createdAtMs);
     if (day !== lastDay) {
@@ -126,6 +132,24 @@ export default function ChatScreen() {
 
   const canSend = conv.active && !conv.unverified;
 
+  // Long press: delete for me; on someone else's message, also report it or block them.
+  const messageMenu = (msg: ChatMessage) => {
+    const { name } = authorName(account, book, msg.senderUser);
+    const block = () =>
+      showAlert(`Block ${name}?`, 'You’ll stop being connected. They can’t send you requests or see anything new you post, and their messages are hidden. They aren’t told.', [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Block', style: 'destructive', onPress: () => blockUser(account, msg.senderUser).catch(() => showAlert('Couldn’t block', 'Check your connection and try again.')) },
+      ]);
+    showAlert('Message', undefined, [
+      { text: 'Delete for me', style: 'destructive', onPress: () => setHidden(new Set([...hidden, msg.seq])) },
+      ...(!msg.mine && canReport
+        ? [{ text: 'Report message', style: 'destructive' as const, onPress: () => router.push({ pathname: '/report/[id]', params: { id: conv.groupId, kind: 'message', seq: String(msg.seq) } }) }]
+        : []),
+      ...(!msg.mine ? [{ text: `Block ${name}`, style: 'destructive' as const, onPress: block }] : []),
+      { text: 'Cancel', style: 'cancel' },
+    ]);
+  };
+
   return (
     <SafeAreaView edges={['bottom']} className="flex-1 bg-surface dark:bg-surface-dark">
       <KeyboardAvoidingView className="flex-1" behavior="padding" keyboardVerticalOffset={90}>
@@ -146,12 +170,7 @@ export default function ChatScreen() {
               <Text className="py-2 text-center text-xs text-muted dark:text-muted-dark">{item.label}</Text>
             ) : (
               <Pressable
-                onLongPress={() =>
-                  showAlert('Message', undefined, [
-                    { text: 'Cancel', style: 'cancel' },
-                    { text: 'Delete for me', style: 'destructive' as const, onPress: () => setHidden(new Set([...hidden, item.msg.seq])) },
-                  ])
-                }
+                onLongPress={() => messageMenu(item.msg)}
                 className={`max-w-[80%] ${item.msg.mine ? 'self-end' : 'self-start'}`}>
                 {item.showName ? <Text className="px-2 pb-0.5 text-xs text-muted dark:text-muted-dark">{authorName(account, book, item.msg.senderUser).name}</Text> : null}
                 {item.msg.media.length ? (

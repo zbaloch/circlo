@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" role="img" aria-label="Circlo">
+<title>Circlo</title>
+<style>.ink{fill:#101828}.dot{fill:#0EA5E9}@media (prefers-color-scheme:dark){.ink{fill:#FFFFFF}.dot{fill:#38BDF8}}</style>
+<path d="M2 32a30 30 0 1 0 60 0a30 30 0 1 0 -60 0ZM12.79 32a19.21 19.21 0 1 0 38.43 0a19.21 19.21 0 1 0 -38.43 0Z" fill="#101828" fill-rule="evenodd" class="ink"/>
+<circle cx="32" cy="32" r="9.44" fill="#0EA5E9" class="dot"/>
+</svg>

@@ -5,7 +5,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Pressable, RefreshControl, ScrollView, Share, View } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
 
-import { CircleChoice , circlesLine } from '@/components/circle-choice';
+import { CirclePickerSheet, circlesLine } from '@/components/circle-choice';
 import { Avatar } from '@/components/avatar';
 import { Button, ErrorText, TextField } from '@/components/form';
 import { describeError } from '@/lib/account';
@@ -20,9 +20,9 @@ const INVITE_POLL_MS = 3_000;
 
 type Section = 'friends' | 'join' | 'invite';
 const SECTIONS: { key: Section; label: string }[] = [
-  { key: 'friends', label: 'Friends' },
+  { key: 'friends', label: 'My People' },
   { key: 'join', label: 'Got an invite?' },
-  { key: 'invite', label: 'Invite a friend' },
+  { key: 'invite', label: 'Invite someone' },
 ];
 
 function message(e: unknown) {
@@ -31,7 +31,7 @@ function message(e: unknown) {
 
 /**
  * Friends, in three tabs: Friends (requests to answer, requests I sent, my friends), Got an invite? (scan or paste
- * someone's), and Invite a friend (my QR code and link). Invites are the only way to connect; there is no search.
+ * someone's), and Invite someone (my QR code and link). Invites are the only way to connect; there is no search.
  * When someone scans my code, their request replaces the QR code so I can accept it right there.
  */
 export default function SearchScreen() {
@@ -53,12 +53,14 @@ export default function SearchScreen() {
   const [error, setError] = useState<string>();
   const [notice, setNotice] = useState<string>();
   const [refreshing, setRefreshing] = useState(false);
-  // The circles each request goes into when accepted (author-only; none by default: they see Everyone posts).
+  // Asked before accepting a request or sending a pasted invite: which circles the person goes into (author-only;
+  // none keeps them in Everyone only).
   const [book, setBook] = useState<AddressBook | null>(null);
-  const [placement, setPlacement] = useState<Record<string, number[]>>({});
-  const circlesFor = (userId: string) => placement[userId] ?? [];
-  // The circles someone whose invite I use goes into (author-only; none by default).
-  const [joinCircles, setJoinCircles] = useState<number[]>([]);
+  const [ask, setAsk] = useState<{ title: string; confirmLabel: string; done: (ids: number[]) => void }>();
+  const askCircles = (title: string, confirmLabel: string, done: (ids: number[]) => void) => {
+    if (book) setAsk({ title, confirmLabel, done });
+    else done([]);
+  };
 
   useFocusEffect(
     useCallback(() => {
@@ -105,24 +107,23 @@ export default function SearchScreen() {
     }
   };
 
+  const accept = (c: Connection, circles: number[]) =>
+    run(`accept:${c.userId}`, async () => {
+      await acceptRequest(account, c.userId, circles);
+      await refresh();
+      if (book) setNotice(`You and ${displayName(c)} are now connected${circles.length ? `, in ${circlesLine(book, circles)}` : ''}.`);
+      else setNotice(`You and ${displayName(c)} are now connected.`);
+    });
+
   const requestActions = (c: Connection) => (
     <View className="gap-3">
-      {book ? (
-        <CircleChoice book={book} value={circlesFor(c.userId)} onChange={(ids) => setPlacement((p) => ({ ...p, [c.userId]: ids }))} />
-      ) : null}
       <View className="flex-row gap-3">
         <View className="flex-1">
           <Button
             label="Accept"
             loading={busy === `accept:${c.userId}`}
             disabled={!!busy}
-            onPress={() => run(`accept:${c.userId}`, async () => {
-              const circles = circlesFor(c.userId);
-              await acceptRequest(account, c.userId, circles);
-              await refresh();
-              if (book) setNotice(`You and ${displayName(c)} are now friends${circles.length ? `, in ${circlesLine(book, circles)}` : ''}.`);
-              else setNotice(`You and ${displayName(c)} are now friends.`);
-            })}
+            onPress={() => askCircles(`Add ${displayName(c)} to circles`, 'Accept', (ids) => void accept(c, ids))}
           />
         </View>
         <View className="flex-1">
@@ -158,12 +159,14 @@ export default function SearchScreen() {
     setError(undefined);
     setNotice(undefined);
   };
-  // A dot on a section with something waiting: requests in Friends, the scanner's request in Invite a friend.
+  // A dot on a section with something waiting: requests in Friends, the scanner's request in Invite someone.
   const dots: Record<Section, boolean> = {
     friends: otherRequests.length > 0,
     join: false,
     invite: scanner?.status === 'incoming',
   };
+
+  const tabLabel = (t: { key: Section; label: string }) => (t.key === 'friends' ? `${t.label} (${friends.length})` : t.label);
 
   const feedback = (
     <>
@@ -184,7 +187,7 @@ export default function SearchScreen() {
                 <View className="flex-1">
                   <Text className="font-bold text-ink dark:text-ink-dark">{displayName(c)}</Text>
                   <Text className="text-muted dark:text-muted-dark">
-                    {c.profile?.handle ? `@${c.profile.handle} · ` : ''}wants to be friends
+                    {c.profile?.handle ? `@${c.profile.handle} · ` : ''}wants to connect
                   </Text>
                 </View>
               </View>
@@ -214,11 +217,10 @@ export default function SearchScreen() {
       ) : null}
 
       <View className="gap-2">
-        <Text className="text-lg font-bold text-ink dark:text-ink-dark">Your friends ({friends.length})</Text>
         {friends.length === 0 ? (
           <View className="items-start gap-3">
-            <Text className="text-muted dark:text-muted-dark">No friends yet. Invite someone, or use an invite you were sent.</Text>
-            <Button label="Invite a friend" onPress={() => pick('invite')} />
+            <Text className="text-muted dark:text-muted-dark">No one here yet. Invite someone, or use an invite you were sent.</Text>
+            <Button label="Invite someone" onPress={() => pick('invite')} />
           </View>
         ) : null}
         {friends.map((f) => (
@@ -246,23 +248,24 @@ export default function SearchScreen() {
   const joinSection = (
     <>
       <Text className="text-muted dark:text-muted-dark">
-        Scan the QR code a friend shows you, or paste the invite link they sent. Choose their circles first if you like; they’ll get your request to accept.
+        Scan the QR code someone shows you, or paste the invite link they sent. You’ll choose their circles next; they’ll get your request to accept.
       </Text>
-      {book ? <CircleChoice book={book} value={joinCircles} onChange={setJoinCircles} /> : null}
-      <Button label="Scan QR code" onPress={() => router.push({ pathname: '/scan', params: { circles: joinCircles.join(',') } })} />
+      <Button label="Scan QR code" onPress={() => router.push('/scan')} />
       <TextField label="Or paste an invite link" placeholder="https://circlo.com/i/…" value={pasted} onChangeText={setPasted} />
       <Button
-        label="Send friend request"
+        label="Send request"
         variant="outline"
         disabled={!pasted}
         loading={busy === 'paste'}
         onPress={() =>
-          run('paste', async () => {
-            await acceptInvite(account, pasted, joinCircles);
-            setPasted('');
-            setNotice('Friend request sent. You’ll see their profile once they accept.');
-            await refresh();
-          })
+          askCircles('Add to circles', 'Send request', (ids) =>
+            void run('paste', async () => {
+              await acceptInvite(account, pasted, ids);
+              setPasted('');
+              setNotice('Request sent. You’ll see their profile once they accept.');
+              await refresh();
+            }),
+          )
         }
       />
       {feedback}
@@ -276,7 +279,7 @@ export default function SearchScreen() {
         <View className="flex-1">
           <Text className="font-bold text-ink dark:text-ink-dark">{displayName(scanner)} used your invite</Text>
           <Text className="text-muted dark:text-muted-dark">
-            {scanner.status === 'accepted' ? 'You’re now friends.' : 'Accept their request to become friends.'}
+            {scanner.status === 'accepted' ? 'You’re now connected.' : 'Accept their request to connect.'}
           </Text>
         </View>
         <Icon name="checkmark-circle" size={26} color={palette.primary} />
@@ -293,7 +296,7 @@ export default function SearchScreen() {
   ) : invite ? (
     <View className="items-center gap-3">
       <Text className="self-start text-muted dark:text-muted-dark">
-        Ask your friend to scan this in Circlo. Their request will show up here for you to accept.
+        Ask them to scan this in Circlo. Their request will show up here for you to accept.
       </Text>
       <View className="rounded-xl bg-white p-3">
         <QRCode value={invite.link} size={200} />
@@ -319,7 +322,7 @@ export default function SearchScreen() {
     <>
       <Text className="text-muted dark:text-muted-dark">
         Create a one-time invite to add someone. You’ll get a QR code to show them in person and a link you can send.
-        Each invite works once, for 7 days, and lets your friend’s app check it’s really you.
+        Each invite works once, for 7 days, and lets their app check it’s really you.
       </Text>
       <Button label="Create invite" loading={busy === 'invite'} disabled={!connections} onPress={newInvite} />
       {feedback}
@@ -334,12 +337,12 @@ export default function SearchScreen() {
             key={t.key}
             accessibilityRole="tab"
             accessibilityState={{ selected: section === t.key }}
-            accessibilityLabel={dots[t.key] ? `${t.label}, new` : t.label}
+            accessibilityLabel={dots[t.key] ? `${tabLabel(t)}, new` : tabLabel(t)}
             onPress={() => pick(t.key)}
             className="flex-1 items-center pt-3 active:opacity-60">
             <View className="flex-row items-center gap-1.5">
               <Text className={section === t.key ? 'font-bold text-ink dark:text-ink-dark' : 'text-muted dark:text-muted-dark'}>
-                {t.label}
+                {tabLabel(t)}
               </Text>
               {dots[t.key] ? <View className="h-2 w-2 rounded-full bg-primary dark:bg-primary-dark" /> : null}
             </View>
@@ -354,6 +357,17 @@ export default function SearchScreen() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={async () => { setRefreshing(true); await refresh(); setRefreshing(false); }} />}>
         {section === 'friends' ? friendsSection : section === 'join' ? joinSection : inviteSection}
       </ScrollView>
+      {ask && book ? (
+        <CirclePickerSheet
+          visible
+          book={book}
+          selected={[]}
+          title={ask.title}
+          confirmLabel={ask.confirmLabel}
+          onDone={ask.done}
+          onClose={() => setAsk(undefined)}
+        />
+      ) : null}
     </View>
   );
 }

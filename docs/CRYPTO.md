@@ -1,6 +1,6 @@
 # Circlo cryptography specification
 
-> **Status: v1.3 — owner request 2026-10-29** (v1.3: independent circles and audiences, sections 8.3, 8.5, 8.6, 9.1; v1.2: exclusive circles; no new primitives. v1.1, approved 2026-10-25: where epoch secrets are stored, section 6.1) (owner delegated all design choices to "the most secure
+> **Status: v1.4 — owner request 2026-10-29** (v1.4: reports to the operator reinstated, section 13c; v1.3: independent circles and audiences, sections 8.3, 8.5, 8.6, 9.1; v1.2: exclusive circles; no new primitives. v1.1, approved 2026-10-25: where epoch secrets are stored, section 6.1) (owner delegated all design choices to "the most secure
 > option"). Section 14 lists every point where this spec deliberately goes beyond PLAN.md and why.
 > `core/` implements this document byte-for-byte. Any change requires editing this file first.
 > **An external cryptography audit is required before public launch.**
@@ -348,8 +348,18 @@ storage plug into it.
   the server hashes and compares in constant time. Only people who can open the post can derive the token, so
   friends outside the audience learn nothing about who interacted. A database copy holds only hashes. (Owner
   approved, 2026-10-27; closes THREAT_MODEL leak 14.)
-- **No operator reports:** reporting content to the operator was removed (owner decision, 2026-10-27). Nothing a
-  user posts or sends is ever made readable to the operator; abuse is handled between people by blocking and muting.
+- **Reports to the operator (v1.4, owner decision 2026-10-29; reinstated after the 2026-10-27 removal):** a user who
+  reports a post, a person or a chat message chooses to share what they can see. Their device builds the report
+  (reason, optional note, and either the post's text and photos, the person's name, handle and bio, or the one
+  message's text and photos with its sender, all as decrypted on that device), signs
+  `"circlo/v1/report" || 0x00 || report_id || reporter_id || content` with the reporter's Ed25519 identity key, and
+  seals CBOR `{1: content, 2: reporter_id, 3: signature}` with HPKE base mode (X25519-HKDF-SHA256,
+  ChaCha20-Poly1305) to the operator's moderation public key, info `"circlo/v1/report"`, AAD
+  `AAD("circlo/v1/report", report_id)` (section 3: label, id, version). `report_id` is a fresh random id the server
+  stores the row under, so a sealed report can't be replayed under another id. Reports are at most 4 MiB. The server
+  stores ciphertext only (`POST /v1/reports`, 20 per hour per user); the operator opens reports offline with the
+  moderation secret key (`circlo-moderation open`), which never touches the server. The person reported is not told. Only
+  what a reporter explicitly reports becomes readable to the operator; nothing else does.
 
 ## 13. Server-side secrets (outside the DB, via the core)
 

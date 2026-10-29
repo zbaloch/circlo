@@ -13,7 +13,7 @@ const people = (n: number) => `${n} ${n === 1 ? 'person' : 'people'}`;
 
 export function audienceLine(book: AddressBook, audience: Audience): string {
   if (audience.kind === 'onlyMe') return 'Only you';
-  if (audience.kind === 'everyone') return `All your friends · ${people(audienceSize(book, audience))}`;
+  if (audience.kind === 'everyone') return `All your people · ${people(audienceSize(book, audience))}`;
   return `Only people in ${audience.ids.length === 1 ? 'this circle' : 'these circles'} · ${people(audienceSize(book, audience))}`;
 }
 
@@ -37,7 +37,7 @@ export function Sheet({ visible, onClose, title, children }: { visible: boolean;
 export function ChoiceRow({ badge, title, line, checked, multi = false, onPress }: {
   badge: React.ReactNode;
   title: string;
-  line: string;
+  line?: string;
   checked: boolean;
   multi?: boolean;
   onPress: () => void;
@@ -52,7 +52,7 @@ export function ChoiceRow({ badge, title, line, checked, multi = false, onPress 
       {badge}
       <View className="flex-1">
         <Text className="text-base font-semibold text-ink dark:text-ink-dark">{title}</Text>
-        <Text className="text-sm text-muted dark:text-muted-dark">{line}</Text>
+        {line ? <Text className="text-sm text-muted dark:text-muted-dark">{line}</Text> : null}
       </View>
       {multi ? (
         <Icon name={checked ? 'checkbox' : 'square-outline'} size={22} color={checked ? palette.primary : palette.muted} />

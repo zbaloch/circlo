@@ -289,5 +289,13 @@ class DevicesFlowIT extends IntegrationTest {
         for (String leak : List.of("secret", "dinner", "push_bob", "push_alice", bobApp.userId.toString(), Ids.uuid(group).toString())) {
             assertThat(everything).doesNotContain(leak);
         }
+
+        // Once Alice blocks Bob, his messages in their old chat no longer wake her phone.
+        assertThat(call("POST", "/v1/blocks/" + bobApp.userId, null, aliceApp.accessToken).getStatusCode().value()).isEqualTo(200);
+        Thread.sleep(300);
+        PUSHES.clear();
+        post(bob, group, TestClientNative.mlsEncrypt(bob.mls(), group, "still here".getBytes(StandardCharsets.UTF_8)), List.of(), null);
+        Thread.sleep(500);
+        assertThat(PUSHES).isEmpty();
     }
 }

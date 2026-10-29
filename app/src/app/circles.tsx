@@ -61,7 +61,7 @@ export default function CirclesScreen() {
           <AudienceBadge book={book} audience={TO_EVERYONE} />
           <View className="flex-1">
             <Text className="text-base font-bold text-ink dark:text-ink-dark">Everyone</Text>
-            <Text className="text-muted dark:text-muted-dark">All your friends · {people(Object.keys(book.contacts).length)}</Text>
+            <Text className="text-muted dark:text-muted-dark">All your people · {people(Object.keys(book.contacts).length)}</Text>
           </View>
         </View>
         <Text className="pt-4 text-xs font-semibold uppercase text-muted dark:text-muted-dark">Your circles</Text>

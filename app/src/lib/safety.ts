@@ -1,5 +1,5 @@
 /**
- * Safety and legal (PLAN.md Phase 11): blocking, account deletion, and an export of your own data decrypted on this
+ * Safety and legal (PLAN.md Phase 11): account deletion and an export of your own data decrypted on this
  * device. No cryptography is implemented here.
  */
 import { Directory } from 'expo-file-system';
@@ -7,23 +7,12 @@ import { Directory } from 'expo-file-system';
 import { api, ok } from '@/api/client';
 
 import { loadAddressBook } from './addressbook';
-import { unfriend } from './circles';
+import { audienceLabel, circleDefs, circleName, circlesOf } from './circles';
 import { loadMyProfile } from './friends';
 import type { StoredAccount } from './keystore';
 import { imageUri } from './media';
 import { conversationsSnapshot } from './messaging';
 import { fetchAuthorPosts } from './posts';
-
-/** Blocks someone: unfriend first (rotates my keys so they can't read anything new), then block on the server. */
-export async function blockUser(account: StoredAccount, userId: string): Promise<void> {
-  const book = await loadAddressBook(account);
-  if (book.contacts[userId]) await unfriend(account, userId).catch(() => undefined);
-  ok(await api.POST('/v1/blocks/{userId}', { params: { path: { userId } } }));
-}
-
-export async function unblockUser(userId: string): Promise<void> {
-  ok(await api.DELETE('/v1/blocks/{userId}', { params: { path: { userId } } }));
-}
 
 /** Deletes the account on the server (after the user retypes their handle). The caller then signs out locally. */
 export async function deleteAccount(handle: string): Promise<void> {
@@ -35,13 +24,13 @@ export async function deleteAccount(handle: string): Promise<void> {
 type ExportProgress = (step: string) => void;
 
 /**
- * Exports my data, decrypted on this device: profile, friends (names as I see them), circle labels, my posts (text,
+ * Exports my data, decrypted on this device: profile, friends (names as I see them) and their circles, my posts (text,
  * time, audience, photos), and my chats. Saved as one JSON file in a folder the user picks; nothing goes to the
  * server.
  */
 export async function exportMyData(account: StoredAccount, onProgress?: ExportProgress): Promise<string> {
   const folder = await Directory.pickDirectoryAsync();
-  onProgress?.('Reading your profile and friends…');
+  onProgress?.('Reading your profile and people…');
   const [profile, book] = await Promise.all([loadMyProfile(account), loadAddressBook(account)]);
   onProgress?.('Decrypting your posts…');
   const posts: Record<string, unknown>[] = [];
@@ -57,7 +46,7 @@ export async function exportMyData(account: StoredAccount, onProgress?: ExportPr
         postId: p.postId,
         createdAt: new Date(p.createdAtMs).toISOString(),
         text: p.text,
-        audienceCircle: book.postCircles?.[p.postId] ?? null,
+        audience: book.postAudiences?.[p.postId] ? audienceLabel(book, book.postAudiences[p.postId]) : null,
         photos: photos.filter(Boolean),
         videos: p.media.filter((m) => m.kind === 'full' && m.item.mime.startsWith('video/')).length,
       });
@@ -75,8 +64,14 @@ export async function exportMyData(account: StoredAccount, onProgress?: ExportPr
     app: 'Circlo',
     account: { handle: account.handle, userId: account.userId },
     profile,
-    circleLabels: book.labels ?? {},
-    friends: Object.entries(book.contacts).map(([id, c]) => ({ userId: id, name: c.displayName ?? null, handle: c.handle ?? null, circle: c.circle, verified: c.verified })),
+    circles: circleDefs(book).map((c) => c.name),
+    friends: Object.entries(book.contacts).map(([id, c]) => ({
+      userId: id,
+      name: c.displayName ?? null,
+      handle: c.handle ?? null,
+      circles: circlesOf(book, c).map((n) => circleName(book, n)),
+      verified: c.verified,
+    })),
     posts,
     chats,
   };

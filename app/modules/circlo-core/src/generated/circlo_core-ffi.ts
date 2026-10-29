@@ -713,6 +713,17 @@ const DEFINITIONS = {
       ret: FfiType.RustBuffer,
       hasRustCallStatus: true,
     },
+    uniffi_circlo_core_fn_func_seal_report: {
+      args: [
+        FfiType.RustBuffer,
+        FfiType.RustBuffer,
+        FfiType.RustBuffer,
+        FfiType.RustBuffer,
+        FfiType.RustBuffer,
+      ],
+      ret: FfiType.RustBuffer,
+      hasRustCallStatus: true,
+    },
     uniffi_circlo_core_fn_func_seal_user_blob: {
       args: [
         FfiType.RustBuffer,
@@ -1226,6 +1237,11 @@ const DEFINITIONS = {
       hasRustCallStatus: false,
     },
     uniffi_circlo_core_checksum_func_seal_reply: {
+      args: [],
+      ret: FfiType.UInt16,
+      hasRustCallStatus: false,
+    },
+    uniffi_circlo_core_checksum_func_seal_report: {
       args: [],
       ret: FfiType.UInt16,
       hasRustCallStatus: false,
@@ -1929,6 +1945,14 @@ interface NativeModuleInterface {
     reply: Uint8Array,
     uniffi_out_err: UniffiRustCallStatus,
   ): Uint8Array;
+  uniffi_circlo_core_fn_func_seal_report(
+    moderationPublicKey: Uint8Array,
+    reporter: Uint8Array,
+    reporterId: Uint8Array,
+    reportId: Uint8Array,
+    content: Uint8Array,
+    uniffi_out_err: UniffiRustCallStatus,
+  ): Uint8Array;
   uniffi_circlo_core_fn_func_seal_user_blob(
     dataKey: Uint8Array,
     kind: Uint8Array,
@@ -2212,6 +2236,7 @@ interface NativeModuleInterface {
   uniffi_circlo_core_checksum_func_seal_push_token(): number;
   uniffi_circlo_core_checksum_func_seal_recovery_backup(): number;
   uniffi_circlo_core_checksum_func_seal_reply(): number;
+  uniffi_circlo_core_checksum_func_seal_report(): number;
   uniffi_circlo_core_checksum_func_seal_user_blob(): number;
   uniffi_circlo_core_checksum_func_sign_device_certificate(): number;
   uniffi_circlo_core_checksum_func_sign_identity(): number;

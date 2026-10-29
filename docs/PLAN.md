@@ -612,9 +612,9 @@ On the device:
 **Done when:** linking and revoking work, and a push payload captured in tests contains no content or names.
 
 ### Phase 11: Safety, abuse, legal
-- ~~In-app report: the reporter's device sends decrypted content plus a signed context to a moderation endpoint.~~
-  *Removed by owner decision (2026-10-27): posts are shared between people who know each other; block and mute instead.*
-- Block and mute.
+- In-app report: the reporter's device sends decrypted content plus a signed context to a moderation endpoint.
+  *Removed 2026-10-27, reinstated by owner decision 2026-10-29: sealed to the operator's moderation key (CRYPTO.md 13c).*
+- Block (mute removed 2026-10-29). Report and block are reachable from posts, profiles and chat messages.
 - Account deletion, which deletes all blobs and rows.
 - Data-export of your own content (decrypted on the device).
 

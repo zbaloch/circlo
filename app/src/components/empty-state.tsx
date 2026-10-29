@@ -1,6 +1,6 @@
 import { View } from 'react-native';
 
-import { CircloMark } from './circlo-mark';
+import { CircloSymbol } from './circlo-mark';
 import { Button } from './form';
 import { Text } from '@/components/ui/text';
 
@@ -10,7 +10,7 @@ type Props = { title: string; body?: string; actionLabel?: string; onAction?: ()
 export function EmptyState({ title, body, actionLabel, onAction }: Props) {
   return (
     <View className="flex-1 items-center justify-center gap-3 px-10">
-      <CircloMark size="lg" />
+      <CircloSymbol size="lg" />
       <Text className="mt-4 text-center text-2xl font-bold text-ink dark:text-ink-dark">{title}</Text>
       {body ? <Text className="text-center text-base text-muted dark:text-muted-dark">{body}</Text> : null}
       {actionLabel && onAction ? (

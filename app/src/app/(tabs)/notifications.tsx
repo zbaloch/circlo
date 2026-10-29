@@ -36,7 +36,7 @@ export default function NotificationsScreen() {
   if (connections && incoming.length === 0) {
     return (
       <Screen>
-        <EmptyState title="Nothing yet" body="Friend requests, replies and likes show up here." />
+        <EmptyState title="Nothing yet" body="Requests, replies and likes show up here." />
       </Screen>
     );
   }
@@ -52,13 +52,13 @@ export default function NotificationsScreen() {
           <Pressable
             key={c.userId}
             accessibilityRole="button"
-            accessibilityHint="Opens your friend requests"
+            accessibilityHint="Opens your requests"
             onPress={() => router.navigate({ pathname: '/search', params: { section: 'friends' } })}
             className={`flex-row items-center gap-3 border-b border-border px-5 py-4 active:opacity-60 dark:border-border-dark ${isNew ? 'bg-primary-soft dark:bg-primary-soft-dark' : ''}`}>
             <Avatar name={displayName(c)} />
             <View className="flex-1">
               <Text className="text-base text-ink dark:text-ink-dark">
-                <Text className="font-bold text-ink dark:text-ink-dark">{displayName(c)}</Text> wants to be friends
+                <Text className="font-bold text-ink dark:text-ink-dark">{displayName(c)}</Text> wants to connect
               </Text>
               <Text className="text-sm text-muted dark:text-muted-dark">
                 {c.identityChanged ? 'Their security keys changed. Review before accepting.' : 'Tap to review the request'}

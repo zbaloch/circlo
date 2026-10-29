@@ -38,6 +38,10 @@ circlo:
     fcm:
       project-id: ${CIRCLO_FCM_PROJECT_ID:}
       service-account: ${CIRCLO_FCM_SERVICE_ACCOUNT:}
+  # Operator's moderation public key (core CLI: circlo-moderation keygen). The secret half stays offline. Empty = the
+  # app hides Report.
+  moderation:
+    public-key: ${CIRCLO_MODERATION_PUBLIC_KEY:}
   auth:
     access-ttl: 15m
     refresh-ttl: 30d

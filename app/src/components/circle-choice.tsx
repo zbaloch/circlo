@@ -29,6 +29,7 @@ export function CirclePickerSheet({ visible, title = 'Their circles', ...rest }:
   onDone: (ids: number[]) => void;
   onClose: () => void;
   title?: string;
+  confirmLabel?: string;
 }) {
   // The body mounts each time the sheet opens, so it starts from the current choice.
   return (
@@ -38,18 +39,19 @@ export function CirclePickerSheet({ visible, title = 'Their circles', ...rest }:
   );
 }
 
-function CirclePicker({ book, selected, onDone, onClose }: {
+function CirclePicker({ book, selected, onDone, onClose, confirmLabel = 'Done' }: {
   book: AddressBook;
   selected: number[];
   onDone: (ids: number[]) => void;
   onClose: () => void;
+  confirmLabel?: string;
 }) {
   const [ids, setIds] = useState<number[]>(selected);
   const toggle = (id: number) => setIds((cur) => (cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id].sort((a, b) => a - b)));
   return (
     <>
       <Text className="px-5 pb-2 text-sm text-muted dark:text-muted-dark">
-        They see your Everyone posts, plus posts to the circles you put them in. Only you see this.
+        They always see your Everyone posts, plus posts to any circles you pick here. Pick none to keep them in Everyone only. Only you see this.
       </Text>
       <ScrollView>
         {circleDefs(book).map((c) => (
@@ -66,7 +68,7 @@ function CirclePicker({ book, selected, onDone, onClose }: {
       </ScrollView>
       <View className="px-5 pt-3">
         <Button
-          label="Done"
+          label={confirmLabel}
           onPress={() => {
             onDone(ids);
             onClose();

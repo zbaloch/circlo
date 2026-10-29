@@ -6,6 +6,7 @@ import com.circlo.server.crypto.CircloCore;
 import com.circlo.server.storage.MediaStore;
 import com.circlo.server.web.ApiException;
 import com.circlo.server.web.Ids;
+import com.circlo.server.web.RateLimiter;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
@@ -15,6 +16,8 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -28,7 +31,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
-/** Phase 11: blocking and account deletion (everything the user left behind is removed). */
+/** Phase 11: blocking, sealed reports, and account deletion (everything the user left behind is removed). */
 @RestController
 public class SafetyController {
 
@@ -36,12 +39,17 @@ public class SafetyController {
     private final CircloCore core;
     private final ServerSecrets secrets;
     private final MediaStore store;
+    private final RateLimiter limiter;
+    private final String moderationPublicKey;
 
-    public SafetyController(JdbcTemplate jdbc, CircloCore core, ServerSecrets secrets, MediaStore store) {
+    public SafetyController(JdbcTemplate jdbc, CircloCore core, ServerSecrets secrets, MediaStore store, RateLimiter limiter,
+            @Value("${circlo.moderation.public-key:}") String moderationPublicKey) {
         this.jdbc = jdbc;
         this.core = core;
         this.secrets = secrets;
         this.store = store;
+        this.limiter = limiter;
+        this.moderationPublicKey = moderationPublicKey;
     }
 
     private static byte[] me(Jwt jwt) {
@@ -52,6 +60,36 @@ public class SafetyController {
     public static boolean blockedEitherWay(JdbcTemplate jdbc, byte[] a, byte[] b) {
         return !jdbc.queryForList("SELECT 1 FROM user_blocks WHERE (blocker_id = ? AND blocked_id = ?) OR (blocker_id = ? AND blocked_id = ?)",
                 a, b, b, a).isEmpty();
+    }
+
+    // ---------- reports ----------
+
+    public record NewReport(@NotNull UUID reportId, @NotNull @Size(min = 64, max = 4 << 20) byte[] sealed) {}
+
+    /**
+     * Stores a report sealed on the reporter's phone to the moderation key, under the id bound into its AAD; the
+     * server can't read it.
+     */
+    @PostMapping("/v1/reports")
+    @ResponseStatus(HttpStatus.CREATED)
+    public Map<String, String> report(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody NewReport r) {
+        byte[] me = me(jwt);
+        if (!limiter.tryAcquire("reports", me, 20, 3_600_000)) {
+            throw new ApiException(HttpStatus.TOO_MANY_REQUESTS, "rate_limited");
+        }
+        try {
+            jdbc.update("INSERT INTO reports (id, reporter_id, sealed, created_at) VALUES (?, ?, ?, ?)",
+                    Ids.bytes(r.reportId()), me, r.sealed(), Timestamp.from(Instant.now()));
+        } catch (DuplicateKeyException e) {
+            throw new ApiException(HttpStatus.CONFLICT, "duplicate_report");
+        }
+        return Map.of("status", "received");
+    }
+
+    /** Client configuration: the operator's moderation public key (empty if reporting isn't set up). */
+    @GetMapping("/v1/config")
+    public Map<String, String> config() {
+        return Map.of("moderationPublicKey", moderationPublicKey);
     }
 
     // ---------- blocks ----------

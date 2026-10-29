@@ -74,8 +74,6 @@ export type AddressBook = {
   lastAudience?: Audience;
   /** Circle layout: 3 = independent circles (CRYPTO.md 8.6). Older books are migrated once. */
   circlesLayout?: 2 | 3;
-  /** Authors whose posts I hide from my timeline (local preference; the server never learns it). */
-  muted?: string[];
 };
 
 /** The chain position every friend gets from v1.3: the Everyone key (CRYPTO.md 8.6). */

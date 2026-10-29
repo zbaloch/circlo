@@ -1,56 +1,56 @@
-import { View } from 'react-native';
 import Svg, { Circle, Path } from 'react-native-svg';
 
 import { colors } from '@/theme/tokens';
 import { usePalette } from '@/theme/use-palette';
 
-type Props = { size?: 'sm' | 'lg'; wordmark?: boolean };
+// Geometry from the wordmark brand pack (logo/svg): "circlo" with a dotted final "o". Letters and ring are ink on
+// light and white on dark; only the dot is sky (sky-500 on light, sky-400 on dark).
 
-// Geometry from circlo-brand-assets/logo/svg (Halo mark, 200 × 200): a centre dot ("only me") in a ring of eight.
-// Below ~32 px the brand pack's optical "small" version (bigger dots) is used.
-const GEOMETRY = {
-  regular: { core: 26.67, dot: 17.33, ring: [[100, 17.33], [158.45, 41.55], [182.67, 100], [158.45, 158.45], [100, 182.67], [41.55, 158.45], [17.33, 100], [41.55, 41.55]] },
-  small: { core: 33.33, dot: 22.67, ring: [[100, 22.67], [154.68, 45.32], [177.33, 100], [154.68, 154.68], [100, 177.33], [45.32, 154.68], [22.67, 100], [45.32, 45.32]] },
-};
+// circlo-symbol-*.svg, 200 × 200: the dotted "o" alone.
+const SYMBOL_RING = 'M0 100a100 100 0 1 0 200 0a100 100 0 1 0 -200 0ZM35.96 100a64.04 64.04 0 1 0 128.09 0a64.04 64.04 0 1 0 -128.09 0Z';
+const SYMBOL_DOT = { cx: 100, cy: 100, r: 31.46 };
+
+// circlo-wordmark-*.svg, 333.23 × 101.6: "circl" outlined from Inter Display SemiBold, then the ring and dot.
+const WORDMARK_SIZE = { w: 333.23, h: 101.6 };
+const WORDMARK_LETTERS =
+  'M34.4 101.6C52.2 101.6 65.13 90.13 66.33 74.73H49.73C48.13 82.53 43.4 87.6 34.6 87.6C23.53 87.6 17 78.73 17 64.87C17 50.93 23.6 42 34.6 42C43.33 42 48.6 47.27 49.87 54.8H66.33C64.87 39.13 52.07 28 34.4 28C13.8 28 0 43.13 0 64.87C0 86.6 13.8 101.6 34.4 101.6ZM74.87 100H91.67V29.6H74.87ZM83.27 19.13C89 19.13 93.34 15 93.34 9.53C93.34 4.13 89 0 83.27 0C77.54 0 73.2 4.13 73.2 9.53C73.2 15 77.54 19.13 83.27 19.13ZM103.87 100H120.67V60.13C120.67 49.13 126.87 43.6 134.87 43.6C138.21 43.6 141.54 43.93 142.81 44.13V29.2C141.47 29.07 139.61 28.93 137.34 28.93C128.27 28.93 122.87 33.2 120.27 41.27H120.07V29.6H103.87ZM180.87 101.6C198.67 101.6 211.61 90.13 212.81 74.73H196.21C194.61 82.53 189.87 87.6 181.07 87.6C170.01 87.6 163.47 78.73 163.47 64.87C163.47 50.93 170.07 42 181.07 42C189.81 42 195.07 47.27 196.34 54.8H212.81C211.34 39.13 198.54 28 180.87 28C160.27 28 146.47 43.13 146.47 64.87C146.47 86.6 160.27 101.6 180.87 101.6ZM238.14 0.67H221.34V100H238.14Z';
+const WORDMARK_RING = 'M251.86 57.49a40.69 40.69 0 1 0 81.37 0a40.69 40.69 0 1 0 -81.37 0ZM266.49 57.49a26.06 26.06 0 1 0 52.11 0a26.06 26.06 0 1 0 -52.11 0Z';
+const WORDMARK_DOT = { cx: 292.54, cy: 57.49, r: 12.8 };
+
 const PIXELS = { sm: 28, lg: 96 };
-const GAP = { sm: 'gap-2', lg: 'gap-6' };
 
-// "circlo" wordmark (outlined Inter Display Bold), 321.69 × 100.
-const WORDMARK =
-  'M34.71 100C53.11 100 66.34 88.41 67.19 72.43H48.4C47.15 79.7 42.76 84.41 34.97 84.41C25.28 84.41 19.45 76.49 19.45 63.92C19.45 51.28 25.21 43.29 34.97 43.29C42.7 43.29 47.54 48.07 48.53 55.14H67.19C65.95 39.03 52.91 27.7 34.71 27.7C13.95 27.7 0 42.5 0 63.92C0 85.33 13.88 100 34.71 100ZM74.79 98.43H94.11V29.27H74.79ZM84.42 20.56C90.77 20.56 95.42 16.18 95.42 10.28C95.42 4.39 90.77 0 84.42 0C78.06 0 73.41 4.39 73.41 10.28C73.41 16.18 78.06 20.56 84.42 20.56ZM105.05 98.43H124.37V60.97C124.37 50.56 130.2 45.06 138.12 45.06C141.39 45.06 145 45.32 146.44 45.38V28.95C144.86 28.88 142.97 28.81 140.74 28.81C131.64 28.81 126.4 32.74 123.84 41.06H123.65V29.27H105.05ZM184.09 100C202.5 100 215.72 88.41 216.58 72.43H197.78C196.54 79.7 192.15 84.41 184.36 84.41C174.66 84.41 168.84 76.49 168.84 63.92C168.84 51.28 174.6 43.29 184.36 43.29C192.08 43.29 196.93 48.07 197.91 55.14H216.58C215.33 39.03 202.3 27.7 184.09 27.7C163.33 27.7 149.39 42.5 149.39 63.92C149.39 85.33 163.27 100 184.09 100ZM243.49 0.85H224.18V98.43H243.49ZM286.52 100C307.54 100 321.69 85.59 321.69 63.92C321.69 42.24 307.54 27.7 286.52 27.7C265.57 27.7 251.42 42.24 251.42 63.92C251.42 85.59 265.57 100 286.52 100ZM286.52 84.35C277.16 84.35 270.87 76.75 270.87 63.92C270.87 51.02 277.22 43.35 286.52 43.35C295.89 43.35 302.24 51.02 302.24 63.92C302.24 76.75 295.95 84.35 286.52 84.35Z';
-
-/** Brand colours for the current scheme: ink dots + sky-500 centre on light, white dots + sky-400 centre on dark. */
+/** Brand colours for the current scheme: ink letters + sky-500 dot on light, white letters + sky-400 dot on dark. */
 function useBrand() {
   const { dark } = usePalette();
-  return dark
-    ? { dots: '#FFFFFF', centre: colors.brand['accent-dark'] }
-    : { dots: colors.brand.ink, centre: colors.brand.accent };
+  return dark ? { ink: '#FFFFFF', dot: colors.brand['accent-dark'] } : { ink: colors.brand.ink, dot: colors.brand.accent };
 }
 
-/** The Halo mark, optionally with the "circlo" wordmark beside it (brand lockup proportions). */
-export function CircloMark({ size = 'sm', wordmark = false }: Props) {
-  const { dots, centre } = useBrand();
+/** The dotted "o" alone, where only a square fits (empty states, small spaces). */
+export function CircloSymbol({ size = 'sm' }: { size?: 'sm' | 'lg' }) {
+  const { ink, dot } = useBrand();
   const px = PIXELS[size];
-  const g = px < 32 ? GEOMETRY.small : GEOMETRY.regular;
   return (
-    <View className={`flex-row items-center ${GAP[size]}`} accessible accessibilityRole="image" accessibilityLabel="Circlo">
-      <Svg width={px} height={px} viewBox="0 0 200 200">
-        <Circle cx={100} cy={100} r={g.core} fill={centre} />
-        {g.ring.map(([cx, cy]) => (
-          <Circle key={`${cx},${cy}`} cx={cx} cy={cy} r={g.dot} fill={dots} />
-        ))}
-      </Svg>
-      {wordmark ? <CircloWordmark height={px / 2} /> : null}
-    </View>
+    <Svg width={px} height={px} viewBox="0 0 200 200" accessible accessibilityRole="image" accessibilityLabel="Circlo">
+      <Path d={SYMBOL_RING} fill={ink} fillRule="evenodd" />
+      <Circle {...SYMBOL_DOT} fill={dot} />
+    </Svg>
   );
 }
 
-/** The "circlo" wordmark alone, in ink on light and white on dark. Decorative: pair it with a labelled mark or text. */
-export function CircloWordmark({ height = 40 }: { height?: number }) {
-  const { dots } = useBrand();
+/** The "circlo" wordmark: the logo itself (top bar, welcome screen). */
+export function CircloWordmark({ height = 24 }: { height?: number }) {
+  const { ink, dot } = useBrand();
   return (
-    <Svg width={(height * 321.69) / 100} height={height} viewBox="0 0 321.69 100">
-      <Path d={WORDMARK} fill={dots} />
+    <Svg
+      width={(height * WORDMARK_SIZE.w) / WORDMARK_SIZE.h}
+      height={height}
+      viewBox={`0 0 ${WORDMARK_SIZE.w} ${WORDMARK_SIZE.h}`}
+      accessible
+      accessibilityRole="image"
+      accessibilityLabel="Circlo">
+      <Path d={WORDMARK_LETTERS} fill={ink} fillRule="evenodd" />
+      <Path d={WORDMARK_RING} fill={ink} fillRule="evenodd" />
+      <Circle {...WORDMARK_DOT} fill={dot} />
     </Svg>
   );
 }

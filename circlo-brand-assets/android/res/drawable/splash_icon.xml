@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Circlo splash icon (Android 12+). Colours follow light/dark via @color resources -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="288dp"
+    android:height="288dp"
+    android:viewportWidth="288"
+    android:viewportHeight="288">
+    <path android:fillColor="@color/circlo_logo_ink" android:fillType="evenOdd" android:pathData="M72 144a72 72 0 1 0 144 0a72 72 0 1 0 -144 0ZM97.89 144a46.11 46.11 0 1 0 92.22 0a46.11 46.11 0 1 0 -92.22 0Z"/>
+    <path android:fillColor="@color/circlo_logo_dot" android:fillType="evenOdd" android:pathData="M121.35 144a22.65 22.65 0 1 0 45.3 0a22.65 22.65 0 1 0 -45.3 0Z"/>
+</vector>

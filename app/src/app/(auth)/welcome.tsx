@@ -4,7 +4,7 @@ import { ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Button } from '@/components/form';
-import { CircloMark, CircloWordmark } from '@/components/circlo-mark';
+import { CircloWordmark } from '@/components/circlo-mark';
 import { Text } from '@/components/ui/text';
 import { usePalette } from '@/theme/use-palette';
 
@@ -15,7 +15,7 @@ const POINTS: Point[] = [
   {
     icon: 'people-outline',
     title: 'Share with your circles',
-    body: 'Put friends in circles like Family, Kids or Close Friends. Post to one or more circles and only the people in them can read it, or share with Everyone, or keep it for yourself.',
+    body: 'Put people in circles like Family, Kids or Close Friends. Post to one or more circles and only the people in them can read it, or share with Everyone, or keep it for yourself.',
   },
   {
     icon: 'lock-closed-outline',
@@ -30,8 +30,7 @@ export default function WelcomeScreen() {
     <SafeAreaView className="flex-1 bg-surface px-6 dark:bg-surface-dark">
       <ScrollView contentContainerClassName="flex-grow justify-center gap-8 py-6" showsVerticalScrollIndicator={false}>
         <View className="items-center gap-5">
-          <CircloMark size="lg" />
-          <CircloWordmark height={40} />
+          <CircloWordmark height={52} />
           <Text className="text-center text-lg text-muted dark:text-muted-dark">A private social network for the people you choose.</Text>
         </View>
         <View className="gap-5">

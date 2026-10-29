@@ -1,6 +1,6 @@
 import { Icon, type IconName } from '@/components/ui/icon';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Modal, Pressable, ScrollView, View } from 'react-native';
 
 import { Avatar } from '@/components/avatar';
@@ -12,10 +12,11 @@ import { Spinner } from '@/components/ui/spinner';
 import { Text } from '@/components/ui/text';
 import { describeError } from '@/lib/account';
 import { loadAddressBook, type AddressBook, type Contact } from '@/lib/addressbook';
+import { blockUser } from '@/lib/blocks';
 import { audienceLabel, circleDefs, circlesOf, setCircles, unfriend } from '@/lib/circles';
 import { showAlert } from '@/lib/dialog';
 import type { Connection } from '@/lib/friends';
-import { blockUser } from '@/lib/safety';
+import { loadModerationKey } from '@/lib/report';
 import { displayName, useConnections } from '@/lib/use-connections';
 import { usePalette } from '@/theme/use-palette';
 
@@ -32,6 +33,10 @@ export default function FriendScreen() {
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string>();
+  const [canReport, setCanReport] = useState(false);
+  useEffect(() => {
+    loadModerationKey().then((k) => setCanReport(!!k), () => setCanReport(false));
+  }, []);
 
   const reloadBook = useCallback(() => {
     setOpen(false); // the screen stays mounted between visits: always reopen with the sheet closed
@@ -59,13 +64,24 @@ export default function FriendScreen() {
   const remove = () =>
     showAlert(
       `Remove ${name}?`,
-      `They won’t see anything you post from now on, and they aren’t told. “Remove and block” also stops them using any invite of yours to ask again.`,
+      `They won’t see anything you post from now on, and they aren’t told. To connect again, you’ll both need to use a new invite.`,
       [
         { text: 'Cancel', style: 'cancel' },
         { text: 'Remove', style: 'destructive', onPress: () => run(async () => { setOpen(false); await unfriend(account, c.userId); await refresh(); router.back(); }) },
-        { text: 'Remove and block', style: 'destructive', onPress: () => run(async () => { setOpen(false); await blockUser(account, c.userId); await refresh(); router.back(); }) },
       ],
     );
+
+  const block = () =>
+    showAlert(`Block ${name}?`, 'You’ll stop being connected. They can’t send you requests or see anything new you post, and their messages are hidden. They aren’t told.', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Block', style: 'destructive', onPress: () => run(async () => { setOpen(false); await blockUser(account, c.userId); await refresh(); router.back(); }) },
+    ]);
+  const report = canReport
+    ? () => {
+        setOpen(false);
+        router.push({ pathname: '/report/[id]', params: { id: c.userId, kind: 'user' } });
+      }
+    : undefined;
 
   // The button beside the avatar: their circles ("Everyone" if none: they see my Everyone posts).
   const theirCircles = contact && book ? circlesOf(book, contact) : [];
@@ -104,6 +120,8 @@ export default function FriendScreen() {
           onPreview={() => { setOpen(false); router.push({ pathname: '/preview/[id]', params: { id: c.userId } }); }}
           onSafety={() => { setOpen(false); router.push({ pathname: '/safety/[id]', params: { id: c.userId } }); }}
           onRemove={remove}
+          onReport={report}
+          onBlock={block}
         />
       ) : null}
     </View>
@@ -119,9 +137,19 @@ export default function FriendScreen() {
       <Text className="text-2xl font-bold text-ink dark:text-ink-dark">{name}</Text>
       {c.profile?.handle ? <Text className="text-muted dark:text-muted-dark">@{c.profile.handle}</Text> : null}
       {c.profile?.bio ? <Text className="text-center text-base text-ink dark:text-ink-dark">{c.profile.bio}</Text> : null}
-      <Text className="text-muted dark:text-muted-dark">Friend request pending</Text>
+      <Text className="text-muted dark:text-muted-dark">Request pending</Text>
       {circleButton}
       <View className="w-full">{below}</View>
+      <View className="flex-row gap-6 pt-2">
+        {report ? (
+          <Pressable accessibilityRole="button" onPress={report} disabled={busy} className="active:opacity-60">
+            <Text className="font-semibold text-danger dark:text-danger-dark">Report</Text>
+          </Pressable>
+        ) : null}
+        <Pressable accessibilityRole="button" onPress={block} disabled={busy} className="active:opacity-60">
+          <Text className="font-semibold text-danger dark:text-danger-dark">Block</Text>
+        </Pressable>
+      </View>
     </ScrollView>
   );
 }
@@ -161,10 +189,12 @@ type SheetProps = {
   onPreview: () => void;
   onSafety: () => void;
   onRemove: () => void;
+  onReport?: () => void;
+  onBlock: () => void;
 };
 
 /** One sheet for everything about my relationship with this friend. Only I ever see it. */
-function FriendSheet({ visible, name, book, contact, busy, onClose, onToggle, onPreview, onSafety, onRemove }: SheetProps) {
+function FriendSheet({ visible, name, book, contact, busy, onClose, onToggle, onPreview, onSafety, onRemove, onReport, onBlock }: SheetProps) {
   const palette = usePalette();
   const row = (icon: IconName, label: string, onPress: () => void, danger = false) => (
     <Pressable accessibilityRole="button" onPress={onPress} disabled={busy} className="flex-row items-center gap-3 px-5 py-3.5 active:bg-surface-raised dark:active:bg-surface-raised-dark">
@@ -215,6 +245,8 @@ function FriendSheet({ visible, name, book, contact, busy, onClose, onToggle, on
           {row('eye-outline', `See what ${name} can see`, onPreview)}
           {row('shield-checkmark-outline', 'Safety number', onSafety)}
           {row('person-remove-outline', `Remove ${name}`, onRemove, true)}
+          {onReport ? row('flag-outline', `Report ${name}`, onReport, true) : null}
+          {row('ban-outline', `Block ${name}`, onBlock, true)}
         </ScrollView>
       </View>
     </Modal>

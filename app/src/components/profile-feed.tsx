@@ -3,7 +3,7 @@ import { useCallback, useState, type ReactElement } from "react";
 import { FlatList, Pressable, View } from "react-native";
 
 import { Avatar } from "@/components/avatar";
-import { usePostActions, visiblePosts } from "@/components/post-actions";
+import { usePostActions } from "@/components/post-actions";
 import { PostCard } from "@/components/post-card";
 import { Spinner } from "@/components/ui/spinner";
 import { Text } from "@/components/ui/text";
@@ -88,10 +88,7 @@ export function ProfileFeed({
   const live = (authored ?? []).map(
     (p) => timeline.posts.find((t) => t.postId === p.postId) ?? p,
   );
-  const data = visiblePosts(
-    own ? null : book,
-    postsForTab(tab, live, timeline.posts),
-  );
+  const data = postsForTab(tab, live, timeline.posts);
 
   return (
     <>
@@ -129,7 +126,7 @@ export function ProfileFeed({
                   <Text className="font-bold text-ink dark:text-ink-dark">
                     {friendCount}
                   </Text>{" "}
-                  {friendCount === 1 ? "friend" : "friends"}
+                  {friendCount === 1 ? "person" : "people"}
                 </Text>
               ) : null}
               {actions}

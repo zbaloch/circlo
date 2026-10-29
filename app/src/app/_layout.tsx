@@ -67,7 +67,7 @@ function Navigator() {
         <Drawer.Screen name="recovery" options={{ title: 'Recovery phrase' }} />
         <Drawer.Screen name="dev" options={{ title: 'Crypto self-test' }} />
         <Drawer.Screen name="edit-profile" options={{ title: 'Edit profile' }} />
-        <Drawer.Screen name="friend/[id]" options={{ title: 'Friend' }} />
+        <Drawer.Screen name="friend/[id]" options={{ title: 'Profile' }} />
         <Drawer.Screen name="safety/[id]" options={{ title: 'Safety number' }} />
         <Drawer.Screen name="scan" options={{ title: 'Scan code' }} />
         <Drawer.Screen name="circle/[n]" options={{ title: 'Circle' }} />
@@ -79,6 +79,7 @@ function Navigator() {
         <Drawer.Screen name="chat/[id]" options={{ title: 'Chat' }} />
         <Drawer.Screen name="new-message" options={{ title: 'New message' }} />
         <Drawer.Screen name="link-confirm" options={{ title: 'Link a device' }} />
+        <Drawer.Screen name="report/[id]" options={{ title: 'Report' }} />
       </Drawer.Protected>
     </Drawer>
   );

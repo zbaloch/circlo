@@ -1,4 +1,4 @@
-import { audienceBadge, authorName, visiblePosts } from '@/components/post-actions';
+import { audienceBadge, authorName } from '@/components/post-actions';
 import { mergeIds } from '@/lib/feed-store';
 import type { FeedPost } from '@/lib/posts';
 import { toggledLike, validateReply } from '@/lib/thread';
@@ -41,19 +41,14 @@ describe('audience badges', () => {
   });
 });
 
-describe('author names and mutes', () => {
+describe('author names', () => {
   const account = { userId: 'me', handle: 'zaheer' };
-  const book = { contacts: { b: { displayName: 'Bob', handle: 'bob' } as never, c: { handle: 'carol' } as never }, muted: ['c'] };
+  const book = { contacts: { b: { displayName: 'Bob', handle: 'bob' } as never, c: { handle: 'carol' } as never } };
   it('names me, friends by profile, and strangers neutrally', () => {
     expect(authorName(account, book, 'me').name).toBe('zaheer');
     expect(authorName(account, book, 'b')).toEqual({ name: 'Bob', handle: 'bob' });
     expect(authorName(account, book, 'c').name).toBe('@carol');
-    expect(authorName(account, book, 'x').name).toBe('Friend');
-  });
-  it('hides muted authors locally', () => {
-    const list = [post({ postId: '1', authorId: 'b' }), post({ postId: '2', authorId: 'c' })];
-    expect(visiblePosts(book, list).map((p) => p.postId)).toEqual(['1']);
-    expect(visiblePosts(null, list)).toHaveLength(2);
+    expect(authorName(account, book, 'x').name).toBe('Someone');
   });
 });
 

@@ -30,7 +30,7 @@ jest.mock('react-native-reanimated', () => ({
   withTiming: (v: number) => v,
 }));
 jest.mock('@shopify/flash-list', () => ({ FlashList: jest.requireActual('react-native').FlatList }));
-jest.mock('@/components/post-actions', () => ({ usePostActions: () => ({ cardProps: () => ({}), sheet: null }), visiblePosts: (_b: unknown, p: unknown[]) => p }));
+jest.mock('@/components/post-actions', () => ({ usePostActions: () => ({ cardProps: () => ({}), sheet: null }) }));
 jest.mock('@/lib/feed-store', () => ({
   useFeed: () => ({ posts: [], ids: [], pending: [], refreshing: false, loading: false, hasMore: false, loaded: true }),
   refreshFeed: async () => {},
@@ -43,7 +43,7 @@ jest.mock('@/lib/feed-store', () => ({
 // it is checked on the emulator (docs/PROGRESS.md "Needs manual check").
 describe('app shell', () => {
   it('has exactly the four icon-only tabs from PLAN.md 2A, each with a screen-reader label', () => {
-    expect(TABS.map((t) => t.label)).toEqual(['Home', 'Friends', 'Notifications', 'Messages']);
+    expect(TABS.map((t) => t.label)).toEqual(['Home', 'People', 'Notifications', 'Messages']);
     for (const t of TABS) {
       expect(t.icon).toBeTruthy();
       expect(t.iconActive).toBeTruthy();
@@ -57,7 +57,7 @@ describe('app shell', () => {
   it('Home shows the empty state and a labelled compose button', async () => {
     await render(<HomeScreen />);
     expect(await screen.findByText('Your timeline is quiet')).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Invite your first friend' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Invite your first person' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Compose post' })).toBeTruthy();
   });
 

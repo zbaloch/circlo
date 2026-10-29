@@ -6,7 +6,7 @@ import { useConnectionsSync, useHasUnseenRequests } from '@/lib/use-connections'
 
 export const TABS: TabSpec[] = [
   { name: 'index', label: 'Home', icon: 'home-outline', iconActive: 'home' },
-  { name: 'search', label: 'Friends', icon: 'people-outline', iconActive: 'people' },
+  { name: 'search', label: 'People', icon: 'people-outline', iconActive: 'people' },
   { name: 'notifications', label: 'Notifications', icon: 'notifications-outline', iconActive: 'notifications' },
   { name: 'messages', label: 'Messages', icon: 'mail-outline', iconActive: 'mail' },
 ];

@@ -128,7 +128,7 @@ export async function acceptInvite(account: StoredAccount, link: string, circles
   const fp = Core.identityFingerprint(fromB64(identity.ed25519Pub), fromB64(identity.x25519Pub));
   if (!equalBytes(fp, parsed.fingerprint)) {
     // The server returned keys that don't belong to the person who made this invite.
-    throw new InviteError('This invite doesn’t match the keys Circlo returned. Don’t continue; ask your friend to show their code in person.');
+    throw new InviteError('This invite doesn’t match the keys Circlo returned. Don’t continue; ask them to show their code in person.');
   }
   verifyIdentitySignature(inviter.userId!, identity);
   await sendRequest(account, inviter.userId!, identity, circles);

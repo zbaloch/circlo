@@ -1,9 +1,11 @@
 import { Icon, type IconName } from '@/components/ui/icon';
 import type { DrawerContentComponentProps } from 'expo-router/drawer';
 import { router, type Href } from 'expo-router';
+import { useEffect, useState } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { loadMyProfile, type Profile } from '@/lib/friends';
 import { useSession } from '@/lib/session';
 import { usePalette } from '@/theme/use-palette';
 
@@ -21,10 +23,18 @@ export const DRAWER_ITEMS: Item[] = [
 ];
 
 /** Side drawer opened from the Home avatar (PLAN.md 2A app shell). */
-export function AppDrawer({ navigation }: DrawerContentComponentProps) {
+export function AppDrawer({ navigation, state }: DrawerContentComponentProps) {
   const palette = usePalette();
   const session = useSession();
-  const handle = session.status === 'signedIn' ? session.account.handle : '';
+  const account = session.status === 'signedIn' ? session.account : null;
+  const handle = account?.handle ?? '';
+  const open = !!state.history?.some((h) => h.type === 'drawer');
+  const [profile, setProfile] = useState<Profile | null>(null);
+  useEffect(() => {
+    if (!account || !open) return;
+    void loadMyProfile(account).then(setProfile, () => setProfile(null));
+  }, [account, open]);
+  const displayName = profile?.displayName || handle;
   const go = (href: Href) => {
     navigation.closeDrawer();
     router.push(href);
@@ -34,10 +44,10 @@ export function AppDrawer({ navigation }: DrawerContentComponentProps) {
   return (
     <SafeAreaView edges={['top', 'bottom']} className="flex-1 bg-surface dark:bg-surface-dark">
     <ScrollView className="flex-1" contentContainerClassName="px-5 pt-4">
-      <View className="gap-1 border-b border-border pb-4 dark:border-border-dark">
-        <Avatar size="lg" name={handle} />
-        <Text className="mt-2 text-[17px] font-extrabold text-ink dark:text-ink-dark">@{handle}</Text>
-        <Text className="text-muted dark:text-muted-dark">End-to-end encrypted</Text>
+      <View className="pb-2">
+        <Avatar size="lg" name={displayName} />
+        <Text className="mt-3 text-xl font-extrabold text-ink dark:text-ink-dark">{displayName}</Text>
+        <Text className="text-base text-muted dark:text-muted-dark">@{handle}</Text>
       </View>
       {items.map((item) => (
         <Pressable

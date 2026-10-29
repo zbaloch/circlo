@@ -335,9 +335,10 @@ public class MessagingController {
                         Ids.bytes(Ids.newId()), Ids.bytes(d), r.welcome(), now(), group, seq);
             }
         }
-        // Content-free push to every other device in the group (never the sender's own).
-        push.notifyDevices(jdbc.query("SELECT device_id FROM mls_group_members WHERE group_id = ? AND device_id <> ?",
-                (rs, i) -> rs.getBytes(1), group, device));
+        // Content-free push to every other device in the group (never the sender's own), except people who blocked me.
+        push.notifyDevices(jdbc.query("SELECT device_id FROM mls_group_members WHERE group_id = ? AND device_id <> ? "
+                + "AND user_id NOT IN (SELECT blocker_id FROM user_blocks WHERE blocked_id = ?)",
+                (rs, i) -> rs.getBytes(1), group, device, me));
         return Map.of("seq", seq);
     }
 

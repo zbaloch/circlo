@@ -9,7 +9,7 @@ import { Fab } from '@/components/fab';
 import { HomeHeader } from '@/components/home-header';
 import { IntegrityBanner } from '@/components/integrity-banner';
 import { OutboxCard, PostCard } from '@/components/post-card';
-import { usePostActions, visiblePosts } from '@/components/post-actions';
+import { usePostActions } from '@/components/post-actions';
 import { Screen } from '@/components/screen';
 import { loadAddressBook, type AddressBook } from '@/lib/addressbook';
 import { resumePendingRotation } from '@/lib/circles';
@@ -35,7 +35,7 @@ function HomeEmptyState({ connections }: { connections: Connection[] | null }) {
     return (
       <EmptyState
         title="No posts yet"
-        body={`You have ${friends} ${friends === 1 ? 'friend' : 'friends'}. When they share something with you, it shows up here. Why not start? Only the circles you choose can read it.`}
+        body={`You have ${friends} ${friends === 1 ? 'person' : 'people'} here. When they share something with you, it shows up here. Why not start? Only the circles you choose can read it.`}
         actionLabel="Write a post"
         onAction={() => router.push('/compose')}
       />
@@ -54,8 +54,8 @@ function HomeEmptyState({ connections }: { connections: Connection[] | null }) {
   return (
     <EmptyState
       title="Your timeline is quiet"
-      body="Posts from friends appear here. Only people in the circles you choose can read what you share."
-      actionLabel="Invite your first friend"
+      body="Posts from your people appear here. Only people in the circles you choose can read what you share."
+      actionLabel="Invite your first person"
       onAction={() => router.navigate({ pathname: '/search', params: { section: 'invite' } })}
     />
   );
@@ -132,7 +132,7 @@ export default function HomeScreen() {
         ref={(r) => {
           list.current = r;
         }}
-        data={visiblePosts(book, feed.posts)}
+        data={feed.posts}
         keyExtractor={(p: FeedPost) => p.postId}
         onScroll={onScroll}
         scrollEventThrottle={16}

@@ -21,7 +21,7 @@ const config: ExpoConfig = {
   userInterfaceStyle: 'automatic',
   ios: {
     bundleIdentifier: 'com.circlo.app',
-    // Brand pack (circlo-brand-assets/ios/AppIcon.appiconset): light, dark and tinted (iOS 18) variants.
+    // Brand pack (ios/AppIcon.appiconset): the dotted "o" on white, plus dark and tinted (iOS 18) variants.
     icon: {
       light: './assets/images/icon.png',
       dark: './assets/images/icon-ios-dark.png',
@@ -35,7 +35,7 @@ const config: ExpoConfig = {
   android: {
     package: 'com.circlo.app',
     adaptiveIcon: {
-      backgroundColor: colors.brand.ink,
+      backgroundColor: colors.brand.background,
       foregroundImage: './assets/images/adaptive-icon-foreground.png',
       monochromeImage: './assets/images/adaptive-icon-monochrome.png',
     },
@@ -61,16 +61,15 @@ const config: ExpoConfig = {
     ['expo-video', { supportsPictureInPicture: false, supportsBackgroundPlayback: false }],
     // Push carries no content; FCM/APNs credentials come from EAS, never the repo.
     ['expo-notifications', { icon: './assets/images/notification-icon.png', color: colors.brand.accent }],
-    // Light: ink mark with a sky-500 centre on the app's white surface. Dark: the brand pack's white mark with a
-    // sky-400 centre on ink. Both images share the pack's padding for Android 12's circular splash mask.
+    // The wordmark: gray-900 with a sky-500 dot on white; white with a sky-400 dot on gray-950 in dark mode.
     [
       'expo-splash-screen',
       {
-        backgroundColor: colors.surface.DEFAULT,
-        image: './assets/images/splash-icon.png',
-        imageWidth: 160,
+        backgroundColor: colors.brand.background,
+        image: './assets/images/splash-wordmark.png',
+        imageWidth: 180,
         resizeMode: 'contain',
-        dark: { backgroundColor: colors.brand.ink, image: './assets/images/splash-icon-dark.png' },
+        dark: { backgroundColor: colors.brand['background-dark'], image: './assets/images/splash-wordmark-dark.png' },
       },
     ],
   ],

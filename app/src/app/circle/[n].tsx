@@ -12,7 +12,7 @@ import { useSession } from '@/lib/session';
 import { Text } from '@/components/ui/text';
 
 function name(c: Contact) {
-  return c.displayName || (c.handle ? `@${c.handle}` : 'Friend');
+  return c.displayName || (c.handle ? `@${c.handle}` : 'Someone');
 }
 
 /**

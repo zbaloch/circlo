@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Circlo API
-  version: 0.11.1
+  version: 0.12.0
   description: >
     circlo-server API. The server stores and relays ciphertext only. Request and response bodies never contain
     plaintext content, names, emails, circle numbers or private keys. Byte fields are standard base64 strings;
@@ -988,6 +988,39 @@ paths:
       summary: Unblock
       responses:
         "200": { content: { application/json: { schema: { type: object } } } }
+
+  /v1/reports:
+    post:
+      summary: Report something to the operator, sealed on the phone to the moderation key (CRYPTO.md 13c)
+      description: The id is bound into the sealed report's AAD; the server stores ciphertext only.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reportId, sealed]
+              properties:
+                reportId: { $ref: "#/components/schemas/Id" }
+                sealed: { $ref: "#/components/schemas/Bytes", description: "HPKE ciphertext, 64 bytes to 4 MiB" }
+      responses:
+        "201": { content: { application/json: { schema: { type: object } } } }
+        "400": { $ref: "#/components/responses/Error" }
+        "409": { $ref: "#/components/responses/Error" }
+        "429": { $ref: "#/components/responses/Error" }
+
+  /v1/config:
+    get:
+      summary: Client configuration
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [moderationPublicKey]
+                properties:
+                  moderationPublicKey: { type: string, description: "Operator's moderation key (base64); empty = reporting off" }
 
   /v1/account:
     delete:

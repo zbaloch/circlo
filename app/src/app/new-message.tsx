@@ -57,7 +57,7 @@ export default function NewMessageScreen() {
       <FlatList
         data={friends}
         keyExtractor={(id) => id}
-        ListEmptyComponent={<Text className="p-6 text-center text-muted dark:text-muted-dark">Add friends first to message them.</Text>}
+        ListEmptyComponent={<Text className="p-6 text-center text-muted dark:text-muted-dark">Add people first to message them.</Text>}
         renderItem={({ item }) => {
           const on = picked.includes(item);
           const { name, handle } = authorName(account, book, item);
