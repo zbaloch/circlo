@@ -15,6 +15,8 @@ regexes = [
   '''_TEST_ONLY''',
   # Public crypto domain-separation labels (docs/CRYPTO.md), e.g. "circlo/v1/reply".
   '''^circlo/v1/[a-z0-9/-]+$''',
+  # The same labels under the project's earlier name; they exist only in history from before the rename.
+  '''^halqo/v1/[a-z0-9/-]+$''',
 ]
 
 [[allowlists]]
