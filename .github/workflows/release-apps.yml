@@ -67,11 +67,12 @@ jobs:
         run: |
           npm ci
           (cd modules/circlo-core && npm ci)
+      # The runner's own NDK (ANDROID_NDK_ROOT is set by the runner image, so it isn't in the `env` context).
       - name: Build the Rust core for Android
         working-directory: app/modules/circlo-core
-        env:
-          ANDROID_NDK_HOME: ${{ env.ANDROID_NDK_LATEST_HOME }}
-        run: npm run ubrn:android:release
+        run: |
+          export ANDROID_NDK_HOME="$ANDROID_NDK_ROOT"
+          npm run ubrn:android:release
       - name: Generate the Android project
         working-directory: app
         run: npx expo prebuild --platform android --clean --no-install
