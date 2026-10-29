@@ -34,6 +34,7 @@ function HomeEmptyState({ connections }: { connections: Connection[] | null }) {
   if (friends > 0) {
     return (
       <EmptyState
+        icon="pencil-outline"
         title="No posts yet"
         body={`You have ${friends} ${friends === 1 ? 'person' : 'people'} here. When they share something with you, it shows up here. Why not start? Only the circles you choose can read it.`}
         actionLabel="Write a post"
@@ -44,6 +45,7 @@ function HomeEmptyState({ connections }: { connections: Connection[] | null }) {
   if (requests > 0) {
     return (
       <EmptyState
+        icon="person-add-outline"
         title="Someone wants to connect"
         body="Accept their request to start sharing. You choose which circles they’re in."
         actionLabel="Review request"
@@ -53,6 +55,7 @@ function HomeEmptyState({ connections }: { connections: Connection[] | null }) {
   }
   return (
     <EmptyState
+      icon="people-outline"
       title="Your timeline is quiet"
       body="Posts from your people appear here. Only people in the circles you choose can read what you share."
       actionLabel="Invite your first person"

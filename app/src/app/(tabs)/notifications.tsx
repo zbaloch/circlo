@@ -36,7 +36,7 @@ export default function NotificationsScreen() {
   if (connections && incoming.length === 0) {
     return (
       <Screen>
-        <EmptyState title="Nothing yet" body="Requests, replies and likes show up here." />
+        <EmptyState icon="notifications-outline" title="Nothing yet" body="Requests, replies and likes show up here." />
       </Screen>
     );
   }

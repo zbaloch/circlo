@@ -7,9 +7,10 @@ import { CircloSymbol, CircloWordmark } from '@/components/circlo-mark';
 import { IconButton } from '@/components/icon-button';
 
 describe('components', () => {
-  it('EmptyState shows title, body and a call to action', async () => {
+  it('EmptyState shows title, body and a call to action, without the Circlo logo', async () => {
     const onAction = jest.fn();
-    await render(<EmptyState title="Nothing here" body="Invite someone" actionLabel="Invite" onAction={onAction} />);
+    await render(<EmptyState icon="people-outline" title="Nothing here" body="Invite someone" actionLabel="Invite" onAction={onAction} />);
+    expect(screen.queryByLabelText('Circlo')).toBeNull();
     expect(screen.getByText('Nothing here')).toBeTruthy();
     expect(screen.getByText('Invite someone')).toBeTruthy();
     await fireEvent.press(screen.getByRole('button', { name: 'Invite' }));
