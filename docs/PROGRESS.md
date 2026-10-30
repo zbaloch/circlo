@@ -447,6 +447,7 @@ See docs/HARDENING.md for how to repeat each check.
 | 2026-10-27 | **UI identical on iOS and Android, X/Bluesky style**: bundled Inter font, own header/tab bar/dialogs/toggle/spinner instead of native ones; teal brand kept | Owner request; native headers, alerts and switches looked like stock Material on Android. Fonts ship in the app (no runtime download, no third-party requests) |
 | 2026-10-25 | Only `secret-scan / gitleaks` should be a required check | Path-filtered CI workflows don't run on every PR |
 | 2026-10-30 | **Compose is two steps**: write, then choose who can see it, with nothing pre-selected (the remembered last audience is no longer used). PLAN.md 2A updated | Owner decision: the audience must be a deliberate choice on every post |
+| 2026-10-30 | **Login hardening**: passwords need 12+ characters, zxcvbn score 3+ and not in a leaked list (zxcvbn's ~49k + NCSC top 100k); 3 wrong passwords lock password login for 15 min, 1 h, then 24 h (escalating, not until recovery, so a handle can't be used to force someone through recovery); new sign-ins alert other devices; change-password screen | Owner request; lockout style chosen by owner |
 
 ## Waiting on owner
 

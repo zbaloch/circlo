@@ -1,4 +1,4 @@
-import { useFocusEffect } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState, type ReactNode } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
 
@@ -17,7 +17,7 @@ import { usePalette } from '@/theme/use-palette';
 import { Text, TextInput } from '@/components/ui/text';
 import { showAlert } from '@/lib/dialog';
 
-/** Settings: notifications, privacy, blocked people, export my data, delete my account, and Circlo's terms, privacy and support. */
+/** Settings: notifications, password, privacy, blocked people, export my data, delete my account, and Circlo's terms, privacy and support. */
 export default function SettingsScreen() {
   const session = useSession();
   const account = session.status === 'signedIn' ? session.account : null;
@@ -86,6 +86,21 @@ export default function SettingsScreen() {
             </Pressable>
           </Row>
         ) : null}
+      </Section>
+
+      <Section title="Password">
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => router.push('/change-password')}
+          className="flex-row items-center gap-4 px-4 py-3 active:bg-surface-raised dark:active:bg-surface-raised-dark">
+          <View className="flex-1 gap-0.5">
+            <Text className="text-[15px] font-semibold text-ink dark:text-ink-dark">Change password</Text>
+            <Text className="text-[13px] leading-[18px] text-muted dark:text-muted-dark">
+              Signs out every other device. After 3 wrong passwords, password login locks for a while; your recovery phrase always works.
+            </Text>
+          </View>
+          <Icon name="chevron-forward" size={18} color={palette.muted} />
+        </Pressable>
       </Section>
 
       <Section title="Privacy">

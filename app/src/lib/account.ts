@@ -5,10 +5,10 @@
  */
 import * as Core from '@circlo/core';
 
-import { api, ok, setAccessToken, withToken } from '@/api/client';
+import { api, ApiError, ok, setAccessToken, withToken } from '@/api/client';
 
 import { equalBytes, fromB64, toB64, utf8, uuidFromRandom, uuidToBytes } from './bytes';
-import { saveAccount, type StoredAccount } from './keystore';
+import { saveAccount, updateRefreshToken, type StoredAccount } from './keystore';
 
 export type Tokens = { userId: string; accessToken: string; refreshToken: string };
 
@@ -24,17 +24,52 @@ export function describeError(e: unknown): string {
       return 'This signup expired before it was finished, so nothing was saved. Please start again.';
     case 'rate_limited':
       return 'Too many attempts. Wait a minute and try again.';
+    case 'locked': {
+      const wait = (e as { retryAfter?: number }).retryAfter;
+      return `Too many wrong passwords, so password login is locked${wait ? ` for ${waitText(wait)}` : ' for now'}. Use your recovery phrase to get in now.`;
+    }
     case 'unauthorized':
       return 'Wrong handle or password.';
   }
   const tag = (e as { tag?: string })?.tag;
-  if (tag === 'AuthFailed') return 'Wrong handle or password.';
+  if (tag === 'AuthFailed') {
+    const { attemptsLeft, lockSeconds } = e as { attemptsLeft?: number; lockSeconds?: number | null };
+    if (attemptsLeft === 0) {
+      return `Wrong handle or password. Password login is now locked${lockSeconds ? ` for ${waitText(lockSeconds)}` : ''}. Use your recovery phrase to get in now.`;
+    }
+    if (attemptsLeft !== undefined) {
+      return `Wrong handle or password. ${attemptsLeft} ${attemptsLeft === 1 ? 'try' : 'tries'} left before password login locks for a while.`;
+    }
+    return 'Wrong handle or password.';
+  }
   if (tag === 'InvalidInput') return 'Please check what you entered.';
   if (e instanceof TypeError) return 'Can’t reach the Circlo server. Check your connection.';
   return 'Something went wrong. Please try again.';
 }
 
-export const MIN_PASSWORD = 10;
+/** "1 minute", "15 minutes", "1 hour", "24 hours", rounded up. Exported for tests. */
+export function waitText(seconds: number): string {
+  if (seconds < 3600) {
+    const m = Math.max(1, Math.ceil(seconds / 60));
+    return `${m} ${m === 1 ? 'minute' : 'minutes'}`;
+  }
+  const h = Math.ceil(seconds / 3600);
+  return `${h} ${h === 1 ? 'hour' : 'hours'}`;
+}
+
+type LoginStarted = { loginId?: string; credentialResponse?: string; attemptsLeft?: number; lockSeconds?: number | null };
+
+/**
+ * Finishes the phone's half of an OPAQUE login. A wrong password fails here (AuthFailed), never on the server, so the
+ * error carries what the server said about attempts left and the lock.
+ */
+function finishLogin(login: Core.OpaqueClientLogin, handle: string, start: LoginStarted) {
+  try {
+    return login.finish(handle, fromB64(start.credentialResponse!));
+  } catch (e) {
+    throw Object.assign(e as object, { attemptsLeft: start.attemptsLeft, lockSeconds: start.lockSeconds });
+  }
+}
 
 function newId(): string {
   return uuidFromRandom(Core.newSymmetricKey());
@@ -136,7 +171,7 @@ export async function login(rawHandle: string, password: string): Promise<Stored
   const start = ok(
     await api.POST('/v1/auth/login/start', { body: { handle, credentialRequest: toB64(login.request()) } }),
   );
-  const fin = login.finish(handle, fromB64(start.credentialResponse!)); // throws AuthFailed for a wrong password
+  const fin = finishLogin(login, handle, start);
   const tokens = ok(
     await api.POST('/v1/auth/login/finish', {
       body: { loginId: start.loginId!, handle, credentialFinalization: toB64(fin.message) },
@@ -146,6 +181,39 @@ export async function login(rawHandle: string, password: string): Promise<Stored
   const stored = ok(await api.GET('/v1/backups/{kind}', { params: { path: { kind: 'password' } }, ...auth }));
   const backup = Core.openPasswordBackup(fin.exportKey, uuidToBytes(tokens.userId), fromB64(stored.ciphertext));
   return finishOnThisDevice(handle, tokens, backup);
+}
+
+// ---------------- change the password (signed in) ----------------
+
+/**
+ * Proves the current password (it unlocks the key backup on this phone), then re-registers OPAQUE with the new one and
+ * re-seals the backup. The server signs out every other device; this one keeps going with the new session.
+ */
+export async function changePassword(account: StoredAccount, current: string, next: string): Promise<void> {
+  const handle = Core.normalizeHandle(account.handle);
+  const uid = uuidToBytes(account.userId);
+  const login = new Core.OpaqueClientLogin(utf8(current));
+  const start = ok(
+    await api.POST('/v1/auth/password/verify/start', { body: { handle, credentialRequest: toB64(login.request()) } }),
+  );
+  const fin = finishLogin(login, handle, start);
+  const verified = await api.POST('/v1/auth/password/verify/finish', {
+    body: { loginId: start.loginId!, handle, credentialFinalization: toB64(fin.message) },
+  });
+  if (!verified.response.ok) throw new ApiError(verified.response.status, 'unauthorized');
+  const stored = ok(await api.GET('/v1/backups/{kind}', { params: { path: { kind: 'password' } } }));
+  const backup = Core.openPasswordBackup(fin.exportKey, uid, fromB64(stored.ciphertext));
+
+  const reg = new Core.OpaqueClientRegistration(utf8(next));
+  const ps = ok(await api.POST('/v1/auth/password/start', { body: { handle, registrationRequest: toB64(reg.request()) } }));
+  const done = reg.finish(handle, fromB64(ps.registrationResponse!));
+  const tokens = ok(
+    await api.POST('/v1/auth/password/finish', {
+      body: { registrationUpload: toB64(done.message), passwordBackup: toB64(Core.sealPasswordBackup(done.exportKey, uid, backup)) },
+    }),
+  ) as Tokens;
+  setAccessToken(tokens.accessToken);
+  await updateRefreshToken(tokens.refreshToken);
 }
 
 // ---------------- recover with the 24 words ----------------

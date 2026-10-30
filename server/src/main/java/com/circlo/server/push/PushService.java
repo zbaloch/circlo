@@ -20,6 +20,8 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 public class PushService {
 
     static final Map<String, String> ACTIVITY = Map.of("type", "activity");
+    /** A new sign-in to the account: the app shows it from GET /v1/security-events. */
+    static final Map<String, String> SECURITY = Map.of("type", "security");
 
     private final JdbcTemplate jdbc;
     private final CircloCore core;
@@ -40,6 +42,10 @@ public class PushService {
 
     /** Notifies the given devices (never with content). */
     public void notifyDevices(List<byte[]> deviceIds) {
+        notifyDevices(deviceIds, ACTIVITY);
+    }
+
+    private void notifyDevices(List<byte[]> deviceIds, Map<String, String> data) {
         if (deviceIds.isEmpty()) {
             return;
         }
@@ -51,7 +57,7 @@ public class PushService {
                             (rs, i) -> new Object[] {rs.getBytes(1), rs.getString(2)}, (Object) device);
                     for (Object[] row : rows) {
                         byte[] token = core.openPushToken(secrets.pushTokenKey(), device, (byte[]) row[0]);
-                        sender.send((String) row[1], token, ACTIVITY);
+                        sender.send((String) row[1], token, data);
                     }
                 } catch (RuntimeException e) {
                     // a bad token or provider outage: skip this device
@@ -72,6 +78,15 @@ public class PushService {
 
     /** All active devices of a user. */
     public void notifyUser(byte[] userId) {
-        notifyDevices(jdbc.query("SELECT id FROM devices WHERE user_id = ? AND revoked_at IS NULL", (rs, i) -> rs.getBytes(1), (Object) userId));
+        notifyDevices(devicesOf(userId));
+    }
+
+    /** All active devices of a user, about a new sign-in to their account. */
+    public void notifyUserSecurity(byte[] userId) {
+        notifyDevices(devicesOf(userId), SECURITY);
+    }
+
+    private List<byte[]> devicesOf(byte[] userId) {
+        return jdbc.query("SELECT id FROM devices WHERE user_id = ? AND revoked_at IS NULL", (rs, i) -> rs.getBytes(1), (Object) userId);
     }
 }

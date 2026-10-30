@@ -7,12 +7,14 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import java.util.UUID;
+import org.springframework.http.HttpStatus;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 /** Auth endpoints. Byte fields are base64 in JSON; IDs are UUID strings. Nothing here is logged. */
@@ -116,6 +118,17 @@ public class AuthController {
     @PostMapping("/password/start")
     public PasswordStartResponse passwordStart(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody PasswordStartRequest r) {
         return new PasswordStartResponse(auth.passwordStart(UUID.fromString(jwt.getSubject()), r.handle(), r.registrationRequest()));
+    }
+
+    @PostMapping("/password/verify/start")
+    public AuthService.LoginStart verifyStart(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody LoginStartRequest r) {
+        return auth.verifyStart(UUID.fromString(jwt.getSubject()), r.handle(), r.credentialRequest());
+    }
+
+    @PostMapping("/password/verify/finish")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void verifyFinish(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody LoginFinishRequest r) {
+        auth.verifyFinish(UUID.fromString(jwt.getSubject()), r.loginId(), r.handle(), r.credentialFinalization());
     }
 
     @PostMapping("/password/finish")

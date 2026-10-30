@@ -8,6 +8,7 @@ import { clearFeed } from './feed-store';
 import { clearMediaCache } from './media';
 import { clearMessaging } from './messaging';
 import { resetPush } from './push';
+import { forgetSignIns } from './security-events';
 import { clearOutbox } from './outbox';
 import { forgetConnections } from './use-connections';
 
@@ -33,6 +34,7 @@ async function wipeDevice() {
   clearFeed();
   resetPush();
   if (current) await forgetConnections(current.userId).catch(() => {});
+  if (current) await forgetSignIns(current.userId);
   await clearMessaging().catch(() => {});
   try {
     clearMediaCache(); // decrypted photos must not outlive the session

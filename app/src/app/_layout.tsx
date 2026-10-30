@@ -81,6 +81,8 @@ function Navigator() {
         <Drawer.Screen name="link-confirm" options={{ title: 'Link a device' }} />
         <Drawer.Screen name="report/[id]" options={{ title: 'Report' }} />
         <Drawer.Screen name="enable-notifications" options={{ headerShown: false, swipeEnabled: false }} />
+        <Drawer.Screen name="security-alert" options={{ headerShown: false, swipeEnabled: false }} />
+        <Drawer.Screen name="change-password" options={{ title: 'Change password' }} />
       </Drawer.Protected>
     </Drawer>
   );

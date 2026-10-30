@@ -17,6 +17,8 @@ import { checkForNewPosts, loadMoreFeed, refreshFeed, showPendingPosts, useFeed 
 import { syncMessaging } from '@/lib/messaging';
 import { dismissPost, retryPost, useOutbox } from '@/lib/outbox';
 import { offerPushNow, onPushActivity, registerForPush } from '@/lib/push';
+import type { StoredAccount } from '@/lib/keystore';
+import { newSignIns } from '@/lib/security-events';
 import type { FeedPost } from '@/lib/posts';
 import { loadMyProfile, type Connection } from '@/lib/friends';
 import { useSession } from '@/lib/session';
@@ -25,6 +27,11 @@ import { Text } from '@/components/ui/text';
 import { Spinner } from '@/components/ui/spinner';
 
 const NEW_POSTS_INTERVAL = 60_000;
+
+/** A password login on another device that this phone hasn't shown yet opens "New sign-in to your account". */
+function checkSignIns(account: StoredAccount) {
+  newSignIns(account).then((signIns) => signIns.length && router.push('/security-alert'), () => undefined);
+}
 
 /** Home timeline (PLAN.md 2A): FlashList, pull-to-refresh, infinite scroll, "New posts" pill, header hides on scroll. */
 /** The empty timeline nudges the next useful step: invite someone, answer a request, or post first. */
@@ -88,6 +95,7 @@ export default function HomeScreen() {
     return onPushActivity(() => {
       checkForNewPosts(account);
       syncMessaging(account).catch(() => {});
+      checkSignIns(account);
     });
   }, [account]);
 
@@ -104,6 +112,7 @@ export default function HomeScreen() {
     useCallback(() => {
       if (!account) return;
       refresh();
+      checkSignIns(account);
       const timer = setInterval(() => checkForNewPosts(account), NEW_POSTS_INTERVAL);
       return () => clearInterval(timer);
     }, [account, refresh]),

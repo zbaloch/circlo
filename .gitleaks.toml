@@ -33,3 +33,9 @@ condition = "AND"
 paths = ['''(^|/)Cargo\.lock$''']
 regexTarget = "match"
 regexes = ['''libcrux-secrets''']
+
+# The app's blocklist of common leaked passwords (public breach data, so nobody can choose one; see
+# app/src/lib/password-strength.ts). A few entries sit next to the word "password" and trip generic-api-key.
+[[allowlists]]
+description = "Public leaked-password blocklist"
+paths = ['''^app/src/lib/leaked-passwords\.json$''']

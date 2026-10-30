@@ -23,6 +23,8 @@ the build if a column for identity or tracking data is ever added, and the leake
 | Account | Random id, keyed HMAC of the handle (not the handle), OPAQUE record, signup time | Log in, and let friends find you if you opt in |
 | Keys | Public keys; private keys only inside backups encrypted on the phone | Friends verify you; you can recover your account with your 24 words |
 | Devices | Random id, public key, push token (encrypted with a server key), created/revoked times | Deliver to and revoke your phones |
+| Sign-ins | The time of each password login (no device, place or address), kept 30 days | Warn your other phones: "New sign-in to your account" |
+| Login lock | Per keyed handle hash: failed-attempt count and lock time, deleted a week after the last attempt (and on success) | Lock password login after 3 wrong passwords (15 min, 1 h, then 24 h) |
 | Friends and blocks | Pairs of random ids, status, time | Who can fetch whose (encrypted) posts |
 | Posts, replies, likes | Encrypted content, padded sizes, times; a hash of each post's read token | Show posts to the people you chose. The audience is not visible to the server |
 | Photos and videos | Encrypted files with random names in the bucket | Media in posts and chats |

@@ -67,6 +67,10 @@ paths:
   /v1/auth/login/start:
     post:
       summary: Start OPAQUE login (unknown handles get an indistinguishable fake response)
+      description: >
+        Every start counts as a failed password attempt until a login finishes (a wrong password fails on the phone).
+        After 3, password login for the handle is locked for 15 minutes, then 1 hour, then 24 hours; a day without
+        attempts starts over. The recovery phrase is never locked, and setting a new password lifts the lock.
       security: []
       requestBody:
         required: true
@@ -87,7 +91,17 @@ paths:
                 properties:
                   loginId: { $ref: "#/components/schemas/Id" }
                   credentialResponse: { $ref: "#/components/schemas/Bytes" }
-        "429": { $ref: "#/components/responses/Error" }
+                  attemptsLeft: { type: integer, description: "Attempts left after this one before the lock (0: this is the last)" }
+                  lockSeconds: { type: integer, nullable: true, description: "At attemptsLeft 0: how long the lock lasts if this attempt fails" }
+        "429":
+          description: "`locked`: password login is locked; `retryAfter` (also the Retry-After header) is in seconds"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error: { type: string }
+                  retryAfter: { type: integer }
 
   /v1/auth/login/finish:
     post:
@@ -190,6 +204,51 @@ paths:
                 properties:
                   registrationResponse: { $ref: "#/components/schemas/Bytes" }
 
+  /v1/auth/password/verify/start:
+    post:
+      summary: Prove the current password before changing it (OPAQUE login for the signed-in user; counts towards the lock, no sign-in alert)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [handle, credentialRequest]
+              properties:
+                handle: { type: string }
+                credentialRequest: { $ref: "#/components/schemas/Bytes" }
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  loginId: { $ref: "#/components/schemas/Id" }
+                  credentialResponse: { $ref: "#/components/schemas/Bytes" }
+                  attemptsLeft: { type: integer }
+                  lockSeconds: { type: integer, nullable: true }
+        "403": { $ref: "#/components/responses/Error" }
+        "429": { $ref: "#/components/responses/Error" }
+
+  /v1/auth/password/verify/finish:
+    post:
+      summary: Finish proving the current password
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [loginId, handle, credentialFinalization]
+              properties:
+                loginId: { $ref: "#/components/schemas/Id" }
+                handle: { type: string }
+                credentialFinalization: { $ref: "#/components/schemas/Bytes" }
+      responses:
+        "204": { description: Verified }
+        "401": { $ref: "#/components/responses/Error" }
+
   /v1/auth/password/finish:
     post:
       summary: Finish setting a new password; revokes all sessions and returns a full session
@@ -230,6 +289,26 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/Backup" }
         "409": { $ref: "#/components/responses/Error" }
+
+  /v1/security-events:
+    get:
+      summary: Recent sign-ins to my account (30 days, newest first); only the kind and time
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  events:
+                    type: array
+                    items:
+                      type: object
+                      required: [id, kind, createdAt]
+                      properties:
+                        id: { $ref: "#/components/schemas/Id" }
+                        kind: { type: string, enum: [sign_in] }
+                        createdAt: { type: string, format: date-time }
 
   /v1/devices:
     get:

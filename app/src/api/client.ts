@@ -65,6 +65,8 @@ export class ApiError extends Error {
   constructor(
     readonly status: number,
     readonly code: string,
+    /** Seconds until a lock or rate limit lifts, when the server says. */
+    readonly retryAfter?: number,
   ) {
     super(code);
   }
@@ -73,8 +75,8 @@ export class ApiError extends Error {
 /** Unwraps an openapi-fetch result, throwing ApiError on failure. */
 export function ok<T>(result: { data?: T; error?: unknown; response: Response }): T {
   if (result.data !== undefined && result.response.ok) return result.data;
-  const code = (result.error as { error?: string } | undefined)?.error ?? `http_${result.response.status}`;
-  throw new ApiError(result.response.status, code);
+  const body = result.error as { error?: string; retryAfter?: number } | undefined;
+  throw new ApiError(result.response.status, body?.error ?? `http_${result.response.status}`, body?.retryAfter);
 }
 
 /** Calls with a specific bearer token (e.g. a recovery-scoped token) instead of the current session. */

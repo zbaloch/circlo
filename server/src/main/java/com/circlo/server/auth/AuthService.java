@@ -4,12 +4,15 @@ import com.circlo.server.config.AuthProperties;
 import com.circlo.server.config.ServerSecrets;
 import com.circlo.server.crypto.CoreException;
 import com.circlo.server.crypto.CircloCore;
+import com.circlo.server.push.PushService;
 import com.circlo.server.web.ApiException;
 import com.circlo.server.web.Ids;
+import com.circlo.server.web.LockedException;
 import com.circlo.server.web.RateLimiter;
 import java.security.MessageDigest;
 import java.sql.Timestamp;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
@@ -34,16 +37,20 @@ public class AuthService {
     private final JdbcTemplate jdbc;
     private final TokenService tokens;
     private final RateLimiter limiter;
+    private final LoginThrottle throttle;
+    private final PushService push;
     private final Clock clock = Clock.systemUTC();
 
     public AuthService(CircloCore core, ServerSecrets secrets, AuthProperties props, JdbcTemplate jdbc,
-            TokenService tokens, RateLimiter limiter) {
+            TokenService tokens, RateLimiter limiter, LoginThrottle throttle, PushService push) {
         this.core = core;
         this.secrets = secrets;
         this.props = props;
         this.jdbc = jdbc;
         this.tokens = tokens;
         this.limiter = limiter;
+        this.throttle = throttle;
+        this.push = push;
     }
 
     // ---------- helpers ----------
@@ -145,13 +152,18 @@ public class AuthService {
 
     // ---------- login ----------
 
-    public record LoginStart(UUID loginId, byte[] credentialResponse) {}
+    /**
+     * `attemptsLeft`: password attempts left after this one before login locks; at 0, `lockSeconds` is how long the lock
+     * that is now set lasts if this attempt fails too (a successful login lifts it).
+     */
+    public record LoginStart(UUID loginId, byte[] credentialResponse, int attemptsLeft, Long lockSeconds) {}
 
-    @Transactional
+    @Transactional(noRollbackFor = LockedException.class)
     public LoginStart loginStart(String rawHandle, byte[] request) {
         Handle h = handle(rawHandle);
-        if (!limiter.tryAcquire("login-handle", h.lookup(), LOGIN_ATTEMPTS_PER_HANDLE_PER_MINUTE, 60_000)) {
-            throw new ApiException(HttpStatus.TOO_MANY_REQUESTS, "rate_limited");
+        LoginThrottle.Decision attempt = throttle.attempt(h.lookup());
+        if (attempt.locked()) {
+            throw new LockedException(Math.max(1, Duration.between(clock.instant(), attempt.lockedUntil()).toSeconds()));
         }
         UserRow u = userBy("handle_lookup", h.lookup()).stream().filter(x -> x.status().equals("active")).findFirst()
                 .orElse(null);
@@ -161,12 +173,24 @@ public class AuthService {
         jdbc.update("INSERT INTO opaque_login_states (id, user_id, state, expires_at) VALUES (?, ?, ?, ?)",
                 Ids.bytes(loginId), u == null ? null : u.id(), ls.state(),
                 Timestamp.from(clock.instant().plus(props.challengeTtl())));
-        return new LoginStart(loginId, ls.response());
+        Long lockSeconds = attempt.lockedUntil() == null ? null : Duration.between(clock.instant(), attempt.lockedUntil()).toSeconds();
+        return new LoginStart(loginId, ls.response(), attempt.attemptsLeft(), lockSeconds);
     }
 
     @Transactional
     public TokenService.Tokens loginFinish(UUID loginId, String rawHandle, byte[] finalization) {
         Handle h = handle(rawHandle);
+        UserRow u = verifyLogin(loginId, h, finalization);
+        throttle.clear(h.lookup());
+        // Tell the account's other devices (the new one has no device row yet), with no detail about this one.
+        jdbc.update("INSERT INTO security_events (id, user_id, kind, created_at) VALUES (?, ?, 'sign_in', ?)",
+                Ids.bytes(Ids.newId()), u.id(), Timestamp.from(clock.instant()));
+        push.notifyUserSecurity(u.id());
+        return tokens.issue(Ids.uuid(u.id()), TokenService.Scope.full);
+    }
+
+    /** Checks an OPAQUE finalization against its single-use login state; returns the user it proves. */
+    private UserRow verifyLogin(UUID loginId, Handle h, byte[] finalization) {
         byte[] id = Ids.bytes(loginId);
         List<Object[]> rows = jdbc.query(
                 "SELECT user_id, state, expires_at FROM opaque_login_states WHERE id = ? FOR UPDATE",
@@ -180,7 +204,32 @@ public class AuthService {
                 || !core.opaqueLoginFinish((byte[]) rows.get(0)[1], h.normalized(), finalization)) {
             throw ApiException.unauthorized();
         }
-        return tokens.issue(Ids.uuid(u.id()), TokenService.Scope.full);
+        return u;
+    }
+
+    // ---------- proving the current password (before changing it) ----------
+
+    /**
+     * The same OPAQUE login, for the signed-in user only: it unlocks the password backup on the phone so it can be
+     * re-sealed under a new password. It counts towards the lock like any login, but isn't a new sign-in.
+     */
+    @Transactional(noRollbackFor = LockedException.class)
+    public LoginStart verifyStart(UUID userId, String rawHandle, byte[] request) {
+        Handle h = handle(rawHandle);
+        if (!MessageDigest.isEqual(activeUser(userId).lookup(), h.lookup())) {
+            throw ApiException.forbidden();
+        }
+        return loginStart(rawHandle, request);
+    }
+
+    @Transactional
+    public void verifyFinish(UUID userId, UUID loginId, String rawHandle, byte[] finalization) {
+        Handle h = handle(rawHandle);
+        UserRow u = verifyLogin(loginId, h, finalization);
+        if (!Ids.uuid(u.id()).equals(userId)) {
+            throw ApiException.forbidden();
+        }
+        throttle.clear(h.lookup());
     }
 
     // ---------- recovery ----------
@@ -256,6 +305,7 @@ public class AuthService {
         jdbc.update("UPDATE users SET opaque_record = ? WHERE id = ?", record, u.id());
         jdbc.update("UPDATE key_backups SET ciphertext = ?, version = version + 1 WHERE user_id = ? AND kind = 'password'",
                 passwordBackup, u.id());
+        throttle.clear(u.lookup()); // a new password (e.g. after the recovery phrase) lifts any lock
         tokens.revokeAll(userId);
         return tokens.issue(userId, TokenService.Scope.full);
     }

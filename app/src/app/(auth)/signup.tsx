@@ -4,9 +4,11 @@ import { Pressable, View } from 'react-native';
 
 import { AuthScreen } from '@/components/auth-screen';
 import { Button, ErrorText, TextField, Title } from '@/components/form';
+import { PasswordStrength } from '@/components/password-strength';
 import { Icon } from '@/components/ui/icon';
 import { Text } from '@/components/ui/text';
-import { describeError, MIN_PASSWORD, normalizeHandle, Signup } from '@/lib/account';
+import { describeError, normalizeHandle, Signup } from '@/lib/account';
+import { checkPassword } from '@/lib/password-strength';
 import { LINKS, openLink } from '@/lib/links';
 import { setPendingSignup } from '@/lib/signup-store';
 import { usePalette } from '@/theme/use-palette';
@@ -19,6 +21,7 @@ export default function SignupScreen() {
   const [busy, setBusy] = useState(false);
   const [agreed, setAgreed] = useState(false);
   const palette = usePalette();
+  const strength = checkPassword(password, handle);
 
   const submit = async () => {
     setError(undefined);
@@ -28,8 +31,8 @@ export default function SignupScreen() {
       setError('Handles are 3–30 characters: letters, numbers and _.');
       return;
     }
-    if (password.length < MIN_PASSWORD) {
-      setError(`Use at least ${MIN_PASSWORD} characters. A few random words work well.`);
+    if (!strength.ok) {
+      setError(strength.problem ?? 'Choose a stronger password.');
       return;
     }
     if (password !== confirm) {
@@ -54,6 +57,7 @@ export default function SignupScreen() {
       </Title>
       <TextField label="Handle" placeholder="e.g. sam_k" value={handle} onChangeText={setHandle} maxLength={30} />
       <TextField label="Password" secureTextEntry value={password} onChangeText={setPassword} textContentType="newPassword" />
+      <PasswordStrength check={strength} empty={!password} />
       <TextField label="Confirm password" secureTextEntry value={confirm} onChangeText={setConfirm} textContentType="newPassword" />
       <View className="flex-row items-start gap-3">
         <Pressable

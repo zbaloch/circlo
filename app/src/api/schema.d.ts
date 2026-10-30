@@ -105,7 +105,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Start OPAQUE login (unknown handles get an indistinguishable fake response) */
+        /**
+         * Start OPAQUE login (unknown handles get an indistinguishable fake response)
+         * @description Every start counts as a failed password attempt until a login finishes (a wrong password fails on the phone). After 3, password login for the handle is locked for 15 minutes, then 1 hour, then 24 hours; a day without attempts starts over. The recovery phrase is never locked, and setting a new password lifts the lock.
+         */
         post: {
             parameters: {
                 query?: never;
@@ -130,10 +133,25 @@ export interface paths {
                         "application/json": {
                             loginId?: components["schemas"]["Id"];
                             credentialResponse?: components["schemas"]["Bytes"];
+                            /** @description Attempts left after this one before the lock (0: this is the last) */
+                            attemptsLeft?: number;
+                            /** @description At attemptsLeft 0: how long the lock lasts if this attempt fails */
+                            lockSeconds?: number | null;
                         };
                     };
                 };
-                429: components["responses"]["Error"];
+                /** @description `locked`: password login is locked; `retryAfter` (also the Retry-After header) is in seconds */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error?: string;
+                            retryAfter?: number;
+                        };
+                    };
+                };
             };
         };
         delete?: never;
@@ -345,6 +363,98 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/auth/password/verify/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Prove the current password before changing it (OPAQUE login for the signed-in user; counts towards the lock, no sign-in alert) */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        handle: string;
+                        credentialRequest: components["schemas"]["Bytes"];
+                    };
+                };
+            };
+            responses: {
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            loginId?: components["schemas"]["Id"];
+                            credentialResponse?: components["schemas"]["Bytes"];
+                            attemptsLeft?: number;
+                            lockSeconds?: number | null;
+                        };
+                    };
+                };
+                403: components["responses"]["Error"];
+                429: components["responses"]["Error"];
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/auth/password/verify/finish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Finish proving the current password */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        loginId: components["schemas"]["Id"];
+                        handle: string;
+                        credentialFinalization: components["schemas"]["Bytes"];
+                    };
+                };
+            };
+            responses: {
+                /** @description Verified */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                401: components["responses"]["Error"];
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/auth/password/finish": {
         parameters: {
             query?: never;
@@ -439,6 +549,49 @@ export interface paths {
                 409: components["responses"]["Error"];
             };
         };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/security-events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Recent sign-ins to my account (30 days, newest first); only the kind and time */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            events?: {
+                                id: components["schemas"]["Id"];
+                                /** @enum {string} */
+                                kind: "sign_in";
+                                /** Format: date-time */
+                                createdAt: string;
+                            }[];
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
         post?: never;
         delete?: never;
         options?: never;

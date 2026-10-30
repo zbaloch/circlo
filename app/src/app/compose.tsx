@@ -181,7 +181,11 @@ export default function ComposeScreen() {
                 placeholderTextColor={palette.muted}
                 value={text}
                 onChangeText={setText}
-                className="min-h-24 text-lg text-ink dark:text-ink-dark"
+                // Android centres multiline text and pads it by default: start at the top, with no line height
+                // (Android adds it above the text). 4 pt puts the first line's centre on the 40 pt avatar's, as
+                // measured on screen; Android snaps the text, so 5 pt already lands about 5 pt too low.
+                textAlignVertical="top"
+                className="min-h-24 p-0 pt-1 text-lg text-ink dark:text-ink-dark"
               />
             </View>
           </View>

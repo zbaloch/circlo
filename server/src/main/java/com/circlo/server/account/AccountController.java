@@ -9,6 +9,7 @@ import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import java.sql.Timestamp;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -46,6 +47,21 @@ public class AccountController {
             throw ApiException.notFound();
         }
         return k;
+    }
+
+    // ---------- security events ----------
+
+    public record SecurityEvent(UUID id, String kind, Instant createdAt) {}
+
+    public record SecurityEvents(List<SecurityEvent> events) {}
+
+    /** Recent sign-ins to my account (30 days, newest first); each device shows the ones after its own sign-in. */
+    @GetMapping("/v1/security-events")
+    public SecurityEvents securityEvents(@AuthenticationPrincipal Jwt jwt) {
+        return new SecurityEvents(jdbc.query(
+                "SELECT id, kind, created_at FROM security_events WHERE user_id = ? AND created_at > ? ORDER BY created_at DESC LIMIT 20",
+                (rs, i) -> new SecurityEvent(Ids.uuid(rs.getBytes(1)), rs.getString(2), rs.getTimestamp(3).toInstant()),
+                me(jwt), Timestamp.from(Instant.now().minus(Duration.ofDays(30)))));
     }
 
     // ---------- key backups ----------
