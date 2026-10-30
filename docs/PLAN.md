@@ -46,7 +46,7 @@ The product is **Circlo** (domain `circlo.com`). Every project, package, databas
 | Containers and volume | `circlo-minio`, `circlo-minio-init`, volume `circlo-minio-data` |
 | **Expo / React Native app** | `name: "Circlo"`, `slug: "circlo"`, `scheme: "circlo"` (deep links `circlo://…`) |
 | npm package names | root workspace `circlo`, app package `@circlo/app` |
-| iOS bundle identifier | `com.circlo.app` |
+| iOS bundle identifier | `com.hellocirclo.app` (`com.circlo.app` was taken on Apple's side; owner decision 2026-10-31) |
 | Android application ID | `com.circlo.app` |
 | Universal / app links | `https://circlo.com/i/<token>` (friend invites), `https://circlo.com/.well-known/…` |
 | Keychain / Keystore service name | `com.circlo.app.keys` |
