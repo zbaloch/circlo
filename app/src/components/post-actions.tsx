@@ -6,6 +6,7 @@ import { blockUser } from '@/lib/blocks';
 import { audienceLabel } from '@/lib/circles';
 import { getPost, openViewer, putPost, removePost } from '@/lib/feed-store';
 import type { StoredAccount } from '@/lib/keystore';
+import { getMyName } from '@/lib/my-name';
 import { deletePost, type FeedPost } from '@/lib/posts';
 import { loadModerationKey } from '@/lib/report';
 import { setLiked, toggledLike } from '@/lib/thread';
@@ -13,7 +14,7 @@ import { showAlert } from '@/lib/dialog';
 
 /** Display name for an author: me, a friend's decrypted profile name, or a neutral fallback. Pure. */
 export function authorName(account: Pick<StoredAccount, 'userId' | 'handle'>, book: Pick<AddressBook, 'contacts'> | null, authorId: string) {
-  if (authorId === account.userId) return { name: account.handle, handle: account.handle };
+  if (authorId === account.userId) return { name: getMyName() ?? account.handle, handle: account.handle };
   const c = book?.contacts[authorId];
   return { name: c?.displayName || (c?.handle ? `@${c.handle}` : 'Someone'), handle: c?.handle };
 }

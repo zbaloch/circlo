@@ -18,7 +18,7 @@ import { syncMessaging } from '@/lib/messaging';
 import { dismissPost, retryPost, useOutbox } from '@/lib/outbox';
 import { offerPushNow, onPushActivity, registerForPush } from '@/lib/push';
 import type { FeedPost } from '@/lib/posts';
-import type { Connection } from '@/lib/friends';
+import { loadMyProfile, type Connection } from '@/lib/friends';
 import { useSession } from '@/lib/session';
 import { useConnections } from '@/lib/use-connections';
 import { Text } from '@/components/ui/text';
@@ -93,6 +93,8 @@ export default function HomeScreen() {
 
   const refresh = useCallback(async () => {
     if (!account) return;
+    // My display name for my own posts (cached by loadMyProfile).
+    await loadMyProfile(account).catch(() => null);
     setBook(await loadAddressBook(account).catch(() => null));
     await refreshFeed(account);
   }, [account]);

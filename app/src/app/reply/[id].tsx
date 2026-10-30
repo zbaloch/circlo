@@ -16,6 +16,7 @@ import { putPost, usePost } from '@/lib/feed-store';
 import { useSession } from '@/lib/session';
 import { MAX_REPLY_CHARS, sendReply, validateReply } from '@/lib/thread';
 import { relativeTime } from '@/lib/time';
+import { useNow } from '@/lib/use-now';
 import { usePalette } from '@/theme/use-palette';
 import { Spinner } from '@/components/ui/spinner';
 import { Text, TextInput } from '@/components/ui/text';
@@ -25,14 +26,20 @@ import { Text, TextInput } from '@/components/ui/text';
  * @handle", then my avatar and the text box. Opened from the reply icon on any post or the thread's reply bar.
  */
 export default function ReplyScreen() {
+  const now = useNow();
   const { id } = useLocalSearchParams<{ id: string }>();
   const session = useSession();
   const account = session.status === 'signedIn' ? session.account : null;
   const palette = usePalette();
   const post = usePost(id);
   const [book, setBook] = useState<AddressBook | null>(null);
-  const [text, setText] = useState('');
-  const [sending, setSending] = useState(false);
+  // Drawer screens stay mounted between visits, so the draft and the sending state belong to one post: a reply to
+  // another post starts empty.
+  const [draft, setDraft] = useState({ id, text: '' });
+  const [sendingId, setSendingId] = useState<string | null>(null);
+  const text = draft.id === id ? draft.text : '';
+  const setText = (t: string) => setDraft({ id, text: t });
+  const sending = sendingId === id;
 
   useFocusEffect(
     useCallback(() => {
@@ -50,14 +57,16 @@ export default function ReplyScreen() {
 
   const send = async () => {
     if (blocked) return;
-    setSending(true);
+    setSendingId(id);
     try {
       await sendReply(account, post, text);
       putPost({ ...post, replyCount: post.replyCount + 1 });
+      setText('');
+      setSendingId(null);
       router.back();
     } catch {
       showAlert('Couldn’t send reply', 'Check your connection and try again.');
-      setSending(false);
+      setSendingId(null);
     }
   };
 
@@ -90,7 +99,7 @@ export default function ReplyScreen() {
               <View className="flex-row items-center gap-1">
                 <Text numberOfLines={1} className="shrink text-[15px] font-bold text-ink dark:text-ink-dark">{author.name}</Text>
                 {author.handle ? <Text numberOfLines={1} className="shrink text-[15px] text-muted dark:text-muted-dark">@{author.handle}</Text> : null}
-                <Text className="text-[15px] text-muted dark:text-muted-dark">· {relativeTime(post.createdAtMs)}</Text>
+                <Text className="text-[15px] text-muted dark:text-muted-dark">· {relativeTime(post.createdAtMs, now)}</Text>
               </View>
               {post.text ? <PostText text={post.text} className="text-[15px] leading-5 text-ink dark:text-ink-dark" /> : null}
               <Text className="pt-3 text-[15px] text-muted dark:text-muted-dark">

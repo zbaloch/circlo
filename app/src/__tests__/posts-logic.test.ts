@@ -1,6 +1,6 @@
 import { kindName, matchMedia, type PickedMedia } from '@/lib/media';
 import { STARTER_CIRCLES } from '@/lib/addressbook';
-import { defaultAudience, validateDraft, type Draft } from '@/lib/posts';
+import { validateDraft, type Draft } from '@/lib/posts';
 import { relativeTime } from '@/lib/time';
 
 // Native modules don't load under jest; these tests cover the pure logic only.
@@ -40,15 +40,6 @@ describe('validateDraft', () => {
     expect(check({ text: 'a', media: [], audience: { kind: 'circles', ids: [1, 3] } })).toBeNull();
     expect(check({ text: 'a', media: [], audience: { kind: 'circles', ids: [] } })).not.toBeNull();
     expect(check({ text: 'a', media: [], audience: { kind: 'circles', ids: [7] } })).not.toBeNull();
-  });
-});
-
-describe('defaultAudience', () => {
-  it('remembers my last choice, and starts at Only me so nothing is shared by accident', () => {
-    expect(defaultAudience(book)).toEqual({ kind: 'onlyMe' });
-    expect(defaultAudience({ ...book, lastAudience: { kind: 'circles', ids: [2, 3] } })).toEqual({ kind: 'circles', ids: [2, 3] });
-    // A remembered circle that was deleted falls back to Only me.
-    expect(defaultAudience({ ...book, lastAudience: { kind: 'circles', ids: [7] } })).toEqual({ kind: 'onlyMe' });
   });
 });
 

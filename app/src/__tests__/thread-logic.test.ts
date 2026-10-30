@@ -1,5 +1,6 @@
 import { audienceBadge, authorName } from '@/components/post-actions';
 import { mergeIds } from '@/lib/feed-store';
+import { setMyName } from '@/lib/my-name';
 import type { FeedPost } from '@/lib/posts';
 import { toggledLike, validateReply } from '@/lib/thread';
 import { likersLine, linkParts, postsForTab, profileTabs } from '@/lib/view-logic';
@@ -46,6 +47,10 @@ describe('author names', () => {
   const book = { contacts: { b: { displayName: 'Bob', handle: 'bob' } as never, c: { handle: 'carol' } as never } };
   it('names me, friends by profile, and strangers neutrally', () => {
     expect(authorName(account, book, 'me').name).toBe('zaheer');
+    // Once my profile has loaded, my own posts show my display name.
+    setMyName('Zaheer B');
+    expect(authorName(account, book, 'me')).toEqual({ name: 'Zaheer B', handle: 'zaheer' });
+    setMyName(null);
     expect(authorName(account, book, 'b')).toEqual({ name: 'Bob', handle: 'bob' });
     expect(authorName(account, book, 'c').name).toBe('@carol');
     expect(authorName(account, book, 'x').name).toBe('Someone');

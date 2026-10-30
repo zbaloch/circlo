@@ -12,6 +12,7 @@ import { putPost, usePost } from '@/lib/feed-store';
 import { useSession } from '@/lib/session';
 import { deleteReply, fetchLikers, fetchReplies, type Reply } from '@/lib/thread';
 import { relativeTime } from '@/lib/time';
+import { useNow } from '@/lib/use-now';
 import { likersLine } from '@/lib/view-logic';
 import { Text } from '@/components/ui/text';
 import { showAlert } from '@/lib/dialog';
@@ -22,6 +23,7 @@ import { Spinner } from '@/components/ui/spinner';
  * its replies in order, and a "Post your reply" bar that opens the reply composer.
  */
 export default function ThreadScreen() {
+  const now = useNow();
   const { id } = useLocalSearchParams<{ id: string }>();
   const session = useSession();
   const account = session.status === 'signedIn' ? session.account : null;
@@ -103,7 +105,7 @@ export default function ThreadScreen() {
                 </Pressable>
                 <View className="flex-1 gap-1">
                   <Text className="text-sm text-muted dark:text-muted-dark">
-                    <Text className="font-bold text-ink dark:text-ink-dark">{name}</Text> · {relativeTime(item.createdAtMs)}
+                    <Text className="font-bold text-ink dark:text-ink-dark">{name}</Text> · {relativeTime(item.createdAtMs, now)}
                   </Text>
                   <Text className="text-base text-ink dark:text-ink-dark">{item.text}</Text>
                 </View>

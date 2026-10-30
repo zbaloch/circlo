@@ -19,6 +19,7 @@ import {
 } from './addressbook';
 import { equalBytes, fromB64, toB64, utf8, uuidFromRandom, uuidToBytes } from './bytes';
 import type { StoredAccount } from './keystore';
+import { setMyName } from './my-name';
 
 export const INVITE_HOST = 'https://circlo.com/i/';
 
@@ -80,7 +81,9 @@ export async function loadMyProfile(account: StoredAccount): Promise<Profile | n
   // The profile may still be sealed under the previous epoch while a rotation is finishing.
   const epoch = book.myEpochs.find((e) => e.epochId === blob.epochId);
   if (!epoch) return null;
-  return decryptProfile(account.userId, blob.epochId!, blob.ciphertext, epoch.profileKey);
+  const profile = decryptProfile(account.userId, blob.epochId!, blob.ciphertext, epoch.profileKey);
+  setMyName(profile.displayName);
+  return profile;
 }
 
 /** Encrypts the profile with the current epoch's profile key (only friends of this epoch can read it). */
@@ -96,6 +99,7 @@ export async function saveMyProfile(account: StoredAccount, profile: Profile): P
       body: { epochId: epoch.epochId, ciphertext: toB64(ciphertext), version },
     }),
   );
+  setMyName(profile.displayName);
 }
 
 function decryptProfile(userId: string, epochId: string, ciphertext: string, profileKey: string): Profile {

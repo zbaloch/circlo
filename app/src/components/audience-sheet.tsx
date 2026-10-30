@@ -1,9 +1,7 @@
 import { Icon } from '@/components/ui/icon';
-import { useState } from 'react';
-import { Modal, Pressable, ScrollView, View } from 'react-native';
+import { Modal, Pressable, View } from 'react-native';
 
 import { AudienceBadge, CircleBadge } from './circle-badge';
-import { Button } from '@/components/form';
 import type { AddressBook, Audience } from '@/lib/addressbook';
 import { audienceSize, circleDefs, membersOf, ONLY_ME, TO_EVERYONE } from '@/lib/circles';
 import { usePalette } from '@/theme/use-palette';
@@ -64,76 +62,53 @@ export function ChoiceRow({ badge, title, line, checked, multi = false, onPress 
 }
 
 /**
- * Who can see a post (PLAN.md 2A): Only me, Everyone, or any of my circles together. Author-only: readers never see
- * any of this, and the server can't tell one audience from another.
+ * Who can see a post (PLAN.md 2A): Only me, Everyone, or any of my circles together. Step 2 of compose shows it with
+ * nothing chosen, so the author picks an audience for every post. Author-only: readers never see any of this, and the
+ * server can't tell one audience from another.
  */
-export function AudienceSheet(props: {
-  visible: boolean;
+export function AudiencePicker({ book, selected, onChange }: {
   book: AddressBook;
-  selected: Audience;
-  onSelect: (audience: Audience) => void;
-  onClose: () => void;
+  selected: Audience | null;
+  onChange: (audience: Audience | null) => void;
 }) {
-  // The body mounts each time the sheet opens, so its circle choice starts from the current audience.
-  return (
-    <Sheet visible={props.visible} onClose={props.onClose} title="Who can see this?">
-      <AudienceChoices {...props} />
-    </Sheet>
-  );
-}
-
-function AudienceChoices({ book, selected, onSelect, onClose }: {
-  book: AddressBook;
-  selected: Audience;
-  onSelect: (audience: Audience) => void;
-  onClose: () => void;
-}) {
-  const [ids, setIds] = useState<number[]>(selected.kind === 'circles' ? selected.ids : []);
-  const pick = (a: Audience) => {
-    onSelect(a);
-    onClose();
+  const ids = selected?.kind === 'circles' ? selected.ids : [];
+  const toggle = (id: number) => {
+    const next = ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id].sort((a, b) => a - b);
+    onChange(next.length ? { kind: 'circles', ids: next } : null);
   };
-  const toggle = (id: number) => setIds((cur) => (cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id].sort((a, b) => a - b)));
   const circles = circleDefs(book);
   return (
     <>
-      <ScrollView>
-        <ChoiceRow
-          badge={<AudienceBadge book={book} audience={ONLY_ME} />}
-          title="Only me"
-          line="Only you"
-          checked={selected.kind === 'onlyMe' && ids.length === 0}
-          onPress={() => pick(ONLY_ME)}
-        />
-        <ChoiceRow
-          badge={<AudienceBadge book={book} audience={TO_EVERYONE} />}
-          title="Everyone"
-          line={audienceLine(book, TO_EVERYONE)}
-          checked={selected.kind === 'everyone' && ids.length === 0}
-          onPress={() => pick(TO_EVERYONE)}
-        />
-        {circles.length ? (
-          <Text className="px-5 pb-1 pt-4 text-xs font-semibold uppercase text-muted dark:text-muted-dark">
-            Circles · pick one or more
-          </Text>
-        ) : null}
-        {circles.map((c) => (
-          <ChoiceRow
-            key={c.id}
-            multi
-            badge={<CircleBadge book={book} id={c.id} />}
-            title={c.name}
-            line={people(membersOf(book, c.id).length)}
-            checked={ids.includes(c.id)}
-            onPress={() => toggle(c.id)}
-          />
-        ))}
-      </ScrollView>
-      {ids.length ? (
-        <View className="px-5 pt-3">
-          <Button label={`Share with ${people(audienceSize(book, { kind: 'circles', ids }))}`} onPress={() => pick({ kind: 'circles', ids })} />
-        </View>
+      <ChoiceRow
+        badge={<AudienceBadge book={book} audience={ONLY_ME} />}
+        title="Only me"
+        line="Only you"
+        checked={selected?.kind === 'onlyMe'}
+        onPress={() => onChange(ONLY_ME)}
+      />
+      <ChoiceRow
+        badge={<AudienceBadge book={book} audience={TO_EVERYONE} />}
+        title="Everyone"
+        line={audienceLine(book, TO_EVERYONE)}
+        checked={selected?.kind === 'everyone'}
+        onPress={() => onChange(TO_EVERYONE)}
+      />
+      {circles.length ? (
+        <Text className="px-5 pb-1 pt-4 text-xs font-semibold uppercase text-muted dark:text-muted-dark">
+          Circles · pick one or more
+        </Text>
       ) : null}
+      {circles.map((c) => (
+        <ChoiceRow
+          key={c.id}
+          multi
+          badge={<CircleBadge book={book} id={c.id} />}
+          title={c.name}
+          line={people(membersOf(book, c.id).length)}
+          checked={ids.includes(c.id)}
+          onPress={() => toggle(c.id)}
+        />
+      ))}
     </>
   );
 }
