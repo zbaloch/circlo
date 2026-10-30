@@ -1,6 +1,6 @@
 # app/ — @circlo/app (Expo SDK 58, React Native 0.88, TypeScript)
 
-- Expo dev builds (not Expo Go). `name: "Circlo"`, `slug: "circlo"`, `scheme: "circlo"`, bundle/package `com.circlo.app`
+- Expo dev builds (not Expo Go). `name: "Circlo"`, `slug: "circlo"`, `scheme: "circlo"`, iOS bundle ID `com.hellocirclo.app` (`com.circlo.app` was taken at Apple), Android package `com.circlo.app`
   (see `app.config.ts`).
 - **Expo changes every SDK: don't trust memory.** Check the versioned docs for SDK 58
   (https://docs.expo.dev/versions/v58.0.0/ and https://docs.expo.dev/llms.txt) before using an Expo/RN API.

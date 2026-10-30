@@ -22,7 +22,8 @@ const config: ExpoConfig = {
   icon: './assets/images/icon.png',
   userInterfaceStyle: 'automatic',
   ios: {
-    bundleIdentifier: 'com.circlo.app',
+    // com.circlo.app was already taken on Apple's side, so iOS uses com.hellocirclo.app (owner decision 2026-10-31).
+    bundleIdentifier: 'com.hellocirclo.app',
     ...(buildNumber ? { buildNumber } : {}),
     // Brand pack (ios/AppIcon.appiconset): the dotted "o" on white, plus dark and tinted (iOS 18) variants.
     icon: {
