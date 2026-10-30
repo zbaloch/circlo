@@ -4,7 +4,9 @@ import { usePreventScreenCapture } from 'expo-screen-capture';
 
 import { AuthScreen } from '@/components/auth-screen';
 import { Button, ErrorText, TextField, Title } from '@/components/form';
-import { describeError, MIN_PASSWORD, recover } from '@/lib/account';
+import { PasswordStrength } from '@/components/password-strength';
+import { describeError, recover } from '@/lib/account';
+import { checkPassword } from '@/lib/password-strength';
 import { useSession } from '@/lib/session';
 
 /** Recover with the 24-word phrase and choose a new password. */
@@ -18,6 +20,7 @@ export default function RecoverScreen() {
   const [confirm, setConfirm] = useState('');
   const [error, setError] = useState<string>();
   const [busy, setBusy] = useState(false);
+  const strength = checkPassword(password, handle);
 
   const submit = async () => {
     setError(undefined);
@@ -25,8 +28,8 @@ export default function RecoverScreen() {
       setError('Enter all 24 words, separated by spaces.');
       return;
     }
-    if (password.length < MIN_PASSWORD) {
-      setError(`Use at least ${MIN_PASSWORD} characters.`);
+    if (!strength.ok) {
+      setError(strength.problem ?? 'Choose a stronger password.');
       return;
     }
     if (password !== confirm) {
@@ -58,6 +61,7 @@ export default function RecoverScreen() {
       <TextField label="Handle" value={handle} onChangeText={setHandle} />
       <TextField label="Recovery phrase (24 words)" value={phrase} onChangeText={setPhrase} multiline numberOfLines={4} />
       <TextField label="New password" secureTextEntry value={password} onChangeText={setPassword} textContentType="newPassword" />
+      <PasswordStrength check={strength} empty={!password} />
       <TextField label="Confirm new password" secureTextEntry value={confirm} onChangeText={setConfirm} textContentType="newPassword" />
       <ErrorText>{error}</ErrorText>
       <Button size="lg" label="Recover" onPress={submit} loading={busy} />

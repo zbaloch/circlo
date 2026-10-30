@@ -74,6 +74,10 @@ final class FcmPushSender implements PushSender {
         return accessToken;
     }
 
+    static String body(Map<String, String> data) {
+        return "security".equals(data.get("type")) ? "New sign-in to your account. Open Circlo to review it." : "You have new activity";
+    }
+
     @Override
     public void send(String platform, byte[] token, Map<String, String> data) {
         if (!"android".equals(platform)) {
@@ -83,8 +87,8 @@ final class FcmPushSender implements PushSender {
             byte[] message = json.writeValueAsBytes(Map.of("message", Map.of(
                     "token", new String(token, StandardCharsets.UTF_8),
                     "data", data,
-                    // Always the same generic text: never names, previews or counts.
-                    "android", Map.of("priority", "high", "notification", Map.of("title", "Circlo", "body", "You have new activity")))));
+                    // Fixed generic texts: never names, previews or counts.
+                    "android", Map.of("priority", "high", "notification", Map.of("title", "Circlo", "body", body(data))))));
             http.send(HttpRequest.newBuilder(URI.create("https://fcm.googleapis.com/v1/projects/" + projectId + "/messages:send"))
                     .timeout(Duration.ofSeconds(10)).header("Authorization", "Bearer " + accessToken())
                     .header("Content-Type", "application/json").POST(HttpRequest.BodyPublishers.ofByteArray(message)).build(),

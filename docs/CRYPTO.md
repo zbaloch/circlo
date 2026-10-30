@@ -103,7 +103,17 @@ context               = "circlo/v1/opaque"
   cache entry, deleted on use or expiry). It contains the expected client MAC, so it must never be sent to the client.
 - The client's OPAQUE **`export_key`** (64 bytes) never leaves the device. It derives
   `backup_pw_key = HKDF(export_key, "circlo/v1/backup-password")`.
-- **Password change:** re-register with a new password (requires a valid session), re-encrypt the password backup.
+- **Password change:** prove the current password with an OPAQUE login bound to the session
+  (`/v1/auth/password/verify/*`; it opens the password backup on the phone), re-register with the new password, and
+  re-encrypt the backup. All other sessions are revoked.
+- **Lockout:** a wrong password fails in the client's `finish`, so the server can't see failures; it counts every login
+  start for a `handle_lookup` until one finishes. After 3, password login locks for 15 min, then 1 h, then 24 h (a day
+  without attempts resets). Unknown handles are throttled identically. Recovery (section 6.3) is never locked, and a
+  new password clears the lock.
+- **New sign-in alerts:** each successful password login records a `security_events` row (kind and time only) and
+  sends a content-free push; other devices show the ones after their own sign-in.
+- **Password strength** can only be checked on the phone (the server never sees the password): at least 12
+  characters, zxcvbn score >= 3, and not in a leaked-password blocklist (no composition rules, NIST SP 800-63B).
 
 ## 6. Key backup and recovery
 

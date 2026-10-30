@@ -15,6 +15,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.web.client.RestClient;
 
 /**
@@ -53,7 +54,8 @@ public abstract class IntegrationTest {
     }
 
     protected RestClient http() {
-        return RestClient.builder().baseUrl("http://localhost:" + port).build();
+        // The JDK client never retries on its own (Apache HttpClient would wait out a 429's Retry-After).
+        return RestClient.builder().requestFactory(new JdkClientHttpRequestFactory()).baseUrl("http://localhost:" + port).build();
     }
 
     /** POST/GET/PUT that never throws on error statuses; returns status and parsed JSON. */

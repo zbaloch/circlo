@@ -11,8 +11,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
+import org.springframework.http.ResponseEntity;
 
-/** Phase 3: signup, login, sessions, key backups, devices, identity keys, recovery, rate limits. */
+/** Phase 3: signup, login, sessions, key backups, devices, identity keys, recovery, login lockout, sign-in alerts. */
 class AuthFlowIT extends IntegrationTest {
 
     @Test
@@ -247,17 +248,122 @@ class AuthFlowIT extends IntegrationTest {
         assertThat(call("GET", "/v1/backups/whatever", null, a.accessToken).getStatusCode().value()).isEqualTo(404);
     }
 
-    @Test
-    void loginAttemptsPerHandleAreRateLimited() {
-        new TestApp(this, "jack_limited", "pw").register();
-        byte[][] login = TestClientNative.loginStart("pw".getBytes(StandardCharsets.UTF_8));
-        int limited = 0;
-        for (int i = 0; i < 12; i++) {
-            var r = call("POST", "/v1/auth/login/start", Map.of("handle", "jack_limited", "credentialRequest", login[0]), null);
-            if (r.getStatusCode().value() == 429) {
-                limited++;
-            }
+    /** One login with the wrong password: the start goes through, then the phone's OPAQUE finish fails. */
+    private ResponseEntity<Map<String, Object>> wrongPasswordAttempt(String handle) {
+        byte[] pw = "not the password".getBytes(StandardCharsets.UTF_8);
+        byte[][] login = TestClientNative.loginStart(pw);
+        var start = call("POST", "/v1/auth/login/start", Map.of("handle", handle, "credentialRequest", login[0]), null);
+        if (start.getStatusCode().value() == 200) {
+            assertThatThrownBy(() -> TestClientNative.loginFinish(login[1], pw, handle, b64(start.getBody().get("credentialResponse"))))
+                    .isInstanceOf(CoreException.class);
         }
-        assertThat(limited).isEqualTo(2);
+        return start;
+    }
+
+    @Test
+    void threeWrongPasswordsLockPasswordLoginButNotTheRecoveryPhrase() {
+        TestApp a = new TestApp(this, "jack_locked", "the right password").register();
+        assertThat(wrongPasswordAttempt(a.handle).getBody().get("attemptsLeft")).isEqualTo(2);
+        assertThat(wrongPasswordAttempt(a.handle).getBody().get("attemptsLeft")).isEqualTo(1);
+        var last = wrongPasswordAttempt(a.handle).getBody();
+        assertThat(last.get("attemptsLeft")).isEqualTo(0);
+        assertThat(((Number) last.get("lockSeconds")).longValue()).isBetween(890L, 900L);
+
+        // Locked for 15 minutes, even with the right password.
+        var locked = wrongPasswordAttempt(a.handle);
+        assertThat(locked.getStatusCode().value()).isEqualTo(429);
+        assertThat(locked.getBody().get("error")).isEqualTo("locked");
+        assertThat(((Number) locked.getBody().get("retryAfter")).longValue()).isBetween(800L, 900L);
+        assertThat(locked.getHeaders().getFirst("Retry-After")).isNotNull();
+        assertThatThrownBy(() -> new TestApp(this, a.handle, "the right password").login("the right password"))
+                .isInstanceOf(AssertionError.class);
+
+        // The recovery phrase still works, and setting a new password lifts the lock.
+        String recoveryToken = recoveryLogin(a);
+        resetPassword(a, recoveryToken, "a new strong password");
+        assertThat(new TestApp(this, a.handle, "x").login("a new strong password").getStatusCode().value()).isEqualTo(200);
+    }
+
+    @Test
+    void aSuccessfulLoginStartsTheCountAgain() {
+        TestApp a = new TestApp(this, "kate_retry", "kate's password").register();
+        wrongPasswordAttempt(a.handle);
+        wrongPasswordAttempt(a.handle);
+        assertThat(a.login("kate's password").getStatusCode().value()).isEqualTo(200);
+        assertThat(wrongPasswordAttempt(a.handle).getBody().get("attemptsLeft")).isEqualTo(2);
+    }
+
+    @Test
+    void unknownHandlesLockTheSameWay() {
+        for (int i = 0; i < 3; i++) {
+            assertThat(wrongPasswordAttempt("nobody_here").getStatusCode().value()).isEqualTo(200);
+        }
+        assertThat(wrongPasswordAttempt("nobody_here").getBody().get("error")).isEqualTo("locked");
+    }
+
+    @Test
+    void otherDevicesSeeANewSignIn() {
+        TestApp a = new TestApp(this, "liam_alert", "liam's password").register();
+        assertThat((List<?>) call("GET", "/v1/security-events", null, a.accessToken).getBody().get("events")).isEmpty();
+
+        TestApp phone2 = new TestApp(this, a.handle, "liam's password");
+        assertThat(phone2.login("liam's password").getStatusCode().value()).isEqualTo(200);
+
+        List<?> events = (List<?>) call("GET", "/v1/security-events", null, a.accessToken).getBody().get("events");
+        assertThat(events).hasSize(1);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> e = (Map<String, Object>) events.get(0);
+        assertThat(e.get("kind")).isEqualTo("sign_in");
+        assertThat(e.keySet()).containsExactlyInAnyOrder("id", "kind", "createdAt"); // nothing about the device or network
+        assertThat(call("GET", "/v1/security-events", null, null).getStatusCode().value()).isEqualTo(401);
+    }
+
+    @Test
+    void changingThePasswordProvesTheCurrentOneWithoutASignInAlert() {
+        TestApp a = new TestApp(this, "mia_change", "mia's old password").register();
+        byte[] current = "mia's old password".getBytes(StandardCharsets.UTF_8);
+
+        // Proving the current password needs this account's session, and the handle must be its own.
+        byte[][] login = TestClientNative.loginStart(current);
+        assertThat(call("POST", "/v1/auth/password/verify/start", Map.of("handle", a.handle, "credentialRequest", login[0]), null)
+                .getStatusCode().value()).isEqualTo(401);
+        TestApp other = new TestApp(this, "noah_other", "noah's password").register();
+        assertThat(call("POST", "/v1/auth/password/verify/start", Map.of("handle", other.handle, "credentialRequest", login[0]), a.accessToken)
+                .getStatusCode().value()).isEqualTo(403);
+
+        var start = call("POST", "/v1/auth/password/verify/start", Map.of("handle", a.handle, "credentialRequest", login[0]), a.accessToken);
+        assertThat(start.getStatusCode().value()).isEqualTo(200);
+        assertThat(start.getBody().get("attemptsLeft")).isEqualTo(2);
+        byte[][] fin = TestClientNative.loginFinish(login[1], current, a.handle, b64(start.getBody().get("credentialResponse")));
+        var verified = call("POST", "/v1/auth/password/verify/finish",
+                Map.of("loginId", start.getBody().get("loginId"), "handle", a.handle, "credentialFinalization", fin[0]), a.accessToken);
+        assertThat(verified.getStatusCode().value()).isEqualTo(204);
+        resetPassword(a, a.accessToken, "mia's new password");
+
+        // Her own password change is not "a new sign-in", and the new password works.
+        TestApp again = new TestApp(this, a.handle, "x");
+        assertThat(again.login("mia's new password").getStatusCode().value()).isEqualTo(200);
+        List<?> events = (List<?>) call("GET", "/v1/security-events", null, again.accessToken).getBody().get("events");
+        assertThat(events).hasSize(1); // only the login just above
+    }
+
+    private String recoveryLogin(TestApp a) {
+        var start = call("POST", "/v1/auth/recovery/start", Map.of("handle", a.handle), null);
+        UUID challengeId = UUID.fromString((String) start.getBody().get("challengeId"));
+        long expiresAt = ((Number) start.getBody().get("expiresAt")).longValue();
+        byte[] sig = TestClientNative.signRecoveryLogin(a.recoveryEntropy, Ids.bytes(a.userId), Ids.bytes(challengeId),
+                b64(start.getBody().get("nonce")), expiresAt);
+        var rec = call("POST", "/v1/auth/recovery/finish", Map.of("challengeId", challengeId.toString(), "signature", sig), null);
+        assertThat(rec.getStatusCode().value()).isEqualTo(200);
+        return (String) rec.getBody().get("accessToken");
+    }
+
+    private void resetPassword(TestApp a, String token, String password) {
+        byte[] pw = password.getBytes(StandardCharsets.UTF_8);
+        byte[][] reg = TestClientNative.registrationStart(pw);
+        var ps = call("POST", "/v1/auth/password/start", Map.of("handle", a.handle, "registrationRequest", reg[0]), token);
+        byte[][] fin = TestClientNative.registrationFinish(reg[1], pw, a.handle, b64(ps.getBody().get("registrationResponse")));
+        assertThat(call("POST", "/v1/auth/password/finish", Map.of("registrationUpload", fin[0], "passwordBackup", TestApp.fakeBackup("reset")), token)
+                .getStatusCode().value()).isEqualTo(200);
     }
 }

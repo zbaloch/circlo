@@ -16,6 +16,12 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 @RestControllerAdvice
 public class ApiExceptionHandler {
 
+    @ExceptionHandler(LockedException.class)
+    ResponseEntity<Map<String, Object>> locked(LockedException e) {
+        return ResponseEntity.status(e.status()).header("Retry-After", Long.toString(e.retryAfterSeconds()))
+                .body(Map.of("error", e.getMessage(), "retryAfter", e.retryAfterSeconds()));
+    }
+
     @ExceptionHandler(ApiException.class)
     ResponseEntity<Map<String, String>> api(ApiException e) {
         return ResponseEntity.status(e.status()).body(Map.of("error", e.getMessage()));
