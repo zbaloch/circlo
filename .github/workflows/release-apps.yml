@@ -143,9 +143,12 @@ jobs:
       - name: Build the Rust core for iOS
         working-directory: app/modules/circlo-core
         run: npm run ubrn:ios:release
+      # expo prebuild only warns when `pod install` fails, so check for the workspace here rather than failing later.
       - name: Generate the iOS project
         working-directory: app
-        run: npx expo prebuild --platform ios --clean
+        run: |
+          npx expo prebuild --platform ios --clean
+          test -d ios/Circlo.xcworkspace || { echo "::error::pod install failed (see the CocoaPods errors above)"; exit 1; }
       - name: App Store Connect API key
         env:
           ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
@@ -177,8 +180,18 @@ jobs:
             <key>destination</key><string>export</string>
           </dict></plist>
           EOF
-          xcodebuild -exportArchive -archivePath "$RUNNER_TEMP/Circlo.xcarchive" \
-            -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" -exportPath "$RUNNER_TEMP/export" "${auth[@]}"
+          if ! xcodebuild -exportArchive -archivePath "$RUNNER_TEMP/Circlo.xcarchive" \
+            -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" -exportPath "$RUNNER_TEMP/export" "${auth[@]}"; then
+            # xcodebuild prints only a summary; the reason is in its distribution logs. Show the error lines, never
+            # lines that could carry an App Store Connect token (this repo's logs are public).
+            echo "::group::Distribution log errors"
+            find "${TMPDIR:-/tmp}" -name 'IDEDistribution*.log' -path '*.xcdistributionlogs/*' 2>/dev/null | while read -r f; do
+              grep -iE 'error|fail|reason|detail|not available|already|permission|forbidden|profile|certificate' "$f" \
+                | grep -viE 'authorization|bearer|eyJ[A-Za-z0-9_-]{10,}' | cut -c1-400 | head -80
+            done
+            echo "::endgroup::"
+            exit 1
+          fi
       - name: Upload to TestFlight
         if: inputs.testflight
         env:
