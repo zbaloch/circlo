@@ -22,7 +22,7 @@ the build if a column for identity or tracking data is ever added, and the leake
 |---|---|---|
 | Account | Random id, keyed HMAC of the handle (not the handle), OPAQUE record, signup time | Log in, and let friends find you if you opt in |
 | Keys | Public keys; private keys only inside backups encrypted on the phone | Friends verify you; you can recover your account with your 24 words |
-| Devices | Random id, public key, push token (encrypted with a server key), created/revoked times | Deliver to and revoke your phones |
+| Devices | Random id, public key, created/revoked times; if background checks are on, a hash of the device's check token | Deliver to and revoke your phones; answer "anything new?" with counts |
 | Sign-ins | The time of each password login (no device, place or address), kept 30 days | Warn your other phones: "New sign-in to your account" |
 | Login lock | Per keyed handle hash: failed-attempt count and lock time, deleted a week after the last attempt (and on success) | Lock password login after 3 wrong passwords (15 min, 1 h, then 24 h) |
 | Friends and blocks | Pairs of random ids, status, time | Who can fetch whose (encrypted) posts |
@@ -35,7 +35,8 @@ Deleting an account removes all of it: every row, and every file in the bucket.
 
 ## Who else sees something
 
-- **Apple / Google push**: that a device got a "new activity" notification. No content, names or counts.
+- **Apple / Google: nothing.** There is no remote push (owner decision 2026-10-30). A phone that opts in checks Circlo
+  itself in the background and shows a local notification with counts; Apple's and Google's servers aren't involved.
 - **The hosting provider and the storage (S3) provider** see IP addresses of connections at the network level. Our
   code doesn't record them, but their logs might (see the deployment rules below).
 
@@ -49,5 +50,5 @@ These keep the guarantee true outside our code:
    the media bucket.
 3. **No APM or analytics agents** on the server (they capture IPs and request data by default).
 4. **Database backups are encrypted.** They hold only ciphertext and hashes, but they also hold the social graph.
-5. Keep the server's secrets (OPAQUE setup, handle/JWT/push keys) in a secret store, separate from database
+5. Keep the server's secrets (OPAQUE setup, handle and JWT keys) in a secret store, separate from database
    backups.

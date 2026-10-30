@@ -105,14 +105,6 @@ public class CircloCore {
         return safe(() -> CircloCoreNative.verifyDeviceCertificate(identityPk, userId, deviceId, devicePk, signature));
     }
 
-    public byte[] sealPushToken(byte[] key, byte[] deviceId, byte[] token) {
-        return CircloCoreNative.sealPushToken(key, deviceId, token);
-    }
-
-    public byte[] openPushToken(byte[] key, byte[] deviceId, byte[] ciphertext) {
-        return CircloCoreNative.openPushToken(key, deviceId, ciphertext);
-    }
-
     private static boolean safe(BooleanSupplier check) {
         try {
             return check.getAsBoolean();

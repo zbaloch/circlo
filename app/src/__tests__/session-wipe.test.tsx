@@ -12,7 +12,9 @@ jest.mock('@/lib/addressbook', () => ({ resetAddressBookCache: () => mockCalls.p
 jest.mock('@/lib/feed-store', () => ({ clearFeed: () => mockCalls.push('feed') }));
 jest.mock('@/lib/media', () => ({ clearMediaCache: () => mockCalls.push('media') }));
 jest.mock('@/lib/messaging', () => ({ clearMessaging: async () => void mockCalls.push('messaging') }));
-jest.mock('@/lib/push', () => ({ resetPush: () => mockCalls.push('push') }));
+jest.mock('@/lib/background-check', () => ({ stopLocally: async () => void mockCalls.push('backgroundChecks') }));
+jest.mock('@/lib/activity', () => ({ forgetActivity: async (id: string) => void mockCalls.push(`activity:${id}`) }));
+jest.mock('@/lib/security-events', () => ({ forgetSignIns: async (id: string) => void mockCalls.push(`signIns:${id}`) }));
 jest.mock('@/lib/outbox', () => ({ clearOutbox: () => mockCalls.push('outbox') }));
 jest.mock('@/lib/use-connections', () => ({ forgetConnections: async (id: string) => void mockCalls.push(`connections:${id}`) }));
 jest.mock('@/api/client', () => {
@@ -45,7 +47,7 @@ function Status() {
   return <Text>{useSession().status}</Text>;
 }
 
-const EVERYTHING = ['account', 'accessToken', 'addressBook', 'outbox', 'feed', 'push', 'connections:u1', 'messaging', 'media'];
+const EVERYTHING = ['account', 'accessToken', 'addressBook', 'outbox', 'feed', 'backgroundChecks', 'connections:u1', 'signIns:u1', 'activity:u1', 'messaging', 'media'];
 
 describe('session ended by the server', () => {
   beforeEach(() => {

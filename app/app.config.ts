@@ -1,7 +1,7 @@
 import type { ExpoConfig } from 'expo/config';
 
-// Names and identifiers follow docs/PLAN.md section 0A. Secrets never go here: signing keys, push keys and
-// google-services.json come from EAS credentials / EAS file environment variables.
+// Names and identifiers follow docs/PLAN.md section 0A. Secrets never go here: signing keys come from EAS credentials or
+// the release workflow's secrets. There is no remote push, so no APNs key or google-services.json.
 // Development builds talk to the local server over plain HTTP (LAN / emulator). Release builds are HTTPS-only.
 const isDev = process.env.APP_VARIANT !== 'production';
 // Release builds pin the API host's keys; host and pins come from EAS environment variables (plugins/pinning.js).
@@ -63,8 +63,10 @@ const config: ExpoConfig = {
       },
     ],
     ['expo-video', { supportsPictureInPicture: false, supportsBackgroundPlayback: false }],
-    // Push carries no content; FCM/APNs credentials come from EAS, never the repo.
-    ['expo-notifications', { icon: './assets/images/notification-icon.png', color: colors.brand.accent }],
+    // Local notifications only (lib/background-check): no remote push, so no APNs entitlement and no FCM.
+    ['expo-notifications', { icon: './assets/images/notification-icon.png', color: colors.brand.accent, enableRemoteNotifications: false }],
+    // Background checks for new activity (iOS BGTaskScheduler, Android WorkManager).
+    'expo-background-task',
     // The wordmark: gray-900 with a sky-500 dot on white; white with a sky-400 dot on gray-950 in dark mode.
     [
       'expo-splash-screen',

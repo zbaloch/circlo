@@ -42,19 +42,11 @@ public class ThreadController {
     private final JdbcTemplate jdbc;
     private final PostAccess access;
     private final RateLimiter limiter;
-    private final com.circlo.server.push.PushService push;
 
-    public ThreadController(JdbcTemplate jdbc, PostAccess access, RateLimiter limiter, com.circlo.server.push.PushService push) {
+    public ThreadController(JdbcTemplate jdbc, PostAccess access, RateLimiter limiter) {
         this.jdbc = jdbc;
         this.access = access;
         this.limiter = limiter;
-        this.push = push;
-    }
-
-    private void notifyAuthor(byte[] me, byte[] author) {
-        if (!java.util.Arrays.equals(me, author)) {
-            push.notifyUser(author);
-        }
     }
 
     private static byte[] me(Jwt jwt) {
@@ -83,13 +75,12 @@ public class ThreadController {
     public Map<String, Object> reply(@AuthenticationPrincipal Jwt jwt, @PathVariable("postId") UUID postId,
             @RequestHeader(value = READ_TOKEN, required = false) String readToken, @Valid @RequestBody NewReply r) {
         byte[] me = me(jwt);
-        byte[] author = readableAuthor(me, postId, readToken);
+        readableAuthor(me, postId, readToken);
         if (!limiter.tryAcquire("replies", me, 120, 60_000)) {
             throw new ApiException(HttpStatus.TOO_MANY_REQUESTS, "rate_limited");
         }
         jdbc.update("INSERT INTO post_replies (id, post_id, author_id, ciphertext, created_at) VALUES (?, ?, ?, ?, ?)",
                 Ids.bytes(r.replyId()), Ids.bytes(postId), me, r.ciphertext(), Timestamp.from(Instant.now()));
-        notifyAuthor(me, author);
         return Map.of("replyId", r.replyId());
     }
 
@@ -127,12 +118,9 @@ public class ThreadController {
     public Map<String, String> like(@AuthenticationPrincipal Jwt jwt, @PathVariable("postId") UUID postId,
             @RequestHeader(value = READ_TOKEN, required = false) String readToken) {
         byte[] me = me(jwt);
-        byte[] author = readableAuthor(me, postId, readToken);
-        int added = jdbc.update("INSERT IGNORE INTO post_likes (post_id, liker_id, created_at) VALUES (?, ?, ?)", Ids.bytes(postId), me,
+        readableAuthor(me, postId, readToken);
+        jdbc.update("INSERT IGNORE INTO post_likes (post_id, liker_id, created_at) VALUES (?, ?, ?)", Ids.bytes(postId), me,
                 Timestamp.from(Instant.now()));
-        if (added == 1) {
-            notifyAuthor(me, author);
-        }
         return Map.of("status", "liked");
     }
 

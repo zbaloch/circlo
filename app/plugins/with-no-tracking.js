@@ -10,6 +10,8 @@ const BLOCKED_PERMISSIONS = [
   'android.permission.ACCESS_ADSERVICES_AD_ID',
   'android.permission.ACCESS_ADSERVICES_ATTRIBUTION',
   'android.permission.ACCESS_ADSERVICES_TOPICS',
+  // There is no remote push (notifications are local, from background checks), so Google's push receiver isn't needed.
+  'com.google.android.c2dm.permission.RECEIVE',
 ];
 
 /** Adds tools:node="remove" entries so the merged manifest drops these permissions. Pure; exported for tests. */

@@ -5,12 +5,13 @@ import { Pressable, ScrollView, View } from 'react-native';
 import { Button, ErrorText } from '@/components/form';
 import { authorName } from '@/components/post-actions';
 import { Icon } from '@/components/ui/icon';
+import { Toggle } from '@/components/ui/toggle';
 import { describeError } from '@/lib/account';
 import { loadAddressBook, type AddressBook } from '@/lib/addressbook';
 import { refreshBlocked, unblockUser, useBlocked } from '@/lib/blocks';
 import { LINKS, openLink } from '@/lib/links';
 import { useIntegrityWarning } from '@/lib/device-integrity';
-import { enablePush, pushPermission, type PushPermission } from '@/lib/push';
+import { backgroundChecksOn, disableBackgroundChecks, enableBackgroundChecks, notificationPermission } from '@/lib/background-check';
 import { deleteAccount, exportMyData } from '@/lib/safety';
 import { useSession } from '@/lib/session';
 import { usePalette } from '@/theme/use-palette';
@@ -29,14 +30,19 @@ export default function SettingsScreen() {
   const [exporting, setExporting] = useState<string | null>(null);
   const [confirm, setConfirm] = useState('');
   const [deleting, setDeleting] = useState(false);
-  const [push, setPush] = useState<PushPermission | null>(null);
+  // Background checks: on, off, or off because notifications are blocked in the phone's settings.
+  const [checks, setChecks] = useState<'on' | 'off' | 'blocked' | null>(null);
+  const loadChecks = useCallback(async () => {
+    if (await backgroundChecksOn()) return setChecks('on');
+    setChecks((await notificationPermission()) === 'blocked' ? 'blocked' : 'off');
+  }, []);
 
   useFocusEffect(
     useCallback(() => {
       refreshBlocked().catch((e) => setError(describeError(e)));
-      pushPermission().then(setPush, () => {});
+      loadChecks().catch(() => {});
       if (account) loadAddressBook(account).then(setBook, () => {});
-    }, [account]),
+    }, [account, loadChecks]),
   );
 
   if (!account) return null;
@@ -75,17 +81,26 @@ export default function SettingsScreen() {
   return (
     <ScrollView className="flex-1 bg-surface dark:bg-surface-dark" contentContainerClassName="pb-10" keyboardShouldPersistTaps="handled">
       <Section title="Notifications">
-        {push === 'on' ? <Row title="Notifications are on" subtitle={PUSH_NOTE} /> : null}
-        {push === 'ask' || push === 'blocked' ? (
-          <Row title="Notifications are off" subtitle={push === 'blocked' ? `Turn them on in your phone’s settings. ${PUSH_NOTE}` : PUSH_NOTE}>
-            <Pressable
-              accessibilityRole="button"
-              onPress={() => enablePush(account).then(setPush, (e) => setError(describeError(e)))}
-              className="rounded-full bg-primary px-4 py-1.5 active:bg-primary-pressed dark:bg-primary-dark dark:active:bg-primary-pressed-dark">
-              <Text className="text-sm font-bold text-on-primary dark:text-on-primary-dark">{push === 'blocked' ? 'Open settings' : 'Turn on'}</Text>
-            </Pressable>
-          </Row>
-        ) : null}
+        <Row
+          title="Check for new activity in the background"
+          subtitle={checks === 'blocked' ? `Notifications are blocked in your phone’s settings. ${CHECKS_NOTE}` : CHECKS_NOTE}>
+          {checks === null ? null : (
+            <Toggle
+              accessibilityLabel="Check for new activity in the background"
+              value={checks === 'on'}
+              onValueChange={async (on) => {
+                setError(undefined);
+                try {
+                  if (on) await enableBackgroundChecks(account);
+                  else await disableBackgroundChecks(account);
+                } catch (e) {
+                  setError(describeError(e));
+                }
+                await loadChecks();
+              }}
+            />
+          )}
+        </Row>
       </Section>
 
       <Section title="Password">
@@ -159,7 +174,8 @@ export default function SettingsScreen() {
   );
 }
 
-const PUSH_NOTE = 'They only say there’s something new, never who or what.';
+const CHECKS_NOTE =
+  'Your phone asks Circlo now and then and shows how many new things there are. Nothing goes through Apple or Google. Your phone decides when to check, so it can take a while.';
 
 /** A settings group: small heading, rows separated by a hairline (X style). */
 function Section({ title, children }: { title: string; children: ReactNode }) {

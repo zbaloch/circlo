@@ -23,6 +23,12 @@ export function unseenSignIns(events: SignIn[], seenAt: string | null): { unseen
   return { unseen: after, marker: seenAt };
 }
 
+/** Every sign-in of the last 30 days, newest first, for the Notifications tab. */
+export async function listSignIns(): Promise<SignIn[]> {
+  const res = ok(await api.GET('/v1/security-events'));
+  return (res.events ?? []).filter((e) => e.kind === 'sign_in').map((e) => ({ id: e.id, createdAt: e.createdAt }));
+}
+
 /** Sign-ins this phone hasn't shown yet. */
 export async function newSignIns(account: StoredAccount): Promise<SignIn[]> {
   const res = ok(await api.GET('/v1/security-events'));

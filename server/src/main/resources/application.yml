@@ -31,13 +31,7 @@ circlo:
   secrets:
     opaque-server-setup: ${CIRCLO_OPAQUE_SERVER_SETUP:}
     handle-key: ${CIRCLO_HANDLE_KEY:}
-    push-token-key: ${CIRCLO_PUSH_TOKEN_KEY:}
     jwt-key: ${CIRCLO_JWT_KEY:}
-  # FCM HTTP v1 for content-free pushes; both empty = push off.
-  push:
-    fcm:
-      project-id: ${CIRCLO_FCM_PROJECT_ID:}
-      service-account: ${CIRCLO_FCM_SERVICE_ACCOUNT:}
   # Operator's moderation public key (core CLI: circlo-moderation keygen). The secret half stays offline. Empty = the
   # app hides Report.
   moderation:

@@ -605,7 +605,7 @@ On the device:
 ### Phase 10: Multi-device and push
 - Link a new device by scanning a QR code from an existing one (encrypted transfer).
 - Revoke devices.
-- Push via APNs/FCM with **no content**: "new activity", then the app fetches and decrypts. On iOS, a Notification Service Extension can decrypt a preview locally.
+- ~~Push via APNs/FCM with no content~~ **Replaced (owner decision 2026-10-30): no remote push at all.** The Notifications tab lists requests, replies, likes and sign-ins; phones that opt in check in the background (expo-background-task) with a counts-only check token and show local notifications. Apple and Google learn nothing about anyone's activity.
 
 **Done when:** linking and revoking work, and a push payload captured in tests contains no content or names.
 

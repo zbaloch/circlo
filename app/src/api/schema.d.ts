@@ -2204,7 +2204,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/devices/{deviceId}/push-token": {
+    "/v1/devices/{deviceId}/check-token": {
         parameters: {
             query?: never;
             header?: never;
@@ -2214,8 +2214,9 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /** Register this device's push token (stored sealed; pushes carry no content) */
-        put: {
+        put?: never;
+        /** Turn on background checks for this device (replaces any earlier check token) */
+        post: {
             parameters: {
                 query?: never;
                 header?: never;
@@ -2224,15 +2225,33 @@ export interface paths {
                 };
                 cookie?: never;
             };
-            requestBody: {
-                content: {
-                    "application/json": {
-                        token: string;
-                        /** @enum {string} */
-                        platform: "android" | "ios";
+            requestBody?: never;
+            responses: {
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** @description Only for GET /v1/activity/pending (X-Circlo-Check-Token) */
+                            token: string;
+                        };
                     };
                 };
+                404: components["responses"]["Error"];
             };
+        };
+        /** Turn off background checks for this device */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    deviceId: components["schemas"]["Id"];
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
             responses: {
                 200: {
                     headers: {
@@ -2242,9 +2261,101 @@ export interface paths {
                         "application/json": Record<string, never>;
                     };
                 };
-                404: components["responses"]["Error"];
             };
         };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/activity": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Replies and likes by other people on my posts, newest first (people I blocked are left out) */
+        get: {
+            parameters: {
+                query?: {
+                    before?: string;
+                    limit?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            items: {
+                                /** @enum {string} */
+                                kind: "reply" | "like";
+                                postId: components["schemas"]["Id"];
+                                actorId: components["schemas"]["Id"];
+                                replyId?: components["schemas"]["Id"];
+                                /** Format: date-time */
+                                createdAt: string;
+                            }[];
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/activity/pending": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Counts of new activity since a time, for a background check (no session; the device's check token) */
+        get: {
+            parameters: {
+                query: {
+                    since: string;
+                };
+                header: {
+                    "X-Circlo-Check-Token": string;
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            requests: number;
+                            replies: number;
+                            likes: number;
+                            messages: number;
+                            signIns: number;
+                        };
+                    };
+                };
+                401: components["responses"]["Error"];
+                429: components["responses"]["Error"];
+            };
+        };
+        put?: never;
         post?: never;
         delete?: never;
         options?: never;

@@ -7,4 +7,4 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * They live outside the database (CRYPTO.md section 13) and none of them can decrypt user content.
  */
 @ConfigurationProperties("circlo.secrets")
-public record SecretsProperties(String opaqueServerSetup, String handleKey, String pushTokenKey, String jwtKey) {}
+public record SecretsProperties(String opaqueServerSetup, String handleKey, String jwtKey) {}

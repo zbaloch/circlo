@@ -4,7 +4,6 @@ import com.circlo.server.config.AuthProperties;
 import com.circlo.server.config.ServerSecrets;
 import com.circlo.server.crypto.CoreException;
 import com.circlo.server.crypto.CircloCore;
-import com.circlo.server.push.PushService;
 import com.circlo.server.web.ApiException;
 import com.circlo.server.web.Ids;
 import com.circlo.server.web.LockedException;
@@ -38,11 +37,10 @@ public class AuthService {
     private final TokenService tokens;
     private final RateLimiter limiter;
     private final LoginThrottle throttle;
-    private final PushService push;
     private final Clock clock = Clock.systemUTC();
 
     public AuthService(CircloCore core, ServerSecrets secrets, AuthProperties props, JdbcTemplate jdbc,
-            TokenService tokens, RateLimiter limiter, LoginThrottle throttle, PushService push) {
+            TokenService tokens, RateLimiter limiter, LoginThrottle throttle) {
         this.core = core;
         this.secrets = secrets;
         this.props = props;
@@ -50,7 +48,6 @@ public class AuthService {
         this.tokens = tokens;
         this.limiter = limiter;
         this.throttle = throttle;
-        this.push = push;
     }
 
     // ---------- helpers ----------
@@ -182,10 +179,9 @@ public class AuthService {
         Handle h = handle(rawHandle);
         UserRow u = verifyLogin(loginId, h, finalization);
         throttle.clear(h.lookup());
-        // Tell the account's other devices (the new one has no device row yet), with no detail about this one.
+        // Shown on the account's other devices ("New sign-in"), with no detail about this one.
         jdbc.update("INSERT INTO security_events (id, user_id, kind, created_at) VALUES (?, ?, 'sign_in', ?)",
                 Ids.bytes(Ids.newId()), u.id(), Timestamp.from(clock.instant()));
-        push.notifyUserSecurity(u.id());
         return tokens.issue(Ids.uuid(u.id()), TokenService.Scope.full);
     }
 

@@ -14,9 +14,8 @@ import { Screen } from '@/components/screen';
 import { loadAddressBook, type AddressBook } from '@/lib/addressbook';
 import { resumePendingRotation } from '@/lib/circles';
 import { checkForNewPosts, loadMoreFeed, refreshFeed, showPendingPosts, useFeed } from '@/lib/feed-store';
-import { syncMessaging } from '@/lib/messaging';
 import { dismissPost, retryPost, useOutbox } from '@/lib/outbox';
-import { offerPushNow, onPushActivity, registerForPush } from '@/lib/push';
+import { offerBackgroundChecksNow, onNotificationOpened } from '@/lib/background-check';
 import type { StoredAccount } from '@/lib/keystore';
 import { newSignIns } from '@/lib/security-events';
 import type { FeedPost } from '@/lib/posts';
@@ -86,17 +85,12 @@ export default function HomeScreen() {
     if (account) resumePendingRotation(account).catch(() => {});
   }, [account]);
 
-  // Content-free pushes: register once, and on "new activity" just fetch and decrypt as usual. If notifications
-  // haven't been asked about yet, Circlo's own screen asks first; the system popup only follows a "yes" there.
+  // No remote push: if notifications haven't been asked about yet, Circlo's own screen offers background checks first
+  // (the system popup only follows a "yes" there). Tapping one of their notifications opens the Notifications tab.
   useEffect(() => {
     if (!account) return;
-    registerForPush(account);
-    offerPushNow().then((offer) => offer && router.push('/enable-notifications'));
-    return onPushActivity(() => {
-      checkForNewPosts(account);
-      syncMessaging(account).catch(() => {});
-      checkSignIns(account);
-    });
+    offerBackgroundChecksNow().then((offer) => offer && router.push('/enable-notifications'));
+    return onNotificationOpened(() => router.navigate('/notifications'));
   }, [account]);
 
   const refresh = useCallback(async () => {

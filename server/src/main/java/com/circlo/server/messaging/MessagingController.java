@@ -4,7 +4,6 @@ import com.circlo.server.crypto.CoreException;
 import com.circlo.server.crypto.CircloCore;
 import com.circlo.server.posts.MediaSweeper;
 import com.circlo.server.posts.PostAccess;
-import com.circlo.server.push.PushService;
 import com.circlo.server.storage.MediaStore;
 import java.util.OptionalLong;
 import com.circlo.server.web.ApiException;
@@ -54,15 +53,13 @@ public class MessagingController {
     private final CircloCore core;
     private final PostAccess access;
     private final RateLimiter limiter;
-    private final PushService push;
     private final MediaStore store;
 
-    public MessagingController(JdbcTemplate jdbc, CircloCore core, PostAccess access, RateLimiter limiter, PushService push, MediaStore store) {
+    public MessagingController(JdbcTemplate jdbc, CircloCore core, PostAccess access, RateLimiter limiter, MediaStore store) {
         this.jdbc = jdbc;
         this.core = core;
         this.access = access;
         this.limiter = limiter;
-        this.push = push;
         this.store = store;
     }
 
@@ -335,10 +332,6 @@ public class MessagingController {
                         Ids.bytes(Ids.newId()), Ids.bytes(d), r.welcome(), now(), group, seq);
             }
         }
-        // Content-free push to every other device in the group (never the sender's own), except people who blocked me.
-        push.notifyDevices(jdbc.query("SELECT device_id FROM mls_group_members WHERE group_id = ? AND device_id <> ? "
-                + "AND user_id NOT IN (SELECT blocker_id FROM user_blocks WHERE blocked_id = ?)",
-                (rs, i) -> rs.getBytes(1), group, device, me));
         return Map.of("seq", seq);
     }
 
