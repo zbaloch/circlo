@@ -32,10 +32,11 @@ const config: ExpoConfig = {
       tinted: './assets/images/icon-ios-tinted.png',
     },
     supportsTablet: false,
-    // Circlo uses standard encryption algorithms of its own (core/: XChaCha20-Poly1305, X25519, Ed25519, MLS, OPAQUE),
-    // not only Apple's, so it declares non-exempt encryption. App Store Connect's export compliance answers (and, once
-    // Apple issues it, the ITSEncryptionExportComplianceCode here) cover it.
-    config: { usesNonExemptEncryption: true },
+    // Export compliance: Circlo uses standard encryption algorithms of its own (core/: XChaCha20-Poly1305, X25519,
+    // Ed25519, MLS, OPAQUE), not only Apple's. Until Apple approves the encryption documentation and issues a code,
+    // ITSAppUsesNonExemptEncryption is left out: declaring YES without ITSEncryptionExportComplianceCode makes App Store
+    // Connect reject the upload, while leaving it out means each build's encryption questions are answered in App Store
+    // Connect. With the code: config: { usesNonExemptEncryption: true } plus infoPlist ITSEncryptionExportComplianceCode.
     // Loopback is needed in every build: encrypted video plays through the core's 127.0.0.1 server.
     infoPlist: { NSAppTransportSecurity: { NSAllowsLocalNetworking: true } },
   },
