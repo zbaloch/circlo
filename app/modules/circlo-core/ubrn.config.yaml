@@ -9,4 +9,7 @@ jsi2:
   bundleIdPrefix: com.circlo
 android:
   directory: ./android
+  # Set here rather than as package.json codegenConfig: this module has no React Native codegen specs, and any
+  # codegenConfig makes RN's iOS codegen (and Android autolinking, with a name) expect them.
+  packageName: com.circlo.core
   apiLevel: 24
