@@ -7,7 +7,8 @@ import { clearAccount, loadAccount, updateRefreshToken, type StoredAccount } fro
 import { clearFeed } from './feed-store';
 import { clearMediaCache } from './media';
 import { clearMessaging } from './messaging';
-import { resetPush } from './push';
+import { forgetActivity } from './activity';
+import { stopLocally as stopBackgroundChecks } from './background-check';
 import { forgetSignIns } from './security-events';
 import { clearOutbox } from './outbox';
 import { forgetConnections } from './use-connections';
@@ -32,9 +33,10 @@ async function wipeDevice() {
   resetAddressBookCache();
   clearOutbox();
   clearFeed();
-  resetPush();
+  await stopBackgroundChecks();
   if (current) await forgetConnections(current.userId).catch(() => {});
   if (current) await forgetSignIns(current.userId);
+  if (current) await forgetActivity(current.userId);
   await clearMessaging().catch(() => {});
   try {
     clearMediaCache(); // decrypted photos must not outlive the session

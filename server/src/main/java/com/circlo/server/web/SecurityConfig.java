@@ -48,6 +48,8 @@ public class SecurityConfig {
                                 "/v1/auth/recovery/start", "/v1/auth/recovery/finish").permitAll()
                         // The new device picks up its sealed link hand-off before it has a session (single use, 10 min).
                         .requestMatchers(HttpMethod.GET, "/v1/device-links/*").permitAll()
+                        // Background checks: authenticated by the device's check token instead (ActivityController).
+                        .requestMatchers(HttpMethod.GET, "/v1/activity/pending").permitAll()
                         .requestMatchers("/dev/**").permitAll() // only exists in profile 'local'
                         .requestMatchers("/error").permitAll()
                         .requestMatchers(HttpMethod.GET, "/v1/backups/recovery").hasAnyAuthority("SCOPE_full", "SCOPE_recovery")
@@ -67,7 +69,8 @@ public class SecurityConfig {
         return request -> {
             String uri = request.getRequestURI();
             boolean publicAuth = uri.startsWith("/v1/auth/") && !uri.startsWith("/v1/auth/password");
-            return publicAuth || uri.startsWith("/v1/device-links/") ? null : standard.resolve(request);
+            boolean checkToken = uri.equals("/v1/activity/pending");
+            return publicAuth || checkToken || uri.startsWith("/v1/device-links/") ? null : standard.resolve(request);
         };
     }
 

@@ -1,6 +1,7 @@
 // The native core isn't available under jest; only pure helpers and the tab bar dot are tested here.
 jest.mock('@circlo/core', () => ({}));
-jest.mock('@/lib/push', () => ({ onPushActivity: () => () => {} }));
+jest.mock('@/lib/background-check', () => ({ markActiveNow: async () => {} }));
+jest.mock('@/lib/activity', () => ({ refreshActivity: async () => {} }));
 jest.mock('@/lib/session', () => ({ useSession: () => ({ status: 'signedOut' }) }));
 
 // eslint-disable-next-line import/first

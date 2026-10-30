@@ -6,12 +6,13 @@ import { AppState } from 'react-native';
 import { describeError } from './account';
 import { syncConnections, type Connection } from './friends';
 import type { StoredAccount } from './keystore';
-import { onPushActivity } from './push';
+import { refreshActivity } from './activity';
+import { markActiveNow } from './background-check';
 import { useSession } from './session';
 
 /**
  * Connections (requests + friends) shared by every screen, so the bell's dot, Notifications and Friends agree.
- * Refreshed when a screen gains focus, every POLL_MS while the app is open, and on (content-free) push activity.
+ * Refreshed when a screen gains focus and every POLL_MS while the app is open (there is no remote push).
  * Which requests I've already seen is kept on this device only, in the keystore.
  */
 const POLL_MS = 15_000;
@@ -109,23 +110,30 @@ export function useConnections() {
   };
 }
 
-/** Keeps connections fresh while signed in: a poll while the app is in the foreground, plus push activity. */
+/**
+ * Keeps connections and activity (replies and likes on my posts) fresh while signed in, with a poll while the app is
+ * in the foreground. Every switch to or from the foreground tells background checks the app was in use.
+ */
 export function useConnectionsSync() {
   const session = useSession();
   const account = session.status === 'signedIn' ? session.account : null;
   useEffect(() => {
     if (!account) return;
     const tick = () => {
-      if (AppState.currentState === 'active') void refreshConnections(account);
+      if (AppState.currentState !== 'active') return;
+      void refreshConnections(account);
+      refreshActivity(account).catch(() => {});
     };
     tick();
+    void markActiveNow();
     const timer = setInterval(tick, POLL_MS);
-    const appState = AppState.addEventListener('change', (s) => s === 'active' && tick());
-    const unsubscribePush = onPushActivity(tick);
+    const appState = AppState.addEventListener('change', (s) => {
+      void markActiveNow();
+      if (s === 'active') tick();
+    });
     return () => {
       clearInterval(timer);
       appState.remove();
-      unsubscribePush();
     };
   }, [account]);
 }

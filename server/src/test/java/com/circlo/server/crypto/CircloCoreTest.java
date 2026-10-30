@@ -108,17 +108,4 @@ class CircloCoreTest {
         assertThat(core.verifyRecoveryLogin(pk, userId, challenge, nonce, 1_900_000_000L, sig)).isTrue();
         assertThat(core.verifyRecoveryLogin(pk, userId, challenge, nonce, 1_900_000_001L, sig)).isFalse();
     }
-
-    @Test
-    void pushTokensAreSealed() {
-        byte[] key = random(32);
-        byte[] deviceId = random(16);
-        byte[] token = utf8("fcm-token-test-only");
-        byte[] ct = core.sealPushToken(key, deviceId, token);
-        assertThat(new String(ct, StandardCharsets.ISO_8859_1)).doesNotContain("fcm-token");
-        assertThat(core.openPushToken(key, deviceId, ct)).isEqualTo(token);
-        assertThatThrownBy(() -> core.openPushToken(key, random(16), ct))
-                .isInstanceOf(CoreException.class)
-                .hasMessage("DecryptionFailed");
-    }
 }

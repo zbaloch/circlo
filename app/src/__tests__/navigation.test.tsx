@@ -20,7 +20,9 @@ jest.mock('@/lib/circles', () => ({ resumePendingRotation: async () => false, la
 jest.mock('@/components/post-card', () => ({ PostCard: () => null, OutboxCard: () => null }));
 jest.mock('@/lib/posts', () => ({}));
 jest.mock('@/lib/outbox', () => ({ useOutbox: () => [] }));
-jest.mock('@/lib/push', () => ({ registerForPush: async () => {}, offerPushNow: async () => false, onPushActivity: () => () => {} }));
+jest.mock('@/lib/background-check', () => ({ offerBackgroundChecksNow: async () => false, onNotificationOpened: () => () => {}, markActiveNow: async () => {} }));
+jest.mock('@/lib/activity', () => ({ refreshActivity: async () => {}, useActivity: () => ({ items: null, unseen: 0 }) }));
+jest.mock('@/lib/security-events', () => ({ newSignIns: async () => [] }));
 jest.mock('@/lib/messaging', () => ({ useConversations: () => [], syncMessaging: async () => {}, unreadCount: () => 0 }));
 jest.mock('react-native-reanimated', () => ({
   __esModule: true,

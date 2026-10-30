@@ -915,24 +915,74 @@ paths:
         "200": { content: { application/json: { schema: { type: object } } } }
         "404": { $ref: "#/components/responses/Error" }
 
-  /v1/devices/{deviceId}/push-token:
+  /v1/devices/{deviceId}/check-token:
     parameters:
       - { name: deviceId, in: path, required: true, schema: { $ref: "#/components/schemas/Id" } }
-    put:
-      summary: Register this device's push token (stored sealed; pushes carry no content)
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [token, platform]
-              properties:
-                token: { type: string }
-                platform: { type: string, enum: [android, ios] }
+    post:
+      summary: Turn on background checks for this device (replaces any earlier check token)
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [token]
+                properties:
+                  token: { type: string, description: "Only for GET /v1/activity/pending (X-Circlo-Check-Token)" }
+        "404": { $ref: "#/components/responses/Error" }
+    delete:
+      summary: Turn off background checks for this device
       responses:
         "200": { content: { application/json: { schema: { type: object } } } }
-        "404": { $ref: "#/components/responses/Error" }
+
+  /v1/activity:
+    get:
+      summary: Replies and likes by other people on my posts, newest first (people I blocked are left out)
+      parameters:
+        - { name: before, in: query, schema: { type: string, format: date-time } }
+        - { name: limit, in: query, schema: { type: integer, default: 50, maximum: 100 } }
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      required: [kind, postId, actorId, createdAt]
+                      properties:
+                        kind: { type: string, enum: [reply, like] }
+                        postId: { $ref: "#/components/schemas/Id" }
+                        actorId: { $ref: "#/components/schemas/Id" }
+                        replyId: { $ref: "#/components/schemas/Id" }
+                        createdAt: { type: string, format: date-time }
+
+  /v1/activity/pending:
+    get:
+      summary: Counts of new activity since a time, for a background check (no session; the device's check token)
+      security: []
+      parameters:
+        - { name: since, in: query, required: true, schema: { type: string, format: date-time } }
+        - { name: X-Circlo-Check-Token, in: header, required: true, schema: { type: string } }
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [requests, replies, likes, messages, signIns]
+                properties:
+                  requests: { type: integer }
+                  replies: { type: integer }
+                  likes: { type: integer }
+                  messages: { type: integer }
+                  signIns: { type: integer }
+        "401": { $ref: "#/components/responses/Error" }
+        "429": { $ref: "#/components/responses/Error" }
 
   /v1/device-links:
     post:

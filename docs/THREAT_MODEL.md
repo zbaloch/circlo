@@ -5,7 +5,7 @@
 ## Headline guarantee
 
 **A full copy of the database and the S3 bucket reveals no content, no names, no emails, no handles, no profile data,
-no circle membership, no private keys and no push tokens, and does not allow offline password guessing.** The few
+no circle membership, no private keys and no push tokens (there are none), and does not allow offline password guessing.** The few
 server secrets (CRYPTO.md section 13) live outside the database and still cannot decrypt user content.
 
 ## Assets
@@ -44,7 +44,7 @@ circle numbers, circle labels, group names.
 | Integrity / tamper detection | AEAD with AAD bound to type, ids and version; STREAM detects truncation/reordering |
 | Authenticity | Ed25519 author signatures on posts/replies; HPKE Auth for friend payloads |
 | Login without revealing the password | OPAQUE (RFC 9807); the server never sees the password or anything guessable from a DB dump |
-| No PII at rest | No email/phone exists; handles stored only as keyed HMAC; profiles encrypted; push tokens sealed |
+| No PII at rest | No email/phone exists; handles stored only as keyed HMAC; profiles encrypted; no push tokens |
 | Audience hiding over time | Per-post `key_ref`; every circle change rotates the epoch for all friends |
 | Messaging FS / PCS | MLS (RFC 9420) |
 | Key-substitution detection | Safety numbers; pinned identity keys with change warnings |
@@ -69,7 +69,8 @@ circle numbers, circle labels, group names.
    handles become testable. Content stays encrypted.
 10. **Live server compromise:** an attacker running the server sees plaintext handles at login/lookup time and the
     request metadata above; still no content or keys.
-11. **Push delivery:** APNs/FCM see that a device got "new activity" pings; pushes carry no content.
+11. **No push delivery:** APNs and FCM aren't used, so Apple and Google can't time anyone's activity. Background checks
+    tell the Circlo server when a phone checks in (it already sees app use) and return counts only.
 12. **Media shape:** the server sees how many objects a post has, their kinds (full/thumb/poster) and padded sizes, so
     it can tell a photo post from a video post and roughly how long a video is.
 13. **Video encoder tags:** stripping removes container metadata (location, device, dates in `udta`/`meta`), but the

@@ -43,12 +43,10 @@ public class SocialController {
     private final JdbcTemplate jdbc;
     private final CircloCore core;
 
-    private final com.circlo.server.push.PushService push;
 
-    public SocialController(JdbcTemplate jdbc, CircloCore core, com.circlo.server.push.PushService push) {
+    public SocialController(JdbcTemplate jdbc, CircloCore core) {
         this.jdbc = jdbc;
         this.core = core;
-        this.push = push;
     }
 
     private static byte[] me(Jwt jwt) {
@@ -188,7 +186,6 @@ public class SocialController {
         jdbc.update("INSERT INTO friendships (id, user_a, user_b, status, created_at) VALUES (?, ?, ?, 'pending', ?)",
                 Ids.bytes(Ids.newId()), me, to, now());
         upsertPayload(me, to, r.epochId(), r.payload());
-        push.notifyUser(to); // content-free: "new activity"
         return Map.of("status", "outgoing");
     }
 

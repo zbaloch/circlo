@@ -37,8 +37,4 @@ final class CircloCoreNative {
 
     static native boolean verifyDeviceCertificate(
             byte[] identityPk, byte[] userId, byte[] deviceId, byte[] devicePk, byte[] sig);
-
-    static native byte[] sealPushToken(byte[] key, byte[] deviceId, byte[] token);
-
-    static native byte[] openPushToken(byte[] key, byte[] deviceId, byte[] ciphertext);
 }

@@ -7,13 +7,14 @@ import { CircloSymbol } from '@/components/circlo-mark';
 import { Button } from '@/components/form';
 import { Icon } from '@/components/ui/icon';
 import { Text } from '@/components/ui/text';
-import { dismissPushPrompt, enablePush } from '@/lib/push';
+import { dismissNotificationsPrompt, enableBackgroundChecks } from '@/lib/background-check';
 import { useSession } from '@/lib/session';
 import { usePalette } from '@/theme/use-palette';
 
 /**
  * Asks about notifications before the system popup, which iOS and Android show only once: the popup follows only a
- * "yes" here, and "Not now" leaves it unused so the user can still turn notifications on later from Settings.
+ * "yes" here, and "Not now" leaves it unused so the user can still turn them on later from Settings. There's no remote
+ * push: a "yes" turns on background checks, and the phone shows its own notifications (lib/background-check).
  */
 export default function EnableNotificationsScreen() {
   const session = useSession();
@@ -25,12 +26,12 @@ export default function EnableNotificationsScreen() {
   const enable = async () => {
     if (!account) return;
     setBusy(true);
-    await enablePush(account).catch(() => undefined);
-    dismissPushPrompt();
+    await enableBackgroundChecks(account).catch(() => undefined);
+    dismissNotificationsPrompt();
     close();
   };
   const notNow = () => {
-    dismissPushPrompt();
+    dismissNotificationsPrompt();
     close();
   };
 
@@ -39,16 +40,17 @@ export default function EnableNotificationsScreen() {
       <ScrollView contentContainerClassName="flex-grow justify-center gap-8 py-6" showsVerticalScrollIndicator={false}>
         <PhonePreview />
         <View className="gap-3">
-          <Text className="text-center text-3xl font-extrabold text-ink dark:text-ink-dark">Know when your people share</Text>
+          <Text className="text-center text-3xl font-extrabold text-ink dark:text-ink-dark">Know when something’s new</Text>
           <Text className="text-center text-base text-muted dark:text-muted-dark">
-            Get a nudge when someone posts to you, replies, likes or sends a message.
+            Circlo can check for new replies, likes, messages and requests now and then, and let you know.
           </Text>
         </View>
         <View className="flex-row gap-3 rounded-2xl bg-surface-raised p-4 dark:bg-surface-raised-dark">
           <Icon name="lock-closed-outline" size={20} color={palette.primary} />
           <Text className="flex-1 text-sm text-muted dark:text-muted-dark">
-            Notifications never say who or what. They only say there’s something new, and it stays encrypted until you
-            open Circlo.
+            Nothing goes through Apple or Google: your phone checks Circlo itself, and the notification only says how many
+            new things there are. Your phone decides when to check, so it can take a while; Circlo is always up to date
+            when you open it.
           </Text>
         </View>
       </ScrollView>
@@ -62,15 +64,15 @@ export default function EnableNotificationsScreen() {
   );
 }
 
-/** The top of a phone's lock screen with Circlo's notifications as they really look: no names, no content. */
+/** The top of a phone's lock screen with Circlo's notifications as they really look: counts only, no names or content. */
 function PhonePreview() {
   return (
     <View accessible={false} importantForAccessibility="no-hide-descendants" className="items-center">
       <View className="w-64 gap-2 overflow-hidden rounded-t-[44px] border-4 border-b-0 border-border bg-surface-raised px-3 pb-6 pt-8 dark:border-border-dark dark:bg-surface-raised-dark">
         <Text className="pb-2 text-center text-5xl font-bold text-ink dark:text-ink-dark">9:41</Text>
-        <NotificationCard when="now" />
+        <NotificationCard when="now" text="2 replies, 1 new message." />
         <View className="opacity-60">
-          <NotificationCard when="12m ago" />
+          <NotificationCard when="1h ago" text="1 friend request." />
         </View>
       </View>
       <View className="h-px w-72 bg-border dark:bg-border-dark" />
@@ -78,7 +80,7 @@ function PhonePreview() {
   );
 }
 
-function NotificationCard({ when }: { when: string }) {
+function NotificationCard({ when, text }: { when: string; text: string }) {
   return (
     <View className="flex-row items-center gap-3 rounded-2xl bg-surface p-3 dark:bg-surface-dark">
       <View className="h-9 w-9 items-center justify-center rounded-lg border border-border bg-surface dark:border-border-dark">
@@ -89,7 +91,7 @@ function NotificationCard({ when }: { when: string }) {
           <Text className="text-[13px] font-bold text-ink dark:text-ink-dark">Circlo</Text>
           <Text className="text-xs text-muted dark:text-muted-dark">{when}</Text>
         </View>
-        <Text className="text-[13px] text-ink dark:text-ink-dark">You have new activity</Text>
+        <Text className="text-[13px] text-ink dark:text-ink-dark">{text}</Text>
       </View>
     </View>
   );

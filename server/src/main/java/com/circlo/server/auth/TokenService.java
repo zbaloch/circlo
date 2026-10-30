@@ -101,7 +101,7 @@ public class TokenService {
                 Timestamp.from(clock.instant()), Ids.bytes(userId));
     }
 
-    static byte[] sha256(byte[] b) {
+    public static byte[] sha256(byte[] b) {
         try {
             return MessageDigest.getInstance("SHA-256").digest(b);
         } catch (NoSuchAlgorithmException e) {

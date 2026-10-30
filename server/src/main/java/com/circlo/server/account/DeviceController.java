@@ -1,7 +1,6 @@
 package com.circlo.server.account;
 
 import com.circlo.server.auth.TokenService;
-import com.circlo.server.push.PushService;
 import com.circlo.server.web.ApiException;
 import com.circlo.server.web.Ids;
 import jakarta.validation.Valid;
@@ -31,19 +30,17 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
-/** Phase 10: revoking devices, push-token registration, and the one-time device-link hand-off (CRYPTO.md 13b). */
+/** Phase 10: revoking devices and the one-time device-link hand-off (CRYPTO.md 13b). */
 @RestController
 public class DeviceController {
 
     static final Duration LINK_TTL = Duration.ofMinutes(10);
 
     private final JdbcTemplate jdbc;
-    private final PushService push;
     private final TokenService tokens;
 
-    public DeviceController(JdbcTemplate jdbc, PushService push, TokenService tokens) {
+    public DeviceController(JdbcTemplate jdbc, TokenService tokens) {
         this.jdbc = jdbc;
-        this.push = push;
         this.tokens = tokens;
     }
 
@@ -58,7 +55,7 @@ public class DeviceController {
     }
 
     /**
-     * Revokes one of my devices: it can no longer use messaging, gets no pushes, and its key packages and pending
+     * Revokes one of my devices: it can no longer use messaging or background checks, and its key packages and pending
      * welcomes are deleted. Its MLS leaves are removed from chats by the members' apps.
      */
     @DeleteMapping("/v1/devices/{deviceId}")
@@ -67,24 +64,11 @@ public class DeviceController {
         byte[] me = me(jwt);
         byte[] device = Ids.bytes(deviceId);
         requireMyDevice(me, device);
-        jdbc.update("UPDATE devices SET revoked_at = ?, push_token_enc = NULL, push_platform = NULL WHERE id = ?", Timestamp.from(Instant.now()), device);
+        jdbc.update("UPDATE devices SET revoked_at = ?, check_token_hash = NULL WHERE id = ?", Timestamp.from(Instant.now()), device);
         jdbc.update("DELETE FROM mls_group_members WHERE device_id = ?", (Object) device);
         jdbc.update("DELETE FROM mls_key_packages WHERE device_id = ?", (Object) device);
         jdbc.update("DELETE FROM mls_welcomes WHERE recipient_device_id = ?", (Object) device);
         return Map.of("status", "revoked");
-    }
-
-    public record PushToken(@NotNull @Size(min = 1, max = 4096) String token, @NotNull @Pattern(regexp = "android|ios") String platform) {}
-
-    /** Stores this device's push token sealed with CIRCLO_PUSH_TOKEN_KEY (the DB alone can't reveal it). */
-    @PutMapping("/v1/devices/{deviceId}/push-token")
-    public Map<String, String> pushToken(@AuthenticationPrincipal Jwt jwt, @PathVariable("deviceId") UUID deviceId, @Valid @RequestBody PushToken r) {
-        byte[] me = me(jwt);
-        byte[] device = Ids.bytes(deviceId);
-        requireMyDevice(me, device);
-        jdbc.update("UPDATE devices SET push_token_enc = ?, push_platform = ? WHERE id = ?",
-                push.sealToken(device, r.token().getBytes(StandardCharsets.UTF_8)), r.platform(), device);
-        return Map.of("status", "registered");
     }
 
     // ---------- device links ----------

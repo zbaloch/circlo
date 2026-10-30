@@ -9,6 +9,7 @@ describe('no tracking', () => {
     expect(perms).not.toContainEqual({ 'android:name': 'com.google.android.gms.permission.AD_ID' });
     for (const name of BLOCKED_PERMISSIONS) expect(perms).toContainEqual({ 'android:name': name, 'tools:node': 'remove' });
     expect(BLOCKED_PERMISSIONS).toContain('com.google.android.finsky.permission.BIND_GET_INSTALL_REFERRER_SERVICE');
+    expect(BLOCKED_PERMISSIONS).toContain('com.google.android.c2dm.permission.RECEIVE'); // no remote push
     expect(manifest.$['xmlns:tools']).toBe('http://schemas.android.com/tools');
   });
 

@@ -38,8 +38,8 @@ is legal advice.
 
 ## Privacy law
 - GDPR/UK GDPR: roles (controller), lawful basis, records of processing, DPIA for an E2EE social network, data
-  subject rights (export and deletion are built in), international transfers for the hosting and push providers
-  (Apple/Google receive only "new activity" pushes and device tokens).
+  subject rights (export and deletion are built in), international transfers for the hosting provider. There is no
+  push provider: notifications are local, from background checks against the Circlo server.
 - Export controls on encryption (e.g. US EAR mass-market notification, Apple's export compliance answers).
 
 ## Before launch, also

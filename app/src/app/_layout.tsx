@@ -1,5 +1,7 @@
 import '../global.css';
 import '@/lib/interop';
+// Defines the background check task at start-up, as the OS may launch the app just to run it.
+import '@/lib/background-check';
 
 import { Inter_400Regular } from '@expo-google-fonts/inter/400Regular';
 import { Inter_500Medium } from '@expo-google-fonts/inter/500Medium';

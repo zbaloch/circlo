@@ -18,7 +18,7 @@ public final class GenerateSecrets {
         Base64.Encoder b64 = Base64.getEncoder();
         SecureRandom random = new SecureRandom();
         System.out.println("CIRCLO_OPAQUE_SERVER_SETUP=" + b64.encodeToString(core.opaqueServerSetupNew()));
-        for (String name : new String[] {"CIRCLO_HANDLE_KEY", "CIRCLO_PUSH_TOKEN_KEY", "CIRCLO_JWT_KEY"}) {
+        for (String name : new String[] {"CIRCLO_HANDLE_KEY", "CIRCLO_JWT_KEY"}) {
             byte[] key = new byte[32];
             random.nextBytes(key);
             System.out.println(name + "=" + b64.encodeToString(key));

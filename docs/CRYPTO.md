@@ -11,7 +11,7 @@
    profile fields, passwords, private keys, circle numbers or circle labels.
 2. **A stolen database (and S3 bucket) reveals nothing readable.** No key that decrypts user data is stored on the
    server. A database dump alone does not even allow offline password guessing (section 5).
-3. Server-side secrets that exist (OPAQUE server setup, handle key, push-token key) live in the deployment secret
+3. Server-side secrets that exist (OPAQUE server setup, handle key, JWT key) live in the deployment secret
    store / environment, **never in the database or the repo**.
 4. All primitives live in `core/` (Rust) using audited crates. The app and the server call the core; neither implements
    primitives itself.
@@ -110,8 +110,8 @@ context               = "circlo/v1/opaque"
   start for a `handle_lookup` until one finishes. After 3, password login locks for 15 min, then 1 h, then 24 h (a day
   without attempts resets). Unknown handles are throttled identically. Recovery (section 6.3) is never locked, and a
   new password clears the lock.
-- **New sign-in alerts:** each successful password login records a `security_events` row (kind and time only) and
-  sends a content-free push; other devices show the ones after their own sign-in.
+- **New sign-in alerts:** each successful password login records a `security_events` row (kind and time only); other
+  devices show the ones after their own sign-in, and background checks count them.
 - **Password strength** can only be checked on the phone (the server never sees the password): at least 12
   characters, zxcvbn score >= 3, and not in a leaked-password blocklist (no composition rules, NIST SP 800-63B).
 
@@ -347,7 +347,7 @@ storage plug into it.
 - The server keeps the ciphertext at most 10 minutes and hands it out once (unauthenticated, rate-limited pickup by
   `link_id`) together with a session for the account. The new device opens it, checks the published identity keys
   match (as at login), registers itself as a new device and joins chats as its members add it.
-- Revoking a device removes it from every chat's server-side ACL, deletes its key packages, welcomes and push token;
+- Revoking a device removes it from every chat's server-side ACL, deletes its key packages, welcomes and check token;
   members' apps remove its MLS leaves.
 
 ## 13c. Read tokens (Phase 11)
@@ -377,11 +377,15 @@ storage plug into it.
 |---|---|---|---|
 | OPAQUE `ServerSetup` | `CIRCLO_OPAQUE_SERVER_SETUP` | Password login | Users log in via recovery phrase and re-register |
 | Handle key | `CIRCLO_HANDLE_KEY` | `handle_lookup` | Handles must be re-entered by users at next login |
-| Push-token key | `CIRCLO_PUSH_TOKEN_KEY` | `devices.push_token_enc = Seal(key, token, "circlo/v1/push-token", device_id)` | Devices re-register push tokens |
 | JWT signing key | `CIRCLO_JWT_KEY` | Sessions | Everyone logs in again |
 
 None of these can decrypt user content. They only protect metadata and stop offline guessing from a DB-only leak.
-The server calls the core (JNI) for OPAQUE, HMAC and the push-token seal; it implements no primitives.
+The server calls the core (JNI) for OPAQUE and HMAC; it implements no primitives. (There is no push, so no push-token
+key: `seal_push_token`/`open_push_token` remain in the core unused, until the next bindings regeneration removes them.)
+
+**Background check tokens:** a device that opts in gets 32 random bytes; the server stores only their SHA-256
+(`devices.check_token_hash`). The token authenticates `GET /v1/activity/pending` only, which returns counts since a time;
+it is replaced when reissued, cleared when turned off, and dies with the device.
 
 ## 14. Where this goes beyond PLAN.md (approved)
 

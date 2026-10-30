@@ -33,11 +33,9 @@ public abstract class IntegrationTest {
         Base64.Encoder b64 = Base64.getEncoder();
         byte[] setup = core.opaqueServerSetupNew();
         byte[] handleKey = Ids.random(32);
-        byte[] pushKey = Ids.random(32);
         byte[] jwtKey = Ids.random(32);
         registry.add("circlo.secrets.opaque-server-setup", () -> b64.encodeToString(setup));
         registry.add("circlo.secrets.handle-key", () -> b64.encodeToString(handleKey));
-        registry.add("circlo.secrets.push-token-key", () -> b64.encodeToString(pushKey));
         registry.add("circlo.secrets.jwt-key", () -> b64.encodeToString(jwtKey));
     }
 

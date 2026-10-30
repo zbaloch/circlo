@@ -9,13 +9,11 @@ public class ServerSecrets {
 
     private final byte[] opaqueServerSetup;
     private final byte[] handleKey;
-    private final byte[] pushTokenKey;
     private final byte[] jwtKey;
 
     public ServerSecrets(SecretsProperties props) {
         this.opaqueServerSetup = decode("CIRCLO_OPAQUE_SERVER_SETUP", props.opaqueServerSetup(), 64);
         this.handleKey = exact("CIRCLO_HANDLE_KEY", decode("CIRCLO_HANDLE_KEY", props.handleKey(), 32), 32);
-        this.pushTokenKey = exact("CIRCLO_PUSH_TOKEN_KEY", decode("CIRCLO_PUSH_TOKEN_KEY", props.pushTokenKey(), 32), 32);
         this.jwtKey = decode("CIRCLO_JWT_KEY", props.jwtKey(), 32);
     }
 
@@ -48,10 +46,6 @@ public class ServerSecrets {
 
     public byte[] handleKey() {
         return handleKey.clone();
-    }
-
-    public byte[] pushTokenKey() {
-        return pushTokenKey.clone();
     }
 
     public byte[] jwtKey() {

@@ -2,6 +2,7 @@ import { Tabs } from 'expo-router';
 
 import { DrawerAvatarButton, HeaderBar } from '@/components/ui/header';
 import { TabBar, type TabSpec } from '@/components/ui/tab-bar';
+import { useActivity } from '@/lib/activity';
 import { useConnectionsSync, useHasUnseenRequests } from '@/lib/use-connections';
 
 export const TABS: TabSpec[] = [
@@ -15,9 +16,10 @@ export const TABS: TabSpec[] = [
 export default function TabLayout() {
   useConnectionsSync();
   const unseenRequests = useHasUnseenRequests();
+  const activity = useActivity();
   return (
     <Tabs
-      tabBar={(props) => <TabBar {...props} tabs={TABS} dots={{ notifications: unseenRequests }} />}
+      tabBar={(props) => <TabBar {...props} tabs={TABS} dots={{ notifications: unseenRequests || activity.unseen > 0 }} />}
       screenOptions={{ header: ({ options }) => <HeaderBar title={options.title} left={<DrawerAvatarButton />} /> }}>
       {TABS.map((t) => (
         <Tabs.Screen

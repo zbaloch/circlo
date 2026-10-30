@@ -5,42 +5,24 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.circlo.server.crypto.CircloCore;
 import com.circlo.server.crypto.TestClientNative;
 import com.circlo.server.posts.MediaSweeper;
-import com.circlo.server.push.PushSender;
 import com.circlo.server.web.Ids;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.CopyOnWriteArrayList;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.TestConfiguration;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Primary;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 
-/** Phase 10: revoking devices, adding a friend's new device to chats, chat media, device links, content-free push. */
+/** Phase 10: revoking devices, adding a friend's new device to chats, chat media, device links. */
 class DevicesFlowIT extends IntegrationTest {
-
-    /** Captures every push instead of sending it (production uses FCM when configured). */
-    static final List<Map<String, Object>> PUSHES = new CopyOnWriteArrayList<>();
-
-    @TestConfiguration
-    static class CapturePush {
-        @Bean
-        @Primary
-        PushSender capturingPushSender() {
-            return (platform, token, data) -> PUSHES.add(Map.of("platform", platform, "token", new String(token, StandardCharsets.UTF_8), "data", data));
-        }
-    }
 
     @Autowired
     private CircloCore core;
@@ -251,51 +233,4 @@ class DevicesFlowIT extends IntegrationTest {
         assertThat(call("POST", "/v1/device-links", Map.of("linkId", Ids.random(32), "sealed", sealed), null).getStatusCode().value()).isEqualTo(401);
     }
 
-    @Test
-    void pushCarriesNoContentOrNames() throws Exception {
-        PUSHES.clear();
-        TestApp aliceApp = new TestApp(this, "push_alice", "pw").register();
-        TestApp bobApp = new TestApp(this, "push_bob", "pw").register();
-        befriend(aliceApp, bobApp);
-        Device alice = device(aliceApp, aliceApp.deviceId);
-        Device bob = device(bobApp, bobApp.deviceId);
-        uploadKeyPackages(alice);
-        assertThat(call("PUT", "/v1/devices/" + alice.deviceId() + "/push-token", Map.of("token", "fcm-token-alice", "platform", "android"),
-                aliceApp.accessToken).getStatusCode().value()).isEqualTo(200);
-        assertThat(call("PUT", "/v1/devices/" + bob.deviceId() + "/push-token", Map.of("token", "fcm-token-bob", "platform", "android"),
-                bobApp.accessToken).getStatusCode().value()).isEqualTo(200);
-        // Someone else's device can't register a token.
-        assertThat(call("PUT", "/v1/devices/" + alice.deviceId() + "/push-token", Map.of("token", "x", "platform", "android"),
-                bobApp.accessToken).getStatusCode().value()).isEqualTo(404);
-
-        byte[] group = Ids.random(16);
-        as(bob, "POST", "/v1/mls/groups", Map.of("groupId", Ids.uuid(group).toString()));
-        TestClientNative.mlsCreateGroup(bob.mls(), group);
-        byte[][] out = TestClientNative.mlsAdd(bob.mls(), group, new byte[][] {claimDevice(bob, alice.deviceId())});
-        post(bob, group, out[0], List.of(alice.deviceId()), out[1]);
-        TestClientNative.mlsMerge(bob.mls(), group);
-        post(bob, group, TestClientNative.mlsEncrypt(bob.mls(), group, "secret dinner plans".getBytes(StandardCharsets.UTF_8)), List.of(), null);
-
-        for (int i = 0; i < 50 && PUSHES.size() < 2; i++) {
-            Thread.sleep(50);
-        }
-        List<Map<String, Object>> pushes = new ArrayList<>(PUSHES);
-        assertThat(pushes).isNotEmpty();
-        assertThat(pushes).allSatisfy(p -> {
-            assertThat(p.get("token")).isEqualTo("fcm-token-alice"); // only the recipient, never the sender's own device
-            assertThat(p.get("data")).isEqualTo(Map.of("type", "activity"));
-        });
-        String everything = pushes.toString();
-        for (String leak : List.of("secret", "dinner", "push_bob", "push_alice", bobApp.userId.toString(), Ids.uuid(group).toString())) {
-            assertThat(everything).doesNotContain(leak);
-        }
-
-        // Once Alice blocks Bob, his messages in their old chat no longer wake her phone.
-        assertThat(call("POST", "/v1/blocks/" + bobApp.userId, null, aliceApp.accessToken).getStatusCode().value()).isEqualTo(200);
-        Thread.sleep(300);
-        PUSHES.clear();
-        post(bob, group, TestClientNative.mlsEncrypt(bob.mls(), group, "still here".getBytes(StandardCharsets.UTF_8)), List.of(), null);
-        Thread.sleep(500);
-        assertThat(PUSHES).isEmpty();
-    }
 }
