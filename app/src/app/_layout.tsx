@@ -9,8 +9,7 @@ import { Inter_600SemiBold } from '@expo-google-fonts/inter/600SemiBold';
 import { Inter_700Bold } from '@expo-google-fonts/inter/700Bold';
 import { Inter_800ExtraBold } from '@expo-google-fonts/inter/800ExtraBold';
 import { useFonts } from 'expo-font';
-import { DarkTheme, DefaultTheme, ThemeProvider } from 'expo-router';
-import { Drawer } from 'expo-router/drawer';
+import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
@@ -18,7 +17,6 @@ import { View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
 
-import { AppDrawer } from '@/components/app-drawer';
 import { DialogHost } from '@/components/ui/dialog-host';
 import { BackButton, HeaderBar } from '@/components/ui/header';
 import { Spinner } from '@/components/ui/spinner';
@@ -28,7 +26,11 @@ import { usePalette } from '@/theme/use-palette';
 // Keep the splash screen up until the bundled fonts are ready, so text never flashes in the system font.
 SplashScreen.preventAutoHideAsync().catch(() => undefined);
 
-/** Signed-out users only reach the onboarding stack; signed-in users get the drawer + tabs. */
+/**
+ * Signed-out users only reach the onboarding stack. Signed-in users get the drawer + tabs ((drawer)), with every other
+ * screen pushed on this stack above them: back (the header arrow, Android's back, iOS's left-edge swipe) returns to the
+ * previous screen, and the drawer only opens on the tabs.
+ */
 function Navigator() {
   const session = useSession();
   const palette = usePalette();
@@ -40,53 +42,50 @@ function Navigator() {
     );
   }
   const signedIn = session.status === 'signedIn';
+  // Screens with their own Cancel or close button: no swipe, so a half-finished post or reply isn't dismissed by accident.
+  const own = { headerShown: false, gestureEnabled: false };
   // Keyed on the auth state: signing in or out drops all navigation history, so finished onboarding screens
   // (including the recovery phrase) are unmounted and can never be navigated back to.
   return (
-    <Drawer
+    <Stack
       key={signedIn ? 'signed-in' : 'signed-out'}
-      drawerContent={(props) => <AppDrawer {...props} />}
-      // Back returns to the previous screen (thread → viewer → thread), not always to the first route.
-      backBehavior="history"
       screenOptions={{
-        swipeEnabled: signedIn,
-        drawerType: 'front',
-        overlayColor: 'rgba(0,0,0,0.4)',
+        contentStyle: { backgroundColor: palette.surface },
         // Same header everywhere (components/ui/header.tsx) instead of the platform's native one.
         header: ({ options }) => (
           <HeaderBar title={options.title} left={<BackButton />} right={options.headerRight?.({ tintColor: palette.ink, canGoBack: true })} />
         ),
       }}>
-      <Drawer.Protected guard={!signedIn} redirectTo="/">
-        <Drawer.Screen name="(auth)" options={{ headerShown: false }} />
-      </Drawer.Protected>
-      <Drawer.Protected guard={signedIn} redirectTo="/welcome">
-        <Drawer.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Drawer.Screen name="profile" options={{ title: 'Profile' }} />
-        <Drawer.Screen name="circles" options={{ title: 'Circles' }} />
-        <Drawer.Screen name="devices" options={{ title: 'Devices' }} />
-        <Drawer.Screen name="settings" options={{ title: 'Settings' }} />
-        <Drawer.Screen name="recovery" options={{ title: 'Recovery phrase' }} />
-        <Drawer.Screen name="dev" options={{ title: 'Crypto self-test' }} />
-        <Drawer.Screen name="edit-profile" options={{ title: 'Edit profile' }} />
-        <Drawer.Screen name="friend/[id]" options={{ title: 'Profile' }} />
-        <Drawer.Screen name="safety/[id]" options={{ title: 'Safety number' }} />
-        <Drawer.Screen name="scan" options={{ title: 'Scan code' }} />
-        <Drawer.Screen name="circle/[n]" options={{ title: 'Circle' }} />
-        <Drawer.Screen name="compose" options={{ headerShown: false, swipeEnabled: false }} />
-        <Drawer.Screen name="post/[id]" options={{ title: 'Post' }} />
-        <Drawer.Screen name="reply/[id]" options={{ headerShown: false, swipeEnabled: false }} />
-        <Drawer.Screen name="viewer" options={{ headerShown: false, swipeEnabled: false }} />
-        <Drawer.Screen name="preview/[id]" options={{ title: 'What they can see' }} />
-        <Drawer.Screen name="chat/[id]" options={{ title: 'Chat' }} />
-        <Drawer.Screen name="new-message" options={{ title: 'New message' }} />
-        <Drawer.Screen name="link-confirm" options={{ title: 'Link a device' }} />
-        <Drawer.Screen name="report/[id]" options={{ title: 'Report' }} />
-        <Drawer.Screen name="enable-notifications" options={{ headerShown: false, swipeEnabled: false }} />
-        <Drawer.Screen name="security-alert" options={{ headerShown: false, swipeEnabled: false }} />
-        <Drawer.Screen name="change-password" options={{ title: 'Change password' }} />
-      </Drawer.Protected>
-    </Drawer>
+      <Stack.Protected guard={!signedIn}>
+        <Stack.Screen name="(auth)" options={{ headerShown: false }} />
+      </Stack.Protected>
+      <Stack.Protected guard={signedIn}>
+        <Stack.Screen name="(drawer)" options={{ headerShown: false }} />
+        <Stack.Screen name="profile" options={{ title: 'Profile' }} />
+        <Stack.Screen name="circles" options={{ title: 'Circles' }} />
+        <Stack.Screen name="devices" options={{ title: 'Devices' }} />
+        <Stack.Screen name="settings" options={{ title: 'Settings' }} />
+        <Stack.Screen name="recovery" options={{ title: 'Recovery phrase' }} />
+        <Stack.Screen name="dev" options={{ title: 'Crypto self-test' }} />
+        <Stack.Screen name="edit-profile" options={{ title: 'Edit profile' }} />
+        <Stack.Screen name="friend/[id]" options={{ title: 'Profile' }} />
+        <Stack.Screen name="safety/[id]" options={{ title: 'Safety number' }} />
+        <Stack.Screen name="scan" options={{ title: 'Scan code' }} />
+        <Stack.Screen name="circle/[n]" options={{ title: 'Circle' }} />
+        <Stack.Screen name="compose" options={own} />
+        <Stack.Screen name="post/[id]" options={{ title: 'Post' }} />
+        <Stack.Screen name="reply/[id]" options={own} />
+        <Stack.Screen name="viewer" options={own} />
+        <Stack.Screen name="preview/[id]" options={{ title: 'What they can see' }} />
+        <Stack.Screen name="chat/[id]" options={{ title: 'Chat' }} />
+        <Stack.Screen name="new-message" options={{ title: 'New message' }} />
+        <Stack.Screen name="link-confirm" options={{ title: 'Link a device' }} />
+        <Stack.Screen name="report/[id]" options={{ title: 'Report' }} />
+        <Stack.Screen name="enable-notifications" options={own} />
+        <Stack.Screen name="security-alert" options={own} />
+        <Stack.Screen name="change-password" options={{ title: 'Change password' }} />
+      </Stack.Protected>
+    </Stack>
   );
 }
 

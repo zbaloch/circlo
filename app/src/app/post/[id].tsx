@@ -1,4 +1,4 @@
-import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { FlatList, Pressable, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -20,7 +20,7 @@ import { Spinner } from '@/components/ui/spinner';
 
 /**
  * Thread view, X style (PLAN.md 2A): the post in detail (author row, full-width text and media, full time, actions),
- * its replies in order, and a "Post your reply" bar that opens the reply composer.
+ * and its replies in order. Replying starts from the post's reply button (owner decision 2026-10-31: no docked reply bar).
  */
 export default function ThreadScreen() {
   const now = useNow();
@@ -113,17 +113,6 @@ export default function ThreadScreen() {
             );
           }}
         />
-        {/* X style: a bar that opens the reply composer, with the post shown above what I type. */}
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Post your reply"
-          onPress={() => router.push({ pathname: '/reply/[id]', params: { id: post.postId } })}
-          className="flex-row items-center gap-3 border-t border-border px-4 py-2 dark:border-border-dark">
-          <Avatar size="sm" name={authorName(account, book, account.userId).name} />
-          <View className="flex-1 rounded-full bg-surface-raised px-4 py-2.5 dark:bg-surface-raised-dark">
-            <Text className="text-base text-muted dark:text-muted-dark">Post your reply</Text>
-          </View>
-        </Pressable>
       </View>
       {actions.sheet}
     </SafeAreaView>
