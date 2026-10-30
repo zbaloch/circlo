@@ -8,6 +8,7 @@ import { MediaGrid } from '@/components/encrypted-media';
 import type { OutboxItem } from '@/lib/outbox';
 import type { FeedPost } from '@/lib/posts';
 import { fullTime, relativeTime } from '@/lib/time';
+import { useNow } from '@/lib/use-now';
 import { linkParts } from '@/lib/view-logic';
 import { usePalette } from '@/theme/use-palette';
 import { Text } from '@/components/ui/text';
@@ -95,6 +96,7 @@ export function PostDetail({ post, name, handle, audience, onReply, onLike, onMo
 }
 
 export function PostCard({ post, name, handle, audience, onOpen, onReply, onLike, onMore, onMediaPress, onAuthor }: Props) {
+  const now = useNow();
   const palette = usePalette();
   return (
     <Pressable onPress={onOpen} disabled={!onOpen} className="flex-row gap-3 border-b border-border px-4 py-3 active:bg-surface-raised dark:border-border-dark dark:active:bg-surface-raised-dark">
@@ -111,7 +113,7 @@ export function PostCard({ post, name, handle, audience, onOpen, onReply, onLike
               @{handle}
             </Text>
           ) : null}
-          <Text className="text-[15px] text-muted dark:text-muted-dark">· {relativeTime(post.createdAtMs)}</Text>
+          <Text className="text-[15px] text-muted dark:text-muted-dark">· {relativeTime(post.createdAtMs, now)}</Text>
           <View className="flex-1" />
           {onMore ? (
             <Pressable accessibilityRole="button" accessibilityLabel="More options" onPress={onMore} hitSlop={8}>

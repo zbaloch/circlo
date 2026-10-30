@@ -10,7 +10,7 @@ import { api, ok } from '@/api/client';
 import type { components } from '@/api/schema';
 
 import { EVERYONE, loadAddressBook, updateAddressBook, type AddressBook, type Audience } from './addressbook';
-import { circlesOf, coreAudience, ONLY_ME, validAudience } from './circles';
+import { circlesOf, coreAudience, validAudience } from './circles';
 import { fromB64, toB64, uuidFromRandom, uuidToBytes } from './bytes';
 import { ensureEpoch, refreshContact } from './friends';
 import type { StoredAccount } from './keystore';
@@ -231,9 +231,4 @@ export async function previewAs(account: StoredAccount, friendId: string, before
     return epoch && circle ? Core.ReaderKeyring.forFriend(fromB64(epoch.root), circle, Uint8Array.from(circles).buffer) : null;
   }).map((p) => ({ ...p, mine: false, audience: undefined }));
   return { posts, cursor: rows.length ? rows[rows.length - 1].createdAt : undefined, hasMore: rows.length === limit };
-}
-
-/** Default audience for the composer: my last choice (if still valid); before my first post, Only me (nothing is shared by accident). */
-export function defaultAudience(book: Pick<AddressBook, 'lastAudience' | 'circleDefs'>): Audience {
-  return book.lastAudience && validAudience(book, book.lastAudience) ? book.lastAudience : ONLY_ME;
 }

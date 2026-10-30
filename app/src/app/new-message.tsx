@@ -1,6 +1,6 @@
 import { Icon } from '@/components/ui/icon';
-import { router, useLocalSearchParams } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { useCallback, useState } from 'react';
 import { FlatList, Pressable, View } from 'react-native';
 
 import { Avatar } from '@/components/avatar';
@@ -23,9 +23,15 @@ export default function NewMessageScreen() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string>();
 
-  useEffect(() => {
-    if (account) loadAddressBook(account).then(setBook, () => {});
-  }, [account]);
+  // Drawer screens stay mounted between visits: reload people (someone may have connected since) and start fresh.
+  useFocusEffect(
+    useCallback(() => {
+      setPicked([]);
+      setError(undefined);
+      setBusy(false);
+      if (account) loadAddressBook(account).then(setBook, () => {});
+    }, [account]),
+  );
 
   if (!account) return null;
   const skip = new Set((exclude ?? '').split(',').filter(Boolean));

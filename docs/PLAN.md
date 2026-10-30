@@ -313,11 +313,9 @@ Build the familiar Twitter/X interaction model under the **Circlo** brand. Do no
 - Decrypted images and thumbnails are shown from local decrypted cache files. Show a skeleton/shimmer while decrypting, and a lock icon placeholder if decryption fails.
 
 ### Compose (modal sheet, like Twitter's composer)
-- Your avatar and text field with a character counter ring (limit 500), plus Cancel and **Post** buttons.
-- **Audience chip** above the text field, like Twitter's "Everyone" selector. Tapping it opens a bottom sheet listing your circles by your labels:
-  - Me only (1), Spouse (2), Kids (3–4), Parents & siblings (5), Extended family (6), Closest friends (7), Neighbourhood (8), Work (9), Faded contacts (10), and custom circles up to 100
-  - Each row shows "visible to this circle and closer" and a live count of people who can see it
-  - Remember the last-used circle as the default
+Two steps, so the audience is chosen deliberately for every post (owner decision, 30 Oct 2026):
+- **Step 1, write:** your avatar and text field with a character counter ring (limit 500), media buttons, plus Cancel and **Next** buttons.
+- **Step 2, who can see this?:** a short preview of the post, then Only me, Everyone, and your circles (pick one or more) with a live count of people who can see it. Nothing is pre-selected, and **Post** stays disabled until you choose. Back (arrow or Android back) returns to step 1 with the draft kept. After posting or cancelling, the next post starts empty at step 1.
 - Media buttons (gallery, camera), with thumbnails of selected items that can be removed or reordered (up to 4 images or 1 video).
 - Upload progress shows inline in the timeline as an "uploading…" post card, so the user isn't blocked.
 

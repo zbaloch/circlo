@@ -12,11 +12,13 @@ import { refreshBlocked, useBlocked, visibleConversations } from '@/lib/blocks';
 import { syncMessaging, unreadCount, useConversations, type Conversation } from '@/lib/messaging';
 import { useSession } from '@/lib/session';
 import { relativeTime } from '@/lib/time';
+import { useNow } from '@/lib/use-now';
 import { chatTitle } from '@/lib/view-logic';
 import { Text } from '@/components/ui/text';
 
 /** Messages inbox (PLAN.md 2A): conversations newest first, unread counts kept on this device. */
 export default function MessagesScreen() {
+  const now = useNow();
   const session = useSession();
   const account = session.status === 'signedIn' ? session.account : null;
   const blocked = useBlocked();
@@ -80,7 +82,7 @@ export default function MessagesScreen() {
                   <Text numberOfLines={1} className={`flex-1 text-base text-ink dark:text-ink-dark ${unread ? 'font-bold' : 'font-semibold'}`}>
                     {title(item)}
                   </Text>
-                  {last ? <Text className="text-sm text-muted dark:text-muted-dark">{relativeTime(last.createdAtMs)}</Text> : null}
+                  {last ? <Text className="text-sm text-muted dark:text-muted-dark">{relativeTime(last.createdAtMs, now)}</Text> : null}
                 </View>
                 <Text numberOfLines={1} className={unread ? 'text-ink dark:text-ink-dark' : 'text-muted dark:text-muted-dark'}>
                   {!item.active ? 'You’re no longer in this chat' : last ? `${last.mine ? 'You: ' : ''}${last.text || 'Photo'}` : 'No messages yet'}

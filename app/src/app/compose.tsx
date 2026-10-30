@@ -1,22 +1,22 @@
 import { Icon } from '@/components/ui/icon';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
-import { router } from 'expo-router';
-import { useEffect, useState } from 'react';
-import { Pressable, ScrollView, View } from 'react-native';
+import { router, useFocusEffect } from 'expo-router';
+import { useCallback, useState } from 'react';
+import { BackHandler, Pressable, ScrollView, View } from 'react-native';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { AudienceSheet, audienceLine } from '@/components/audience-sheet';
+import { AudiencePicker, audienceLine } from '@/components/audience-sheet';
 import { Avatar } from '@/components/avatar';
 import { CharRing } from '@/components/char-ring';
-import { ErrorText } from '@/components/form';
+import { Button, ErrorText } from '@/components/form';
 import { describeError } from '@/lib/account';
 import { loadAddressBook, type AddressBook, type Audience } from '@/lib/addressbook';
 import { audienceLabel, ONLY_ME } from '@/lib/circles';
 import { discardPicked, MAX_IMAGES, type PickedMedia } from '@/lib/media';
 import { enqueuePost } from '@/lib/outbox';
-import { defaultAudience, MAX_POST_CHARS, validateDraft } from '@/lib/posts';
+import { MAX_POST_CHARS, validateDraft } from '@/lib/posts';
 import { useSession } from '@/lib/session';
 import { usePalette } from '@/theme/use-palette';
 import { Text, TextInput } from '@/components/ui/text';
@@ -32,34 +32,48 @@ function toPicked(a: ImagePicker.ImagePickerAsset): PickedMedia {
   };
 }
 
-/** The compose sheet (PLAN.md 2A): audience chip, text with counter ring, up to 4 photos or 1 video. */
+/**
+ * The compose sheet (PLAN.md 2A), in two steps: write (text with counter ring, up to 4 photos or 1 video), then choose
+ * who can see it. Step 2 starts with nothing chosen, so every post's audience is a deliberate choice.
+ */
 export default function ComposeScreen() {
   const session = useSession();
   const account = session.status === 'signedIn' ? session.account : null;
   const palette = usePalette();
   const [book, setBook] = useState<AddressBook | null>(null);
-  const [audience, setAudience] = useState<Audience>(ONLY_ME);
+  const [step, setStep] = useState<'write' | 'audience'>('write');
+  const [audience, setAudience] = useState<Audience | null>(null);
   const [text, setText] = useState('');
   const [media, setMedia] = useState<PickedMedia[]>([]);
-  const [sheet, setSheet] = useState(false);
   const [error, setError] = useState<string>();
 
-  useEffect(() => {
-    if (!account) return;
-    loadAddressBook(account).then(
-      (b) => {
-        setBook(b);
-        setAudience(defaultAudience(b));
-      },
-      (e) => setError(describeError(e)),
-    );
-  }, [account]);
+  // Reload circles on every visit (the screen stays mounted), so one made since the last post shows up.
+  useFocusEffect(
+    useCallback(() => {
+      if (!account) return;
+      loadAddressBook(account).then(setBook, (e) => setError(describeError(e)));
+    }, [account]),
+  );
+
+  // Android's back button goes from choosing the audience back to the text, not out of compose.
+  useFocusEffect(
+    useCallback(() => {
+      if (step !== 'audience') return;
+      const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+        setStep('write');
+        return true;
+      });
+      return () => sub.remove();
+    }, [step]),
+  );
 
   const hasVideo = media.some((m) => m.type === 'video');
   const canAdd = !hasVideo && media.length < MAX_IMAGES;
-  const draft = { text: text.trim(), audience, media };
+  const content = { text: text.trim(), media };
   const used = [...text].length;
-  const postable = !!book && validateDraft(draft, book) === null;
+  // Step 1 checks only the content; the audience is chosen in step 2.
+  const writable = !!book && validateDraft({ ...content, audience: ONLY_ME }, book) === null;
+  const postable = !!book && !!audience && validateDraft({ ...content, audience }, book) === null;
 
   const pick = async (camera: boolean) => {
     setError(undefined);
@@ -79,11 +93,57 @@ export default function ComposeScreen() {
     setMedia(video ? [video] : [...media, ...picked.filter((p) => p.type === 'image')].slice(0, MAX_IMAGES));
   };
 
+  // Drawer screens stay mounted between visits, so the next post starts from an empty composer.
+  const reset = () => {
+    setText('');
+    setMedia([]);
+    setError(undefined);
+    setAudience(null);
+    setStep('write');
+  };
+
   const post = () => {
-    if (!account || !postable) return;
-    enqueuePost(account, draft);
+    if (!account || !audience || !postable) return;
+    enqueuePost(account, { ...content, audience });
+    reset();
     router.back();
   };
+
+  if (step === 'audience' && book) {
+    return (
+      <SafeAreaView className="flex-1 bg-surface dark:bg-surface-dark">
+        <View className="flex-row items-center gap-3 px-4 py-2">
+          <Pressable accessibilityRole="button" accessibilityLabel="Back" onPress={() => setStep('write')} hitSlop={8} className="py-2">
+            <Icon name="arrow-back" size={22} color={palette.ink} />
+          </Pressable>
+          <Text accessibilityRole="header" className="text-xl font-bold text-ink dark:text-ink-dark">
+            Who can see this?
+          </Text>
+        </View>
+        <ScrollView className="flex-1" contentContainerClassName="pb-4">
+          <View className="mx-4 mb-2 gap-1 rounded-2xl bg-surface-raised px-4 py-3 dark:bg-surface-raised-dark">
+            {content.text ? (
+              <Text numberOfLines={3} className="text-base text-ink dark:text-ink-dark">
+                {content.text}
+              </Text>
+            ) : null}
+            {media.length ? (
+              <Text className="text-sm text-muted dark:text-muted-dark">
+                {hasVideo ? '1 video' : `${media.length} ${media.length === 1 ? 'photo' : 'photos'}`}
+              </Text>
+            ) : null}
+          </View>
+          <AudiencePicker book={book} selected={audience} onChange={setAudience} />
+        </ScrollView>
+        <View className="gap-2 border-t border-border px-4 py-3 dark:border-border-dark">
+          <Text className="text-center text-sm text-muted dark:text-muted-dark">
+            {audience ? `${audienceLabel(book, audience)} · ${audienceLine(book, audience)}` : 'Choose who can see this post.'}
+          </Text>
+          <Button label="Post" disabled={!postable} onPress={post} />
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView className="flex-1 bg-surface dark:bg-surface-dark">
@@ -93,6 +153,7 @@ export default function ComposeScreen() {
             accessibilityRole="button"
             onPress={() => {
               discardPicked(media);
+              reset();
               router.back();
             }}
             className="py-2">
@@ -100,11 +161,11 @@ export default function ComposeScreen() {
           </Pressable>
           <Pressable
             accessibilityRole="button"
-            accessibilityState={{ disabled: !postable }}
-            disabled={!postable}
-            onPress={post}
-            className={`rounded-full bg-primary px-5 py-2 active:bg-primary-pressed dark:bg-primary-dark dark:active:bg-primary-pressed-dark ${postable ? '' : 'opacity-50'}`}>
-            <Text className="text-base font-bold text-on-primary dark:text-on-primary-dark">Post</Text>
+            accessibilityState={{ disabled: !writable }}
+            disabled={!writable}
+            onPress={() => setStep('audience')}
+            className={`rounded-full bg-primary px-5 py-2 active:bg-primary-pressed dark:bg-primary-dark dark:active:bg-primary-pressed-dark ${writable ? '' : 'opacity-50'}`}>
+            <Text className="text-base font-bold text-on-primary dark:text-on-primary-dark">Next</Text>
           </Pressable>
         </View>
 
@@ -112,21 +173,6 @@ export default function ComposeScreen() {
           <View className="flex-row gap-3">
             <Avatar name={account?.handle} />
             <View className="flex-1 gap-2">
-              {book ? (
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel={`Audience: ${audienceLabel(book, audience)}. ${audienceLine(book, audience)}`}
-                  onPress={() => setSheet(true)}
-                  className="flex-row items-center gap-1 self-start rounded-full border border-primary px-3 py-1 dark:border-primary-dark">
-                  <Icon
-                    name={audience.kind === 'onlyMe' ? 'lock-closed' : audience.kind === 'everyone' ? 'globe-outline' : 'people'}
-                    size={14}
-                    color={palette.primary}
-                  />
-                  <Text className="text-sm font-bold text-primary dark:text-primary-dark">{audienceLabel(book, audience)}</Text>
-                  <Icon name="chevron-down" size={14} color={palette.primary} />
-                </Pressable>
-              ) : null}
               <TextInput
                 accessibilityLabel="Post text"
                 autoFocus
@@ -137,7 +183,6 @@ export default function ComposeScreen() {
                 onChangeText={setText}
                 className="min-h-24 text-lg text-ink dark:text-ink-dark"
               />
-              {book ? <Text className="text-sm text-muted dark:text-muted-dark">{audienceLine(book, audience)}</Text> : null}
             </View>
           </View>
 
@@ -188,7 +233,6 @@ export default function ComposeScreen() {
           <CharRing used={used} limit={MAX_POST_CHARS} />
         </View>
       </KeyboardAvoidingView>
-      {book ? <AudienceSheet visible={sheet} book={book} selected={audience} onSelect={setAudience} onClose={() => setSheet(false)} /> : null}
     </SafeAreaView>
   );
 }
