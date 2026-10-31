@@ -95,6 +95,19 @@ fn compute() -> BTreeMap<String, String> {
         &recovery::sign_recovery_login(&[0x44; 32], &[1; 16], &[2; 16], &[3; 32], 1_900_000_000),
     );
 
+    put(
+        "recovery.root12(phrase=abandon*11 about)",
+        &*recovery::entropy_from_phrase(
+            "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about",
+        )
+        .unwrap(),
+    );
+    put("passkey.prf_salt", &recovery::passkey_prf_salt());
+    put(
+        "passkey.pubkey(prf=55*32)",
+        &recovery::method_public_key(recovery::RecoveryKind::Passkey, &[0x55; 32]),
+    );
+
     // Padding.
     let pads: Vec<u8> = [0u64, 1, 9, 100, 1000, 65_537, 10_000_000]
         .iter()

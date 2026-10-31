@@ -135,17 +135,37 @@ so this state syncs across devices and survives recovery without re-sealing the 
 ### 6.2 Password copy (`key_backups.kind = 'password'`, kind byte 0x01)
 `Seal(backup_pw_key, padded_backup, "circlo/v1/backup", user_id, 0x01)`
 
-### 6.3 Recovery copy (`key_backups.kind = 'recovery'`, kind byte 0x02)
+### 6.3 Recovery methods: phrase copies (kind byte 0x02)
+A user has one or more recovery methods (`recovery_methods` rows, section 6.4 for passkeys). Each has a 32-byte
+**recovery root** and two derivations; the phrase kind keeps its original labels:
 ```
-entropy       = 32 random bytes  →  BIP39 24-word phrase, shown once at signup (user confirms 3 words)
-recovery_key  = HKDF(entropy, "circlo/v1/backup-recovery")
-recovery_auth = Ed25519 key from seed HKDF(entropy, "circlo/v1/recovery-auth")      → users.recovery_pubkey
-envelope      = Seal(recovery_key, padded_backup, "circlo/v1/backup", user_id, 0x02)
+root (24 words) = the 32-byte BIP39 entropy                                   (phrases from before 2026-10-31)
+root (12 words) = HKDF(16-byte BIP39 entropy, "circlo/v1/recovery-root-128")  (new phrases)
+recovery_key    = HKDF(root, "circlo/v1/backup-recovery")
+recovery_auth   = Ed25519 key from seed HKDF(root, "circlo/v1/recovery-auth")  → recovery_methods.auth_pubkey
+envelope        = Seal(recovery_key, padded_backup, "circlo/v1/backup", user_id, 0x02)
 ```
+A 12-word phrase carries 128 bits, which is enough: the root is never stored and every guess needs the server's
+rate-limited recovery login. The phrase is offered at sign-up only where passkey recovery isn't available, or later in
+Settings; there is no word quiz.
+
 **Recovery login:** server sends `challenge_id:16 || nonce:32 || expires_at:u64`; client signs
-`"circlo/v1/recovery-login" || 0x00 || user_id || challenge_id || nonce || u64(expires_at)` with `recovery_auth`;
-the server verifies (strict) and releases the recovery copy; the client then re-registers OPAQUE with a new password.
-Recovery requires the handle (to find `user_id`) and the phrase (256 bits: not guessable).
+`"circlo/v1/recovery-login" || 0x00 || user_id || challenge_id || nonce || u64(expires_at)` with the method's `auth`
+key; the server verifies (strict) against **any** of the user's method keys, releases that method's copy, and the
+client then re-registers OPAQUE with a new password. Recovery requires the handle (to find `user_id`) and the method.
+
+### 6.4 Passkey copies (kind byte 0x03)
+```
+prf_salt      = SHA-256("circlo/v1/passkey-prf")
+root          = WebAuthn PRF output of the user's passkey for prf_salt (32 bytes; RP ID www.hellocirclo.com)
+passkey_key   = HKDF(root, "circlo/v1/backup-passkey")
+passkey_auth  = Ed25519 key from seed HKDF(root, "circlo/v1/passkey-auth")    → recovery_methods.auth_pubkey
+envelope      = Seal(passkey_key, padded_backup, "circlo/v1/backup", user_id, 0x03)
+```
+The PRF output never leaves the phone. The server stores no passkey data and does no WebAuthn: it only checks
+`passkey_auth` signatures, exactly as for phrases. A passkey method may hold several wraps (rows) for the same passkey,
+because synced passkeys have been reported to give a different PRF output on another device (Apple forums, 2026); a
+password login on a device with the passkey adds a wrap when its output opens none. Design: `docs/PASSKEY_RECOVERY.md`.
 
 ## 7. Identity and device keys
 

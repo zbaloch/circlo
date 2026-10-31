@@ -813,18 +813,74 @@ pub fn open_recovery_backup(entropy: &[u8], user_id: &[u8], ciphertext: &[u8]) -
     )?))
 }
 
+/// A new 12-word phrase. `entropy` is its 32-byte recovery root (what the other recovery functions take).
 #[uniffi::export]
 pub fn new_recovery_phrase() -> RecoveryPhrase {
-    let e = recovery::new_entropy();
+    let (phrase, root) = recovery::new_phrase_12();
     RecoveryPhrase {
-        phrase: recovery::phrase_from_entropy(&e).to_string(),
-        entropy: e.to_vec(),
+        phrase: phrase.to_string(),
+        entropy: root.to_vec(),
     }
 }
 
+/// The 32-byte recovery root of a 12- or 24-word phrase.
 #[uniffi::export]
 pub fn recovery_entropy_from_phrase(phrase: &str) -> Result<Vec<u8>> {
     Ok(recovery::entropy_from_phrase(phrase)?.to_vec())
+}
+
+/// The PRF input for passkey recovery: the passkey's PRF output for it is the passkey method's root.
+#[uniffi::export]
+pub fn passkey_prf_salt() -> Vec<u8> {
+    recovery::passkey_prf_salt().to_vec()
+}
+
+#[uniffi::export]
+pub fn passkey_recovery_public_key(prf_output: &[u8]) -> Result<Vec<u8>> {
+    let root = Zeroizing::new(key32(prf_output, "prf_output")?);
+    Ok(recovery::method_public_key(recovery::RecoveryKind::Passkey, &root).to_vec())
+}
+
+#[uniffi::export]
+pub fn sign_passkey_recovery_login(
+    prf_output: &[u8],
+    user_id: &[u8],
+    challenge_id: &[u8],
+    nonce: &[u8],
+    expires_at: u64,
+) -> Result<Vec<u8>> {
+    let root = Zeroizing::new(key32(prf_output, "prf_output")?);
+    Ok(recovery::sign_method_login(
+        recovery::RecoveryKind::Passkey,
+        &root,
+        &id16(user_id, "user_id")?,
+        &id16(challenge_id, "challenge_id")?,
+        &key32(nonce, "nonce")?,
+        expires_at,
+    )
+    .to_vec())
+}
+
+#[uniffi::export]
+pub fn seal_passkey_backup(prf_output: &[u8], user_id: &[u8], backup: &KeyBackup) -> Result<Vec<u8>> {
+    let root = Zeroizing::new(key32(prf_output, "prf_output")?);
+    backup::seal_method_backup(
+        recovery::RecoveryKind::Passkey,
+        &root,
+        &id16(user_id, "user_id")?,
+        &backup.to_payload()?,
+    )
+}
+
+#[uniffi::export]
+pub fn open_passkey_backup(prf_output: &[u8], user_id: &[u8], ciphertext: &[u8]) -> Result<KeyBackup> {
+    let root = Zeroizing::new(key32(prf_output, "prf_output")?);
+    Ok(KeyBackup::from_payload(backup::open_method_backup(
+        recovery::RecoveryKind::Passkey,
+        &root,
+        &id16(user_id, "user_id")?,
+        ciphertext,
+    )?))
 }
 
 #[uniffi::export]
