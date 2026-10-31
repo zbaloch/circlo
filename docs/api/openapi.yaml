@@ -1,21 +1,22 @@
 openapi: 3.1.0
 info:
   title: Circlo API
-  version: 0.12.0
+  version: 1.0.0
   description: >
-    circlo-server API. The server stores and relays ciphertext only. Request and response bodies never contain
-    plaintext content, names, emails, circle numbers or private keys. Byte fields are standard base64 strings;
-    IDs are UUID strings (16 bytes, the same bytes used in crypto AAD). Errors are `{"error": "<code>"}` and never
-    echo request data. See docs/CRYPTO.md for every byte format.
+    circlo-server API, used by the iOS and Android apps and the web app (app.hellocirclo.com). Requests go over HTTPS;
+    content is stored as sent and the server decides who may see it. IDs are UUID strings; times are ISO-8601 instants.
+    Errors are `{"error": "<code>"}` (plus fixed details such as `attemptsLeft`) and never echo request data.
+    Photos and videos go straight between the app and storage through short-lived presigned URLs.
 servers:
   - url: http://localhost:8080
 security:
   - bearer: []
 
 paths:
-  /v1/auth/register/start:
+  # ---------------- auth ----------------
+  /v1/auth/signup:
     post:
-      summary: Start OPAQUE registration; reserves the handle and returns the new user id
+      summary: Start a signup; emails a 6-digit code to verify the address
       security: []
       requestBody:
         required: true
@@ -23,26 +24,31 @@ paths:
           application/json:
             schema:
               type: object
-              required: [handle, registrationRequest]
+              required: [name, username, email, password]
               properties:
-                handle: { type: string, maxLength: 64, description: "3-30 chars [a-z0-9_] after NFKC + lowercase" }
-                registrationRequest: { $ref: "#/components/schemas/Bytes" }
+                name: { type: string, description: "1-50 characters" }
+                username: { type: string, description: "3-30 of [a-z0-9_], case-insensitive" }
+                email: { type: string }
+                password: { type: string, description: "12-128 characters" }
       responses:
-        "200":
+        "201":
+          description: Code sent
           content:
             application/json:
-              schema:
-                type: object
-                properties:
-                  userId: { $ref: "#/components/schemas/Id" }
-                  registrationResponse: { $ref: "#/components/schemas/Bytes" }
+              schema: { type: object, required: [email], properties: { email: { type: string } } }
         "400": { $ref: "#/components/responses/Error" }
         "409": { $ref: "#/components/responses/Error" }
         "429": { $ref: "#/components/responses/Error" }
-
-  /v1/auth/register/finish:
+  /v1/auth/signup/resend:
     post:
-      summary: Finish registration with OPAQUE upload, public keys and both encrypted backups
+      summary: Send a new code for an unfinished signup (says nothing about whether one exists)
+      security: []
+      requestBody: { $ref: "#/components/requestBodies/Email" }
+      responses:
+        "202": { $ref: "#/components/responses/Status" }
+  /v1/auth/signup/verify:
+    post:
+      summary: Finish a signup with the emailed code; signs this device in
       security: []
       requestBody:
         required: true
@@ -50,31 +56,18 @@ paths:
           application/json:
             schema:
               type: object
-              required: [userId, handle, registrationUpload, identity, device, passwordBackup]
-              properties:
-                userId: { $ref: "#/components/schemas/Id" }
-                handle: { type: string }
-                registrationUpload: { $ref: "#/components/schemas/Bytes" }
-                recoveryMethods:
-                  type: array
-                  description: "One or more (CRYPTO.md 6.3/6.4). Older apps send recoveryPubkey + recoveryBackup instead."
-                  items: { $ref: "#/components/schemas/NewRecoveryMethod" }
-                recoveryPubkey: { $ref: "#/components/schemas/Bytes", description: "Deprecated: a single phrase method's key (32 bytes)" }
-                identity: { $ref: "#/components/schemas/Identity" }
-                device: { $ref: "#/components/schemas/Device" }
-                passwordBackup: { $ref: "#/components/schemas/Bytes" }
-                recoveryBackup: { $ref: "#/components/schemas/Bytes", description: "Deprecated: a single phrase method's copy" }
+              required: [email, code]
+              properties: { email: { type: string }, code: { type: string } }
       responses:
         "200": { $ref: "#/components/responses/Tokens" }
         "400": { $ref: "#/components/responses/Error" }
-
-  /v1/auth/login/start:
+        "409": { $ref: "#/components/responses/Error" }
+  /v1/auth/login:
     post:
-      summary: Start OPAQUE login (unknown handles get an indistinguishable fake response)
+      summary: Log in with a username or email and password
       description: >
-        Every start counts as a failed password attempt until a login finishes (a wrong password fails on the phone).
-        After 3, password login for the handle is locked for 15 minutes, then 1 hour, then 24 hours; a day without
-        attempts starts over. The recovery phrase is never locked, and setting a new password lifts the lock.
+        401 carries `attemptsLeft` (and `lockSeconds` when this failure set a lock); 429 `locked` carries `retryAfter`.
+        An account whose email isn't verified yet answers 403 `email_not_verified` with `email`, and gets a fresh code.
       security: []
       requestBody:
         required: true
@@ -82,244 +75,183 @@ paths:
           application/json:
             schema:
               type: object
-              required: [handle, credentialRequest]
-              properties:
-                handle: { type: string }
-                credentialRequest: { $ref: "#/components/schemas/Bytes" }
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  loginId: { $ref: "#/components/schemas/Id" }
-                  credentialResponse: { $ref: "#/components/schemas/Bytes" }
-                  attemptsLeft: { type: integer, description: "Attempts left after this one before the lock (0: this is the last)" }
-                  lockSeconds: { type: integer, nullable: true, description: "At attemptsLeft 0: how long the lock lasts if this attempt fails" }
-        "429":
-          description: "`locked`: password login is locked; `retryAfter` (also the Retry-After header) is in seconds"
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  error: { type: string }
-                  retryAfter: { type: integer }
-
-  /v1/auth/login/finish:
-    post:
-      summary: Finish OPAQUE login (single use, 60 s)
-      security: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [loginId, handle, credentialFinalization]
-              properties:
-                loginId: { $ref: "#/components/schemas/Id" }
-                handle: { type: string }
-                credentialFinalization: { $ref: "#/components/schemas/Bytes" }
+              required: [login, password]
+              properties: { login: { type: string }, password: { type: string } }
       responses:
         "200": { $ref: "#/components/responses/Tokens" }
         "401": { $ref: "#/components/responses/Error" }
-
-  /v1/auth/refresh:
-    post:
-      summary: Rotate a refresh token (single use)
-      security: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [refreshToken]
-              properties:
-                refreshToken: { type: string }
-      responses:
-        "200": { $ref: "#/components/responses/Tokens" }
-        "401": { $ref: "#/components/responses/Error" }
-
-  /v1/auth/recovery/start:
-    post:
-      summary: Start recovery-phrase login; returns a challenge to sign with the recovery key
-      security: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [handle]
-              properties:
-                handle: { type: string }
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  userId: { $ref: "#/components/schemas/Id" }
-                  challengeId: { $ref: "#/components/schemas/Id" }
-                  nonce: { $ref: "#/components/schemas/Bytes" }
-                  expiresAt: { type: integer, format: int64, description: unix seconds }
-
-  /v1/auth/recovery/finish:
-    post:
-      summary: Finish recovery login; returns a recovery-scoped session
-      security: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [challengeId, signature]
-              properties:
-                challengeId: { $ref: "#/components/schemas/Id" }
-                signature: { $ref: "#/components/schemas/Bytes", description: "64 bytes, CRYPTO.md 6.3" }
-      responses:
-        "200":
-          description: A recovery session and the method that proved it
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - { $ref: "#/components/schemas/Tokens" }
-                  - type: object
-                    properties:
-                      methodId: { $ref: "#/components/schemas/Id" }
-                      methodKind: { type: string, enum: [phrase, passkey] }
-        "401": { $ref: "#/components/responses/Error" }
-
-  /v1/auth/password/start:
-    post:
-      summary: Start setting a new password (OPAQUE re-registration); full or recovery scope
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [handle, registrationRequest]
-              properties:
-                handle: { type: string }
-                registrationRequest: { $ref: "#/components/schemas/Bytes" }
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  registrationResponse: { $ref: "#/components/schemas/Bytes" }
-
-  /v1/auth/password/verify/start:
-    post:
-      summary: Prove the current password before changing it (OPAQUE login for the signed-in user; counts towards the lock, no sign-in alert)
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [handle, credentialRequest]
-              properties:
-                handle: { type: string }
-                credentialRequest: { $ref: "#/components/schemas/Bytes" }
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  loginId: { $ref: "#/components/schemas/Id" }
-                  credentialResponse: { $ref: "#/components/schemas/Bytes" }
-                  attemptsLeft: { type: integer }
-                  lockSeconds: { type: integer, nullable: true }
         "403": { $ref: "#/components/responses/Error" }
         "429": { $ref: "#/components/responses/Error" }
-
-  /v1/auth/password/verify/finish:
+  /v1/auth/refresh:
     post:
-      summary: Finish proving the current password
+      summary: Rotate the refresh token (single use; reusing an old one signs out every device)
+      security: []
       requestBody:
         required: true
         content:
           application/json:
-            schema:
-              type: object
-              required: [loginId, handle, credentialFinalization]
-              properties:
-                loginId: { $ref: "#/components/schemas/Id" }
-                handle: { type: string }
-                credentialFinalization: { $ref: "#/components/schemas/Bytes" }
-      responses:
-        "200":
-          description: Verified; a one-time token (5 minutes) that removing a recovery method needs
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  reauthToken: { type: string }
-        "401": { $ref: "#/components/responses/Error" }
-
-  /v1/auth/password/finish:
-    post:
-      summary: Finish setting a new password; revokes all sessions and returns a full session
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [registrationUpload, passwordBackup]
-              properties:
-                registrationUpload: { $ref: "#/components/schemas/Bytes" }
-                passwordBackup: { $ref: "#/components/schemas/Bytes" }
+            schema: { type: object, required: [refreshToken], properties: { refreshToken: { type: string } } }
       responses:
         "200": { $ref: "#/components/responses/Tokens" }
-
-  /v1/backups/{kind}:
-    parameters:
-      - { name: kind, in: path, required: true, schema: { type: string, enum: [password, recovery] } }
-    get:
-      summary: Download an encrypted key backup (recovery scope may read only kind=recovery)
+        "401": { $ref: "#/components/responses/Error" }
+  /v1/auth/password/forgot:
+    post:
+      summary: Email a password-reset code (says nothing about whether the account exists)
+      security: []
+      requestBody: { $ref: "#/components/requestBodies/Email" }
       responses:
-        "200":
-          content:
-            application/json:
-              schema: { $ref: "#/components/schemas/Backup" }
-        "404": { $ref: "#/components/responses/Error" }
-    put:
-      summary: Replace an encrypted key backup; version must be stored version + 1
+        "202": { $ref: "#/components/responses/Status" }
+  /v1/auth/password/reset:
+    post:
+      summary: Set a new password with the emailed code; signs out every device and signs this one in
+      security: []
       requestBody:
         required: true
         content:
           application/json:
-            schema: { $ref: "#/components/schemas/Backup" }
+            schema:
+              type: object
+              required: [email, code, password]
+              properties: { email: { type: string }, code: { type: string }, password: { type: string } }
+      responses:
+        "200": { $ref: "#/components/responses/Tokens" }
+        "400": { $ref: "#/components/responses/Error" }
+  /v1/auth/password/change:
+    post:
+      summary: Change the password (signed in); other devices are signed out
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [currentPassword, newPassword]
+              properties: { currentPassword: { type: string }, newPassword: { type: string } }
+      responses:
+        "200": { $ref: "#/components/responses/Tokens" }
+        "400": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "429": { $ref: "#/components/responses/Error" }
+  /v1/auth/logout:
+    post:
+      summary: Sign this device out
+      responses:
+        "200": { $ref: "#/components/responses/Status" }
+
+  # ---------------- my account ----------------
+  /v1/me:
+    get:
+      summary: My account
+      responses:
+        "200": { $ref: "#/components/responses/Me" }
+  /v1/me/profile:
+    put:
+      summary: Change my name and bio
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, bio]
+              properties: { name: { type: string }, bio: { type: string, description: "Up to 160 characters" } }
+      responses:
+        "200": { $ref: "#/components/responses/Me" }
+        "400": { $ref: "#/components/responses/Error" }
+  /v1/me/avatar:
+    put:
+      summary: Set my photo to an image I just uploaded
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [objectKey], properties: { objectKey: { $ref: "#/components/schemas/ObjectKey" } } }
+      responses:
+        "200": { $ref: "#/components/responses/Me" }
+        "400": { $ref: "#/components/responses/Error" }
+    delete:
+      summary: Remove my photo
+      responses:
+        "200": { $ref: "#/components/responses/Me" }
+  /v1/me/export:
+    get:
+      summary: A copy of my data (profile, circles, friends, posts, replies, chats) as JSON
       responses:
         "200":
+          description: My data
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/Backup" }
-        "409": { $ref: "#/components/responses/Error" }
-
-  /v1/security-events:
+              schema: { type: object, additionalProperties: true }
+  /v1/me/preview/{friendId}:
     get:
-      summary: Recent sign-ins to my account (30 days, newest first); only the kind and time
+      summary: My posts exactly as this friend sees them
+      parameters:
+        - { name: friendId, in: path, required: true, schema: { $ref: "#/components/schemas/Id" } }
+        - { $ref: "#/components/parameters/Before" }
+        - { $ref: "#/components/parameters/Limit" }
+      responses:
+        "200": { $ref: "#/components/responses/Posts" }
+        "404": { $ref: "#/components/responses/Error" }
+  /v1/account:
+    delete:
+      summary: Delete my account and everything in it (needs my password)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [password], properties: { password: { type: string } } }
+      responses:
+        "200": { $ref: "#/components/responses/Status" }
+        "403": { $ref: "#/components/responses/Error" }
+  /v1/devices:
+    get:
+      summary: The devices and browsers signed in to my account
       responses:
         "200":
+          description: Devices, oldest first
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  required: [deviceId, createdAt, current]
+                  properties:
+                    deviceId: { $ref: "#/components/schemas/Id" }
+                    createdAt: { type: string, format: date-time }
+                    current: { type: boolean }
+  /v1/devices/{deviceId}:
+    delete:
+      summary: Sign a device out
+      parameters:
+        - { name: deviceId, in: path, required: true, schema: { $ref: "#/components/schemas/Id" } }
+      responses:
+        "200": { $ref: "#/components/responses/Status" }
+        "404": { $ref: "#/components/responses/Error" }
+  /v1/devices/current/check-token:
+    post:
+      summary: Turn on background checks for this device; returns its check token
+      responses:
+        "200":
+          description: The check token
+          content:
+            application/json:
+              schema: { type: object, required: [token], properties: { token: { type: string } } }
+    delete:
+      summary: Turn background checks off for this device
+      responses:
+        "200": { $ref: "#/components/responses/Status" }
+  /v1/security-events:
+    get:
+      summary: Recent sign-ins to my account (30 days, newest first)
+      responses:
+        "200":
+          description: Sign-ins
           content:
             application/json:
               schema:
                 type: object
+                required: [events]
                 properties:
                   events:
                     type: array
@@ -331,706 +263,404 @@ paths:
                         kind: { type: string, enum: [sign_in] }
                         createdAt: { type: string, format: date-time }
 
-  /v1/recovery-methods:
+  # ---------------- people ----------------
+  /v1/users/{userId}:
     get:
-      summary: My recovery methods (no keys or ciphertext)
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                type: object
-                required: [methods]
-                properties:
-                  methods:
-                    type: array
-                    items:
-                      type: object
-                      required: [id, kind, createdAt]
-                      properties:
-                        id: { $ref: "#/components/schemas/Id" }
-                        kind: { type: string, enum: [phrase, passkey] }
-                        createdAt: { type: string, format: date-time }
-                        lastUsedAt: { type: string, format: date-time, nullable: true }
-    post:
-      summary: Add a recovery method (or another wrap of my passkey)
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { $ref: "#/components/schemas/NewRecoveryMethod" }
-      responses:
-        "201":
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  id: { $ref: "#/components/schemas/Id" }
-        "409": { $ref: "#/components/responses/Error" }
-
-  /v1/recovery-methods/{id}:
-    parameters:
-      - { name: id, in: path, required: true, schema: { $ref: "#/components/schemas/Id" } }
-    delete:
-      summary: Remove a recovery method (needs X-Circlo-Reauth from password/verify; never the last one)
+      summary: Someone's profile (mine, or someone I'm connected with)
       parameters:
-        - { name: X-Circlo-Reauth, in: header, required: true, schema: { type: string } }
-      responses:
-        "200": { content: { application/json: { schema: { type: object } } } }
-        "403": { $ref: "#/components/responses/Error" }
-        "404": { $ref: "#/components/responses/Error" }
-        "409": { $ref: "#/components/responses/Error" }
-
-  /v1/recovery-methods/{id}/backup:
-    parameters:
-      - { name: id, in: path, required: true, schema: { $ref: "#/components/schemas/Id" } }
-    get:
-      summary: The recovery copy of one of my methods (full or recovery session)
+        - { name: userId, in: path, required: true, schema: { $ref: "#/components/schemas/Id" } }
       responses:
         "200":
+          description: Their profile
           content:
             application/json:
               schema:
                 type: object
-                required: [ciphertext]
+                required: [userId, name, username, bio, relation, friendCount]
                 properties:
-                  ciphertext: { $ref: "#/components/schemas/Bytes" }
+                  userId: { $ref: "#/components/schemas/Id" }
+                  name: { type: string }
+                  username: { type: string }
+                  bio: { type: string }
+                  avatarUrl: { type: [string, "null"] }
+                  relation: { type: string, enum: [me, accepted, incoming, outgoing] }
+                  friendCount: { type: integer }
         "404": { $ref: "#/components/responses/Error" }
-
-  /v1/devices:
+  /v1/users/{userId}/posts:
     get:
-      summary: List this account's devices
+      summary: Someone's posts that I may see, newest first
+      parameters:
+        - { name: userId, in: path, required: true, schema: { $ref: "#/components/schemas/Id" } }
+        - { $ref: "#/components/parameters/Before" }
+        - { $ref: "#/components/parameters/Limit" }
       responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                type: array
-                items: { $ref: "#/components/schemas/DeviceView" }
-    post:
-      summary: Register another device (certificate signed by the identity key)
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { $ref: "#/components/schemas/Device" }
-      responses:
-        "201":
-          content:
-            application/json:
-              schema: { $ref: "#/components/schemas/DeviceView" }
-
-  /v1/users/{userId}/identity:
-    parameters:
-      - { name: userId, in: path, required: true, schema: { $ref: "#/components/schemas/Id" } }
-    get:
-      summary: A user's published identity keys (clients pin them; changes trigger a warning)
-      responses:
-        "200":
-          content:
-            application/json:
-              schema: { $ref: "#/components/schemas/Identity" }
-
-  /v1/identity:
-    put:
-      summary: Publish a new identity key version (rotation); version must increase
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { $ref: "#/components/schemas/Identity" }
-      responses:
-        "200":
-          content:
-            application/json:
-              schema: { $ref: "#/components/schemas/Identity" }
-
+        "200": { $ref: "#/components/responses/Posts" }
   /v1/invites:
     post:
-      summary: Register an invite by the hash of a client-generated token (7 days, single use)
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [tokenHash]
-              properties:
-                tokenHash: { $ref: "#/components/schemas/Bytes" }
+      summary: A single-use invite link (7 days)
       responses:
-        "201": { content: { application/json: { schema: { type: object, properties: { expiresAt: { type: string, format: date-time } } } } } }
-
+        "201":
+          description: The invite
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [token, link, expiresAt]
+                properties:
+                  token: { type: string }
+                  link: { type: string }
+                  expiresAt: { type: string, format: date-time }
+        "409": { $ref: "#/components/responses/Error" }
   /v1/invites/redeem:
     post:
-      summary: Redeem an invite token; returns the inviter's identity (check it against the link's fingerprint)
+      summary: Use an invite; returns who sent it
       requestBody:
         required: true
         content:
           application/json:
-            schema:
-              type: object
-              required: [token]
-              properties:
-                token: { $ref: "#/components/schemas/Bytes" }
+            schema: { type: object, required: [token], properties: { token: { type: string } } }
       responses:
-        "200": { content: { application/json: { schema: { $ref: "#/components/schemas/UserWithIdentity" } } } }
+        "200":
+          description: Who sent it
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Person" }
+        "400": { $ref: "#/components/responses/Error" }
         "404": { $ref: "#/components/responses/Error" }
-
-  /v1/epochs:
-    post:
-      summary: Register a new active epoch for me
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [epochId]
-              properties:
-                epochId: { $ref: "#/components/schemas/Id" }
-      responses:
-        "201": { content: { application/json: { schema: { type: object, properties: { epochId: { $ref: "#/components/schemas/Id" } } } } } }
-
   /v1/friends:
     get:
-      summary: My connections (incoming/outgoing requests and accepted friends)
+      summary: My friends and pending requests (with the circles I put each one in)
       responses:
         "200":
+          description: Connections
           content:
             application/json:
               schema:
                 type: array
                 items:
                   type: object
+                  required: [userId, status, since, name, username, circles]
                   properties:
                     userId: { $ref: "#/components/schemas/Id" }
-                    status: { type: string, enum: [incoming, outgoing, accepted] }
+                    status: { type: string, enum: [accepted, incoming, outgoing] }
                     since: { type: string, format: date-time }
-
+                    name: { type: string }
+                    username: { type: string }
+                    avatarUrl: { type: [string, "null"] }
+                    circles: { type: array, items: { type: integer } }
   /v1/friends/requests:
     post:
-      summary: Send a friend request with my friend payload; only after redeeming their invite (403 otherwise, there is no search)
+      summary: Ask someone whose invite I redeemed to connect, putting them in my circles
       requestBody:
         required: true
         content:
           application/json:
             schema:
               type: object
-              required: [toUserId, epochId, payload]
+              required: [toUserId]
               properties:
                 toUserId: { $ref: "#/components/schemas/Id" }
-                epochId: { $ref: "#/components/schemas/Id" }
-                payload: { $ref: "#/components/schemas/Bytes" }
+                circles: { type: array, items: { type: integer } }
       responses:
-        "201": { content: { application/json: { schema: { type: object } } } }
+        "201": { $ref: "#/components/responses/Status" }
         "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
         "409": { $ref: "#/components/responses/Error" }
-
+  /v1/friends/{userId}:
+    delete:
+      summary: Unfriend (or cancel my request)
+      parameters:
+        - { name: userId, in: path, required: true, schema: { $ref: "#/components/schemas/Id" } }
+      responses:
+        "200": { $ref: "#/components/responses/Status" }
+        "404": { $ref: "#/components/responses/Error" }
   /v1/friends/{userId}/accept:
-    parameters:
-      - { name: userId, in: path, required: true, schema: { $ref: "#/components/schemas/Id" } }
     post:
-      summary: Accept an incoming request with my friend payload
+      summary: Accept a request, putting them in my circles
+      parameters:
+        - { name: userId, in: path, required: true, schema: { $ref: "#/components/schemas/Id" } }
+      requestBody:
+        content:
+          application/json:
+            schema: { type: object, properties: { circles: { type: array, items: { type: integer } } } }
+      responses:
+        "200": { $ref: "#/components/responses/Status" }
+        "404": { $ref: "#/components/responses/Error" }
+  /v1/friends/{userId}/decline:
+    post:
+      summary: Decline a request
+      parameters:
+        - { name: userId, in: path, required: true, schema: { $ref: "#/components/schemas/Id" } }
+      responses:
+        "200": { $ref: "#/components/responses/Status" }
+        "404": { $ref: "#/components/responses/Error" }
+  /v1/friends/{userId}/circles:
+    put:
+      summary: Set which of my circles they're in (silent)
+      parameters:
+        - { name: userId, in: path, required: true, schema: { $ref: "#/components/schemas/Id" } }
       requestBody:
         required: true
         content:
           application/json:
-            schema:
-              type: object
-              required: [epochId, payload]
-              properties:
-                epochId: { $ref: "#/components/schemas/Id" }
-                payload: { $ref: "#/components/schemas/Bytes" }
-      responses:
-        "200": { content: { application/json: { schema: { type: object } } } }
-
-  /v1/friends/{userId}/decline:
-    parameters:
-      - { name: userId, in: path, required: true, schema: { $ref: "#/components/schemas/Id" } }
-    post:
-      summary: Decline an incoming request
-      responses:
-        "200": { content: { application/json: { schema: { type: object } } } }
-
-  /v1/friend-payloads:
-    get:
-      summary: Friend payloads addressed to me from one connected user
-      parameters:
-        - { name: from, in: query, required: true, schema: { $ref: "#/components/schemas/Id" } }
+            schema: { type: object, required: [circles], properties: { circles: { type: array, items: { type: integer } } } }
       responses:
         "200":
+          description: The circles they're in now
+          content:
+            application/json:
+              schema: { type: object, required: [circles], properties: { circles: { type: array, items: { type: integer } } } }
+        "404": { $ref: "#/components/responses/Error" }
+  /v1/circles:
+    get:
+      summary: My circles with their members (only ever shown to me)
+      responses:
+        "200":
+          description: My circles
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: "#/components/schemas/Circle" } }
+    post:
+      summary: Add a circle (up to 8)
+      requestBody: { $ref: "#/components/requestBodies/CircleName" }
+      responses:
+        "201":
+          description: The new circle
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Circle" }
+        "409": { $ref: "#/components/responses/Error" }
+  /v1/circles/{id}:
+    put:
+      summary: Rename a circle
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      requestBody: { $ref: "#/components/requestBodies/CircleName" }
+      responses:
+        "200": { $ref: "#/components/responses/Status" }
+        "404": { $ref: "#/components/responses/Error" }
+    delete:
+      summary: Delete a circle (posts already shared with it keep their audience)
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        "200": { $ref: "#/components/responses/Status" }
+        "404": { $ref: "#/components/responses/Error" }
+  /v1/blocks:
+    get:
+      summary: People I blocked
+      responses:
+        "200":
+          description: Blocked people, newest first
           content:
             application/json:
               schema:
                 type: array
                 items:
                   type: object
+                  required: [userId, name, username, createdAt]
                   properties:
-                    fromUserId: { $ref: "#/components/schemas/Id" }
-                    epochId: { $ref: "#/components/schemas/Id" }
-                    ciphertext: { $ref: "#/components/schemas/Bytes" }
+                    userId: { $ref: "#/components/schemas/Id" }
+                    name: { type: string }
+                    username: { type: string }
                     createdAt: { type: string, format: date-time }
-    put:
-      summary: Send a (re-)wrapped friend payload to an accepted friend
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [toUserId, epochId, ciphertext]
-              properties:
-                toUserId: { $ref: "#/components/schemas/Id" }
-                epochId: { $ref: "#/components/schemas/Id" }
-                ciphertext: { $ref: "#/components/schemas/Bytes" }
+  /v1/blocks/{userId}:
+    post:
+      summary: Block someone (ends any connection)
+      parameters:
+        - { name: userId, in: path, required: true, schema: { $ref: "#/components/schemas/Id" } }
       responses:
-        "200": { content: { application/json: { schema: { type: object } } } }
-
-  /v1/friend-payloads/batch:
-    put:
-      summary: Re-wrap for many friends at once after an epoch rotation (all-or-nothing, up to 500)
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [payloads]
-              properties:
-                payloads:
-                  type: array
-                  maxItems: 500
-                  items:
-                    type: object
-                    required: [toUserId, epochId, ciphertext]
-                    properties:
-                      toUserId: { $ref: "#/components/schemas/Id" }
-                      epochId: { $ref: "#/components/schemas/Id" }
-                      ciphertext: { $ref: "#/components/schemas/Bytes" }
-      responses:
-        "200": { content: { application/json: { schema: { type: object } } } }
-        "403": { $ref: "#/components/responses/Error" }
-
-  /v1/friends/{userId}:
-    parameters:
-      - { name: userId, in: path, required: true, schema: { $ref: "#/components/schemas/Id" } }
+        "200": { $ref: "#/components/responses/Status" }
+        "404": { $ref: "#/components/responses/Error" }
     delete:
-      summary: Unfriend (removes the friendship and all payloads between us; the client then rotates its epoch)
+      summary: Unblock
+      parameters:
+        - { name: userId, in: path, required: true, schema: { $ref: "#/components/schemas/Id" } }
       responses:
-        "200": { content: { application/json: { schema: { type: object } } } }
+        "200": { $ref: "#/components/responses/Status" }
+  /v1/reports:
+    post:
+      summary: Report a post, person or chat message
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [kind, targetId, reason]
+              properties:
+                kind: { type: string, enum: [post, user, message] }
+                targetId: { $ref: "#/components/schemas/Id" }
+                reason: { type: string }
+                note: { type: string }
+      responses:
+        "201": { $ref: "#/components/responses/Status" }
         "404": { $ref: "#/components/responses/Error" }
 
-  /v1/blobs/{kind}:
-    parameters:
-      - { name: kind, in: path, required: true, schema: { type: string, enum: [address_book, settings, profile] } }
-    get:
-      summary: My encrypted blob
-      responses:
-        "200": { content: { application/json: { schema: { $ref: "#/components/schemas/Blob" } } } }
-        "404": { $ref: "#/components/responses/Error" }
-    put:
-      summary: Write my encrypted blob (version 1 creates; then stored version + 1; profile needs epochId)
-      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/Blob" } } } }
-      responses:
-        "200": { content: { application/json: { schema: { $ref: "#/components/schemas/Blob" } } } }
-        "409": { $ref: "#/components/responses/Error" }
-
-  /v1/users/{userId}/profile:
-    parameters:
-      - { name: userId, in: path, required: true, schema: { $ref: "#/components/schemas/Id" } }
-    get:
-      summary: A connected user's encrypted profile
-      responses:
-        "200": { content: { application/json: { schema: { $ref: "#/components/schemas/Blob" } } } }
-        "404": { $ref: "#/components/responses/Error" }
-
+  # ---------------- media ----------------
   /v1/media/uploads:
     post:
-      summary: Upload slots - random object keys with PUT URLs locked to each declared padded ciphertext size (15 min)
+      summary: Upload slots (presigned PUT URLs locked to each size and type, 15 minutes)
       requestBody:
         required: true
         content:
           application/json:
             schema:
               type: object
-              required: [sizes]
+              required: [files]
               properties:
-                sizes: { type: array, maxItems: 12, items: { type: integer, format: int64, minimum: 1 } }
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  type: object
-                  properties:
-                    objectKey: { type: string }
-                    putUrl: { type: string }
-                    ctSize: { type: integer, format: int64 }
-
-  /v1/media/download-urls:
-    post:
-      summary: 5-minute GET URLs for media attached to posts I may read
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [objectKeys]
-              properties:
-                objectKeys: { type: array, maxItems: 50, items: { type: string } }
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  type: object
-                  properties:
-                    objectKey: { type: string }
-                    getUrl: { type: string }
-        "404": { $ref: "#/components/responses/Error" }
-
-  /v1/posts:
-    post:
-      summary: Create a post (encrypted header + key ref + uploaded media objects)
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [postId, epochId, keyRef, headerCt, media, readTokenHash]
-              properties:
-                postId: { $ref: "#/components/schemas/Id" }
-                epochId: { $ref: "#/components/schemas/Id" }
-                keyRef: { $ref: "#/components/schemas/Bytes" }
-                headerCt: { $ref: "#/components/schemas/Bytes" }
-                readTokenHash: { $ref: "#/components/schemas/Bytes" }
-                media:
+                files:
                   type: array
                   items:
                     type: object
-                    required: [objectKey, kind]
+                    required: [size, mime]
                     properties:
-                      objectKey: { type: string }
-                      kind: { type: string, enum: [full, thumb, poster] }
+                      size: { type: integer, format: int64 }
+                      mime: { type: string, enum: [image/jpeg, image/png, image/webp, video/mp4, video/quicktime, video/webm] }
       responses:
-        "201": { content: { application/json: { schema: { type: object } } } }
+        "200":
+          description: One slot per file, in order
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  required: [objectKey, putUrl, size, mime]
+                  properties:
+                    objectKey: { $ref: "#/components/schemas/ObjectKey" }
+                    putUrl: { type: string }
+                    size: { type: integer, format: int64 }
+                    mime: { type: string }
         "400": { $ref: "#/components/responses/Error" }
 
-  /v1/posts/{postId}:
-    parameters:
-      - { name: postId, in: path, required: true, schema: { $ref: "#/components/schemas/Id" } }
-    delete:
-      summary: Delete my post
-      responses:
-        "200": { content: { application/json: { schema: { type: object } } } }
-
-  /v1/users/{userId}/posts:
-    parameters:
-      - { name: userId, in: path, required: true, schema: { $ref: "#/components/schemas/Id" } }
+  # ---------------- posts ----------------
+  /v1/feed:
     get:
-      summary: An author's posts, newest first (author and accepted friends only)
+      summary: My posts and my friends' posts that I may see, newest first
       parameters:
-        - { name: before, in: query, required: false, schema: { type: string, format: date-time } }
-        - { name: limit, in: query, required: false, schema: { type: integer, maximum: 100 } }
+        - { $ref: "#/components/parameters/Before" }
+        - { $ref: "#/components/parameters/Limit" }
       responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                type: array
-                items: { $ref: "#/components/schemas/PostView" }
-        "404": { $ref: "#/components/responses/Error" }
-
-  /v1/posts/{postId}/replies:
-    parameters:
-      - { name: postId, in: path, required: true, schema: { $ref: "#/components/schemas/Id" } }
-      - { $ref: "#/components/parameters/ReadToken" }
-    get:
-      summary: Encrypted replies, oldest first (readers of the author only)
-      parameters:
-        - { name: after, in: query, required: false, schema: { type: string, format: date-time } }
-        - { name: limit, in: query, required: false, schema: { type: integer, maximum: 200 } }
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                type: array
-                items: { $ref: "#/components/schemas/ReplyView" }
-        "404": { $ref: "#/components/responses/Error" }
+        "200": { $ref: "#/components/responses/Posts" }
+  /v1/posts:
     post:
-      summary: Add an encrypted reply (sealed under a key derived from the post key)
+      summary: Create a post
       requestBody:
         required: true
         content:
           application/json:
             schema:
               type: object
-              required: [replyId, ciphertext]
+              required: [text, audience]
               properties:
-                replyId: { $ref: "#/components/schemas/Id" }
-                ciphertext: { $ref: "#/components/schemas/Bytes" }
+                text: { type: string, description: "Up to 500 characters; may be empty with media" }
+                audience: { $ref: "#/components/schemas/Audience" }
+                media: { type: array, items: { $ref: "#/components/schemas/NewAttachment" } }
       responses:
-        "201": { content: { application/json: { schema: { type: object } } } }
+        "201":
+          description: The new post
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Post" }
+        "400": { $ref: "#/components/responses/Error" }
+  /v1/posts/{postId}:
+    get:
+      summary: One post I may see
+      parameters:
+        - { $ref: "#/components/parameters/PostId" }
+      responses:
+        "200":
+          description: The post
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Post" }
         "404": { $ref: "#/components/responses/Error" }
-        "409": { $ref: "#/components/responses/Error" }
-
-  /v1/posts/{postId}/replies/{replyId}:
-    parameters:
-      - { name: postId, in: path, required: true, schema: { $ref: "#/components/schemas/Id" } }
-      - { name: replyId, in: path, required: true, schema: { $ref: "#/components/schemas/Id" } }
-      - { $ref: "#/components/parameters/ReadToken" }
     delete:
-      summary: Delete a reply (its author or the post's author)
+      summary: Delete my post
+      parameters:
+        - { $ref: "#/components/parameters/PostId" }
       responses:
-        "200": { content: { application/json: { schema: { type: object } } } }
+        "200": { $ref: "#/components/responses/Status" }
         "404": { $ref: "#/components/responses/Error" }
-
-  /v1/posts/{postId}/like:
-    parameters:
-      - { name: postId, in: path, required: true, schema: { $ref: "#/components/schemas/Id" } }
-      - { $ref: "#/components/parameters/ReadToken" }
-    put:
-      summary: Like (idempotent)
+  /v1/posts/{postId}/replies:
+    get:
+      summary: Replies, oldest first
+      parameters:
+        - { $ref: "#/components/parameters/PostId" }
+        - { name: after, in: query, schema: { type: string, format: date-time } }
+        - { $ref: "#/components/parameters/Limit" }
       responses:
-        "200": { content: { application/json: { schema: { type: object } } } }
+        "200":
+          description: Replies
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: "#/components/schemas/Reply" } }
+        "404": { $ref: "#/components/responses/Error" }
+    post:
+      summary: Reply
+      parameters:
+        - { $ref: "#/components/parameters/PostId" }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [text], properties: { text: { type: string } } }
+      responses:
+        "201":
+          description: The new reply
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Reply" }
+        "400": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+  /v1/posts/{postId}/replies/{replyId}:
+    delete:
+      summary: Delete a reply (mine, or any on my post)
+      parameters:
+        - { $ref: "#/components/parameters/PostId" }
+        - { name: replyId, in: path, required: true, schema: { $ref: "#/components/schemas/Id" } }
+      responses:
+        "200": { $ref: "#/components/responses/Status" }
+        "404": { $ref: "#/components/responses/Error" }
+  /v1/posts/{postId}/like:
+    put:
+      summary: Like
+      parameters:
+        - { $ref: "#/components/parameters/PostId" }
+      responses:
+        "200": { $ref: "#/components/responses/Status" }
         "404": { $ref: "#/components/responses/Error" }
     delete:
       summary: Unlike
+      parameters:
+        - { $ref: "#/components/parameters/PostId" }
       responses:
-        "200": { content: { application/json: { schema: { type: object } } } }
+        "200": { $ref: "#/components/responses/Status" }
         "404": { $ref: "#/components/responses/Error" }
-
   /v1/posts/{postId}/likes:
-    parameters:
-      - { name: postId, in: path, required: true, schema: { $ref: "#/components/schemas/Id" } }
-      - { $ref: "#/components/parameters/ReadToken" }
     get:
-      summary: Who liked a post (clients show it only if they can decrypt the post)
+      summary: Who liked a post
+      parameters:
+        - { $ref: "#/components/parameters/PostId" }
       responses:
         "200":
+          description: Likers, oldest first
           content:
             application/json:
-              schema:
-                type: array
-                items:
-                  type: object
-                  properties:
-                    userId: { $ref: "#/components/schemas/Id" }
-                    createdAt: { type: string, format: date-time }
+              schema: { type: array, items: { $ref: "#/components/schemas/Person" } }
         "404": { $ref: "#/components/responses/Error" }
 
-  /v1/feed:
-    get:
-      summary: My posts and my accepted friends' posts, newest first (headers only; readers decrypt locally)
-      parameters:
-        - { name: before, in: query, required: false, schema: { type: string, format: date-time } }
-        - { name: limit, in: query, required: false, schema: { type: integer, maximum: 200 } }
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                type: array
-                items: { $ref: "#/components/schemas/PostView" }
-
-  /v1/mls/key-packages:
-    put:
-      summary: Upload one-time key packages for my device and replace its last-resort package
-      parameters:
-      - { $ref: "#/components/parameters/Device" }
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [keyPackages]
-              properties:
-                keyPackages: { type: array, maxItems: 50, items: { $ref: "#/components/schemas/Bytes" } }
-                lastResort: { $ref: "#/components/schemas/Bytes" }
-      responses:
-        "200": { content: { application/json: { schema: { type: object, properties: { available: { type: integer } } } } } }
-
-  /v1/mls/key-packages/claim:
-    post:
-      summary: One key package per device of each user (me or accepted friends)
-      parameters:
-      - { $ref: "#/components/parameters/Device" }
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [userIds]
-              properties:
-                userIds: { type: array, maxItems: 50, items: { $ref: "#/components/schemas/Id" } }
-                deviceIds: { type: array, maxItems: 200, items: { $ref: "#/components/schemas/Id" } }
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  keyPackages:
-                    type: array
-                    items:
-                      type: object
-                      properties:
-                        userId: { $ref: "#/components/schemas/Id" }
-                        deviceId: { $ref: "#/components/schemas/Id" }
-                        keyPackage: { $ref: "#/components/schemas/Bytes" }
-        "404": { $ref: "#/components/responses/Error" }
-
-  /v1/mls/groups:
-    get:
-      summary: Groups this device belongs to
-      parameters:
-      - { $ref: "#/components/parameters/Device" }
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  type: object
-                  properties:
-                    groupId: { $ref: "#/components/schemas/Id" }
-                    epoch: { type: integer, format: int64 }
-                    lastSeq: { type: integer, format: int64 }
-    post:
-      summary: Register a new group (this device is its first member)
-      parameters:
-      - { $ref: "#/components/parameters/Device" }
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [groupId]
-              properties:
-                groupId: { $ref: "#/components/schemas/Id" }
-      responses:
-        "201": { content: { application/json: { schema: { type: object } } } }
-
-  /v1/mls/groups/{groupId}/messages:
-    parameters:
-      - { name: groupId, in: path, required: true, schema: { $ref: "#/components/schemas/Id" } }
-      - { $ref: "#/components/parameters/Device" }
-    get:
-      summary: The group's log after a sequence number (members only)
-      parameters:
-        - { name: after, in: query, required: false, schema: { type: integer, format: int64 } }
-        - { name: limit, in: query, required: false, schema: { type: integer, maximum: 500 } }
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  type: object
-                  properties:
-                    seq: { type: integer, format: int64 }
-                    message: { $ref: "#/components/schemas/Bytes" }
-                    createdAt: { type: string, format: date-time }
-        "404": { $ref: "#/components/responses/Error" }
-    post:
-      summary: Append an MLS message; commits must target the current epoch and list their membership changes
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [message]
-              properties:
-                message: { $ref: "#/components/schemas/Bytes" }
-                addDevices: { type: array, items: { $ref: "#/components/schemas/Id" } }
-                removeDevices: { type: array, items: { $ref: "#/components/schemas/Id" } }
-                welcome: { $ref: "#/components/schemas/Bytes" }
-      responses:
-        "201": { content: { application/json: { schema: { type: object, properties: { seq: { type: integer, format: int64 } } } } } }
-        "400": { $ref: "#/components/responses/Error" }
-        "404": { $ref: "#/components/responses/Error" }
-        "409": { $ref: "#/components/responses/Error" }
-
-  /v1/mls/welcomes:
-    get:
-      summary: Welcomes waiting for this device
-      parameters:
-      - { $ref: "#/components/parameters/Device" }
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  type: object
-                  properties:
-                    welcomeId: { $ref: "#/components/schemas/Id" }
-                    groupId: { $ref: "#/components/schemas/Id" }
-                    welcome: { $ref: "#/components/schemas/Bytes" }
-                    afterSeq: { type: integer, format: int64 }
-
-  /v1/mls/welcomes/{welcomeId}:
-    parameters:
-      - { name: welcomeId, in: path, required: true, schema: { $ref: "#/components/schemas/Id" } }
-      - { $ref: "#/components/parameters/Device" }
-    delete:
-      summary: Drop a processed welcome
-      responses:
-        "200": { content: { application/json: { schema: { type: object } } } }
-
-  /v1/devices/{deviceId}:
-    parameters:
-      - { name: deviceId, in: path, required: true, schema: { $ref: "#/components/schemas/Id" } }
-    delete:
-      summary: Revoke one of my devices (removed from chats, no more pushes, key packages deleted)
-      responses:
-        "200": { content: { application/json: { schema: { type: object } } } }
-        "404": { $ref: "#/components/responses/Error" }
-
-  /v1/devices/{deviceId}/check-token:
-    parameters:
-      - { name: deviceId, in: path, required: true, schema: { $ref: "#/components/schemas/Id" } }
-    post:
-      summary: Turn on background checks for this device (replaces any earlier check token)
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                type: object
-                required: [token]
-                properties:
-                  token: { type: string, description: "Only for GET /v1/activity/pending (X-Circlo-Check-Token)" }
-        "404": { $ref: "#/components/responses/Error" }
-    delete:
-      summary: Turn off background checks for this device
-      responses:
-        "200": { content: { application/json: { schema: { type: object } } } }
-
+  # ---------------- activity ----------------
   /v1/activity:
     get:
-      summary: Replies and likes by other people on my posts, newest first (people I blocked are left out)
+      summary: Replies and likes on my posts, newest first
       parameters:
-        - { name: before, in: query, schema: { type: string, format: date-time } }
-        - { name: limit, in: query, schema: { type: integer, default: 50, maximum: 100 } }
+        - { $ref: "#/components/parameters/Before" }
+        - { $ref: "#/components/parameters/Limit" }
       responses:
         "200":
+          description: Activity
           content:
             application/json:
               schema:
@@ -1041,23 +671,26 @@ paths:
                     type: array
                     items:
                       type: object
-                      required: [kind, postId, actorId, createdAt]
+                      required: [kind, postId, postText, actorId, actor, createdAt]
                       properties:
                         kind: { type: string, enum: [reply, like] }
                         postId: { $ref: "#/components/schemas/Id" }
+                        postText: { type: string }
                         actorId: { $ref: "#/components/schemas/Id" }
-                        replyId: { $ref: "#/components/schemas/Id" }
+                        actor: { $ref: "#/components/schemas/Person" }
+                        replyId: { type: [string, "null"], format: uuid }
+                        replyText: { type: [string, "null"] }
                         createdAt: { type: string, format: date-time }
-
   /v1/activity/pending:
     get:
-      summary: Counts of new activity since a time, for a background check (no session; the device's check token)
+      summary: Counts of new activity since a time (background checks; authenticated by the check token)
       security: []
       parameters:
         - { name: since, in: query, required: true, schema: { type: string, format: date-time } }
         - { name: X-Circlo-Check-Token, in: header, required: true, schema: { type: string } }
       responses:
         "200":
+          description: Counts
           content:
             application/json:
               schema:
@@ -1070,307 +703,305 @@ paths:
                   messages: { type: integer }
                   signIns: { type: integer }
         "401": { $ref: "#/components/responses/Error" }
-        "429": { $ref: "#/components/responses/Error" }
 
-  /v1/device-links:
+  # ---------------- chats ----------------
+  /v1/chats:
+    get:
+      summary: My chats, most recent first
+      responses:
+        "200":
+          description: Chats
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: "#/components/schemas/Chat" } }
     post:
-      summary: Hand off account secrets sealed to a new device's QR key (single use, 10 minutes)
+      summary: Start a chat with friends (a 1:1 chat that exists already is reused)
       requestBody:
         required: true
         content:
           application/json:
             schema:
               type: object
-              required: [linkId, sealed]
+              required: [userIds]
               properties:
-                linkId: { $ref: "#/components/schemas/Bytes" }
-                sealed: { $ref: "#/components/schemas/Bytes" }
+                userIds: { type: array, items: { $ref: "#/components/schemas/Id" } }
+                name: { type: string }
       responses:
-        "201": { content: { application/json: { schema: { type: object } } } }
-
-  /v1/device-links/{linkId}:
-    parameters:
-      - { name: linkId, in: path, required: true, schema: { type: string } }
-    get:
-      summary: The new device picks up its hand-off once, with a session (no auth; rate-limited)
-      security: []
-      responses:
-        "200":
+        "201":
+          description: The chat
           content:
             application/json:
-              schema:
-                type: object
-                properties:
-                  userId: { $ref: "#/components/schemas/Id" }
-                  sealed: { $ref: "#/components/schemas/Bytes" }
-                  accessToken: { type: string }
-                  refreshToken: { type: string }
+              schema: { $ref: "#/components/schemas/Chat" }
+        "400": { $ref: "#/components/responses/Error" }
+  /v1/chats/{chatId}:
+    get:
+      summary: One chat
+      parameters:
+        - { $ref: "#/components/parameters/ChatId" }
+      responses:
+        "200":
+          description: The chat
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Chat" }
         "404": { $ref: "#/components/responses/Error" }
-
-  /v1/mls/groups/{groupId}/missing-devices:
-    parameters:
-      - { name: groupId, in: path, required: true, schema: { $ref: "#/components/schemas/Id" } }
-      - { $ref: "#/components/parameters/Device" }
-    get:
-      summary: Members' active devices that aren't in the group yet (e.g. a new phone)
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  type: object
-                  properties:
-                    userId: { $ref: "#/components/schemas/Id" }
-                    deviceId: { $ref: "#/components/schemas/Id" }
-
-  /v1/mls/groups/{groupId}/media:
-    parameters:
-      - { name: groupId, in: path, required: true, schema: { $ref: "#/components/schemas/Id" } }
-      - { $ref: "#/components/parameters/Device" }
+  /v1/chats/{chatId}/members:
     post:
-      summary: Attach my uploaded objects to a chat (members-only downloads)
+      summary: Add friends to a chat
+      parameters:
+        - { $ref: "#/components/parameters/ChatId" }
       requestBody:
         required: true
         content:
           application/json:
             schema:
               type: object
-              required: [objectKeys]
-              properties:
-                objectKeys: { type: array, maxItems: 12, items: { type: string } }
+              required: [userIds]
+              properties: { userIds: { type: array, items: { $ref: "#/components/schemas/Id" } } }
       responses:
-        "200": { content: { application/json: { schema: { type: object } } } }
+        "200":
+          description: The chat
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Chat" }
         "400": { $ref: "#/components/responses/Error" }
-
-  /v1/posts/stats:
-    post:
-      summary: Reply/like counts for posts I can prove I can read (one read token each)
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [items]
-              properties:
-                items:
-                  type: array
-                  maxItems: 200
-                  items:
-                    type: object
-                    required: [postId, readToken]
-                    properties:
-                      postId: { $ref: "#/components/schemas/Id" }
-                      readToken: { $ref: "#/components/schemas/Bytes" }
+  /v1/chats/{chatId}/members/{userId}:
+    delete:
+      summary: Remove someone from a chat, or leave it (my own id)
+      parameters:
+        - { $ref: "#/components/parameters/ChatId" }
+        - { name: userId, in: path, required: true, schema: { $ref: "#/components/schemas/Id" } }
       responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  type: object
-                  properties:
-                    postId: { $ref: "#/components/schemas/Id" }
-                    replyCount: { type: integer }
-                    likeCount: { type: integer }
-                    likedByMe: { type: boolean }
-
-  /v1/blocks:
-    get:
-      summary: People I blocked
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  type: object
-                  properties:
-                    userId: { $ref: "#/components/schemas/Id" }
-                    createdAt: { type: string, format: date-time }
-
-  /v1/blocks/{userId}:
-    parameters:
-      - { name: userId, in: path, required: true, schema: { $ref: "#/components/schemas/Id" } }
-    post:
-      summary: Block (removes any friendship; no requests or invites either way)
-      responses:
-        "200": { content: { application/json: { schema: { type: object } } } }
+        "200": { $ref: "#/components/responses/Status" }
         "404": { $ref: "#/components/responses/Error" }
-    delete:
-      summary: Unblock
-      responses:
-        "200": { content: { application/json: { schema: { type: object } } } }
-
-  /v1/reports:
-    post:
-      summary: Report something to the operator, sealed on the phone to the moderation key (CRYPTO.md 13c)
-      description: The id is bound into the sealed report's AAD; the server stores ciphertext only.
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [reportId, sealed]
-              properties:
-                reportId: { $ref: "#/components/schemas/Id" }
-                sealed: { $ref: "#/components/schemas/Bytes", description: "HPKE ciphertext, 64 bytes to 4 MiB" }
-      responses:
-        "201": { content: { application/json: { schema: { type: object } } } }
-        "400": { $ref: "#/components/responses/Error" }
-        "409": { $ref: "#/components/responses/Error" }
-        "429": { $ref: "#/components/responses/Error" }
-
-  /v1/config:
+  /v1/chats/{chatId}/messages:
     get:
-      summary: Client configuration
+      summary: Messages after `after`, or the latest page before `before` (both oldest first)
+      parameters:
+        - { $ref: "#/components/parameters/ChatId" }
+        - { name: after, in: query, schema: { type: integer, format: int64 } }
+        - { name: before, in: query, schema: { type: integer, format: int64 } }
+        - { $ref: "#/components/parameters/Limit" }
       responses:
         "200":
+          description: Messages
           content:
             application/json:
-              schema:
-                type: object
-                required: [moderationPublicKey]
-                properties:
-                  moderationPublicKey: { type: string, description: "Operator's moderation key (base64); empty = reporting off" }
-
-  /v1/account:
-    delete:
-      summary: Delete my account and everything I left behind (retype the handle to confirm)
+              schema: { type: array, items: { $ref: "#/components/schemas/Message" } }
+        "404": { $ref: "#/components/responses/Error" }
+    post:
+      summary: Send a message
+      parameters:
+        - { $ref: "#/components/parameters/ChatId" }
       requestBody:
         required: true
         content:
           application/json:
             schema:
               type: object
-              required: [handle]
+              required: [text]
               properties:
-                handle: { type: string }
+                text: { type: string }
+                media: { type: array, items: { $ref: "#/components/schemas/NewAttachment" } }
       responses:
-        "200": { content: { application/json: { schema: { type: object } } } }
+        "201":
+          description: The message
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Message" }
         "400": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+  /v1/chats/{chatId}/messages/{messageId}:
+    delete:
+      summary: Delete one of my messages for everyone
+      parameters:
+        - { $ref: "#/components/parameters/ChatId" }
+        - { name: messageId, in: path, required: true, schema: { $ref: "#/components/schemas/Id" } }
+      responses:
+        "200": { $ref: "#/components/responses/Status" }
+        "404": { $ref: "#/components/responses/Error" }
+  /v1/chats/{chatId}/read:
+    post:
+      summary: Mark messages up to `seq` as read
+      parameters:
+        - { $ref: "#/components/parameters/ChatId" }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [seq], properties: { seq: { type: integer, format: int64 } } }
+      responses:
+        "200": { $ref: "#/components/responses/Status" }
 
 components:
-  parameters:
-    ReadToken:
-      name: X-Circlo-Read-Token
-      in: header
-      required: false
-      description: The post's read token (base64); only its audience can derive it
-      schema: { type: string }
-    Device:
-      name: X-Circlo-Device
-      in: header
-      required: true
-      description: The calling device (must be one of the caller's registered devices)
-      schema: { $ref: "#/components/schemas/Id" }
   securitySchemes:
-    bearer:
-      type: http
-      scheme: bearer
-      bearerFormat: JWT
-      description: HS256, iss circlo-server, aud circlo-app, scope full|recovery, 15 minutes
-
-  schemas:
-    PostView:
-      type: object
-      properties:
-        postId: { $ref: "#/components/schemas/Id" }
-        authorId: { $ref: "#/components/schemas/Id" }
-        epochId: { $ref: "#/components/schemas/Id" }
-        keyRef: { $ref: "#/components/schemas/Bytes" }
-        headerCt: { $ref: "#/components/schemas/Bytes" }
-        createdAt: { type: string, format: date-time }
-        media:
-          type: array
-          items:
-            type: object
-            properties:
-              objectKey: { type: string }
-              kind: { type: string, enum: [full, thumb, poster] }
-              ctSize: { type: integer, format: int64 }
-    ReplyView:
-      type: object
-      properties:
-        replyId: { $ref: "#/components/schemas/Id" }
-        authorId: { $ref: "#/components/schemas/Id" }
-        ciphertext: { $ref: "#/components/schemas/Bytes" }
-        createdAt: { type: string, format: date-time }
-    UserWithIdentity:
-      type: object
-      properties:
-        userId: { $ref: "#/components/schemas/Id" }
-        identity: { $ref: "#/components/schemas/Identity" }
-    Blob:
-      type: object
-      required: [ciphertext, version]
-      properties:
-        epochId: { $ref: "#/components/schemas/Id" }
-        ciphertext: { $ref: "#/components/schemas/Bytes" }
-        version: { type: integer, minimum: 1 }
-    Id: { type: string, format: uuid }
-    Bytes: { type: string, contentEncoding: base64 }
-    Identity:
-      type: object
-      required: [x25519Pub, ed25519Pub, signature, version]
-      properties:
-        x25519Pub: { $ref: "#/components/schemas/Bytes" }
-        ed25519Pub: { $ref: "#/components/schemas/Bytes" }
-        signature: { $ref: "#/components/schemas/Bytes", description: "CRYPTO.md section 7" }
-        version: { type: integer, minimum: 1, maximum: 255 }
-    Device:
-      type: object
-      required: [deviceId, devicePubkey, deviceCert]
-      properties:
-        deviceId: { $ref: "#/components/schemas/Id" }
-        devicePubkey: { $ref: "#/components/schemas/Bytes" }
-        deviceCert: { $ref: "#/components/schemas/Bytes" }
-    DeviceView:
-      allOf:
-        - { $ref: "#/components/schemas/Device" }
-        - type: object
-          properties:
-            createdAt: { type: string, format: date-time }
-            revoked: { type: boolean }
-    Backup:
-      type: object
-      required: [ciphertext, version]
-      properties:
-        ciphertext: { $ref: "#/components/schemas/Bytes" }
-        version: { type: integer }
-    NewRecoveryMethod:
-      type: object
-      required: [kind, authPubkey, ciphertext]
-      properties:
-        kind: { type: string, enum: [phrase, passkey] }
-        authPubkey: { $ref: "#/components/schemas/Bytes", description: "32 bytes: the method's recovery_auth / passkey_auth key" }
-        ciphertext: { $ref: "#/components/schemas/Bytes", description: "The method's recovery copy of the key backup" }
-
-    Tokens:
-      type: object
-      properties:
-        userId: { $ref: "#/components/schemas/Id" }
-        accessToken: { type: string }
-        refreshToken: { type: string }
-        expiresIn: { type: integer, description: seconds }
-        scope: { type: string, enum: [full, recovery] }
-
-  responses:
-    Tokens:
-      description: Session tokens
+    bearer: { type: http, scheme: bearer, bearerFormat: JWT }
+  parameters:
+    Before: { name: before, in: query, schema: { type: string, format: date-time } }
+    Limit: { name: limit, in: query, schema: { type: integer } }
+    PostId: { name: postId, in: path, required: true, schema: { $ref: "#/components/schemas/Id" } }
+    ChatId: { name: chatId, in: path, required: true, schema: { $ref: "#/components/schemas/Id" } }
+  requestBodies:
+    Email:
+      required: true
       content:
         application/json:
-          schema: { $ref: "#/components/schemas/Tokens" }
+          schema: { type: object, required: [email], properties: { email: { type: string } } }
+    CircleName:
+      required: true
+      content:
+        application/json:
+          schema: { type: object, required: [name], properties: { name: { type: string, description: "1-40 characters" } } }
+  responses:
     Error:
-      description: Error with a fixed code
+      description: A fixed error code, plus fixed details for some codes
       content:
         application/json:
           schema:
             type: object
+            required: [error]
             properties:
               error: { type: string }
+              attemptsLeft: { type: integer }
+              lockSeconds: { type: integer }
+              retryAfter: { type: integer }
+              email: { type: string }
+    Status:
+      description: OK
+      content:
+        application/json:
+          schema: { type: object, properties: { status: { type: string } } }
+    Tokens:
+      description: A signed-in session for one device
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [userId, deviceId, accessToken, refreshToken, expiresIn]
+            properties:
+              userId: { $ref: "#/components/schemas/Id" }
+              deviceId: { $ref: "#/components/schemas/Id" }
+              accessToken: { type: string }
+              refreshToken: { type: string }
+              expiresIn: { type: integer }
+    Me:
+      description: My account
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Me" }
+    Posts:
+      description: Posts, newest first
+      content:
+        application/json:
+          schema: { type: array, items: { $ref: "#/components/schemas/Post" } }
+  schemas:
+    Id: { type: string, format: uuid }
+    ObjectKey: { type: string, pattern: "^[0-9a-f]{64}$" }
+    Me:
+      type: object
+      required: [userId, name, username, email, bio, createdAt]
+      properties:
+        userId: { $ref: "#/components/schemas/Id" }
+        name: { type: string }
+        username: { type: string }
+        email: { type: string }
+        bio: { type: string }
+        avatarUrl: { type: [string, "null"] }
+        createdAt: { type: string, format: date-time }
+    Person:
+      description: Someone as shown next to their posts, replies and messages (never their email)
+      type: object
+      required: [userId, name, username]
+      properties:
+        userId: { $ref: "#/components/schemas/Id" }
+        name: { type: string }
+        username: { type: string }
+        avatarUrl: { type: [string, "null"] }
+    Circle:
+      type: object
+      required: [id, name, members]
+      properties:
+        id: { type: integer, minimum: 1, maximum: 8 }
+        name: { type: string }
+        members: { type: array, items: { $ref: "#/components/schemas/Id" } }
+    Audience:
+      type: object
+      required: [kind]
+      properties:
+        kind: { type: string, enum: [onlyMe, everyone, circles] }
+        circles: { type: array, items: { type: integer } }
+    NewAttachment:
+      description: A photo (with its thumbnail) or a video (with its poster frame), both uploaded first
+      type: object
+      required: [type, objectKey, previewKey, width, height, durationMs]
+      properties:
+        type: { type: string, enum: [image, video] }
+        objectKey: { $ref: "#/components/schemas/ObjectKey" }
+        previewKey: { $ref: "#/components/schemas/ObjectKey" }
+        width: { type: integer }
+        height: { type: integer }
+        durationMs: { type: integer }
+    Attachment:
+      type: object
+      required: [type, mime, width, height, durationMs, objectKey, url, previewKey, previewUrl]
+      properties:
+        type: { type: string, enum: [image, video] }
+        mime: { type: string }
+        width: { type: integer }
+        height: { type: integer }
+        durationMs: { type: integer }
+        objectKey: { $ref: "#/components/schemas/ObjectKey" }
+        url: { type: string, description: "Presigned GET URL (1 hour)" }
+        previewKey: { $ref: "#/components/schemas/ObjectKey" }
+        previewUrl: { type: string }
+    Post:
+      type: object
+      required: [postId, authorId, author, text, createdAt, media, replyCount, likeCount, likedByMe]
+      properties:
+        postId: { $ref: "#/components/schemas/Id" }
+        authorId: { $ref: "#/components/schemas/Id" }
+        author: { $ref: "#/components/schemas/Person" }
+        text: { type: string }
+        createdAt: { type: string, format: date-time }
+        media: { type: array, items: { $ref: "#/components/schemas/Attachment" } }
+        replyCount: { type: integer }
+        likeCount: { type: integer }
+        likedByMe: { type: boolean }
+        audience:
+          description: Only on my own posts
+          oneOf:
+            - { $ref: "#/components/schemas/Audience" }
+            - { type: "null" }
+    Reply:
+      type: object
+      required: [replyId, authorId, author, text, createdAt]
+      properties:
+        replyId: { $ref: "#/components/schemas/Id" }
+        authorId: { $ref: "#/components/schemas/Id" }
+        author: { $ref: "#/components/schemas/Person" }
+        text: { type: string }
+        createdAt: { type: string, format: date-time }
+    Message:
+      type: object
+      required: [seq, messageId, senderId, text, media, createdAt]
+      properties:
+        seq: { type: integer, format: int64 }
+        messageId: { $ref: "#/components/schemas/Id" }
+        senderId: { $ref: "#/components/schemas/Id" }
+        text: { type: string }
+        media: { type: array, items: { $ref: "#/components/schemas/Attachment" } }
+        createdAt: { type: string, format: date-time }
+    Chat:
+      type: object
+      required: [chatId, members, unread, readSeq, updatedAt]
+      properties:
+        chatId: { $ref: "#/components/schemas/Id" }
+        name: { type: [string, "null"] }
+        members: { type: array, items: { $ref: "#/components/schemas/Person" } }
+        lastMessage:
+          oneOf:
+            - { $ref: "#/components/schemas/Message" }
+            - { type: "null" }
+        unread: { type: integer }
+        readSeq: { type: integer, format: int64 }
+        updatedAt: { type: string, format: date-time }

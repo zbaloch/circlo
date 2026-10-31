@@ -2,180 +2,142 @@ package com.circlo.server;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.circlo.server.crypto.CircloCore;
-import com.circlo.server.posts.MediaSweeper;
-import com.circlo.server.storage.S3Properties;
-import com.circlo.server.web.Ids;
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import software.amazon.awssdk.services.s3.S3Client;
 
-/** Phase 7 server side: size-locked uploads, posts, friend-only reads and downloads, random object keys only. */
+/** Who sees which post, the author-only audience badge, replies, likes, and the Notifications tab. */
 class PostsFlowIT extends IntegrationTest {
 
-    @Autowired
-    private CircloCore core;
+    @Test
+    void audiencesDecideWhoSeesWhat() {
+        TestUser a = user("post_author");
+        TestUser family = user("post_family");
+        TestUser friend = user("post_friend");
+        TestUser stranger = user("post_stranger");
+        a.befriend(family, List.of(2), List.of());
+        a.befriend(friend);
 
-    @Autowired
-    private S3Client s3;
+        a.post("just me", "onlyMe", List.of());
+        a.post("hello everyone", "everyone", List.of());
+        a.post("family only", "circles", List.of(2));
 
-    @Autowired
-    private S3Properties s3Props;
+        assertThat(a.feedTexts()).containsExactly("family only", "hello everyone", "just me");
+        assertThat(family.feedTexts()).containsExactly("family only", "hello everyone");
+        assertThat(friend.feedTexts()).containsExactly("hello everyone");
+        assertThat(stranger.feedTexts()).isEmpty();
+        assertThat(stranger.get("/v1/users/" + a.userId + "/posts")).isEmpty();
 
-    @Autowired
-    private MediaSweeper sweeper;
+        // Only the author sees the audience.
+        Map<String, Object> mine = a.get("/v1/feed").get(0);
+        assertThat(mine.get("audience")).isEqualTo(Map.of("kind", "circles", "circles", List.of(2)));
+        Map<String, Object> theirs = family.get("/v1/feed").get(0);
+        assertThat(theirs.get("audience")).isNull();
+        assertThat(theirs.get("author")).asInstanceOf(org.assertj.core.api.InstanceOfAssertFactories.MAP).containsEntry("username", "post_author");
 
-    @Autowired
-    private org.springframework.jdbc.core.JdbcTemplate jdbc;
-
-    private boolean exists(String key) {
-        return s3.listObjectsV2(b -> b.bucket(s3Props.bucket()).prefix(key)).keyCount() > 0;
-    }
-
-    private final HttpClient httpClient = HttpClient.newHttpClient();
-
-    private UUID epoch(TestApp a) {
-        UUID e = Ids.newId();
-        call("POST", "/v1/epochs", Map.of("epochId", e.toString()), a.accessToken);
-        return e;
-    }
-
-    private void befriend(TestApp inviter, UUID inviterEpoch, TestApp other) {
-        byte[] token = Ids.random(32);
-        call("POST", "/v1/invites", Map.of("tokenHash", core.inviteTokenHash(token)), inviter.accessToken);
-        call("POST", "/v1/invites/redeem", Map.of("token", token), other.accessToken);
-        call("POST", "/v1/friends/requests", Map.of("toUserId", inviter.userId.toString(), "epochId", epoch(other).toString(),
-                "payload", Ids.random(416)), other.accessToken);
-        call("POST", "/v1/friends/" + other.userId + "/accept", Map.of("epochId", inviterEpoch.toString(), "payload", Ids.random(416)),
-                inviter.accessToken);
-    }
-
-    @SuppressWarnings("unchecked")
-    private List<Map<String, Object>> slots(TestApp a, long... sizes) {
-        var res = http().post().uri("/v1/media/uploads").header("Authorization", "Bearer " + a.accessToken)
-                .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
-                .body(Map.of("sizes", java.util.Arrays.stream(sizes).boxed().toList())).retrieve().body(List.class);
-        return (List<Map<String, Object>>) (List<?>) res;
-    }
-
-    private int put(String url, byte[] body) throws Exception {
-        return httpClient.send(HttpRequest.newBuilder(URI.create(url)).PUT(HttpRequest.BodyPublishers.ofByteArray(body)).build(),
-                HttpResponse.BodyHandlers.discarding()).statusCode();
-    }
-
-    private Map<String, Object> newPost(UUID epoch, List<Map<String, String>> media) {
-        return Map.of("postId", Ids.newId().toString(), "epochId", epoch.toString(), "keyRef", Ids.random(32),
-                "headerCt", Ids.random(512), "media", media, "readTokenHash", core.readTokenHash(Ids.random(32)));
+        // "See what they can see" matches what they see.
+        assertThat(a.get("/v1/me/preview/" + family.userId)).extracting(p -> p.get("text")).containsExactly("family only", "hello everyone");
+        assertThat(a.get("/v1/me/preview/" + friend.userId)).extracting(p -> p.get("text")).containsExactly("hello everyone");
+        assertThat(a.status("GET", "/v1/me/preview/" + stranger.userId, null)).isEqualTo(404);
     }
 
     @Test
-    void uploadPostAndFriendDownloadRoundTrip() throws Exception {
-        TestApp alice = new TestApp(this, "post_alice", "pw").register();
-        TestApp bob = new TestApp(this, "post_bob", "pw").register();
-        TestApp eve = new TestApp(this, "post_eve", "pw").register();
-        UUID ae = epoch(alice);
-        befriend(alice, ae, bob);
+    void aCirclePostKeepsTheAudienceItWasSharedWith() {
+        TestUser a = user("snap_author");
+        TestUser early = user("snap_early");
+        TestUser late = user("snap_late");
+        a.befriend(early, List.of(1), List.of());
+        a.befriend(late);
+        a.post("close friends then", "circles", List.of(1));
+        // Moving someone into the circle later doesn't open earlier posts; new posts reach them.
+        a.call("PUT", "/v1/friends/" + late.userId + "/circles", Map.of("circles", List.of(1)));
+        a.post("close friends now", "circles", List.of(1));
+        assertThat(late.feedTexts()).containsExactly("close friends now");
+        assertThat(early.feedTexts()).containsExactly("close friends now", "close friends then");
 
-        byte[] full = Ids.random(70_000);
-        byte[] thumb = Ids.random(5_000);
-        var s = slots(alice, full.length, thumb.length);
-        String fullKey = (String) s.get(0).get("objectKey");
-        String thumbKey = (String) s.get(1).get("objectKey");
-        assertThat(fullKey).matches("[0-9a-f]{64}");
+        // Unfriending removes access to everything, even posts they could see before.
+        a.call("DELETE", "/v1/friends/" + early.userId, null);
+        assertThat(early.feedTexts()).isEmpty();
+    }
 
-        // The PUT is locked to the declared size.
-        assertThat(put((String) s.get(0).get("putUrl"), Ids.random(full.length + 1))).isNotEqualTo(200);
-        assertThat(put((String) s.get(0).get("putUrl"), full)).isEqualTo(200);
-        // Posting before the thumbnail is uploaded fails.
-        var early = call("POST", "/v1/posts", newPost(ae, List.of(Map.of("objectKey", fullKey, "kind", "full"),
-                Map.of("objectKey", thumbKey, "kind", "thumb"))), alice.accessToken);
-        assertThat(early.getBody()).isEqualTo(Map.of("error", "media_not_uploaded"));
-        assertThat(put((String) s.get(1).get("putUrl"), thumb)).isEqualTo(200);
+    @Test
+    void postsAreValidated() {
+        TestUser a = user("post_rules");
+        assertThat(a.call("POST", "/v1/posts", Map.of("text", "  ", "audience", Map.of("kind", "everyone"))).getBody())
+                .containsEntry("error", "invalid_text");
+        assertThat(a.call("POST", "/v1/posts", Map.of("text", "x".repeat(501), "audience", Map.of("kind", "everyone"))).getBody())
+                .containsEntry("error", "invalid_text");
+        assertThat(a.call("POST", "/v1/posts", Map.of("text", "hi", "audience", Map.of("kind", "circles", "circles", List.of()))).getBody())
+                .containsEntry("error", "invalid_audience");
+        assertThat(a.call("POST", "/v1/posts", Map.of("text", "hi", "audience", Map.of("kind", "circles", "circles", List.of(7)))).getBody())
+                .containsEntry("error", "invalid_audience");
+        assertThat(a.call("POST", "/v1/posts", Map.of("text", "hi", "audience", Map.of("kind", "everyone"),
+                "media", List.of(Map.of("type", "image", "objectKey", "a".repeat(64), "previewKey", "b".repeat(64), "width", 10, "height", 10,
+                        "durationMs", 0)))).getBody()).containsEntry("error", "unknown_media");
+    }
 
-        Map<String, Object> post = newPost(ae, List.of(Map.of("objectKey", fullKey, "kind", "full"), Map.of("objectKey", thumbKey, "kind", "thumb")));
-        assertThat(call("POST", "/v1/posts", post, alice.accessToken).getStatusCode().value()).isEqualTo(201);
+    @Test
+    void repliesAndLikesFollowThePost() {
+        TestUser a = user("thread_author");
+        TestUser b = user("thread_friend");
+        TestUser c = user("thread_outsider");
+        a.befriend(b, List.of(1), List.of());
+        a.befriend(c);
+        String post = a.post("close friends post", "circles", List.of(1));
 
-        // Bob (friend) sees the post header and media list, and can download the ciphertext.
+        var reply = b.call("POST", "/v1/posts/" + post + "/replies", Map.of("text", " nice one "));
+        assertThat(reply.getStatusCode().value()).isEqualTo(201);
+        assertThat(reply.getBody()).containsEntry("text", "nice one");
+        assertThat(b.status("PUT", "/v1/posts/" + post + "/like", null)).isEqualTo(200);
+        assertThat(b.status("PUT", "/v1/posts/" + post + "/like", null)).isEqualTo(200); // idempotent
+
+        // Outside the audience, the post and its thread don't exist.
+        assertThat(c.status("GET", "/v1/posts/" + post, null)).isEqualTo(404);
+        assertThat(c.status("GET", "/v1/posts/" + post + "/replies", null)).isEqualTo(404);
+        assertThat(c.status("PUT", "/v1/posts/" + post + "/like", null)).isEqualTo(404);
+        assertThat(c.status("POST", "/v1/posts/" + post + "/replies", Map.of("text", "hi"))).isEqualTo(404);
+
+        Map<String, Object> seen = a.call("GET", "/v1/posts/" + post, null).getBody();
+        assertThat(seen).containsEntry("replyCount", 1).containsEntry("likeCount", 1).containsEntry("likedByMe", false);
+        assertThat(b.call("GET", "/v1/posts/" + post, null).getBody()).containsEntry("likedByMe", true);
+        assertThat(a.get("/v1/posts/" + post + "/replies")).extracting(r -> r.get("text")).containsExactly("nice one");
+        assertThat(a.get("/v1/posts/" + post + "/likes")).extracting(l -> l.get("username")).containsExactly("thread_friend");
+
+        // The post's author may delete any reply; others only their own.
+        String replyId = (String) reply.getBody().get("replyId");
+        assertThat(a.status("DELETE", "/v1/posts/" + post + "/replies/" + replyId, null)).isEqualTo(200);
+
+        // Deleting the post removes it for everyone.
+        assertThat(b.status("DELETE", "/v1/posts/" + post, null)).isEqualTo(404);
+        assertThat(a.status("DELETE", "/v1/posts/" + post, null)).isEqualTo(200);
+        assertThat(b.status("GET", "/v1/posts/" + post, null)).isEqualTo(404);
+    }
+
+    @Test
+    void notificationsListRepliesAndLikesAndBackgroundChecksCountThem() {
+        TestUser a = user("act_author");
+        TestUser b = user("act_friend");
+        a.befriend(b);
+        String since = Instant.now().minusSeconds(5).toString();
+        String post = a.post("tell me", "everyone", List.of());
+        b.call("POST", "/v1/posts/" + post + "/replies", Map.of("text", "told you"));
+        b.call("PUT", "/v1/posts/" + post + "/like", null);
+
         @SuppressWarnings("unchecked")
-        List<Map<String, Object>> feed = http().get().uri("/v1/users/" + alice.userId + "/posts").header("Authorization", "Bearer " + bob.accessToken)
-                .retrieve().body(List.class);
-        assertThat(feed).hasSize(1);
-        assertThat(feed.get(0).get("postId")).isEqualTo(post.get("postId"));
-        assertThat((List<?>) feed.get(0).get("media")).hasSize(2);
-        @SuppressWarnings("unchecked")
-        String getUrl = (String) ((List<Map<String, Object>>) (Object) http().post().uri("/v1/media/download-urls")
-                .header("Authorization", "Bearer " + bob.accessToken).contentType(org.springframework.http.MediaType.APPLICATION_JSON)
-                .body(Map.of("objectKeys", List.of(fullKey))).retrieve().body(List.class)).get(0).get("getUrl");
-        byte[] downloaded = httpClient.send(HttpRequest.newBuilder(URI.create(getUrl)).build(), HttpResponse.BodyHandlers.ofByteArray()).body();
-        assertThat(downloaded).isEqualTo(full);
+        List<Map<String, Object>> items = (List<Map<String, Object>>) a.call("GET", "/v1/activity", null).getBody().get("items");
+        assertThat(items).extracting(i -> i.get("kind")).containsExactly("like", "reply");
+        assertThat(items.get(1)).containsEntry("replyText", "told you").containsEntry("postText", "tell me");
 
-        // A stranger sees neither posts nor media.
-        assertThat(call("GET", "/v1/users/" + alice.userId + "/posts", null, eve.accessToken).getStatusCode().value()).isEqualTo(404);
-        assertThat(call("POST", "/v1/media/download-urls", Map.of("objectKeys", List.of(fullKey)), eve.accessToken).getStatusCode().value())
-                .isEqualTo(404);
+        String check = (String) a.call("POST", "/v1/devices/current/check-token", null).getBody().get("token");
+        var pending = http().get().uri("/v1/activity/pending?since=" + since).header("X-Circlo-Check-Token", check)
+                .retrieve().body(Map.class);
+        assertThat(pending).containsEntry("replies", 1).containsEntry("likes", 1);
+        assertThat(http().get().uri("/v1/activity/pending?since=" + since).header("X-Circlo-Check-Token", "bogus")
+                .retrieve().onStatus(s -> true, (q, r) -> {}).toBodilessEntity().getStatusCode().value()).isEqualTo(401);
 
-        // An object can't be attached twice, or by someone else.
-        assertThat(call("POST", "/v1/posts", newPost(ae, List.of(Map.of("objectKey", fullKey, "kind", "full"))), alice.accessToken).getBody())
-                .isEqualTo(Map.of("error", "unknown_media"));
-        assertThat(call("POST", "/v1/posts", newPost(epoch(bob), List.of(Map.of("objectKey", thumbKey, "kind", "thumb"))), bob.accessToken)
-                .getBody()).isEqualTo(Map.of("error", "unknown_media"));
-
-        // Authors delete their own posts only.
-        assertThat(call("DELETE", "/v1/posts/" + post.get("postId"), null, bob.accessToken).getStatusCode().value()).isEqualTo(404);
-        assertThat(call("DELETE", "/v1/posts/" + post.get("postId"), null, alice.accessToken).getStatusCode().value()).isEqualTo(200);
-
-        // A deleted post's ciphertext leaves the bucket on the next sweep, and its download URLs stop working.
-        assertThat(exists(fullKey)).isTrue();
-        sweeper.sweep();
-        assertThat(exists(fullKey)).isFalse();
-        assertThat(exists(thumbKey)).isFalse();
-        assertThat(call("POST", "/v1/media/download-urls", Map.of("objectKeys", List.of(fullKey)), bob.accessToken).getStatusCode().value())
-                .isEqualTo(404);
-    }
-
-    @Test
-    void abandonedUploadsAreSweptAndCanNoLongerBeAttached() throws Exception {
-        TestApp a = new TestApp(this, "post_dora", "pw").register();
-        UUID e = epoch(a);
-        byte[] body = Ids.random(1000);
-        var s = slots(a, body.length, body.length);
-        String fresh = (String) s.get(0).get("objectKey");
-        String stale = (String) s.get(1).get("objectKey");
-        assertThat(put((String) s.get(0).get("putUrl"), body)).isEqualTo(200);
-        assertThat(put((String) s.get(1).get("putUrl"), body)).isEqualTo(200);
-        jdbc.update("UPDATE media_uploads SET created_at = ? WHERE object_key = ?",
-                java.sql.Timestamp.from(java.time.Instant.now().minus(java.time.Duration.ofHours(25))), stale);
-
-        // Too old to attach (the sweeper may be about to delete it).
-        assertThat(call("POST", "/v1/posts", newPost(e, List.of(Map.of("objectKey", stale, "kind", "full"))), a.accessToken).getBody())
-                .isEqualTo(Map.of("error", "unknown_media"));
-        sweeper.sweep();
-        assertThat(exists(stale)).isFalse();
-        assertThat(exists(fresh)).isTrue(); // still inside its window
-        assertThat(call("POST", "/v1/posts", newPost(e, List.of(Map.of("objectKey", fresh, "kind", "full"))), a.accessToken)
-                .getStatusCode().value()).isEqualTo(201);
-    }
-
-    @Test
-    void bucketHoldsOnlyRandomObjectKeys() {
-        var keys = s3.listObjectsV2(b -> b.bucket(s3Props.bucket())).contents();
-        assertThat(keys).allSatisfy(o -> assertThat(o.key()).matches("[0-9a-f]{64}"));
-    }
-
-    @Test
-    void textOnlyPostsAndValidation() {
-        TestApp a = new TestApp(this, "post_carl", "pw").register();
-        UUID e = epoch(a);
-        assertThat(call("POST", "/v1/posts", newPost(e, List.of()), a.accessToken).getStatusCode().value()).isEqualTo(201);
-        assertThat(call("POST", "/v1/posts", newPost(Ids.newId(), List.of()), a.accessToken).getBody()).isEqualTo(Map.of("error", "unknown_epoch"));
-        assertThat(call("POST", "/v1/media/uploads", Map.of("sizes", List.of(600L * 1024 * 1024)), a.accessToken).getStatusCode().value())
-                .isEqualTo(400);
+        // Blocking hides their activity.
+        a.call("POST", "/v1/blocks/" + b.userId, null);
+        assertThat((List<?>) a.call("GET", "/v1/activity", null).getBody().get("items")).isEmpty();
     }
 }

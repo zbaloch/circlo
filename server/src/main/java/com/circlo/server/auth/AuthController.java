@@ -1,126 +1,74 @@
 package com.circlo.server.auth;
 
+import com.circlo.server.config.AuthProperties;
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.Max;
-import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
-import java.util.List;
-import java.util.UUID;
+import java.util.Map;
+import org.springframework.http.HttpStatus;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
-/** Auth endpoints. Byte fields are base64 in JSON; IDs are UUID strings. Nothing here is logged. */
+/** Signup, login, sessions and passwords. Nothing here is logged. */
 @RestController
 @RequestMapping("/v1/auth")
 public class AuthController {
 
-    static final int MAX_BACKUP = 1 << 20;
-
     private final AuthService auth;
     private final TokenService tokens;
+    private final AuthProperties props;
 
-    public AuthController(AuthService auth, TokenService tokens) {
+    public AuthController(AuthService auth, TokenService tokens, AuthProperties props) {
         this.auth = auth;
         this.tokens = tokens;
+        this.props = props;
     }
 
-    public record RegisterStartRequest(@NotBlank @Size(max = 64) String handle,
-            @NotNull @Size(min = 1, max = 256) byte[] registrationRequest) {}
+    public record SignupRequest(@NotNull @Size(max = 200) String name, @NotNull @Size(max = 64) String username,
+            @NotNull @Size(max = 254) String email, @NotNull @Size(max = 512) String password) {}
 
-    public record IdentityDto(@NotNull @Size(min = 32, max = 32) byte[] x25519Pub,
-            @NotNull @Size(min = 32, max = 32) byte[] ed25519Pub,
-            @NotNull @Size(min = 64, max = 64) byte[] signature,
-            @Min(1) @Max(255) int version) {
-        AuthService.IdentityKeys toKeys() {
-            return new AuthService.IdentityKeys(x25519Pub, ed25519Pub, signature, version);
-        }
-    }
+    public record EmailRequest(@NotNull @Size(max = 254) String email) {}
 
-    public record DeviceDto(@NotNull UUID deviceId,
-            @NotNull @Size(min = 32, max = 32) byte[] devicePubkey,
-            @NotNull @Size(min = 64, max = 64) byte[] deviceCert) {
-        AuthService.Device toDevice() {
-            return new AuthService.Device(deviceId, devicePubkey, deviceCert);
-        }
-    }
+    public record VerifyRequest(@NotNull @Size(max = 254) String email, @NotNull @Size(max = 16) String code) {}
 
-    public record RecoveryMethodDto(@NotNull @Pattern(regexp = "phrase|passkey") String kind,
-            @NotNull @Size(min = 32, max = 32) byte[] authPubkey, @NotNull @Size(min = 1, max = MAX_BACKUP) byte[] ciphertext) {
-        AuthService.NewRecoveryMethod toMethod() {
-            return new AuthService.NewRecoveryMethod(kind, authPubkey, ciphertext);
-        }
-    }
-
-    /**
-     * {@code recoveryMethods} (one or more). Apps from before recovery methods send a single phrase as {@code recoveryPubkey}
-     * + {@code recoveryBackup} instead, which still works.
-     */
-    public record RegisterFinishRequest(@NotNull UUID userId, @NotBlank @Size(max = 64) String handle,
-            @NotNull @Size(min = 1, max = 512) byte[] registrationUpload,
-            @Size(min = 32, max = 32) byte[] recoveryPubkey,
-            @NotNull @Valid IdentityDto identity, @NotNull @Valid DeviceDto device,
-            @NotNull @Size(min = 1, max = MAX_BACKUP) byte[] passwordBackup,
-            @Size(min = 1, max = MAX_BACKUP) byte[] recoveryBackup,
-            @Size(max = 10) List<@Valid RecoveryMethodDto> recoveryMethods) {
-
-        List<AuthService.NewRecoveryMethod> methods() {
-            if (recoveryMethods != null) {
-                return recoveryMethods.stream().map(RecoveryMethodDto::toMethod).toList();
-            }
-            if (recoveryPubkey != null && recoveryBackup != null) {
-                return List.of(new AuthService.NewRecoveryMethod("phrase", recoveryPubkey, recoveryBackup));
-            }
-            return List.of();
-        }
-    }
-
-    public record LoginStartRequest(@NotBlank @Size(max = 64) String handle,
-            @NotNull @Size(min = 1, max = 512) byte[] credentialRequest) {}
-
-    public record LoginFinishRequest(@NotNull UUID loginId, @NotBlank @Size(max = 64) String handle,
-            @NotNull @Size(min = 1, max = 512) byte[] credentialFinalization) {}
+    public record LoginRequest(@NotNull @Size(max = 254) String login, @NotNull @Size(max = 512) String password) {}
 
     public record RefreshRequest(@NotBlank @Size(max = 128) String refreshToken) {}
 
-    public record RecoveryStartRequest(@NotBlank @Size(max = 64) String handle) {}
+    public record ResetRequest(@NotNull @Size(max = 254) String email, @NotNull @Size(max = 16) String code,
+            @NotNull @Size(max = 512) String password) {}
 
-    public record RecoveryFinishRequest(@NotNull UUID challengeId, @NotNull @Size(min = 64, max = 64) byte[] signature) {}
+    public record ChangePasswordRequest(@NotNull @Size(max = 512) String currentPassword, @NotNull @Size(max = 512) String newPassword) {}
 
-    public record PasswordStartRequest(@NotBlank @Size(max = 64) String handle,
-            @NotNull @Size(min = 1, max = 256) byte[] registrationRequest) {}
-
-    public record PasswordStartResponse(byte[] registrationResponse) {}
-
-    public record PasswordFinishRequest(@NotNull @Size(min = 1, max = 512) byte[] registrationUpload,
-            @NotNull @Size(min = 1, max = MAX_BACKUP) byte[] passwordBackup) {}
-
-    @PostMapping("/register/start")
-    public AuthService.RegisterStart registerStart(@Valid @RequestBody RegisterStartRequest r) {
-        return auth.registerStart(r.handle(), r.registrationRequest());
+    /** Starts a signup and emails a 6-digit code to verify the address. */
+    @PostMapping("/signup")
+    @ResponseStatus(HttpStatus.CREATED)
+    public AuthService.SignupStarted signup(@Valid @RequestBody SignupRequest r) {
+        return auth.signup(r.name(), r.username(), r.email(), r.password());
     }
 
-    @PostMapping("/register/finish")
-    public TokenService.Tokens registerFinish(@Valid @RequestBody RegisterFinishRequest r) {
-        return auth.registerFinish(new AuthService.RegisterFinish(r.userId(), r.handle(), r.registrationUpload(),
-                r.identity().toKeys(), r.device().toDevice(), r.passwordBackup(), r.methods()));
+    @PostMapping("/signup/resend")
+    @ResponseStatus(HttpStatus.ACCEPTED)
+    public Map<String, String> resend(@Valid @RequestBody EmailRequest r) {
+        auth.resendVerification(r.email());
+        return Map.of("status", "sent");
     }
 
-    @PostMapping("/login/start")
-    public AuthService.LoginStart loginStart(@Valid @RequestBody LoginStartRequest r) {
-        return auth.loginStart(r.handle(), r.credentialRequest());
+    @PostMapping("/signup/verify")
+    public TokenService.Tokens verify(@Valid @RequestBody VerifyRequest r) {
+        return auth.verifySignup(r.email(), r.code());
     }
 
-    @PostMapping("/login/finish")
-    public TokenService.Tokens loginFinish(@Valid @RequestBody LoginFinishRequest r) {
-        return auth.loginFinish(r.loginId(), r.handle(), r.credentialFinalization());
+    @PostMapping("/login")
+    public TokenService.Tokens login(@Valid @RequestBody LoginRequest r) {
+        return auth.login(r.login(), r.password());
     }
 
     @PostMapping("/refresh")
@@ -128,40 +76,37 @@ public class AuthController {
         return tokens.refresh(r.refreshToken());
     }
 
-    @PostMapping("/recovery/start")
-    public AuthService.RecoveryStart recoveryStart(@Valid @RequestBody RecoveryStartRequest r) {
-        return auth.recoveryStart(r.handle());
+    @PostMapping("/password/forgot")
+    @ResponseStatus(HttpStatus.ACCEPTED)
+    public Map<String, String> forgot(@Valid @RequestBody EmailRequest r) {
+        auth.forgotPassword(r.email());
+        return Map.of("status", "sent");
     }
 
-    @PostMapping("/recovery/finish")
-    public AuthService.RecoveryResult recoveryFinish(@Valid @RequestBody RecoveryFinishRequest r) {
-        return auth.recoveryFinish(r.challengeId(), r.signature());
+    @PostMapping("/password/reset")
+    public TokenService.Tokens reset(@Valid @RequestBody ResetRequest r) {
+        return auth.resetPassword(r.email(), r.code(), r.password());
     }
 
-    @PostMapping("/password/start")
-    public PasswordStartResponse passwordStart(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody PasswordStartRequest r) {
-        return new PasswordStartResponse(auth.passwordStart(UUID.fromString(jwt.getSubject()), r.handle(), r.registrationRequest()));
+    /** Signed in: change the password. Other devices are signed out. */
+    @PostMapping("/password/change")
+    public TokenService.Tokens change(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody ChangePasswordRequest r) {
+        return auth.changePassword(TokenService.userOf(jwt), TokenService.deviceOf(jwt), r.currentPassword(), r.newPassword());
     }
 
-    @PostMapping("/password/verify/start")
-    public AuthService.LoginStart verifyStart(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody LoginStartRequest r) {
-        return auth.verifyStart(UUID.fromString(jwt.getSubject()), r.handle(), r.credentialRequest());
+    /** Signed in: sign this device out. */
+    @PostMapping("/logout")
+    public Map<String, String> logout(@AuthenticationPrincipal Jwt jwt) {
+        tokens.revokeDevice(TokenService.userOf(jwt), TokenService.deviceOf(jwt));
+        return Map.of("status", "signed_out");
     }
 
-    public record Reauth(String reauthToken) {}
-
-    @PostMapping("/password/verify/finish")
-    public Reauth verifyFinish(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody LoginFinishRequest r) {
-        return new Reauth(auth.verifyFinish(UUID.fromString(jwt.getSubject()), r.loginId(), r.handle(), r.credentialFinalization()));
-    }
-
-    @PostMapping("/password/finish")
-    public TokenService.Tokens passwordFinish(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody PasswordFinishRequest r) {
-        return auth.passwordFinish(UUID.fromString(jwt.getSubject()), r.registrationUpload(), r.passwordBackup());
-    }
-
-    @Scheduled(fixedDelay = 60_000)
+    @Scheduled(fixedDelay = 600_000, initialDelay = 60_000)
     void purge() {
-        auth.purgeExpired();
+        try {
+            auth.purgeExpired(props.pendingSignupTtl());
+        } catch (RuntimeException e) {
+            // next run
+        }
     }
 }

@@ -7,10 +7,17 @@ spring:
     url: ${CIRCLO_TEST_DB_URL:jdbc:mariadb://localhost:3306/circlo_test}
   flyway:
     clean-disabled: false
+    # Every test class cleans and re-migrates, so a stale test database must not stop the context from starting.
+    validate-on-migrate: false
 
 circlo:
   auth:
     # Many auth calls come from localhost in tests; production keeps the default of 30/minute.
     ip-requests-per-minute: 100000
+  mail:
+    # Tests read the codes from TestMail instead.
+    mode: log
+  cors:
+    origins: https://app.example.test
   s3:
     bucket: circlo-media-test

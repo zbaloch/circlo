@@ -7,9 +7,10 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.validation.annotation.Validated;
 
 /**
- * S3/MinIO settings under {@code circlo.s3.*}.
+ * S3/MinIO settings under {@code circlo.s3.*}. The bucket is private: every upload and download goes through a
+ * short-lived presigned URL.
  *
- * @param publicEndpoint the address presigned URLs are signed for; must be reachable from phones
+ * @param publicEndpoint the address presigned URLs are signed for; must be reachable from phones and browsers
  *                       (http://${LAN_IP}:9000 in dev), never localhost
  */
 @Validated
@@ -28,6 +29,6 @@ public record S3Properties(
             throw new IllegalArgumentException("circlo.s3.public-endpoint is required");
         }
         putTtl = putTtl == null ? Duration.ofMinutes(15) : putTtl;
-        getTtl = getTtl == null ? Duration.ofMinutes(5) : getTtl;
+        getTtl = getTtl == null ? Duration.ofHours(1) : getTtl;
     }
 }

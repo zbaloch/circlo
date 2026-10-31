@@ -1,8 +1,8 @@
 package com.circlo.server;
 
-import com.circlo.server.crypto.CircloCore;
 import com.circlo.server.web.Ids;
 import java.util.Base64;
+import java.util.List;
 import java.util.Map;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.BeforeAll;
@@ -10,37 +10,37 @@ import org.junit.jupiter.api.TestInstance;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
-import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.web.client.RestClient;
 
 /**
  * Base for integration tests: real server on a random port, the circlo_test database (Flyway clean + migrate before
- * each test class), and fresh test-only server secrets generated per run (nothing secret is committed).
+ * each test class), a fresh test-only JWT key per run (nothing secret is committed), and emails captured by
+ * {@link TestMail} instead of being sent.
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @ActiveProfiles("test")
+@Import(TestMail.class)
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public abstract class IntegrationTest {
 
     @DynamicPropertySource
     static void testSecrets(DynamicPropertyRegistry registry) {
-        CircloCore core = new CircloCore(System.getProperty("circlo.core.library", ""));
-        Base64.Encoder b64 = Base64.getEncoder();
-        byte[] setup = core.opaqueServerSetupNew();
-        byte[] handleKey = Ids.random(32);
         byte[] jwtKey = Ids.random(32);
-        registry.add("circlo.secrets.opaque-server-setup", () -> b64.encodeToString(setup));
-        registry.add("circlo.secrets.handle-key", () -> b64.encodeToString(handleKey));
-        registry.add("circlo.secrets.jwt-key", () -> b64.encodeToString(jwtKey));
+        registry.add("circlo.secrets.jwt-key", () -> Base64.getEncoder().encodeToString(jwtKey));
     }
 
     @Autowired
     protected Flyway flyway;
+
+    @Autowired
+    protected TestMail mail;
 
     @LocalServerPort
     protected int port;
@@ -56,9 +56,19 @@ public abstract class IntegrationTest {
         return RestClient.builder().requestFactory(new JdkClientHttpRequestFactory()).baseUrl("http://localhost:" + port).build();
     }
 
-    /** POST/GET/PUT that never throws on error statuses; returns status and parsed JSON. */
+    /** Any method, never throws on error statuses; returns status and parsed JSON object. */
     @SuppressWarnings("unchecked")
     protected ResponseEntity<Map<String, Object>> call(String method, String path, Object body, String token) {
+        return (ResponseEntity<Map<String, Object>>) (ResponseEntity<?>) exchange(method, path, body, token, Map.class);
+    }
+
+    /** Like {@link #call}, for endpoints that answer with a JSON array. */
+    @SuppressWarnings("unchecked")
+    protected ResponseEntity<List<Map<String, Object>>> list(String method, String path, Object body, String token) {
+        return (ResponseEntity<List<Map<String, Object>>>) (ResponseEntity<?>) exchange(method, path, body, token, List.class);
+    }
+
+    private <T> ResponseEntity<T> exchange(String method, String path, Object body, String token, Class<T> type) {
         RestClient.RequestBodySpec spec = http().method(org.springframework.http.HttpMethod.valueOf(method)).uri(path);
         if (token != null) {
             spec = spec.header("Authorization", "Bearer " + token);
@@ -66,10 +76,11 @@ public abstract class IntegrationTest {
         if (body != null) {
             spec = spec.contentType(MediaType.APPLICATION_JSON).body(body);
         }
-        return spec.retrieve().onStatus(s -> true, (req, res) -> {}).toEntity((Class<Map<String, Object>>) (Class<?>) Map.class);
+        return spec.retrieve().onStatus(s -> true, (req, res) -> {}).toEntity(type);
     }
 
-    protected static byte[] b64(Object value) {
-        return Base64.getDecoder().decode((String) value);
+    /** A new, verified account (signed in on one device). */
+    protected TestUser user(String username) {
+        return new TestUser(this, "Name of " + username, username, username + "@example.test", TestUser.PASSWORD).signUp();
     }
 }

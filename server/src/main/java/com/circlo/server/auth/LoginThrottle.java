@@ -10,11 +10,10 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 /**
- * Password login lockout, kept in the database so a restart doesn't reset it. With OPAQUE a wrong password fails on
- * the phone, so the server never sees the failure itself: every login start counts as a failed attempt until a login
- * finishes successfully. After {@link #MAX_ATTEMPTS} the next lock is set (15 minutes, then 1 hour, then 24 hours);
- * a day without attempts starts over. The recovery phrase is never locked out, and a successful password reset clears
- * the lock. Keyed by the handle lookup, and unknown handles behave exactly like real ones.
+ * Login lockout, kept in the database so a restart doesn't reset it. After {@link #MAX_ATTEMPTS} wrong passwords the
+ * next lock is set (15 minutes, then 1 hour, then 24 hours); a day without failures starts over. A successful login or
+ * a password reset by email clears it. Keyed by the account (or, for logins that match no account, by what was typed),
+ * so unknown accounts behave exactly like real ones.
  */
 @Component
 public class LoginThrottle {
@@ -23,16 +22,16 @@ public class LoginThrottle {
     static final List<Duration> LOCKS = List.of(Duration.ofMinutes(15), Duration.ofHours(1), Duration.ofHours(24));
     static final Duration QUIET_RESET = Duration.ofHours(24);
 
-    /** `lockedUntil` is the latest lock (possibly in the past); `updatedAt` the last attempt. */
+    /** `lockedUntil` is the latest lock (possibly in the past); `updatedAt` the last failure. */
     public record State(int failures, int stage, Instant lockedUntil, Instant updatedAt) {}
 
     /**
-     * The outcome of one attempt: `locked` turns it away; otherwise it may go ahead with `attemptsLeft` more after it.
-     * `lockedUntil` is set when it is turned away, or when this attempt is the last before a lock.
+     * The outcome of one failure: `locked` means a lock was already in force (the state is unchanged); otherwise
+     * `attemptsLeft` more are allowed, and at 0 `lockedUntil` is the lock that has just been set.
      */
     public record Decision(State next, boolean locked, int attemptsLeft, Instant lockedUntil) {}
 
-    /** Pure: the decision for one login attempt at `now`, given the stored state (null if none). */
+    /** Pure: the decision for one failed attempt at `now`, given the stored state (null if none). */
     static Decision attempt(State s, Instant now) {
         if (s != null && s.lockedUntil() != null && now.isBefore(s.lockedUntil())) {
             return new Decision(s, true, 0, s.lockedUntil());
@@ -59,33 +58,42 @@ public class LoginThrottle {
         this.jdbc = jdbc;
     }
 
-    /** Records one login attempt; call inside the login transaction (the row is locked until it commits). */
-    public Decision attempt(byte[] handleLookup) {
-        Instant now = clock.instant();
-        jdbc.update("INSERT IGNORE INTO login_throttle (handle_lookup, failures, stage, locked_until, updated_at) VALUES (?, 0, 0, NULL, ?)",
-                handleLookup, Timestamp.from(now));
-        State s = jdbc.queryForObject(
-                "SELECT failures, stage, locked_until, updated_at FROM login_throttle WHERE handle_lookup = ? FOR UPDATE",
+    private State load(byte[] key, boolean forUpdate) {
+        return jdbc.query("SELECT failures, stage, locked_until, updated_at FROM login_throttle WHERE login_key = ?"
+                        + (forUpdate ? " FOR UPDATE" : ""),
                 (rs, i) -> new State(rs.getInt(1), rs.getInt(2),
                         rs.getTimestamp(3) == null ? null : rs.getTimestamp(3).toInstant(), rs.getTimestamp(4).toInstant()),
-                (Object) handleLookup);
-        Decision d = attempt(s, now);
+                (Object) key).stream().findFirst().orElse(null);
+    }
+
+    /** The lock in force for this key, or null. */
+    public Instant lockedUntil(byte[] key) {
+        State s = load(key, false);
+        return s != null && s.lockedUntil() != null && clock.instant().isBefore(s.lockedUntil()) ? s.lockedUntil() : null;
+    }
+
+    /** Records a wrong password; call inside a transaction that commits even though the login fails. */
+    public Decision fail(byte[] key) {
+        Instant now = clock.instant();
+        jdbc.update("INSERT IGNORE INTO login_throttle (login_key, failures, stage, locked_until, updated_at) VALUES (?, 0, 0, NULL, ?)",
+                key, Timestamp.from(now));
+        Decision d = attempt(load(key, true), now);
         if (!d.locked()) {
             State n = d.next();
-            jdbc.update("UPDATE login_throttle SET failures = ?, stage = ?, locked_until = ?, updated_at = ? WHERE handle_lookup = ?",
+            jdbc.update("UPDATE login_throttle SET failures = ?, stage = ?, locked_until = ?, updated_at = ? WHERE login_key = ?",
                     n.failures(), n.stage(), n.lockedUntil() == null ? null : Timestamp.from(n.lockedUntil()),
-                    Timestamp.from(n.updatedAt()), handleLookup);
+                    Timestamp.from(n.updatedAt()), key);
         }
         return d;
     }
 
     /** A successful login or password reset: start over. */
-    public void clear(byte[] handleLookup) {
-        jdbc.update("DELETE FROM login_throttle WHERE handle_lookup = ?", (Object) handleLookup);
+    public void clear(byte[] key) {
+        jdbc.update("DELETE FROM login_throttle WHERE login_key = ?", (Object) key);
     }
 
     /**
-     * Throttle rows with no lock in force and no attempt for a week carry no information any more; sign-in events are
+     * Throttle rows with no lock in force and no failure for a week carry no information any more; sign-in events are
      * shown for 30 days.
      */
     @Scheduled(fixedDelay = 3_600_000, initialDelay = 300_000)

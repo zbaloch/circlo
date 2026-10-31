@@ -8,7 +8,7 @@ import software.amazon.awssdk.services.s3.model.HeadObjectRequest;
 import software.amazon.awssdk.services.s3.model.NoSuchKeyException;
 import software.amazon.awssdk.services.s3.model.S3Exception;
 
-/** Object metadata checks and deletion. The server never downloads or inspects media bodies (they're ciphertext anyway). */
+/** Object metadata checks and deletion. Uploads and downloads go straight between the app and the bucket. */
 @Component
 public class MediaStore {
 

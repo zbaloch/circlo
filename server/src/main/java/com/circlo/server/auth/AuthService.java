@@ -1,21 +1,17 @@
 package com.circlo.server.auth;
 
-import com.circlo.server.config.AuthProperties;
-import com.circlo.server.config.ServerSecrets;
-import com.circlo.server.crypto.CoreException;
-import com.circlo.server.crypto.CircloCore;
+import com.circlo.server.social.CircleController;
 import com.circlo.server.web.ApiException;
 import com.circlo.server.web.Ids;
 import com.circlo.server.web.LockedException;
 import com.circlo.server.web.RateLimiter;
-import java.security.MessageDigest;
+import java.nio.charset.StandardCharsets;
 import java.sql.Timestamp;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.Arrays;
-import java.util.Base64;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -23,360 +19,251 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Accounts and authentication (CRYPTO.md sections 5–7). The server never sees a password, a handle at rest, or any
- * private key; it stores the OPAQUE record, public keys and ciphertext backups.
+ * Accounts and sign-in: signup with a name, username, email and password; the email is verified with a code before
+ * the account exists; login with the username or email; password reset by an emailed code. Passwords are kept only
+ * as Argon2id hashes. Nothing here is logged.
  */
 @Service
 public class AuthService {
 
-    static final int LOGIN_ATTEMPTS_PER_HANDLE_PER_MINUTE = 10;
+    /** Codes emailed to one address per hour (signup, resend, reset). */
+    static final int CODES_PER_EMAIL_PER_HOUR = 5;
 
-    private final CircloCore core;
-    private final ServerSecrets secrets;
-    private final AuthProperties props;
     private final JdbcTemplate jdbc;
     private final TokenService tokens;
-    private final RateLimiter limiter;
+    private final PasswordHasher passwords;
+    private final EmailCodes codes;
     private final LoginThrottle throttle;
+    private final RateLimiter limiter;
     private final Clock clock = Clock.systemUTC();
 
-    public AuthService(CircloCore core, ServerSecrets secrets, AuthProperties props, JdbcTemplate jdbc,
-            TokenService tokens, RateLimiter limiter, LoginThrottle throttle) {
-        this.core = core;
-        this.secrets = secrets;
-        this.props = props;
+    public AuthService(JdbcTemplate jdbc, TokenService tokens, PasswordHasher passwords, EmailCodes codes, LoginThrottle throttle,
+            RateLimiter limiter) {
         this.jdbc = jdbc;
         this.tokens = tokens;
-        this.limiter = limiter;
+        this.passwords = passwords;
+        this.codes = codes;
         this.throttle = throttle;
+        this.limiter = limiter;
     }
 
-    // ---------- helpers ----------
+    record User(byte[] id, String name, String username, String email, String passwordHash, String status) {
+        UUID uuid() {
+            return Ids.uuid(id);
+        }
 
-    record Handle(String normalized, byte[] lookup) {}
-
-    Handle handle(String raw) {
-        try {
-            String n = core.normalizeHandle(raw);
-            return new Handle(n, core.handleLookup(secrets.handleKey(), n));
-        } catch (CoreException e) {
-            throw ApiException.badRequest("invalid_handle");
+        boolean active() {
+            return status.equals("active");
         }
     }
 
-    private record UserRow(byte[] id, String status, byte[] lookup, byte[] record, Instant createdAt) {}
-
-    private List<UserRow> userBy(String column, byte[] value) {
-        return jdbc.query(
-                "SELECT id, status, handle_lookup, opaque_record, created_at FROM users WHERE " + column + " = ?",
-                (rs, i) -> new UserRow(rs.getBytes(1), rs.getString(2), rs.getBytes(3), rs.getBytes(4),
-                        rs.getTimestamp(5).toInstant()),
-                value);
+    private List<User> usersWhere(String where, Object... args) {
+        return jdbc.query("SELECT id, name, username, email, password_hash, status FROM users WHERE " + where,
+                (rs, i) -> new User(rs.getBytes(1), rs.getString(2), rs.getString(3), rs.getString(4), rs.getString(5), rs.getString(6)),
+                args);
     }
 
-    private UserRow activeUser(UUID id) {
-        return userBy("id", Ids.bytes(id)).stream().filter(u -> u.status().equals("active")).findFirst()
-                .orElseThrow(ApiException::unauthorized);
+    private User activeUser(UUID id) {
+        return usersWhere("id = ? AND status = 'active'", (Object) Ids.bytes(id)).stream().findFirst().orElseThrow(ApiException::unauthorized);
     }
 
     private Timestamp now() {
         return Timestamp.from(clock.instant());
     }
 
-    // ---------- registration ----------
+    /** At most a few codes per address per hour, so Circlo can't be used to flood someone's inbox. */
+    private boolean mayEmail(String email) {
+        return limiter.tryAcquire("email-codes", email.getBytes(StandardCharsets.UTF_8), CODES_PER_EMAIL_PER_HOUR, 3_600_000);
+    }
 
-    public record RegisterStart(UUID userId, byte[] registrationResponse) {}
+    // ---------- signup ----------
 
+    public record SignupStarted(String email) {}
+
+    /**
+     * Starts a signup: reserves nothing until the email is verified (a pending signup with the same username or email is
+     * replaced), and emails a code. Usernames and emails of existing accounts are refused.
+     */
     @Transactional
-    public RegisterStart registerStart(String rawHandle, byte[] request) {
-        Handle h = handle(rawHandle);
-        for (UserRow u : userBy("handle_lookup", h.lookup())) {
-            if (u.status().equals("active")) {
-                throw ApiException.conflict("handle_taken");
+    public SignupStarted signup(String rawName, String rawUsername, String rawEmail, String rawPassword) {
+        String name = Accounts.name(rawName);
+        String username = Accounts.username(rawUsername);
+        String email = Accounts.email(rawEmail);
+        String password = Accounts.password(rawPassword);
+        if (!usersWhere("username = ? AND status = 'active'", username).isEmpty()) {
+            throw ApiException.conflict("username_taken");
+        }
+        if (!usersWhere("email = ? AND status = 'active'", email).isEmpty()) {
+            throw ApiException.conflict("email_taken");
+        }
+        if (!mayEmail(email)) {
+            throw new ApiException(HttpStatus.TOO_MANY_REQUESTS, "rate_limited");
+        }
+        // An unfinished signup isn't an account: starting again (or someone else choosing the same name) replaces it.
+        jdbc.update("DELETE FROM users WHERE status = 'pending' AND (username = ? OR email = ?)", username, email);
+        byte[] id = Ids.bytes(Ids.newId());
+        jdbc.update("INSERT INTO users (id, name, username, email, password_hash, status, created_at) VALUES (?, ?, ?, ?, ?, 'pending', ?)",
+                id, name, username, email, passwords.hash(password), now());
+        codes.send(id, email, name, EmailCodes.Purpose.verify);
+        return new SignupStarted(email);
+    }
+
+    /** Sends a new code for an unfinished signup. Says nothing about whether one exists. */
+    @Transactional
+    public void resendVerification(String rawEmail) {
+        String email = Accounts.email(rawEmail);
+        for (User u : usersWhere("email = ? AND status = 'pending'", email)) {
+            if (mayEmail(email)) {
+                codes.send(u.id(), u.email(), u.name(), EmailCodes.Purpose.verify);
             }
-            // An unfinished signup holds no keys or backups and isn't an account: a new start replaces it, so someone
-            // who abandoned signup (or whose app was closed mid-way) can start again straight away.
+        }
+    }
+
+    /** Finishes a signup with the emailed code: the account becomes active and this device is signed in. */
+    @Transactional(noRollbackFor = ApiException.class)
+    public TokenService.Tokens verifySignup(String rawEmail, String code) {
+        String email = Accounts.email(rawEmail);
+        User u = usersWhere("email = ? AND status = 'pending' FOR UPDATE", email).stream().findFirst()
+                .orElseThrow(() -> ApiException.badRequest("invalid_code"));
+        codes.consume(u.id(), EmailCodes.Purpose.verify, code);
+        // Someone else may have verified the same username or email first.
+        if (!usersWhere("(username = ? OR email = ?) AND status = 'active'", u.username(), u.email()).isEmpty()) {
             jdbc.update("DELETE FROM users WHERE id = ?", (Object) u.id());
+            throw ApiException.conflict(usersWhere("username = ? AND status = 'active'", u.username()).isEmpty() ? "email_taken" : "username_taken");
         }
-        UUID userId = Ids.newId();
-        jdbc.update("INSERT INTO users (id, handle_lookup, status, created_at) VALUES (?, ?, 'pending', ?)",
-                Ids.bytes(userId), h.lookup(), now());
-        byte[] response = core.opaqueRegistrationStart(secrets.opaqueServerSetup(), h.lookup(), request);
-        return new RegisterStart(userId, response);
-    }
-
-    public record IdentityKeys(byte[] x25519Pub, byte[] ed25519Pub, byte[] signature, int version) {}
-
-    public record Device(UUID deviceId, byte[] devicePubkey, byte[] deviceCert) {}
-
-    /** A recovery method: `kind` is "phrase" or "passkey"; the server stores the key and the copy as given. */
-    public record NewRecoveryMethod(String kind, byte[] authPubkey, byte[] ciphertext) {}
-
-    public record RegisterFinish(UUID userId, String handle, byte[] registrationUpload, IdentityKeys identity, Device device,
-            byte[] passwordBackup, List<NewRecoveryMethod> recoveryMethods) {}
-
-    @Transactional
-    public TokenService.Tokens registerFinish(RegisterFinish r) {
-        Handle h = handle(r.handle());
-        UserRow u = userBy("id", Ids.bytes(r.userId())).stream()
-                .filter(x -> x.status().equals("pending") && MessageDigest.isEqual(x.lookup(), h.lookup()))
-                .filter(x -> x.createdAt().plus(props.pendingRegistrationTtl()).isAfter(clock.instant()))
-                .findFirst()
-                .orElseThrow(() -> ApiException.badRequest("registration_expired"));
-        byte[] userId = u.id();
-        // An account always has a way back in besides the password (docs/PASSKEY_RECOVERY.md, decision A).
-        if (r.recoveryMethods().isEmpty()) {
-            throw ApiException.badRequest("recovery_method_required");
-        }
-        verifyIdentity(userId, r.identity());
-        verifyDevice(userId, r.identity().ed25519Pub(), r.device());
-        byte[] record = core.opaqueRegistrationFinish(r.registrationUpload());
-
-        jdbc.update("UPDATE users SET opaque_record = ?, status = 'active' WHERE id = ?", record, userId);
-        jdbc.update("INSERT INTO identity_keys (user_id, x25519_pub, ed25519_pub, signature, version) VALUES (?, ?, ?, ?, ?)",
-                userId, r.identity().x25519Pub(), r.identity().ed25519Pub(), r.identity().signature(), r.identity().version());
-        jdbc.update("INSERT INTO devices (id, user_id, device_pubkey, device_cert, created_at) VALUES (?, ?, ?, ?, ?)",
-                Ids.bytes(r.device().deviceId()), userId, r.device().devicePubkey(), r.device().deviceCert(), now());
-        jdbc.update("INSERT INTO key_backups (user_id, kind, ciphertext, version) VALUES (?, 'password', ?, 1)",
-                userId, r.passwordBackup());
-        for (NewRecoveryMethod m : r.recoveryMethods()) {
-            addRecoveryMethod(userId, m);
-        }
-        return tokens.issue(r.userId(), TokenService.Scope.full);
-    }
-
-    static final int MAX_RECOVERY_METHODS = 10;
-
-    /** Stores one recovery method; returns its id. */
-    UUID addRecoveryMethod(byte[] userId, NewRecoveryMethod m) {
-        if (!m.kind().equals("phrase") && !m.kind().equals("passkey")) {
-            throw ApiException.badRequest("invalid_recovery_method");
-        }
-        Integer count = jdbc.queryForObject("SELECT COUNT(*) FROM recovery_methods WHERE user_id = ?", Integer.class, (Object) userId);
-        if (count != null && count >= MAX_RECOVERY_METHODS) {
-            throw ApiException.conflict("too_many_recovery_methods");
-        }
-        UUID id = Ids.newId();
-        jdbc.update("INSERT INTO recovery_methods (id, user_id, kind, auth_pubkey, ciphertext, created_at) VALUES (?, ?, ?, ?, ?, ?)",
-                Ids.bytes(id), userId, m.kind(), m.authPubkey(), m.ciphertext(), now());
-        return id;
-    }
-
-    void verifyIdentity(byte[] userId, IdentityKeys k) {
-        if (!core.verifyIdentity(k.ed25519Pub(), userId, k.version(), k.x25519Pub(), k.signature())) {
-            throw ApiException.badRequest("bad_identity_signature");
-        }
-    }
-
-    void verifyDevice(byte[] userId, byte[] identityEd25519Pub, Device d) {
-        if (!core.verifyDeviceCertificate(identityEd25519Pub, userId, Ids.bytes(d.deviceId()), d.devicePubkey(), d.deviceCert())) {
-            throw ApiException.badRequest("bad_device_certificate");
-        }
+        jdbc.update("UPDATE users SET status = 'active', email_verified_at = ? WHERE id = ?", now(), u.id());
+        CircleController.createStarterCircles(jdbc, u.id());
+        return tokens.signIn(u.uuid());
     }
 
     // ---------- login ----------
 
-    /**
-     * `attemptsLeft`: password attempts left after this one before login locks; at 0, `lockSeconds` is how long the lock
-     * that is now set lasts if this attempt fails too (a successful login lifts it).
-     */
-    public record LoginStart(UUID loginId, byte[] credentialResponse, int attemptsLeft, Long lockSeconds) {}
-
-    @Transactional(noRollbackFor = LockedException.class)
-    public LoginStart loginStart(String rawHandle, byte[] request) {
-        Handle h = handle(rawHandle);
-        LoginThrottle.Decision attempt = throttle.attempt(h.lookup());
-        if (attempt.locked()) {
-            throw new LockedException(Math.max(1, Duration.between(clock.instant(), attempt.lockedUntil()).toSeconds()));
-        }
-        UserRow u = userBy("handle_lookup", h.lookup()).stream().filter(x -> x.status().equals("active")).findFirst()
-                .orElse(null);
-        CircloCore.LoginStart ls = core.opaqueLoginStart(secrets.opaqueServerSetup(), u == null ? null : u.record(),
-                h.lookup(), h.normalized(), request);
-        UUID loginId = Ids.newId();
-        jdbc.update("INSERT INTO opaque_login_states (id, user_id, state, expires_at) VALUES (?, ?, ?, ?)",
-                Ids.bytes(loginId), u == null ? null : u.id(), ls.state(),
-                Timestamp.from(clock.instant().plus(props.challengeTtl())));
-        Long lockSeconds = attempt.lockedUntil() == null ? null : Duration.between(clock.instant(), attempt.lockedUntil()).toSeconds();
-        return new LoginStart(loginId, ls.response(), attempt.attemptsLeft(), lockSeconds);
+    static byte[] throttleKey(User user, String typed) {
+        String key = user != null ? "user:" + user.uuid() : "login:" + typed;
+        return TokenService.sha256(key.getBytes(StandardCharsets.UTF_8));
     }
 
-    @Transactional
-    public TokenService.Tokens loginFinish(UUID loginId, String rawHandle, byte[] finalization) {
-        Handle h = handle(rawHandle);
-        UserRow u = verifyLogin(loginId, h, finalization);
-        throttle.clear(h.lookup());
+    private User findByLogin(String typed) {
+        String login = typed == null ? "" : typed.trim().toLowerCase(java.util.Locale.ROOT);
+        if (login.startsWith("@")) {
+            login = login.substring(1);
+        }
+        String column = Accounts.looksLikeEmail(login) ? "email" : "username";
+        // An active account wins over a pending signup that reuses its username or email.
+        return usersWhere(column + " = ? ORDER BY status = 'active' DESC LIMIT 1", login).stream().findFirst().orElse(null);
+    }
+
+    /**
+     * Logs in with a username or email and password. A wrong password answers 401 with how many attempts are left
+     * before login locks (and the lock, at 0); unknown accounts answer exactly the same. An account whose email isn't
+     * verified yet gets a fresh code and 403 email_not_verified.
+     */
+    @Transactional(noRollbackFor = ApiException.class)
+    public TokenService.Tokens login(String typed, String password) {
+        String normalized = typed == null ? "" : typed.trim().toLowerCase(java.util.Locale.ROOT);
+        User u = findByLogin(normalized);
+        byte[] key = throttleKey(u, normalized);
+        Instant locked = throttle.lockedUntil(key);
+        if (locked != null) {
+            throw new LockedException(Math.max(1, Duration.between(clock.instant(), locked).toSeconds()));
+        }
+        boolean ok;
+        if (u == null || password == null) {
+            passwords.burn(password == null ? "" : password);
+            ok = false;
+        } else {
+            ok = passwords.matches(password, u.passwordHash());
+        }
+        if (!ok) {
+            LoginThrottle.Decision d = throttle.fail(key);
+            Long lockSeconds = d.lockedUntil() == null ? null : Duration.between(clock.instant(), d.lockedUntil()).toSeconds();
+            throw new ApiException(HttpStatus.UNAUTHORIZED, "unauthorized",
+                    lockSeconds == null ? Map.of("attemptsLeft", d.attemptsLeft()) : Map.of("attemptsLeft", d.attemptsLeft(), "lockSeconds", lockSeconds));
+        }
+        throttle.clear(key);
+        if (!u.active()) {
+            if (mayEmail(u.email())) {
+                codes.send(u.id(), u.email(), u.name(), EmailCodes.Purpose.verify);
+            }
+            throw new ApiException(HttpStatus.FORBIDDEN, "email_not_verified", Map.of("email", u.email()));
+        }
         // Shown on the account's other devices ("New sign-in"), with no detail about this one.
         jdbc.update("INSERT INTO security_events (id, user_id, kind, created_at) VALUES (?, ?, 'sign_in', ?)",
-                Ids.bytes(Ids.newId()), u.id(), Timestamp.from(clock.instant()));
-        return tokens.issue(Ids.uuid(u.id()), TokenService.Scope.full);
+                Ids.bytes(Ids.newId()), u.id(), now());
+        return tokens.signIn(u.uuid());
     }
 
-    /** Checks an OPAQUE finalization against its single-use login state; returns the user it proves. */
-    private UserRow verifyLogin(UUID loginId, Handle h, byte[] finalization) {
-        byte[] id = Ids.bytes(loginId);
-        List<Object[]> rows = jdbc.query(
-                "SELECT user_id, state, expires_at FROM opaque_login_states WHERE id = ? FOR UPDATE",
-                (rs, i) -> new Object[] {rs.getBytes(1), rs.getBytes(2), rs.getTimestamp(3).toInstant()}, (Object) id);
-        jdbc.update("DELETE FROM opaque_login_states WHERE id = ?", (Object) id); // single use, whatever happens next
-        if (rows.isEmpty() || rows.get(0)[0] == null || ((Instant) rows.get(0)[2]).isBefore(clock.instant())) {
-            throw ApiException.unauthorized();
-        }
-        UserRow u = activeUser(Ids.uuid((byte[]) rows.get(0)[0]));
-        if (!MessageDigest.isEqual(u.lookup(), h.lookup())
-                || !core.opaqueLoginFinish((byte[]) rows.get(0)[1], h.normalized(), finalization)) {
-            throw ApiException.unauthorized();
-        }
-        return u;
-    }
+    // ---------- forgotten password ----------
 
-    // ---------- proving the current password (before changing it) ----------
-
-    /**
-     * The same OPAQUE login, for the signed-in user only: it unlocks the password backup on the phone so it can be
-     * re-sealed under a new password. It counts towards the lock like any login, but isn't a new sign-in.
-     */
-    @Transactional(noRollbackFor = LockedException.class)
-    public LoginStart verifyStart(UUID userId, String rawHandle, byte[] request) {
-        Handle h = handle(rawHandle);
-        if (!MessageDigest.isEqual(activeUser(userId).lookup(), h.lookup())) {
-            throw ApiException.forbidden();
-        }
-        return loginStart(rawHandle, request);
-    }
-
-    static final Duration REAUTH_TTL = Duration.ofMinutes(5);
-
-    /**
-     * Returns a one-time token proving the password was just entered (valid 5 minutes, replaced by the next one): removing
-     * a recovery method needs it.
-     */
+    /** Emails a reset code if an account uses this address. Says nothing about whether one does. */
     @Transactional
-    public String verifyFinish(UUID userId, UUID loginId, String rawHandle, byte[] finalization) {
-        Handle h = handle(rawHandle);
-        UserRow u = verifyLogin(loginId, h, finalization);
-        if (!Ids.uuid(u.id()).equals(userId)) {
-            throw ApiException.forbidden();
-        }
-        throttle.clear(h.lookup());
-        byte[] token = Ids.random(32);
-        jdbc.update("UPDATE users SET reauth_hash = ?, reauth_expires_at = ? WHERE id = ?",
-                TokenService.sha256(token), Timestamp.from(clock.instant().plus(REAUTH_TTL)), u.id());
-        return Base64.getUrlEncoder().withoutPadding().encodeToString(token);
-    }
-
-    /** True once for a valid, unexpired token from {@link #verifyFinish}; it can't be used again. */
-    @Transactional
-    public boolean consumeReauth(UUID userId, String token) {
-        if (token == null || token.isEmpty()) {
-            return false;
-        }
-        byte[] raw;
-        try {
-            raw = Base64.getUrlDecoder().decode(token);
-        } catch (IllegalArgumentException e) {
-            return false;
-        }
-        int n = jdbc.update("UPDATE users SET reauth_hash = NULL, reauth_expires_at = NULL WHERE id = ? AND reauth_hash = ? AND reauth_expires_at > ?",
-                Ids.bytes(userId), TokenService.sha256(raw), now());
-        return n == 1;
-    }
-
-    // ---------- recovery ----------
-
-    public record RecoveryStart(UUID userId, UUID challengeId, byte[] nonce, long expiresAt) {}
-
-    @Transactional
-    public RecoveryStart recoveryStart(String rawHandle) {
-        Handle h = handle(rawHandle);
-        if (!limiter.tryAcquire("recovery-handle", h.lookup(), LOGIN_ATTEMPTS_PER_HANDLE_PER_MINUTE, 60_000)) {
-            throw new ApiException(HttpStatus.TOO_MANY_REQUESTS, "rate_limited");
-        }
-        UserRow u = userBy("handle_lookup", h.lookup()).stream().filter(x -> x.status().equals("active")).findFirst()
-                .orElse(null);
-        // Unknown handles get a stable fake user id so the response shape never reveals whether an account exists.
-        UUID userId = u != null ? Ids.uuid(u.id()) : fakeUserId(h.lookup());
-        UUID challengeId = Ids.newId();
-        byte[] nonce = Ids.random(32);
-        Instant expires = clock.instant().plus(props.challengeTtl());
-        jdbc.update("INSERT INTO recovery_challenges (id, user_id, nonce, expires_at) VALUES (?, ?, ?, ?)",
-                Ids.bytes(challengeId), u == null ? null : u.id(), nonce, Timestamp.from(expires));
-        return new RecoveryStart(userId, challengeId, nonce, expires.getEpochSecond());
-    }
-
-    private UUID fakeUserId(byte[] lookup) {
-        return Ids.uuid(Arrays.copyOf(TokenService.sha256(concat("circlo/v1/fake-user".getBytes(), lookup)), 16));
-    }
-
-    private static byte[] concat(byte[] a, byte[] b) {
-        byte[] out = Arrays.copyOf(a, a.length + b.length);
-        System.arraycopy(b, 0, out, a.length, b.length);
-        return out;
-    }
-
-    /** A recovery session, plus which method proved it (its copy is fetched with GET /v1/recovery-methods/{id}/backup). */
-    public record RecoveryResult(UUID userId, String accessToken, String refreshToken, long expiresIn, TokenService.Scope scope,
-            UUID methodId, String methodKind) {}
-
-    @Transactional
-    public RecoveryResult recoveryFinish(UUID challengeId, byte[] signature) {
-        byte[] id = Ids.bytes(challengeId);
-        List<Object[]> rows = jdbc.query(
-                "SELECT user_id, nonce, expires_at FROM recovery_challenges WHERE id = ? FOR UPDATE",
-                (rs, i) -> new Object[] {rs.getBytes(1), rs.getBytes(2), rs.getTimestamp(3).toInstant()}, (Object) id);
-        jdbc.update("DELETE FROM recovery_challenges WHERE id = ?", (Object) id);
-        if (rows.isEmpty() || rows.get(0)[0] == null) {
-            throw ApiException.unauthorized();
-        }
-        Instant expires = (Instant) rows.get(0)[2];
-        if (expires.isBefore(clock.instant())) {
-            throw ApiException.unauthorized();
-        }
-        UserRow u = activeUser(Ids.uuid((byte[]) rows.get(0)[0]));
-        // Any of the user's methods may answer; the one that does is the one whose copy the phone will open.
-        List<Object[]> methods = jdbc.query("SELECT id, kind, auth_pubkey FROM recovery_methods WHERE user_id = ?",
-                (rs, i) -> new Object[] {rs.getBytes(1), rs.getString(2), rs.getBytes(3)}, (Object) u.id());
-        for (Object[] m : methods) {
-            if (core.verifyRecoveryLogin((byte[]) m[2], u.id(), id, (byte[]) rows.get(0)[1], expires.getEpochSecond(), signature)) {
-                jdbc.update("UPDATE recovery_methods SET last_used_at = ? WHERE id = ?", now(), m[0]);
-                TokenService.Tokens t = tokens.issue(Ids.uuid(u.id()), TokenService.Scope.recovery);
-                return new RecoveryResult(t.userId(), t.accessToken(), t.refreshToken(), t.expiresIn(), t.scope(),
-                        Ids.uuid((byte[]) m[0]), (String) m[1]);
+    public void forgotPassword(String rawEmail) {
+        String email = Accounts.email(rawEmail);
+        for (User u : usersWhere("email = ? AND status = 'active'", email)) {
+            if (mayEmail(email)) {
+                codes.send(u.id(), u.email(), u.name(), EmailCodes.Purpose.reset);
             }
         }
-        throw ApiException.unauthorized();
     }
 
-    // ---------- password change (also completes recovery) ----------
+    /** Sets a new password with the emailed code: every other session ends, any login lock lifts, this device signs in. */
+    @Transactional(noRollbackFor = ApiException.class)
+    public TokenService.Tokens resetPassword(String rawEmail, String code, String rawPassword) {
+        String email = Accounts.email(rawEmail);
+        String password = Accounts.password(rawPassword);
+        User u = usersWhere("email = ? AND status = 'active' FOR UPDATE", email).stream().findFirst()
+                .orElseThrow(() -> ApiException.badRequest("invalid_code"));
+        codes.consume(u.id(), EmailCodes.Purpose.reset, code);
+        jdbc.update("UPDATE users SET password_hash = ? WHERE id = ?", passwords.hash(password), u.id());
+        throttle.clear(throttleKey(u, null));
+        tokens.revokeAll(u.uuid());
+        return tokens.signIn(u.uuid());
+    }
 
-    @Transactional(readOnly = true)
-    public byte[] passwordStart(UUID userId, String rawHandle, byte[] request) {
-        Handle h = handle(rawHandle);
-        UserRow u = activeUser(userId);
-        if (!MessageDigest.isEqual(u.lookup(), h.lookup())) {
-            throw ApiException.forbidden();
+    // ---------- changing the password (signed in) ----------
+
+    /**
+     * Checks the current password (a wrong one counts towards the login lock) and sets the new one. Every other device
+     * is signed out; this one gets fresh tokens.
+     */
+    @Transactional(noRollbackFor = ApiException.class)
+    public TokenService.Tokens changePassword(UUID userId, UUID deviceId, String current, String rawNext) {
+        String next = Accounts.password(rawNext);
+        User u = activeUser(userId);
+        byte[] key = throttleKey(u, null);
+        Instant locked = throttle.lockedUntil(key);
+        if (locked != null) {
+            throw new LockedException(Math.max(1, Duration.between(clock.instant(), locked).toSeconds()));
         }
-        return core.opaqueRegistrationStart(secrets.opaqueServerSetup(), h.lookup(), request);
+        if (current == null || !passwords.matches(current, u.passwordHash())) {
+            LoginThrottle.Decision d = throttle.fail(key);
+            throw new ApiException(HttpStatus.FORBIDDEN, "wrong_password", Map.of("attemptsLeft", d.attemptsLeft()));
+        }
+        throttle.clear(key);
+        jdbc.update("UPDATE users SET password_hash = ? WHERE id = ?", passwords.hash(next), u.id());
+        tokens.revokeAllExcept(userId, deviceId);
+        return tokens.issue(userId, deviceId);
     }
 
-    @Transactional
-    public TokenService.Tokens passwordFinish(UUID userId, byte[] registrationUpload, byte[] passwordBackup) {
-        UserRow u = activeUser(userId);
-        byte[] record = core.opaqueRegistrationFinish(registrationUpload);
-        jdbc.update("UPDATE users SET opaque_record = ? WHERE id = ?", record, u.id());
-        jdbc.update("UPDATE key_backups SET ciphertext = ?, version = version + 1 WHERE user_id = ? AND kind = 'password'",
-                passwordBackup, u.id());
-        throttle.clear(u.lookup()); // a new password (e.g. after the recovery phrase) lifts any lock
-        tokens.revokeAll(userId);
-        return tokens.issue(userId, TokenService.Scope.full);
+    /** True if `password` is this user's password (account deletion asks for it). Wrong ones count towards the lock. */
+    @Transactional(noRollbackFor = ApiException.class)
+    public boolean confirmPassword(UUID userId, String password) {
+        User u = activeUser(userId);
+        byte[] key = throttleKey(u, null);
+        if (throttle.lockedUntil(key) != null) {
+            throw new LockedException(60);
+        }
+        if (password != null && passwords.matches(password, u.passwordHash())) {
+            return true;
+        }
+        throttle.fail(key);
+        return false;
     }
 
-    /** Housekeeping: expired login states and challenges. */
+    /** Housekeeping: signups never verified, and expired refresh tokens. */
     @Transactional
-    public void purgeExpired() {
-        Timestamp now = now();
-        jdbc.update("DELETE FROM opaque_login_states WHERE expires_at < ?", now);
-        jdbc.update("DELETE FROM recovery_challenges WHERE expires_at < ?", now);
-        jdbc.update("DELETE FROM refresh_tokens WHERE expires_at < ?", now);
+    public void purgeExpired(Duration pendingTtl) {
+        jdbc.update("DELETE FROM users WHERE status = 'pending' AND created_at < ?", Timestamp.from(clock.instant().minus(pendingTtl)));
+        jdbc.update("DELETE FROM refresh_tokens WHERE expires_at < ?", now());
     }
 }

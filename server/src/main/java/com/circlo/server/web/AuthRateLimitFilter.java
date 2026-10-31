@@ -10,8 +10,8 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 /**
- * Limits unauthenticated auth endpoints per client address. The address is only hashed in memory
- * (see {@link RateLimiter}); it is never logged or stored.
+ * Limits the unauthenticated auth endpoints (signup, login, codes, refresh) per client address. The address is only
+ * hashed in memory (see {@link RateLimiter}); it is never logged or stored.
  */
 @Component
 public class AuthRateLimitFilter extends OncePerRequestFilter {
@@ -26,9 +26,7 @@ public class AuthRateLimitFilter extends OncePerRequestFilter {
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
-        // Unauthenticated endpoints: login/recovery and the one-time device-link pickup.
-        String uri = request.getRequestURI();
-        return !uri.startsWith("/v1/auth/") && !uri.startsWith("/v1/device-links/");
+        return !request.getRequestURI().startsWith("/v1/auth/") || "OPTIONS".equals(request.getMethod());
     }
 
     @Override
