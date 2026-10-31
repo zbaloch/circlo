@@ -1,6 +1,6 @@
 # Passkey recovery (design, for owner approval)
 
-Status: **proposed** (2026-10-31). Nothing here is built yet.
+Status: **approved** (2026-10-31) with the recommended decisions in section 8; being built.
 
 ## 1. Goal
 
@@ -36,7 +36,7 @@ PRF is checked when the passkey is created, and every device where it works can 
 ## 3. User flows
 
 **Sign-up:** handle → password → **"Protect your account with Face ID"** (one tap; the system saves a passkey for
-`hellocirclo.com` in iCloud Keychain or Google Password Manager) → in.
+`www.hellocirclo.com` in iCloud Keychain or Google Password Manager) → in.
 - If the device can't create a PRF passkey (older iOS, provider without PRF), the app says so and offers the
   **12-word phrase** instead, with "Save to password manager" (share sheet) / "Save as file" / "I've written it down".
   No quiz.
@@ -73,7 +73,8 @@ passkeys (0x03), and its `auth` public key. The PRF output never leaves the phon
 server except ciphertext and a public key.
 
 ### 4.2 The passkey itself
-- RP ID `hellocirclo.com`. `user.name` = the handle, `user.id` = 16 random bytes (stored only in the user's keychain).
+- RP ID `www.hellocirclo.com` (the site is on Vercel, where the apex redirects to www; association files must be served
+  without redirects). `user.name` = the handle, `user.id` = 16 random bytes (stored only in the user's keychain).
   Discoverable (resident) credential, user verification required.
 - The server **does not** register or verify the passkey (no WebAuthn on the server). The passkey is only where the
   phone keeps a PRF secret. The server checks only the derived Ed25519 `auth` signature, exactly as for phrases today.
@@ -105,26 +106,28 @@ OPAQUE re-registration (new password) and revokes other sessions.
 ## 6. App
 
 - `react-native-passkey` (≥ 3.3; pin the exact version after testing). Expo config: `ios.associatedDomains:
-  ["webcredentials:hellocirclo.com"]`.
+  ["webcredentials:www.hellocirclo.com"]`.
 - Screens: the sign-up step, Settings → Recovery, the "Forgot password" chooser, a reminder card.
 - Tests: core vectors per method kind, server ITs (multi-method recovery, migration of existing users, any-key match),
   app tests for the flows. Then real-device checks: iPhone → iPhone, iPhone → Mac (Safari), Android → Android.
 
 ## 7. Website and Apple / Google setup (one-off, by the owner)
 
-- `https://hellocirclo.com/.well-known/apple-app-site-association`, served at the **apex** without a redirect:
+- `https://www.hellocirclo.com/.well-known/apple-app-site-association`, served without a redirect, as JSON:
   `{"webcredentials":{"apps":["P9273YDUQ9.com.hellocirclo.app"]}}`.
-- `https://hellocirclo.com/.well-known/assetlinks.json` with relation `delegate_permission/common.get_login_creds` for
+- `https://www.hellocirclo.com/.well-known/assetlinks.json` with relation `delegate_permission/common.get_login_creds` for
   `com.circlo.app` and the SHA-256 fingerprints of every key that signs the Android app (Play app signing, upload key,
-  GitHub APK key).
+  GitHub APK key). Never the React Native debug key: it's public, so any debug app could then claim the domain.
+- Both files live in `circlo-web/public/.well-known/` (`vercel.json` serves the Apple one as JSON).
 - Apple Developer → Identifiers → `com.hellocirclo.app`: enable **Associated Domains**.
 
 ## 8. Owner decisions
 
-- **A.** Must sign-up set up a recovery method (recommended: yes; Face ID makes it one tap), or allow "Later"?
-- **B.** New phrases are 12 words (recommended); existing 24-word phrases keep working.
-- **C.** Drop the 3-word quiz (recommended); keep an optional "Check my phrase" in Settings.
-- **D.** Remove Face ID recovery in Settings needs the password (recommended) or just the session?
+Decided 2026-10-31 (all as recommended):
+- **A.** Sign-up must set up a recovery method (Face ID, or a phrase where that isn't available). No "Later".
+- **B.** New phrases are 12 words; existing 24-word phrases keep working.
+- **C.** No 3-word quiz; an optional "Check my phrase" in Settings.
+- **D.** Removing Face ID recovery (or the phrase) asks for the password.
 
 ## 9. Plan
 
