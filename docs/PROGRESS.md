@@ -450,6 +450,7 @@ See docs/HARDENING.md for how to repeat each check.
 | 2026-10-30 | **Login hardening**: passwords need 12+ characters, zxcvbn score 3+ and not in a leaked list (zxcvbn's ~49k + NCSC top 100k); 3 wrong passwords lock password login for 15 min, 1 h, then 24 h (escalating, not until recovery, so a handle can't be used to force someone through recovery); new sign-ins alert other devices; change-password screen | Owner request; lockout style chosen by owner |
 | 2026-10-30 | **No remote push.** FCM removed (server sender, push-token endpoint and columns, CIRCLO_PUSH_TOKEN_KEY/CIRCLO_FCM_*); no APNs. Notifications tab lists requests, replies, likes and sign-ins (`GET /v1/activity`); opt-in background checks (expo-background-task) with a per-device counts-only check token (`GET /v1/activity/pending`) and local notifications | Owner decision: Apple and Google must not learn about users' activity; slower notifications accepted |
 | 2026-10-31 | **iOS bundle ID `com.hellocirclo.app`** (Android stays `com.circlo.app`) | `com.circlo.app` was not available to register at Apple; the App Store Connect app uses `com.hellocirclo.app` |
+| 2026-10-31 | **Root stack + drawer around the tabs only**; no docked "Post your reply" bar | On iOS the left-edge swipe opened the drawer instead of going back (every screen was a drawer screen). Replying starts only from the reply button |
 
 ## Waiting on owner
 
