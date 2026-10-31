@@ -1,5 +1,5 @@
 import { unseenCount, type ActivityItem } from '@/lib/activity';
-import { mergeRows } from '@/app/(tabs)/notifications';
+import { mergeRows } from '@/app/(drawer)/(tabs)/notifications';
 
 jest.mock('@circlo/core', () => ({}));
 jest.mock('expo-secure-store', () => ({}));

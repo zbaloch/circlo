@@ -308,7 +308,8 @@ Build the familiar Twitter/X interaction model under the **Circlo** brand. Do no
   - media grid: 1 image full-width, 2 side-by-side, 3 as one large plus two stacked, 4 as a 2×2 grid; video with a poster frame and play button, muted autoplay in view
   - action row: **Reply** (count), **Like** (count), **Share-to-DM**, and an overflow menu (Mute, Block; Delete if it's your own post)
 - **No reposts/retweets.** Resharing would leak a post beyond its intended circle. Leave this out deliberately.
-- **Tap a post** to open the thread view: the original post, then replies in order, with a reply composer docked at the bottom.
+- **Tap a post** to open the thread view: the original post, then replies in order. Replying starts from the post's reply button (owner decision 2026-10-31: no reply bar docked at the bottom).
+- **Navigation:** the drawer wraps only the tabs; every other screen is pushed on a stack above them, so back (header arrow, Android back, iOS left-edge swipe) returns to the previous screen and the drawer opens only on the tabs.
 - **Media viewer:** full-screen, swipe between images, pinch to zoom, and swipe down to dismiss.
 - Decrypted images and thumbnails are shown from local decrypted cache files. Show a skeleton/shimmer while decrypting, and a lock icon placeholder if decryption fails.
 

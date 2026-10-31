@@ -1,9 +1,9 @@
 import { render, screen } from '@testing-library/react-native';
 import { useEffect as mockUseEffect } from 'react';
 
-import { TABS } from '@/app/(tabs)/_layout';
-import HomeScreen from '@/app/(tabs)/index';
-import MessagesScreen from '@/app/(tabs)/messages';
+import { TABS } from '@/app/(drawer)/(tabs)/_layout';
+import HomeScreen from '@/app/(drawer)/(tabs)/index';
+import MessagesScreen from '@/app/(drawer)/(tabs)/messages';
 import { DRAWER_ITEMS } from '@/components/app-drawer';
 
 // Jest hoists this above the imports; Home reads the session.
