@@ -65,7 +65,7 @@ function Navigator() {
         <Stack.Screen name="circles" options={{ title: 'Circles' }} />
         <Stack.Screen name="devices" options={{ title: 'Devices' }} />
         <Stack.Screen name="settings" options={{ title: 'Settings' }} />
-        <Stack.Screen name="recovery" options={{ title: 'Recovery phrase' }} />
+        <Stack.Screen name="recovery" options={{ title: 'Account recovery' }} />
         <Stack.Screen name="dev" options={{ title: 'Crypto self-test' }} />
         <Stack.Screen name="edit-profile" options={{ title: 'Edit profile' }} />
         <Stack.Screen name="friend/[id]" options={{ title: 'Profile' }} />

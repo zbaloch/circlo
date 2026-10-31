@@ -1,4 +1,5 @@
-//! Key backups: password copy (OPAQUE export key) and recovery copy (BIP39 entropy) (CRYPTO.md section 6).
+//! Key backups: password copy (OPAQUE export key) and recovery copies, one per recovery method: a phrase or a
+//! passkey (CRYPTO.md section 6).
 //!
 //! Plaintext is a fixed binary layout (not CBOR) so every byte is zeroizable and no parser touches secrets:
 //! `version || x25519_sk:32 || ed25519_sk:32 || data_key:32 || local_root:32 || u16(count) || count × (epoch_id:16 || C1:32 || profile_key:32)`
@@ -10,12 +11,14 @@ use crate::envelope;
 use crate::error::{invalid, CoreError, Result};
 use crate::padding::{pad, unpad};
 use crate::primitives::{hkdf32, VERSION};
+use crate::recovery::RecoveryKind;
 
 const FIXED: usize = 1 + 4 * 32 + 2;
 const EPOCH_LEN: usize = 16 + 32 + 32;
 pub const MAX_EPOCHS: usize = 10_000;
 pub const KIND_PASSWORD: u8 = 0x01;
 pub const KIND_RECOVERY: u8 = 0x02;
+pub const KIND_PASSKEY: u8 = 0x03;
 
 pub struct EpochSecrets {
     pub epoch_id: [u8; 16],
@@ -112,17 +115,35 @@ pub fn open_password_backup(export_key: &[u8; 64], user_id: &[u8; 16], ct: &[u8]
     )
 }
 
+fn method_params(kind: RecoveryKind) -> (&'static str, u8) {
+    match kind {
+        RecoveryKind::Phrase => ("circlo/v1/backup-recovery", KIND_RECOVERY),
+        RecoveryKind::Passkey => ("circlo/v1/backup-passkey", KIND_PASSKEY),
+    }
+}
+
+/// The recovery copy for one method, sealed under a key derived from the method's 32-byte root.
+pub fn seal_method_backup(
+    kind: RecoveryKind,
+    root: &[u8; 32],
+    user_id: &[u8; 16],
+    p: &BackupPayload,
+) -> Result<Vec<u8>> {
+    let (label, kind_byte) = method_params(kind);
+    seal_with(&hkdf32(root, label), user_id, kind_byte, p)
+}
+
+pub fn open_method_backup(kind: RecoveryKind, root: &[u8; 32], user_id: &[u8; 16], ct: &[u8]) -> Result<BackupPayload> {
+    let (label, kind_byte) = method_params(kind);
+    open_with(&hkdf32(root, label), user_id, kind_byte, ct)
+}
+
 pub fn seal_recovery_backup(entropy: &[u8; 32], user_id: &[u8; 16], p: &BackupPayload) -> Result<Vec<u8>> {
-    seal_with(&hkdf32(entropy, "circlo/v1/backup-recovery"), user_id, KIND_RECOVERY, p)
+    seal_method_backup(RecoveryKind::Phrase, entropy, user_id, p)
 }
 
 pub fn open_recovery_backup(entropy: &[u8; 32], user_id: &[u8; 16], ct: &[u8]) -> Result<BackupPayload> {
-    open_with(
-        &hkdf32(entropy, "circlo/v1/backup-recovery"),
-        user_id,
-        KIND_RECOVERY,
-        ct,
-    )
+    open_method_backup(RecoveryKind::Phrase, entropy, user_id, ct)
 }
 
 #[cfg(test)]
@@ -161,6 +182,24 @@ mod tests {
         assert!(open_password_backup(&ek, &[2; 16], &pw).is_err());
         let ent_as_ek: [u8; 64] = [ent, ent].concat().try_into().unwrap();
         assert!(open_password_backup(&ent_as_ek, &[1; 16], &rc).is_err());
+    }
+
+    #[test]
+    fn passkey_copies_are_separate_from_phrase_copies() {
+        let p = payload(1);
+        let root = [8u8; 32];
+        let pk = seal_method_backup(RecoveryKind::Passkey, &root, &[1; 16], &p).unwrap();
+        assert_eq!(
+            *open_method_backup(RecoveryKind::Passkey, &root, &[1; 16], &pk)
+                .unwrap()
+                .data_key,
+            [3; 32]
+        );
+        // The same root as a phrase opens nothing: different key and kind byte.
+        assert!(open_method_backup(RecoveryKind::Phrase, &root, &[1; 16], &pk).is_err());
+        assert!(open_recovery_backup(&root, &[1; 16], &pk).is_err());
+        assert!(open_method_backup(RecoveryKind::Passkey, &[9; 32], &[1; 16], &pk).is_err());
+        assert!(open_method_backup(RecoveryKind::Passkey, &root, &[2; 16], &pk).is_err());
     }
 
     #[test]

@@ -565,6 +565,11 @@ const DEFINITIONS = {
       ret: FfiType.RustBuffer,
       hasRustCallStatus: true,
     },
+    uniffi_circlo_core_fn_func_open_passkey_backup: {
+      args: [FfiType.RustBuffer, FfiType.RustBuffer, FfiType.RustBuffer],
+      ret: FfiType.RustBuffer,
+      hasRustCallStatus: true,
+    },
     uniffi_circlo_core_fn_func_open_password_backup: {
       args: [FfiType.RustBuffer, FfiType.RustBuffer, FfiType.RustBuffer],
       ret: FfiType.RustBuffer,
@@ -609,6 +614,16 @@ const DEFINITIONS = {
         FfiType.RustBuffer,
         FfiType.RustBuffer,
       ],
+      ret: FfiType.RustBuffer,
+      hasRustCallStatus: true,
+    },
+    uniffi_circlo_core_fn_func_passkey_prf_salt: {
+      args: [],
+      ret: FfiType.RustBuffer,
+      hasRustCallStatus: true,
+    },
+    uniffi_circlo_core_fn_func_passkey_recovery_public_key: {
+      args: [FfiType.RustBuffer],
       ret: FfiType.RustBuffer,
       hasRustCallStatus: true,
     },
@@ -659,6 +674,11 @@ const DEFINITIONS = {
       hasRustCallStatus: true,
     },
     uniffi_circlo_core_fn_func_seal_local: {
+      args: [FfiType.RustBuffer, FfiType.RustBuffer, FfiType.RustBuffer],
+      ret: FfiType.RustBuffer,
+      hasRustCallStatus: true,
+    },
+    uniffi_circlo_core_fn_func_seal_passkey_backup: {
       args: [FfiType.RustBuffer, FfiType.RustBuffer, FfiType.RustBuffer],
       ret: FfiType.RustBuffer,
       hasRustCallStatus: true,
@@ -746,6 +766,17 @@ const DEFINITIONS = {
     },
     uniffi_circlo_core_fn_func_sign_identity: {
       args: [FfiType.RustBuffer, FfiType.RustBuffer, FfiType.UInt8],
+      ret: FfiType.RustBuffer,
+      hasRustCallStatus: true,
+    },
+    uniffi_circlo_core_fn_func_sign_passkey_recovery_login: {
+      args: [
+        FfiType.RustBuffer,
+        FfiType.RustBuffer,
+        FfiType.RustBuffer,
+        FfiType.RustBuffer,
+        FfiType.UInt64,
+      ],
       ret: FfiType.RustBuffer,
       hasRustCallStatus: true,
     },
@@ -1146,6 +1177,11 @@ const DEFINITIONS = {
       ret: FfiType.UInt16,
       hasRustCallStatus: false,
     },
+    uniffi_circlo_core_checksum_func_open_passkey_backup: {
+      args: [],
+      ret: FfiType.UInt16,
+      hasRustCallStatus: false,
+    },
     uniffi_circlo_core_checksum_func_open_password_backup: {
       args: [],
       ret: FfiType.UInt16,
@@ -1172,6 +1208,16 @@ const DEFINITIONS = {
       hasRustCallStatus: false,
     },
     uniffi_circlo_core_checksum_func_open_user_blob: {
+      args: [],
+      ret: FfiType.UInt16,
+      hasRustCallStatus: false,
+    },
+    uniffi_circlo_core_checksum_func_passkey_prf_salt: {
+      args: [],
+      ret: FfiType.UInt16,
+      hasRustCallStatus: false,
+    },
+    uniffi_circlo_core_checksum_func_passkey_recovery_public_key: {
       args: [],
       ret: FfiType.UInt16,
       hasRustCallStatus: false,
@@ -1207,6 +1253,11 @@ const DEFINITIONS = {
       hasRustCallStatus: false,
     },
     uniffi_circlo_core_checksum_func_seal_local: {
+      args: [],
+      ret: FfiType.UInt16,
+      hasRustCallStatus: false,
+    },
+    uniffi_circlo_core_checksum_func_seal_passkey_backup: {
       args: [],
       ret: FfiType.UInt16,
       hasRustCallStatus: false,
@@ -1257,6 +1308,11 @@ const DEFINITIONS = {
       hasRustCallStatus: false,
     },
     uniffi_circlo_core_checksum_func_sign_identity: {
+      args: [],
+      ret: FfiType.UInt16,
+      hasRustCallStatus: false,
+    },
+    uniffi_circlo_core_checksum_func_sign_passkey_recovery_login: {
       args: [],
       ret: FfiType.UInt16,
       hasRustCallStatus: false,
@@ -1818,6 +1874,12 @@ interface NativeModuleInterface {
     ciphertext: Uint8Array,
     uniffi_out_err: UniffiRustCallStatus,
   ): Uint8Array;
+  uniffi_circlo_core_fn_func_open_passkey_backup(
+    prfOutput: Uint8Array,
+    userId: Uint8Array,
+    ciphertext: Uint8Array,
+    uniffi_out_err: UniffiRustCallStatus,
+  ): Uint8Array;
   uniffi_circlo_core_fn_func_open_password_backup(
     exportKey: Uint8Array,
     userId: Uint8Array,
@@ -1857,6 +1919,13 @@ interface NativeModuleInterface {
     kind: Uint8Array,
     userId: Uint8Array,
     ciphertext: Uint8Array,
+    uniffi_out_err: UniffiRustCallStatus,
+  ): Uint8Array;
+  uniffi_circlo_core_fn_func_passkey_prf_salt(
+    uniffi_out_err: UniffiRustCallStatus,
+  ): Uint8Array;
+  uniffi_circlo_core_fn_func_passkey_recovery_public_key(
+    prfOutput: Uint8Array,
     uniffi_out_err: UniffiRustCallStatus,
   ): Uint8Array;
   uniffi_circlo_core_fn_func_post_read_token(
@@ -1899,6 +1968,12 @@ interface NativeModuleInterface {
     localCacheKey: Uint8Array,
     fileId: Uint8Array,
     plaintext: Uint8Array,
+    uniffi_out_err: UniffiRustCallStatus,
+  ): Uint8Array;
+  uniffi_circlo_core_fn_func_seal_passkey_backup(
+    prfOutput: Uint8Array,
+    userId: Uint8Array,
+    backup: Uint8Array,
     uniffi_out_err: UniffiRustCallStatus,
   ): Uint8Array;
   uniffi_circlo_core_fn_func_seal_password_backup(
@@ -1971,6 +2046,14 @@ interface NativeModuleInterface {
     identity: Uint8Array,
     userId: Uint8Array,
     version: number,
+    uniffi_out_err: UniffiRustCallStatus,
+  ): Uint8Array;
+  uniffi_circlo_core_fn_func_sign_passkey_recovery_login(
+    prfOutput: Uint8Array,
+    userId: Uint8Array,
+    challengeId: Uint8Array,
+    nonce: Uint8Array,
+    expiresAt: bigint,
     uniffi_out_err: UniffiRustCallStatus,
   ): Uint8Array;
   uniffi_circlo_core_fn_func_sign_recovery_login(
@@ -2217,12 +2300,15 @@ interface NativeModuleInterface {
   uniffi_circlo_core_checksum_func_opaque_server_setup_new(): number;
   uniffi_circlo_core_checksum_func_open_friend_payload(): number;
   uniffi_circlo_core_checksum_func_open_local(): number;
+  uniffi_circlo_core_checksum_func_open_passkey_backup(): number;
   uniffi_circlo_core_checksum_func_open_password_backup(): number;
   uniffi_circlo_core_checksum_func_open_profile(): number;
   uniffi_circlo_core_checksum_func_open_push_token(): number;
   uniffi_circlo_core_checksum_func_open_recovery_backup(): number;
   uniffi_circlo_core_checksum_func_open_reply(): number;
   uniffi_circlo_core_checksum_func_open_user_blob(): number;
+  uniffi_circlo_core_checksum_func_passkey_prf_salt(): number;
+  uniffi_circlo_core_checksum_func_passkey_recovery_public_key(): number;
   uniffi_circlo_core_checksum_func_post_read_token(): number;
   uniffi_circlo_core_checksum_func_post_read_token_hash(): number;
   uniffi_circlo_core_checksum_func_recovery_entropy_from_phrase(): number;
@@ -2230,6 +2316,7 @@ interface NativeModuleInterface {
   uniffi_circlo_core_checksum_func_safety_number(): number;
   uniffi_circlo_core_checksum_func_seal_friend_payload(): number;
   uniffi_circlo_core_checksum_func_seal_local(): number;
+  uniffi_circlo_core_checksum_func_seal_passkey_backup(): number;
   uniffi_circlo_core_checksum_func_seal_password_backup(): number;
   uniffi_circlo_core_checksum_func_seal_post(): number;
   uniffi_circlo_core_checksum_func_seal_profile(): number;
@@ -2240,6 +2327,7 @@ interface NativeModuleInterface {
   uniffi_circlo_core_checksum_func_seal_user_blob(): number;
   uniffi_circlo_core_checksum_func_sign_device_certificate(): number;
   uniffi_circlo_core_checksum_func_sign_identity(): number;
+  uniffi_circlo_core_checksum_func_sign_passkey_recovery_login(): number;
   uniffi_circlo_core_checksum_func_sign_recovery_login(): number;
   uniffi_circlo_core_checksum_func_verify_device_certificate(): number;
   uniffi_circlo_core_checksum_func_verify_identity(): number;

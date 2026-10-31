@@ -50,16 +50,20 @@ paths:
           application/json:
             schema:
               type: object
-              required: [userId, handle, registrationUpload, recoveryPubkey, identity, device, passwordBackup, recoveryBackup]
+              required: [userId, handle, registrationUpload, identity, device, passwordBackup]
               properties:
                 userId: { $ref: "#/components/schemas/Id" }
                 handle: { type: string }
                 registrationUpload: { $ref: "#/components/schemas/Bytes" }
-                recoveryPubkey: { $ref: "#/components/schemas/Bytes", description: "32 bytes (CRYPTO.md 6.3)" }
+                recoveryMethods:
+                  type: array
+                  description: "One or more (CRYPTO.md 6.3/6.4). Older apps send recoveryPubkey + recoveryBackup instead."
+                  items: { $ref: "#/components/schemas/NewRecoveryMethod" }
+                recoveryPubkey: { $ref: "#/components/schemas/Bytes", description: "Deprecated: a single phrase method's key (32 bytes)" }
                 identity: { $ref: "#/components/schemas/Identity" }
                 device: { $ref: "#/components/schemas/Device" }
                 passwordBackup: { $ref: "#/components/schemas/Bytes" }
-                recoveryBackup: { $ref: "#/components/schemas/Bytes" }
+                recoveryBackup: { $ref: "#/components/schemas/Bytes", description: "Deprecated: a single phrase method's copy" }
       responses:
         "200": { $ref: "#/components/responses/Tokens" }
         "400": { $ref: "#/components/responses/Error" }
@@ -179,7 +183,17 @@ paths:
                 challengeId: { $ref: "#/components/schemas/Id" }
                 signature: { $ref: "#/components/schemas/Bytes", description: "64 bytes, CRYPTO.md 6.3" }
       responses:
-        "200": { $ref: "#/components/responses/Tokens" }
+        "200":
+          description: A recovery session and the method that proved it
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - { $ref: "#/components/schemas/Tokens" }
+                  - type: object
+                    properties:
+                      methodId: { $ref: "#/components/schemas/Id" }
+                      methodKind: { type: string, enum: [phrase, passkey] }
         "401": { $ref: "#/components/responses/Error" }
 
   /v1/auth/password/start:
@@ -246,7 +260,14 @@ paths:
                 handle: { type: string }
                 credentialFinalization: { $ref: "#/components/schemas/Bytes" }
       responses:
-        "204": { description: Verified }
+        "200":
+          description: Verified; a one-time token (5 minutes) that removing a recovery method needs
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  reauthToken: { type: string }
         "401": { $ref: "#/components/responses/Error" }
 
   /v1/auth/password/finish:
@@ -309,6 +330,73 @@ paths:
                         id: { $ref: "#/components/schemas/Id" }
                         kind: { type: string, enum: [sign_in] }
                         createdAt: { type: string, format: date-time }
+
+  /v1/recovery-methods:
+    get:
+      summary: My recovery methods (no keys or ciphertext)
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [methods]
+                properties:
+                  methods:
+                    type: array
+                    items:
+                      type: object
+                      required: [id, kind, createdAt]
+                      properties:
+                        id: { $ref: "#/components/schemas/Id" }
+                        kind: { type: string, enum: [phrase, passkey] }
+                        createdAt: { type: string, format: date-time }
+                        lastUsedAt: { type: string, format: date-time, nullable: true }
+    post:
+      summary: Add a recovery method (or another wrap of my passkey)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/NewRecoveryMethod" }
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id: { $ref: "#/components/schemas/Id" }
+        "409": { $ref: "#/components/responses/Error" }
+
+  /v1/recovery-methods/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { $ref: "#/components/schemas/Id" } }
+    delete:
+      summary: Remove a recovery method (needs X-Circlo-Reauth from password/verify; never the last one)
+      parameters:
+        - { name: X-Circlo-Reauth, in: header, required: true, schema: { type: string } }
+      responses:
+        "200": { content: { application/json: { schema: { type: object } } } }
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+        "409": { $ref: "#/components/responses/Error" }
+
+  /v1/recovery-methods/{id}/backup:
+    parameters:
+      - { name: id, in: path, required: true, schema: { $ref: "#/components/schemas/Id" } }
+    get:
+      summary: The recovery copy of one of my methods (full or recovery session)
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ciphertext]
+                properties:
+                  ciphertext: { $ref: "#/components/schemas/Bytes" }
+        "404": { $ref: "#/components/responses/Error" }
 
   /v1/devices:
     get:
@@ -1255,6 +1343,14 @@ components:
       properties:
         ciphertext: { $ref: "#/components/schemas/Bytes" }
         version: { type: integer }
+    NewRecoveryMethod:
+      type: object
+      required: [kind, authPubkey, ciphertext]
+      properties:
+        kind: { type: string, enum: [phrase, passkey] }
+        authPubkey: { $ref: "#/components/schemas/Bytes", description: "32 bytes: the method's recovery_auth / passkey_auth key" }
+        ciphertext: { $ref: "#/components/schemas/Bytes", description: "The method's recovery copy of the key backup" }
+
     Tokens:
       type: object
       properties:

@@ -16,6 +16,17 @@ export function fromB64(b64: string): ArrayBuffer {
   return out.buffer;
 }
 
+/** Base64URL without padding (WebAuthn's encoding). */
+export function toB64Url(data: ArrayBuffer | Uint8Array): string {
+  return toB64(data).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+/** Either base64 or base64url, padded or not (passkey libraries return both, depending on the platform). */
+export function fromAnyB64(s: string): ArrayBuffer {
+  const b64 = s.replace(/-/g, '+').replace(/_/g, '/');
+  return fromB64(b64 + '='.repeat((4 - (b64.length % 4)) % 4));
+}
+
 export function utf8(s: string): ArrayBuffer {
   return new TextEncoder().encode(s).slice().buffer;
 }

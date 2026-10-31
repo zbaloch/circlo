@@ -53,6 +53,7 @@ public class SecurityConfig {
                         .requestMatchers("/dev/**").permitAll() // only exists in profile 'local'
                         .requestMatchers("/error").permitAll()
                         .requestMatchers(HttpMethod.GET, "/v1/backups/recovery").hasAnyAuthority("SCOPE_full", "SCOPE_recovery")
+                        .requestMatchers(HttpMethod.GET, "/v1/recovery-methods/*/backup").hasAnyAuthority("SCOPE_full", "SCOPE_recovery")
                         .requestMatchers("/v1/auth/password/**").hasAnyAuthority("SCOPE_full", "SCOPE_recovery")
                         .anyRequest().hasAuthority("SCOPE_full"))
                 .oauth2ResourceServer(o -> o.bearerTokenResolver(publicEndpointsIgnoreBearer()).jwt(j -> {}));

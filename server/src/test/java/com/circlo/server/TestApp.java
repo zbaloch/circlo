@@ -7,6 +7,7 @@ import com.circlo.server.web.Ids;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.springframework.http.ResponseEntity;
@@ -25,6 +26,8 @@ final class TestApp {
     String accessToken;
     String refreshToken;
     byte[] exportKey;
+    /** When set, registration sends these recovery methods instead of the older single phrase fields. */
+    List<Map<String, Object>> recoveryMethods;
 
     TestApp(IntegrationTest it, String handle, String password) {
         this.it = it;
@@ -66,13 +69,19 @@ final class TestApp {
         body.put("userId", userId.toString());
         body.put("handle", handle);
         body.put("registrationUpload", fin[0]);
-        body.put("recoveryPubkey", TestClientNative.recoveryPublicKey(recoveryEntropy));
+        if (recoveryMethods == null) {
+            body.put("recoveryPubkey", TestClientNative.recoveryPublicKey(recoveryEntropy));
+        } else {
+            body.put("recoveryMethods", recoveryMethods);
+        }
         body.put("identity", Map.of("x25519Pub", x25519Pub(), "ed25519Pub", ed25519Pub(),
                 "signature", TestClientNative.signIdentity(identity, uid, 1), "version", 1));
         body.put("device", Map.of("deviceId", deviceId.toString(), "devicePubkey", devicePub(),
                 "deviceCert", TestClientNative.signDeviceCertificate(identity, uid, Ids.bytes(deviceId), devicePub())));
         body.put("passwordBackup", fakeBackup("password"));
-        body.put("recoveryBackup", fakeBackup("recovery"));
+        if (recoveryMethods == null) {
+            body.put("recoveryBackup", fakeBackup("recovery"));
+        }
         var done = it.call("POST", "/v1/auth/register/finish", body, null);
         assertThat(done.getStatusCode().value()).isEqualTo(status);
         if (status == 200) {

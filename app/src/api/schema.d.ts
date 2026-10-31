@@ -76,12 +76,15 @@ export interface paths {
                         userId: components["schemas"]["Id"];
                         handle: string;
                         registrationUpload: components["schemas"]["Bytes"];
-                        /** @description 32 bytes (CRYPTO.md 6.3) */
-                        recoveryPubkey: components["schemas"]["Bytes"];
+                        /** @description One or more (CRYPTO.md 6.3/6.4). Older apps send recoveryPubkey + recoveryBackup instead. */
+                        recoveryMethods?: components["schemas"]["NewRecoveryMethod"][];
+                        /** @description Deprecated: a single phrase method's key (32 bytes) */
+                        recoveryPubkey?: components["schemas"]["Bytes"];
                         identity: components["schemas"]["Identity"];
                         device: components["schemas"]["Device"];
                         passwordBackup: components["schemas"]["Bytes"];
-                        recoveryBackup: components["schemas"]["Bytes"];
+                        /** @description Deprecated: a single phrase method's copy */
+                        recoveryBackup?: components["schemas"]["Bytes"];
                     };
                 };
             };
@@ -309,7 +312,19 @@ export interface paths {
                 };
             };
             responses: {
-                200: components["responses"]["Tokens"];
+                /** @description A recovery session and the method that proved it */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Tokens"] & {
+                            methodId?: components["schemas"]["Id"];
+                            /** @enum {string} */
+                            methodKind?: "phrase" | "passkey";
+                        };
+                    };
+                };
                 401: components["responses"]["Error"];
             };
         };
@@ -439,12 +454,16 @@ export interface paths {
                 };
             };
             responses: {
-                /** @description Verified */
-                204: {
+                /** @description Verified; a one-time token (5 minutes) that removing a recovery method needs */
+                200: {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": {
+                            reauthToken?: string;
+                        };
+                    };
                 };
                 401: components["responses"]["Error"];
             };
@@ -589,6 +608,163 @@ export interface paths {
                         };
                     };
                 };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/recovery-methods": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** My recovery methods (no keys or ciphertext) */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            methods: {
+                                id: components["schemas"]["Id"];
+                                /** @enum {string} */
+                                kind: "phrase" | "passkey";
+                                /** Format: date-time */
+                                createdAt: string;
+                                /** Format: date-time */
+                                lastUsedAt?: string | null;
+                            }[];
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        /** Add a recovery method (or another wrap of my passkey) */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["NewRecoveryMethod"];
+                };
+            };
+            responses: {
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            id?: components["schemas"]["Id"];
+                        };
+                    };
+                };
+                409: components["responses"]["Error"];
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/recovery-methods/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["schemas"]["Id"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Remove a recovery method (needs X-Circlo-Reauth from password/verify; never the last one) */
+        delete: {
+            parameters: {
+                query?: never;
+                header: {
+                    "X-Circlo-Reauth": string;
+                };
+                path: {
+                    id: components["schemas"]["Id"];
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": Record<string, never>;
+                    };
+                };
+                403: components["responses"]["Error"];
+                404: components["responses"]["Error"];
+                409: components["responses"]["Error"];
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/recovery-methods/{id}/backup": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["schemas"]["Id"];
+            };
+            cookie?: never;
+        };
+        /** The recovery copy of one of my methods (full or recovery session) */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: components["schemas"]["Id"];
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            ciphertext: components["schemas"]["Bytes"];
+                        };
+                    };
+                };
+                404: components["responses"]["Error"];
             };
         };
         put?: never;
@@ -2887,6 +3063,14 @@ export interface components {
         Backup: {
             ciphertext: components["schemas"]["Bytes"];
             version: number;
+        };
+        NewRecoveryMethod: {
+            /** @enum {string} */
+            kind: "phrase" | "passkey";
+            /** @description 32 bytes: the method's recovery_auth / passkey_auth key */
+            authPubkey: components["schemas"]["Bytes"];
+            /** @description The method's recovery copy of the key backup */
+            ciphertext: components["schemas"]["Bytes"];
         };
         Tokens: {
             userId?: components["schemas"]["Id"];

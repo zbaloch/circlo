@@ -570,6 +570,9 @@ export function mlsVerifyMember(
   );
 }
 
+/**
+ * A new 12-word phrase. `entropy` is its 32-byte recovery root (what the other recovery functions take).
+ */
 export function newRecoveryPhrase(): RecoveryPhrase {
   const __rb: Uint8Array = uniffiCaller.rustCall(
     /*caller:*/ (callStatus) => {
@@ -856,6 +859,38 @@ export function openLocal(
   }
 }
 
+export function openPasskeyBackup(
+  prfOutput: ArrayBuffer,
+  userId: ArrayBuffer,
+  ciphertext: ArrayBuffer,
+): KeyBackup /*throws*/ {
+  const __rb: Uint8Array = uniffiCaller.rustCallWithError(
+    /*liftError:*/ FfiConverterTypeCoreError.lift.bind(
+      FfiConverterTypeCoreError,
+    ),
+    /*caller:*/ (callStatus) => {
+      return nativeModule().uniffi_circlo_core_fn_func_open_passkey_backup(
+        FfiConverterArrayBuffer.lower(
+          prfOutput,
+          nativeModule().rustbuffer_alloc,
+        ),
+        FfiConverterArrayBuffer.lower(userId, nativeModule().rustbuffer_alloc),
+        FfiConverterArrayBuffer.lower(
+          ciphertext,
+          nativeModule().rustbuffer_alloc,
+        ),
+        callStatus,
+      );
+    },
+    /*liftString:*/ FfiConverterString.lift.bind(FfiConverterString),
+  );
+  try {
+    return FfiConverterTypeKeyBackup.lift(__rb);
+  } finally {
+    nativeModule().rustbuffer_free(__rb);
+  }
+}
+
 export function openPasswordBackup(
   exportKey: ArrayBuffer,
   userId: ArrayBuffer,
@@ -1056,6 +1091,50 @@ export function openUserBlob(
 }
 
 /**
+ * The PRF input for passkey recovery: the passkey's PRF output for it is the passkey method's root.
+ */
+export function passkeyPrfSalt(): ArrayBuffer {
+  const __rb: Uint8Array = uniffiCaller.rustCall(
+    /*caller:*/ (callStatus) => {
+      return nativeModule().uniffi_circlo_core_fn_func_passkey_prf_salt(
+        callStatus,
+      );
+    },
+    /*liftString:*/ FfiConverterString.lift.bind(FfiConverterString),
+  );
+  try {
+    return FfiConverterArrayBuffer.lift(__rb);
+  } finally {
+    nativeModule().rustbuffer_free(__rb);
+  }
+}
+
+export function passkeyRecoveryPublicKey(
+  prfOutput: ArrayBuffer,
+): ArrayBuffer /*throws*/ {
+  const __rb: Uint8Array = uniffiCaller.rustCallWithError(
+    /*liftError:*/ FfiConverterTypeCoreError.lift.bind(
+      FfiConverterTypeCoreError,
+    ),
+    /*caller:*/ (callStatus) => {
+      return nativeModule().uniffi_circlo_core_fn_func_passkey_recovery_public_key(
+        FfiConverterArrayBuffer.lower(
+          prfOutput,
+          nativeModule().rustbuffer_alloc,
+        ),
+        callStatus,
+      );
+    },
+    /*liftString:*/ FfiConverterString.lift.bind(FfiConverterString),
+  );
+  try {
+    return FfiConverterArrayBuffer.lift(__rb);
+  } finally {
+    nativeModule().rustbuffer_free(__rb);
+  }
+}
+
+/**
  * The post's read token (proves to the server that I can open the post, without revealing anything else).
  */
 export function postReadToken(postKey: ArrayBuffer): ArrayBuffer /*throws*/ {
@@ -1106,6 +1185,9 @@ export function postReadTokenHash(
   }
 }
 
+/**
+ * The 32-byte recovery root of a 12- or 24-word phrase.
+ */
 export function recoveryEntropyFromPhrase(
   phrase: string,
 ): ArrayBuffer /*throws*/ {
@@ -1261,6 +1343,38 @@ export function sealLocal(
         FfiConverterArrayBuffer.lower(fileId, nativeModule().rustbuffer_alloc),
         FfiConverterArrayBuffer.lower(
           plaintext,
+          nativeModule().rustbuffer_alloc,
+        ),
+        callStatus,
+      );
+    },
+    /*liftString:*/ FfiConverterString.lift.bind(FfiConverterString),
+  );
+  try {
+    return FfiConverterArrayBuffer.lift(__rb);
+  } finally {
+    nativeModule().rustbuffer_free(__rb);
+  }
+}
+
+export function sealPasskeyBackup(
+  prfOutput: ArrayBuffer,
+  userId: ArrayBuffer,
+  backup: KeyBackup,
+): ArrayBuffer /*throws*/ {
+  const __rb: Uint8Array = uniffiCaller.rustCallWithError(
+    /*liftError:*/ FfiConverterTypeCoreError.lift.bind(
+      FfiConverterTypeCoreError,
+    ),
+    /*caller:*/ (callStatus) => {
+      return nativeModule().uniffi_circlo_core_fn_func_seal_passkey_backup(
+        FfiConverterArrayBuffer.lower(
+          prfOutput,
+          nativeModule().rustbuffer_alloc,
+        ),
+        FfiConverterArrayBuffer.lower(userId, nativeModule().rustbuffer_alloc),
+        FfiConverterTypeKeyBackup.lower(
+          backup,
           nativeModule().rustbuffer_alloc,
         ),
         callStatus,
@@ -1623,6 +1737,42 @@ export function signIdentity(
         ),
         FfiConverterArrayBuffer.lower(userId, nativeModule().rustbuffer_alloc),
         FfiConverterUInt8.lower(version, nativeModule().rustbuffer_alloc),
+        callStatus,
+      );
+    },
+    /*liftString:*/ FfiConverterString.lift.bind(FfiConverterString),
+  );
+  try {
+    return FfiConverterArrayBuffer.lift(__rb);
+  } finally {
+    nativeModule().rustbuffer_free(__rb);
+  }
+}
+
+export function signPasskeyRecoveryLogin(
+  prfOutput: ArrayBuffer,
+  userId: ArrayBuffer,
+  challengeId: ArrayBuffer,
+  nonce: ArrayBuffer,
+  expiresAt: bigint,
+): ArrayBuffer /*throws*/ {
+  const __rb: Uint8Array = uniffiCaller.rustCallWithError(
+    /*liftError:*/ FfiConverterTypeCoreError.lift.bind(
+      FfiConverterTypeCoreError,
+    ),
+    /*caller:*/ (callStatus) => {
+      return nativeModule().uniffi_circlo_core_fn_func_sign_passkey_recovery_login(
+        FfiConverterArrayBuffer.lower(
+          prfOutput,
+          nativeModule().rustbuffer_alloc,
+        ),
+        FfiConverterArrayBuffer.lower(userId, nativeModule().rustbuffer_alloc),
+        FfiConverterArrayBuffer.lower(
+          challengeId,
+          nativeModule().rustbuffer_alloc,
+        ),
+        FfiConverterArrayBuffer.lower(nonce, nativeModule().rustbuffer_alloc),
+        FfiConverterUInt64.lower(expiresAt, nativeModule().rustbuffer_alloc),
         callStatus,
       );
     },
@@ -5404,7 +5554,7 @@ function uniffiEnsureInitialized() {
   }
   if (
     nativeModule().uniffi_circlo_core_checksum_func_new_recovery_phrase() !==
-    57518
+    50696
   ) {
     throw new UniffiInternalError.ApiChecksumMismatch(
       "uniffi_circlo_core_checksum_func_new_recovery_phrase",
@@ -5487,6 +5637,14 @@ function uniffiEnsureInitialized() {
     );
   }
   if (
+    nativeModule().uniffi_circlo_core_checksum_func_open_passkey_backup() !==
+    42723
+  ) {
+    throw new UniffiInternalError.ApiChecksumMismatch(
+      "uniffi_circlo_core_checksum_func_open_passkey_backup",
+    );
+  }
+  if (
     nativeModule().uniffi_circlo_core_checksum_func_open_password_backup() !==
     24126
   ) {
@@ -5529,6 +5687,21 @@ function uniffiEnsureInitialized() {
     );
   }
   if (
+    nativeModule().uniffi_circlo_core_checksum_func_passkey_prf_salt() !== 38483
+  ) {
+    throw new UniffiInternalError.ApiChecksumMismatch(
+      "uniffi_circlo_core_checksum_func_passkey_prf_salt",
+    );
+  }
+  if (
+    nativeModule().uniffi_circlo_core_checksum_func_passkey_recovery_public_key() !==
+    55410
+  ) {
+    throw new UniffiInternalError.ApiChecksumMismatch(
+      "uniffi_circlo_core_checksum_func_passkey_recovery_public_key",
+    );
+  }
+  if (
     nativeModule().uniffi_circlo_core_checksum_func_post_read_token() !== 16906
   ) {
     throw new UniffiInternalError.ApiChecksumMismatch(
@@ -5545,7 +5718,7 @@ function uniffiEnsureInitialized() {
   }
   if (
     nativeModule().uniffi_circlo_core_checksum_func_recovery_entropy_from_phrase() !==
-    42750
+    2784
   ) {
     throw new UniffiInternalError.ApiChecksumMismatch(
       "uniffi_circlo_core_checksum_func_recovery_entropy_from_phrase",
@@ -5577,6 +5750,14 @@ function uniffiEnsureInitialized() {
   if (nativeModule().uniffi_circlo_core_checksum_func_seal_local() !== 13166) {
     throw new UniffiInternalError.ApiChecksumMismatch(
       "uniffi_circlo_core_checksum_func_seal_local",
+    );
+  }
+  if (
+    nativeModule().uniffi_circlo_core_checksum_func_seal_passkey_backup() !==
+    26400
+  ) {
+    throw new UniffiInternalError.ApiChecksumMismatch(
+      "uniffi_circlo_core_checksum_func_seal_passkey_backup",
     );
   }
   if (
@@ -5644,6 +5825,14 @@ function uniffiEnsureInitialized() {
   ) {
     throw new UniffiInternalError.ApiChecksumMismatch(
       "uniffi_circlo_core_checksum_func_sign_identity",
+    );
+  }
+  if (
+    nativeModule().uniffi_circlo_core_checksum_func_sign_passkey_recovery_login() !==
+    64488
+  ) {
+    throw new UniffiInternalError.ApiChecksumMismatch(
+      "uniffi_circlo_core_checksum_func_sign_passkey_recovery_login",
     );
   }
   if (

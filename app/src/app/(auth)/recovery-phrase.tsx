@@ -1,39 +1,47 @@
-import { Redirect, router } from 'expo-router';
-import { View } from 'react-native';
-
 import { usePreventScreenCapture } from 'expo-screen-capture';
+import { Redirect, router } from 'expo-router';
+import { Share, View } from 'react-native';
 
 import { AuthScreen } from '@/components/auth-screen';
-import { Button, Title } from '@/components/form';
-import { pendingSignup } from '@/lib/signup-store';
+import { Button, ErrorText, Title } from '@/components/form';
+import { PhraseWords } from '@/components/phrase-words';
 import { Text } from '@/components/ui/text';
+import { pendingSignup } from '@/lib/signup-store';
+import { useFinishSignup } from '@/lib/use-finish-signup';
 
-/** Shows the 24-word recovery phrase once. It is the only way back in if the password is forgotten. */
+/**
+ * The 12-word recovery phrase, when Face ID recovery isn't available or the user prefers it. Shown once; there's no word
+ * quiz (docs/PASSKEY_RECOVERY.md). It can be shared straight into a password manager.
+ */
 export default function RecoveryPhraseScreen() {
   // Recovery words must never end up in screenshots, recordings or the recent-apps preview.
   usePreventScreenCapture('recovery-phrase');
   const signup = pendingSignup();
+  const { finish, error, busy, expired } = useFinishSignup();
   if (!signup) return <Redirect href="/signup" />;
 
   return (
     <AuthScreen>
-      <Title subtitle="Write these 24 words down, in order, and keep them somewhere safe. They are the only way to get back in if you forget your password. Circlo can’t reset it for you.">
+      <Title subtitle="Keep these 12 words somewhere safe, like your password manager or on paper. They’re the only way back in if you forget your password: Circlo can’t reset it for you.">
         Your recovery phrase
       </Title>
-      <View className="flex-row flex-wrap gap-2" accessibilityLabel="Recovery phrase, 24 words">
-        {signup.words.map((w, i) => (
-          <View key={i} className="w-[31%] flex-row gap-1 rounded-lg bg-surface-raised px-2 py-2 dark:bg-surface-raised-dark">
-            <Text className="w-6 text-right text-muted dark:text-muted-dark">{i + 1}.</Text>
-            <Text className="font-semibold text-ink dark:text-ink-dark">{w}</Text>
-          </View>
-        ))}
+      <PhraseWords words={signup.words} />
+      <View className="gap-2">
+        <Button
+          variant="outline"
+          label="Save to a password manager"
+          onPress={() => Share.share({ message: signup.words.join(' ') }).catch(() => undefined)}
+        />
+        <Text className="text-sm text-muted dark:text-muted-dark">
+          Choose your password manager in the share sheet. Avoid notes apps and messages.
+        </Text>
       </View>
-      <Text className="text-sm text-muted dark:text-muted-dark">Don’t screenshot it or store it in a notes app.</Text>
-      <Text className="text-sm text-muted dark:text-muted-dark">
-        Your account is created when you confirm these words on the next screen. If you stop before then, nothing is
-        saved and you can simply sign up again.
-      </Text>
-      <Button size="lg" label="I’ve written it down" onPress={() => router.push('/confirm-phrase')} />
+      <ErrorText>{error}</ErrorText>
+      {expired ? (
+        <Button size="lg" label="Start again" onPress={() => router.replace('/signup')} />
+      ) : (
+        <Button size="lg" label="I’ve saved it" onPress={() => finish(signup, { kind: 'phrase' })} loading={busy} />
+      )}
     </AuthScreen>
   );
 }

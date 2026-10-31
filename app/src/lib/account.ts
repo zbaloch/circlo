@@ -82,11 +82,17 @@ export function normalizeHandle(handle: string): string {
 
 // ---------------- sign up ----------------
 
+/** How the new account can get back in without its password: a passkey (Face ID) or a phrase. */
+export type RecoveryChoice = { kind: 'passkey'; prf: ArrayBuffer } | { kind: 'phrase' };
+
 /**
- * A signup in progress. Created after the handle is reserved and OPAQUE registration is computed; finished after the
- * user confirms three words of the recovery phrase. Nothing is stored on the device until `finish` succeeds.
+ * A signup in progress. Created after the handle is reserved and OPAQUE registration is computed; finished once a
+ * recovery method is set up (Face ID, or the 12-word phrase where that isn't available). Nothing is stored on the device
+ * until `finish` succeeds.
  */
 export class Signup {
+  private readonly backup: Core.KeyBackup;
+
   private constructor(
     readonly handle: string,
     readonly userId: string,
@@ -94,7 +100,15 @@ export class Signup {
     private readonly exportKey: ArrayBuffer,
     private readonly identity: Core.IdentityKeys,
     private readonly recovery: Core.RecoveryPhrase,
-  ) {}
+  ) {
+    this.backup = {
+      x25519Sk: identity.x25519Sk,
+      ed25519Sk: identity.ed25519Sk,
+      dataKey: Core.newSymmetricKey(),
+      localRoot: Core.newSymmetricKey(),
+      epochs: [],
+    };
+  }
 
   static async start(rawHandle: string, password: string): Promise<Signup> {
     const handle = Core.normalizeHandle(rawHandle);
@@ -110,24 +124,21 @@ export class Signup {
     return this.recovery.phrase.split(' ');
   }
 
-  async finish(): Promise<StoredAccount> {
+  async finish(choice: RecoveryChoice): Promise<StoredAccount> {
     const uid = uuidToBytes(this.userId);
     const deviceId = newId();
     const device = Core.generateDeviceKeys();
-    const backup: Core.KeyBackup = {
-      x25519Sk: this.identity.x25519Sk,
-      ed25519Sk: this.identity.ed25519Sk,
-      dataKey: Core.newSymmetricKey(),
-      localRoot: Core.newSymmetricKey(),
-      epochs: [],
-    };
+    const backup = this.backup;
+    const method =
+      choice.kind === 'passkey'
+        ? passkeyMethod(choice.prf, uid, backup)
+        : phraseMethod(this.recovery.entropy, uid, backup);
     const tokens = ok(
       await api.POST('/v1/auth/register/finish', {
         body: {
           userId: this.userId,
           handle: this.handle,
           registrationUpload: toB64(this.registrationUpload),
-          recoveryPubkey: toB64(Core.recoveryPublicKey(this.recovery.entropy)),
           identity: {
             x25519Pub: toB64(this.identity.x25519Pk),
             ed25519Pub: toB64(this.identity.ed25519Pk),
@@ -140,7 +151,7 @@ export class Signup {
             deviceCert: toB64(Core.signDeviceCertificate(this.identity, uid, uuidToBytes(deviceId), device.publicKey)),
           },
           passwordBackup: toB64(Core.sealPasswordBackup(this.exportKey, uid, backup)),
-          recoveryBackup: toB64(Core.sealRecoveryBackup(this.recovery.entropy, uid, backup)),
+          recoveryMethods: [method],
         },
       }),
     );
@@ -148,19 +159,15 @@ export class Signup {
   }
 }
 
-/** Three distinct 0-based word positions to confirm, drawn from the core's CSPRNG. */
-export function pickConfirmPositions(count = 24, picks = 3): number[] {
-  const random = new Uint8Array(Core.newSymmetricKey());
-  const chosen: number[] = [];
-  for (let i = 0; i < random.length && chosen.length < picks; i++) {
-    const p = random[i] % count;
-    if (!chosen.includes(p)) chosen.push(p);
-  }
-  return chosen.sort((a, b) => a - b);
+/** A recovery method as the server stores it: its auth key and its sealed copy of the key backup. */
+type RecoveryMethodBody = { kind: 'phrase' | 'passkey'; authPubkey: string; ciphertext: string };
+
+function phraseMethod(root: ArrayBuffer, uid: ArrayBuffer, backup: Core.KeyBackup): RecoveryMethodBody {
+  return { kind: 'phrase', authPubkey: toB64(Core.recoveryPublicKey(root)), ciphertext: toB64(Core.sealRecoveryBackup(root, uid, backup)) };
 }
 
-export function wordsMatch(words: string[], positions: number[], answers: string[]): boolean {
-  return positions.every((p, i) => (answers[i] ?? '').trim().toLowerCase() === words[p]);
+function passkeyMethod(prf: ArrayBuffer, uid: ArrayBuffer, backup: Core.KeyBackup): RecoveryMethodBody {
+  return { kind: 'passkey', authPubkey: toB64(Core.passkeyRecoveryPublicKey(prf)), ciphertext: toB64(Core.sealPasskeyBackup(prf, uid, backup)) };
 }
 
 // ---------------- log in on a new device ----------------
@@ -216,26 +223,27 @@ export async function changePassword(account: StoredAccount, current: string, ne
   await updateRefreshToken(tokens.refreshToken);
 }
 
-// ---------------- recover with the 24 words ----------------
+// ---------------- recover with Face ID or the recovery phrase ----------------
 
-export async function recover(rawHandle: string, phrase: string, newPassword: string): Promise<StoredAccount> {
+type RecoveryProof = {
+  /** Signs the server's challenge with the method's key. */
+  sign: (uid: ArrayBuffer, challengeId: ArrayBuffer, nonce: ArrayBuffer, expiresAt: bigint) => ArrayBuffer;
+  /** Opens the method's recovery copy. */
+  open: (uid: ArrayBuffer, ciphertext: ArrayBuffer) => Core.KeyBackup;
+};
+
+/** Forgot the password: prove a recovery method, open its copy of the keys, and set a new password. */
+async function recoverWith(rawHandle: string, proof: RecoveryProof, newPassword: string): Promise<StoredAccount> {
   const handle = Core.normalizeHandle(rawHandle);
-  const entropy = Core.recoveryEntropyFromPhrase(phrase); // rejects typos / bad checksum locally
   const start = ok(await api.POST('/v1/auth/recovery/start', { body: { handle } }));
   const uid = uuidToBytes(start.userId!);
-  const signature = Core.signRecoveryLogin(
-    entropy,
-    uid,
-    uuidToBytes(start.challengeId!),
-    fromB64(start.nonce!),
-    BigInt(start.expiresAt!),
-  );
-  const recoveryTokens = ok(
+  const signature = proof.sign(uid, uuidToBytes(start.challengeId!), fromB64(start.nonce!), BigInt(start.expiresAt!));
+  const recovered = ok(
     await api.POST('/v1/auth/recovery/finish', { body: { challengeId: start.challengeId!, signature: toB64(signature) } }),
-  ) as Tokens;
-  const auth = withToken(recoveryTokens.accessToken);
-  const stored = ok(await api.GET('/v1/backups/{kind}', { params: { path: { kind: 'recovery' } }, ...auth }));
-  const backup = Core.openRecoveryBackup(entropy, uid, fromB64(stored.ciphertext));
+  );
+  const auth = withToken(recovered.accessToken!);
+  const stored = ok(await api.GET('/v1/recovery-methods/{id}/backup', { params: { path: { id: recovered.methodId! } }, ...auth }));
+  const backup = proof.open(uid, fromB64(stored.ciphertext));
 
   // Set the new password: OPAQUE re-registration + a fresh password copy of the same backup.
   const reg = new Core.OpaqueClientRegistration(utf8(newPassword));
@@ -253,6 +261,96 @@ export async function recover(rawHandle: string, phrase: string, newPassword: st
     }),
   ) as Tokens;
   return finishOnThisDevice(handle, tokens, backup);
+}
+
+/** With the 12- or 24-word phrase (checked locally first: a typo or bad checksum never reaches the server). */
+export async function recover(rawHandle: string, phrase: string, newPassword: string): Promise<StoredAccount> {
+  const root = Core.recoveryEntropyFromPhrase(phrase);
+  return recoverWith(
+    rawHandle,
+    {
+      sign: (uid, c, n, e) => Core.signRecoveryLogin(root, uid, c, n, e),
+      open: (uid, ct) => Core.openRecoveryBackup(root, uid, ct),
+    },
+    newPassword,
+  );
+}
+
+/** With the passkey's PRF output (from Face ID / fingerprint). */
+export async function recoverWithPasskey(rawHandle: string, prf: ArrayBuffer, newPassword: string): Promise<StoredAccount> {
+  return recoverWith(
+    rawHandle,
+    {
+      sign: (uid, c, n, e) => Core.signPasskeyRecoveryLogin(prf, uid, c, n, e),
+      open: (uid, ct) => Core.openPasskeyBackup(prf, uid, ct),
+    },
+    newPassword,
+  );
+}
+
+// ---------------- managing recovery methods (Settings → Account recovery) ----------------
+
+export type RecoveryMethodInfo = { id: string; kind: 'phrase' | 'passkey'; createdAt: string; lastUsedAt?: string | null };
+
+export async function listRecoveryMethods(): Promise<RecoveryMethodInfo[]> {
+  const res = ok(await api.GET('/v1/recovery-methods'));
+  return (res.methods ?? []) as RecoveryMethodInfo[];
+}
+
+/** The keys a recovery copy holds, rebuilt from this phone's keystore (no password needed). */
+function backupOf(account: StoredAccount): Core.KeyBackup {
+  return {
+    x25519Sk: fromB64(account.x25519Sk),
+    ed25519Sk: fromB64(account.ed25519Sk),
+    dataKey: fromB64(account.dataKey),
+    localRoot: fromB64(account.localRoot),
+    epochs: [],
+  };
+}
+
+/** Turns on Face ID recovery (or adds this phone's wrap of the passkey). */
+export async function addPasskeyMethod(account: StoredAccount, prf: ArrayBuffer): Promise<void> {
+  ok(await api.POST('/v1/recovery-methods', { body: passkeyMethod(prf, uuidToBytes(account.userId), backupOf(account)) }));
+}
+
+/** Creates a new 12-word phrase method and returns its words to show once. */
+export async function addPhraseMethod(account: StoredAccount): Promise<string[]> {
+  const phrase = Core.newRecoveryPhrase();
+  ok(await api.POST('/v1/recovery-methods', { body: phraseMethod(phrase.entropy, uuidToBytes(account.userId), backupOf(account)) }));
+  return phrase.phrase.split(' ');
+}
+
+/**
+ * Checks Face ID recovery on this phone: if the passkey's PRF output here opens none of the account's passkey copies
+ * (synced passkeys have been reported to differ between devices), adds a copy for it. Returns whether one was added.
+ */
+export async function ensurePasskeyWorksHere(account: StoredAccount, prf: ArrayBuffer): Promise<boolean> {
+  const uid = uuidToBytes(account.userId);
+  for (const m of (await listRecoveryMethods()).filter((x) => x.kind === 'passkey')) {
+    const copy = ok(await api.GET('/v1/recovery-methods/{id}/backup', { params: { path: { id: m.id } } }));
+    try {
+      Core.openPasskeyBackup(prf, uid, fromB64(copy.ciphertext));
+      return false;
+    } catch {
+      // not this one
+    }
+  }
+  await addPasskeyMethod(account, prf);
+  return true;
+}
+
+/** Removes a method after proving the current password (the server keeps at least one). */
+export async function removeRecoveryMethods(account: StoredAccount, ids: string[], password: string): Promise<void> {
+  const handle = Core.normalizeHandle(account.handle);
+  for (const id of ids) {
+    const login = new Core.OpaqueClientLogin(utf8(password));
+    const start = ok(await api.POST('/v1/auth/password/verify/start', { body: { handle, credentialRequest: toB64(login.request()) } }));
+    const fin = finishLogin(login, handle, start);
+    const verified = ok(
+      await api.POST('/v1/auth/password/verify/finish', { body: { loginId: start.loginId!, handle, credentialFinalization: toB64(fin.message) } }),
+    );
+    ok(await api.DELETE('/v1/recovery-methods/{id}', { params: { path: { id }, header: { 'X-Circlo-Reauth': verified.reauthToken! } } }));
+  }
 }
 
 // ---------------- shared ----------------

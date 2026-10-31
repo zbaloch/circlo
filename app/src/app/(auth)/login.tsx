@@ -36,7 +36,7 @@ export default function LoginScreen() {
       <ErrorText>{error}</ErrorText>
       <Button size="lg" label="Log in" onPress={submit} loading={busy} disabled={!handle || !password} />
       <Pressable accessibilityRole="link" onPress={() => router.push('/recover')} className="items-center py-2">
-        <Text className="font-semibold text-primary dark:text-primary-dark">Forgot password? Use your recovery phrase</Text>
+        <Text className="font-semibold text-primary dark:text-primary-dark">Forgot your password?</Text>
       </Pressable>
       <Pressable accessibilityRole="link" onPress={() => router.push('/link')} className="items-center py-2">
         <Text className="font-semibold text-primary dark:text-primary-dark">Link from another device</Text>

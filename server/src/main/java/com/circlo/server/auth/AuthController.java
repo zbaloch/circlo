@@ -5,16 +5,16 @@ import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
+import java.util.List;
 import java.util.UUID;
-import org.springframework.http.HttpStatus;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 /** Auth endpoints. Byte fields are base64 in JSON; IDs are UUID strings. Nothing here is logged. */
@@ -52,12 +52,35 @@ public class AuthController {
         }
     }
 
+    public record RecoveryMethodDto(@NotNull @Pattern(regexp = "phrase|passkey") String kind,
+            @NotNull @Size(min = 32, max = 32) byte[] authPubkey, @NotNull @Size(min = 1, max = MAX_BACKUP) byte[] ciphertext) {
+        AuthService.NewRecoveryMethod toMethod() {
+            return new AuthService.NewRecoveryMethod(kind, authPubkey, ciphertext);
+        }
+    }
+
+    /**
+     * {@code recoveryMethods} (one or more). Apps from before recovery methods send a single phrase as {@code recoveryPubkey}
+     * + {@code recoveryBackup} instead, which still works.
+     */
     public record RegisterFinishRequest(@NotNull UUID userId, @NotBlank @Size(max = 64) String handle,
             @NotNull @Size(min = 1, max = 512) byte[] registrationUpload,
-            @NotNull @Size(min = 32, max = 32) byte[] recoveryPubkey,
+            @Size(min = 32, max = 32) byte[] recoveryPubkey,
             @NotNull @Valid IdentityDto identity, @NotNull @Valid DeviceDto device,
             @NotNull @Size(min = 1, max = MAX_BACKUP) byte[] passwordBackup,
-            @NotNull @Size(min = 1, max = MAX_BACKUP) byte[] recoveryBackup) {}
+            @Size(min = 1, max = MAX_BACKUP) byte[] recoveryBackup,
+            @Size(max = 10) List<@Valid RecoveryMethodDto> recoveryMethods) {
+
+        List<AuthService.NewRecoveryMethod> methods() {
+            if (recoveryMethods != null) {
+                return recoveryMethods.stream().map(RecoveryMethodDto::toMethod).toList();
+            }
+            if (recoveryPubkey != null && recoveryBackup != null) {
+                return List.of(new AuthService.NewRecoveryMethod("phrase", recoveryPubkey, recoveryBackup));
+            }
+            return List.of();
+        }
+    }
 
     public record LoginStartRequest(@NotBlank @Size(max = 64) String handle,
             @NotNull @Size(min = 1, max = 512) byte[] credentialRequest) {}
@@ -87,7 +110,7 @@ public class AuthController {
     @PostMapping("/register/finish")
     public TokenService.Tokens registerFinish(@Valid @RequestBody RegisterFinishRequest r) {
         return auth.registerFinish(new AuthService.RegisterFinish(r.userId(), r.handle(), r.registrationUpload(),
-                r.recoveryPubkey(), r.identity().toKeys(), r.device().toDevice(), r.passwordBackup(), r.recoveryBackup()));
+                r.identity().toKeys(), r.device().toDevice(), r.passwordBackup(), r.methods()));
     }
 
     @PostMapping("/login/start")
@@ -111,7 +134,7 @@ public class AuthController {
     }
 
     @PostMapping("/recovery/finish")
-    public TokenService.Tokens recoveryFinish(@Valid @RequestBody RecoveryFinishRequest r) {
+    public AuthService.RecoveryResult recoveryFinish(@Valid @RequestBody RecoveryFinishRequest r) {
         return auth.recoveryFinish(r.challengeId(), r.signature());
     }
 
@@ -125,10 +148,11 @@ public class AuthController {
         return auth.verifyStart(UUID.fromString(jwt.getSubject()), r.handle(), r.credentialRequest());
     }
 
+    public record Reauth(String reauthToken) {}
+
     @PostMapping("/password/verify/finish")
-    @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void verifyFinish(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody LoginFinishRequest r) {
-        auth.verifyFinish(UUID.fromString(jwt.getSubject()), r.loginId(), r.handle(), r.credentialFinalization());
+    public Reauth verifyFinish(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody LoginFinishRequest r) {
+        return new Reauth(auth.verifyFinish(UUID.fromString(jwt.getSubject()), r.loginId(), r.handle(), r.credentialFinalization()));
     }
 
     @PostMapping("/password/finish")

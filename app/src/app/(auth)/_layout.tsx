@@ -15,7 +15,7 @@ export default function AuthLayout() {
         contentStyle: { backgroundColor: palette.surface },
       }}>
       <Stack.Screen name="welcome" options={{ headerShown: false }} />
-      <Stack.Screen name="confirm-phrase" />
+      <Stack.Screen name="protect-account" />
     </Stack>
   );
 }
