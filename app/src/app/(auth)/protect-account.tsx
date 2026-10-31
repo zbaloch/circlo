@@ -27,6 +27,10 @@ export default function ProtectAccountScreen() {
     } catch (e) {
       setBusy(false);
       if (isCancelled(e)) return;
+      if (__DEV__) {
+        const error = e as { error?: unknown; code?: unknown; message?: unknown };
+        console.warn('[passkey setup failed]', { error: error.error, code: error.code, message: error.message });
+      }
       setError(
         e instanceof PasskeyUnavailableError
           ? 'Your password manager can’t be used for recovery. Use a recovery phrase instead.'
