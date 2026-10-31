@@ -72,16 +72,27 @@ public class AccountController {
 
     @GetMapping("/v1/backups/{kind}")
     public Backup getBackup(@AuthenticationPrincipal Jwt jwt, @PathVariable("kind") String kind) {
+        if (kind.equals("recovery")) {
+            // Apps from before recovery methods: the phrase copy, the one a phrase recovery has just used.
+            return jdbc.query("""
+                            SELECT ciphertext FROM recovery_methods WHERE user_id = ? AND kind = 'phrase'
+                            ORDER BY last_used_at IS NULL, last_used_at DESC, created_at DESC LIMIT 1""",
+                            (rs, i) -> new Backup(rs.getBytes(1), 1), (Object) me(jwt))
+                    .stream().findFirst().orElseThrow(ApiException::notFound);
+        }
         return jdbc.query("SELECT ciphertext, version FROM key_backups WHERE user_id = ? AND kind = ?",
                         (rs, i) -> new Backup(rs.getBytes(1), rs.getInt(2)), me(jwt), kind(kind))
                 .stream().findFirst().orElseThrow(ApiException::notFound);
     }
 
-    /** Optimistic concurrency: {@code version} must be exactly the stored version + 1. */
+    /** Optimistic concurrency: {@code version} must be exactly the stored version + 1. Only the password copy is kept here. */
     @PutMapping("/v1/backups/{kind}")
     @Transactional
     public Backup putBackup(@AuthenticationPrincipal Jwt jwt, @PathVariable("kind") String kind,
             @Valid @RequestBody PutBackup b) {
+        if (!kind.equals("password")) {
+            throw ApiException.notFound();
+        }
         int n = jdbc.update("UPDATE key_backups SET ciphertext = ?, version = ? WHERE user_id = ? AND kind = ? AND version = ?",
                 b.ciphertext(), b.version(), me(jwt), kind(kind), b.version() - 1);
         if (n != 1) {

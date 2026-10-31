@@ -337,7 +337,7 @@ class AuthFlowIT extends IntegrationTest {
         byte[][] fin = TestClientNative.loginFinish(login[1], current, a.handle, b64(start.getBody().get("credentialResponse")));
         var verified = call("POST", "/v1/auth/password/verify/finish",
                 Map.of("loginId", start.getBody().get("loginId"), "handle", a.handle, "credentialFinalization", fin[0]), a.accessToken);
-        assertThat(verified.getStatusCode().value()).isEqualTo(204);
+        assertThat(verified.getStatusCode().value()).isEqualTo(200);
         resetPassword(a, a.accessToken, "mia's new password");
 
         // Her own password change is not "a new sign-in", and the new password works.

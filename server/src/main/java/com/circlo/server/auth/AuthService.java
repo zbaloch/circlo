@@ -14,6 +14,7 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Arrays;
+import java.util.Base64;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
@@ -63,13 +64,13 @@ public class AuthService {
         }
     }
 
-    private record UserRow(byte[] id, String status, byte[] lookup, byte[] record, byte[] recoveryPubkey, Instant createdAt) {}
+    private record UserRow(byte[] id, String status, byte[] lookup, byte[] record, Instant createdAt) {}
 
     private List<UserRow> userBy(String column, byte[] value) {
         return jdbc.query(
-                "SELECT id, status, handle_lookup, opaque_record, recovery_pubkey, created_at FROM users WHERE " + column + " = ?",
-                (rs, i) -> new UserRow(rs.getBytes(1), rs.getString(2), rs.getBytes(3), rs.getBytes(4), rs.getBytes(5),
-                        rs.getTimestamp(6).toInstant()),
+                "SELECT id, status, handle_lookup, opaque_record, created_at FROM users WHERE " + column + " = ?",
+                (rs, i) -> new UserRow(rs.getBytes(1), rs.getString(2), rs.getBytes(3), rs.getBytes(4),
+                        rs.getTimestamp(5).toInstant()),
                 value);
     }
 
@@ -108,8 +109,11 @@ public class AuthService {
 
     public record Device(UUID deviceId, byte[] devicePubkey, byte[] deviceCert) {}
 
-    public record RegisterFinish(UUID userId, String handle, byte[] registrationUpload, byte[] recoveryPubkey,
-            IdentityKeys identity, Device device, byte[] passwordBackup, byte[] recoveryBackup) {}
+    /** A recovery method: `kind` is "phrase" or "passkey"; the server stores the key and the copy as given. */
+    public record NewRecoveryMethod(String kind, byte[] authPubkey, byte[] ciphertext) {}
+
+    public record RegisterFinish(UUID userId, String handle, byte[] registrationUpload, IdentityKeys identity, Device device,
+            byte[] passwordBackup, List<NewRecoveryMethod> recoveryMethods) {}
 
     @Transactional
     public TokenService.Tokens registerFinish(RegisterFinish r) {
@@ -120,19 +124,42 @@ public class AuthService {
                 .findFirst()
                 .orElseThrow(() -> ApiException.badRequest("registration_expired"));
         byte[] userId = u.id();
+        // An account always has a way back in besides the password (docs/PASSKEY_RECOVERY.md, decision A).
+        if (r.recoveryMethods().isEmpty()) {
+            throw ApiException.badRequest("recovery_method_required");
+        }
         verifyIdentity(userId, r.identity());
         verifyDevice(userId, r.identity().ed25519Pub(), r.device());
         byte[] record = core.opaqueRegistrationFinish(r.registrationUpload());
 
-        jdbc.update("UPDATE users SET opaque_record = ?, recovery_pubkey = ?, status = 'active' WHERE id = ?",
-                record, r.recoveryPubkey(), userId);
+        jdbc.update("UPDATE users SET opaque_record = ?, status = 'active' WHERE id = ?", record, userId);
         jdbc.update("INSERT INTO identity_keys (user_id, x25519_pub, ed25519_pub, signature, version) VALUES (?, ?, ?, ?, ?)",
                 userId, r.identity().x25519Pub(), r.identity().ed25519Pub(), r.identity().signature(), r.identity().version());
         jdbc.update("INSERT INTO devices (id, user_id, device_pubkey, device_cert, created_at) VALUES (?, ?, ?, ?, ?)",
                 Ids.bytes(r.device().deviceId()), userId, r.device().devicePubkey(), r.device().deviceCert(), now());
-        jdbc.update("INSERT INTO key_backups (user_id, kind, ciphertext, version) VALUES (?, 'password', ?, 1), (?, 'recovery', ?, 1)",
-                userId, r.passwordBackup(), userId, r.recoveryBackup());
+        jdbc.update("INSERT INTO key_backups (user_id, kind, ciphertext, version) VALUES (?, 'password', ?, 1)",
+                userId, r.passwordBackup());
+        for (NewRecoveryMethod m : r.recoveryMethods()) {
+            addRecoveryMethod(userId, m);
+        }
         return tokens.issue(r.userId(), TokenService.Scope.full);
+    }
+
+    static final int MAX_RECOVERY_METHODS = 10;
+
+    /** Stores one recovery method; returns its id. */
+    UUID addRecoveryMethod(byte[] userId, NewRecoveryMethod m) {
+        if (!m.kind().equals("phrase") && !m.kind().equals("passkey")) {
+            throw ApiException.badRequest("invalid_recovery_method");
+        }
+        Integer count = jdbc.queryForObject("SELECT COUNT(*) FROM recovery_methods WHERE user_id = ?", Integer.class, (Object) userId);
+        if (count != null && count >= MAX_RECOVERY_METHODS) {
+            throw ApiException.conflict("too_many_recovery_methods");
+        }
+        UUID id = Ids.newId();
+        jdbc.update("INSERT INTO recovery_methods (id, user_id, kind, auth_pubkey, ciphertext, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+                Ids.bytes(id), userId, m.kind(), m.authPubkey(), m.ciphertext(), now());
+        return id;
     }
 
     void verifyIdentity(byte[] userId, IdentityKeys k) {
@@ -218,14 +245,41 @@ public class AuthService {
         return loginStart(rawHandle, request);
     }
 
+    static final Duration REAUTH_TTL = Duration.ofMinutes(5);
+
+    /**
+     * Returns a one-time token proving the password was just entered (valid 5 minutes, replaced by the next one): removing
+     * a recovery method needs it.
+     */
     @Transactional
-    public void verifyFinish(UUID userId, UUID loginId, String rawHandle, byte[] finalization) {
+    public String verifyFinish(UUID userId, UUID loginId, String rawHandle, byte[] finalization) {
         Handle h = handle(rawHandle);
         UserRow u = verifyLogin(loginId, h, finalization);
         if (!Ids.uuid(u.id()).equals(userId)) {
             throw ApiException.forbidden();
         }
         throttle.clear(h.lookup());
+        byte[] token = Ids.random(32);
+        jdbc.update("UPDATE users SET reauth_hash = ?, reauth_expires_at = ? WHERE id = ?",
+                TokenService.sha256(token), Timestamp.from(clock.instant().plus(REAUTH_TTL)), u.id());
+        return Base64.getUrlEncoder().withoutPadding().encodeToString(token);
+    }
+
+    /** True once for a valid, unexpired token from {@link #verifyFinish}; it can't be used again. */
+    @Transactional
+    public boolean consumeReauth(UUID userId, String token) {
+        if (token == null || token.isEmpty()) {
+            return false;
+        }
+        byte[] raw;
+        try {
+            raw = Base64.getUrlDecoder().decode(token);
+        } catch (IllegalArgumentException e) {
+            return false;
+        }
+        int n = jdbc.update("UPDATE users SET reauth_hash = NULL, reauth_expires_at = NULL WHERE id = ? AND reauth_hash = ? AND reauth_expires_at > ?",
+                Ids.bytes(userId), TokenService.sha256(raw), now());
+        return n == 1;
     }
 
     // ---------- recovery ----------
@@ -260,8 +314,12 @@ public class AuthService {
         return out;
     }
 
+    /** A recovery session, plus which method proved it (its copy is fetched with GET /v1/recovery-methods/{id}/backup). */
+    public record RecoveryResult(UUID userId, String accessToken, String refreshToken, long expiresIn, TokenService.Scope scope,
+            UUID methodId, String methodKind) {}
+
     @Transactional
-    public TokenService.Tokens recoveryFinish(UUID challengeId, byte[] signature) {
+    public RecoveryResult recoveryFinish(UUID challengeId, byte[] signature) {
         byte[] id = Ids.bytes(challengeId);
         List<Object[]> rows = jdbc.query(
                 "SELECT user_id, nonce, expires_at FROM recovery_challenges WHERE id = ? FOR UPDATE",
@@ -275,11 +333,18 @@ public class AuthService {
             throw ApiException.unauthorized();
         }
         UserRow u = activeUser(Ids.uuid((byte[]) rows.get(0)[0]));
-        if (u.recoveryPubkey() == null || !core.verifyRecoveryLogin(u.recoveryPubkey(), u.id(), id,
-                (byte[]) rows.get(0)[1], expires.getEpochSecond(), signature)) {
-            throw ApiException.unauthorized();
+        // Any of the user's methods may answer; the one that does is the one whose copy the phone will open.
+        List<Object[]> methods = jdbc.query("SELECT id, kind, auth_pubkey FROM recovery_methods WHERE user_id = ?",
+                (rs, i) -> new Object[] {rs.getBytes(1), rs.getString(2), rs.getBytes(3)}, (Object) u.id());
+        for (Object[] m : methods) {
+            if (core.verifyRecoveryLogin((byte[]) m[2], u.id(), id, (byte[]) rows.get(0)[1], expires.getEpochSecond(), signature)) {
+                jdbc.update("UPDATE recovery_methods SET last_used_at = ? WHERE id = ?", now(), m[0]);
+                TokenService.Tokens t = tokens.issue(Ids.uuid(u.id()), TokenService.Scope.recovery);
+                return new RecoveryResult(t.userId(), t.accessToken(), t.refreshToken(), t.expiresIn(), t.scope(),
+                        Ids.uuid((byte[]) m[0]), (String) m[1]);
+            }
         }
-        return tokens.issue(Ids.uuid(u.id()), TokenService.Scope.recovery);
+        throw ApiException.unauthorized();
     }
 
     // ---------- password change (also completes recovery) ----------
