@@ -39,7 +39,7 @@ export function passkeySupported(): boolean {
 }
 
 const challenge = () => toB64Url(Core.newSymmetricKey());
-const salt = () => toB64Url(Core.passkeyPrfSalt());
+const salt = () => new Uint8Array(Core.passkeyPrfSalt());
 
 function prfFirst(result: { clientExtensionResults?: { prf?: { results?: { first?: unknown } } } }): ArrayBuffer | null {
   const first = result.clientExtensionResults?.prf?.results?.first;

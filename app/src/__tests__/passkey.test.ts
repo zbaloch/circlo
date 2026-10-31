@@ -20,7 +20,7 @@ describe('passkey recovery', () => {
     expect(new Uint8Array(out)).toEqual(new Uint8Array(32).fill(1));
     const request = mockPasskey.get.mock.calls[0][0];
     expect(request).toMatchObject({ rpId: RP_ID, userVerification: 'required' });
-    expect(request.extensions.prf.eval.first).toBe('CQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQk'); // base64url of the salt
+    expect(request.extensions.prf.eval.first).toEqual(new Uint8Array(32).fill(9));
   });
 
   it('creates a discoverable passkey and checks it right away; the result is what get returns', async () => {
@@ -30,6 +30,7 @@ describe('passkey recovery', () => {
     expect(new Uint8Array(out)).toEqual(new Uint8Array(32).fill(2));
     const request = mockPasskey.create.mock.calls[0][0];
     expect(request).toMatchObject({ rp: { id: RP_ID, name: 'Circlo' }, user: { name: 'sofia' }, authenticatorSelection: { residentKey: 'required' } });
+    expect(request.extensions.prf.eval.first).toEqual(new Uint8Array(32).fill(9));
   });
 
   it('works when the provider only gives PRF on get', async () => {
