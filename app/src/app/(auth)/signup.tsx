@@ -42,7 +42,7 @@ export default function SignupScreen() {
     setBusy(true);
     try {
       setPendingSignup(await Signup.start(handle, password));
-      router.push('/recovery-phrase');
+      router.push('/protect-account');
     } catch (e) {
       setError(describeError(e));
     } finally {

@@ -19,7 +19,7 @@ export const DRAWER_ITEMS: Item[] = [
   { label: 'Circles', icon: 'radio-button-on-outline', href: '/circles' },
   { label: 'Devices', icon: 'phone-portrait-outline', href: '/devices' },
   { label: 'Settings', icon: 'settings-outline', href: '/settings' },
-  { label: 'Recovery phrase', icon: 'key-outline', href: '/recovery' },
+  { label: 'Account recovery', icon: 'key-outline', href: '/recovery' },
 ];
 
 /** Side drawer opened from the Home avatar (PLAN.md 2A app shell). */

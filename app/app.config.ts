@@ -32,6 +32,9 @@ const config: ExpoConfig = {
       tinted: './assets/images/icon-ios-tinted.png',
     },
     supportsTablet: false,
+    // Passkeys for Face ID recovery (docs/PASSKEY_RECOVERY.md): www.hellocirclo.com serves the matching
+    // apple-app-site-association (circlo-web), and the App ID has the Associated Domains capability.
+    associatedDomains: ['webcredentials:www.hellocirclo.com'],
     // Export compliance (App Store Connect, 2026-10-31): Circlo uses only standard encryption algorithms (core/:
     // XChaCha20-Poly1305, X25519, Ed25519, MLS, OPAQUE) and isn't distributed in France, so Apple needs no documentation
     // and treats it as exempt: NO here, and builds aren't asked the encryption questions. Before adding France (or any

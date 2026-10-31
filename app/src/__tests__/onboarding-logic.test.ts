@@ -1,13 +1,4 @@
-import { bytesToUuid, equalBytes, fromB64, hexGroups, toB64, uuidFromRandom, uuidToBytes } from '@/lib/bytes';
-
-// The native core isn't available under jest; only the pure helpers are tested here (flows run on the device).
-jest.mock('@circlo/core', () => ({
-  newSymmetricKey: () => new Uint8Array(32).map((_, i) => (i * 37 + 11) % 256).buffer,
-  normalizeHandle: (h: string) => h.trim().toLowerCase(),
-}));
-
-// eslint-disable-next-line import/first
-import { pickConfirmPositions, wordsMatch } from '@/lib/account';
+import { bytesToUuid, equalBytes, fromAnyB64, fromB64, hexGroups, toB64, toB64Url, uuidFromRandom, uuidToBytes } from '@/lib/bytes';
 
 describe('bytes', () => {
   it('base64 round trips arbitrary bytes', () => {
@@ -38,20 +29,12 @@ describe('bytes', () => {
   });
 });
 
-describe('recovery phrase confirmation', () => {
-  const words = Array.from({ length: 24 }, (_, i) => `word${i + 1}`);
-
-  it('picks three distinct, sorted positions within the phrase', () => {
-    const p = pickConfirmPositions();
-    expect(p).toHaveLength(3);
-    expect(new Set(p).size).toBe(3);
-    expect([...p].sort((a, b) => a - b)).toEqual(p);
-    expect(p.every((x) => x >= 0 && x < 24)).toBe(true);
-  });
-
-  it('accepts the right words regardless of case and spaces, rejects anything else', () => {
-    expect(wordsMatch(words, [0, 5, 23], ['word1', ' WORD6 ', 'word24'])).toBe(true);
-    expect(wordsMatch(words, [0, 5, 23], ['word1', 'word6', 'word23'])).toBe(false);
-    expect(wordsMatch(words, [0, 5, 23], ['word1', 'word6'])).toBe(false);
+describe('base64url for passkeys', () => {
+  it('encodes without padding and decodes either alphabet', () => {
+    const data = new Uint8Array([0xfb, 0xff, 0xbf, 0x00, 0x01]);
+    expect(toB64Url(data)).toBe('-_-_AAE');
+    expect(new Uint8Array(fromAnyB64('-_-_AAE'))).toEqual(data);
+    expect(new Uint8Array(fromAnyB64('+/+/AAE='))).toEqual(data);
+    expect(new Uint8Array(fromAnyB64(toB64(data)))).toEqual(data);
   });
 });

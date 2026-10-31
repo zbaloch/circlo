@@ -8,6 +8,7 @@ import { EmptyState } from '@/components/empty-state';
 import { Fab } from '@/components/fab';
 import { HomeHeader } from '@/components/home-header';
 import { IntegrityBanner } from '@/components/integrity-banner';
+import { RecoveryReminder } from '@/components/recovery-reminder';
 import { OutboxCard, PostCard } from '@/components/post-card';
 import { usePostActions } from '@/components/post-actions';
 import { Screen } from '@/components/screen';
@@ -156,6 +157,7 @@ export default function HomeScreen() {
               <HomeHeader />
             </View>
             <IntegrityBanner />
+            <RecoveryReminder account={account} />
             {pending.map((i) => (
               <OutboxCard key={i.id} item={i} onRetry={() => retryPost(account, i.id)} onDismiss={() => dismissPost(i.id)} />
             ))}

@@ -1,5 +1,8 @@
 import { checkPassword, MIN_PASSWORD } from '@/lib/password-strength';
 
+// The first password check loads zxcvbn's dictionaries (~1 MB); give it room when the whole suite runs in parallel.
+jest.setTimeout(20_000);
+
 describe('checkPassword', () => {
   it('needs at least 12 characters', () => {
     expect(MIN_PASSWORD).toBe(12);

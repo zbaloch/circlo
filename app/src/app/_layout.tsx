@@ -66,7 +66,7 @@ function Navigator() {
         <Drawer.Screen name="circles" options={{ title: 'Circles' }} />
         <Drawer.Screen name="devices" options={{ title: 'Devices' }} />
         <Drawer.Screen name="settings" options={{ title: 'Settings' }} />
-        <Drawer.Screen name="recovery" options={{ title: 'Recovery phrase' }} />
+        <Drawer.Screen name="recovery" options={{ title: 'Account recovery' }} />
         <Drawer.Screen name="dev" options={{ title: 'Crypto self-test' }} />
         <Drawer.Screen name="edit-profile" options={{ title: 'Edit profile' }} />
         <Drawer.Screen name="friend/[id]" options={{ title: 'Profile' }} />

@@ -2,6 +2,9 @@ import { fireEvent, render, screen } from '@testing-library/react-native';
 
 import ChangePasswordScreen from '@/app/change-password';
 
+// The first password check loads zxcvbn's dictionaries (~1 MB); give it room when the whole suite runs in parallel.
+jest.setTimeout(20_000);
+
 jest.mock('expo-router', () => ({ router: { back: jest.fn() }, useFocusEffect: () => {} }));
 jest.mock('@/lib/account', () => ({ changePassword: jest.fn(() => Promise.resolve()), describeError: String }));
 jest.mock('@/lib/dialog', () => ({ showAlert: jest.fn() }));

@@ -48,8 +48,9 @@ remove either (at least one stays while there is no other, unless decision A all
 **Forgot password (new phone):** handle → **"Use Face ID"** → the system shows the passkey → new password → in.
 "Use recovery phrase" stays as the other option. Other devices are signed out, as today.
 
-**Every password login on a phone that has the passkey** quietly refreshes passkey recovery for that phone
-(section 4.3), so the cross-device PRF bug can't strand users who still sign in normally.
+**Settings → Account recovery → "Check on this phone"** runs Face ID once and, if this phone's PRF output opens none of
+the passkey copies, adds one for it (section 4.3). It can't run silently: reading a passkey always shows the system
+sheet.
 
 **Existing users (2–3 people):** their 24-word phrases keep working. After the update, Home suggests "Turn on Face ID
 recovery".
@@ -82,9 +83,9 @@ server except ciphertext and a public key.
   without PRF) → no passkey method; offer the phrase.
 
 ### 4.3 Resilience against the PRF cross-device bug
-A method row is keyed by `(user, method_id)`. A passkey method can hold **several wraps**: on a password login on a
-device that has the passkey, the app gets that device's PRF output. If it opens none of the stored wraps, it adds a
-new wrap (new `auth` key + ciphertext) for the same credential. Recovery tries every wrap's `auth` key.
+A method row is keyed by `(user, method_id)`. A passkey can have **several wraps** (rows of kind `passkey`): "Check on
+this phone" gets this device's PRF output and, if it opens none of the stored wraps, adds a new one (new `auth` key +
+ciphertext). Recovery tries every method's `auth` key.
 
 ### 4.4 What doesn't change
 OPAQUE, the password copy, identity and device keys, epochs, posts and MLS are untouched. Recovery still ends with an
