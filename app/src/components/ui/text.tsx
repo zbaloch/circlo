@@ -28,5 +28,6 @@ export function Text({ className, ...props }: ComponentPropsWithRef<typeof RNTex
 }
 
 export function TextInput({ className, ...props }: ComponentPropsWithRef<typeof RNTextInput>) {
-  return <RNTextInput className={fontClass(className)} {...props} />;
+  // No browser focus outline on the web (phones draw none); fields that need a focus cue style their own border.
+  return <RNTextInput className={fontClass(`web:outline-none ${className ?? ''}`)} {...props} />;
 }

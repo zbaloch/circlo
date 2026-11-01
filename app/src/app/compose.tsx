@@ -3,7 +3,7 @@ import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { BackHandler, Pressable, ScrollView, View } from 'react-native';
+import { BackHandler, Platform, Pressable, ScrollView, View } from 'react-native';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -145,6 +145,22 @@ export default function ComposeScreen() {
     );
   }
 
+  // Phones: pinned to the bottom, so it rides just above the keyboard (as on X). The web has no on-screen keyboard:
+  // there it sits right under the text and photos, lined up with them.
+  const web = Platform.OS === 'web';
+  const toolbar = (
+    <View className={`flex-row items-center gap-5 border-t border-border py-3 dark:border-border-dark ${web ? 'ml-12' : 'px-4'}`}>
+      <Pressable accessibilityRole="button" accessibilityLabel="Add photos or video" disabled={!canAdd} onPress={() => pick(false)} className={canAdd ? '' : 'opacity-40'}>
+        <Icon name="image-outline" size={24} color={palette.primary} />
+      </Pressable>
+      <Pressable accessibilityRole="button" accessibilityLabel="Take a photo" disabled={!canAdd} onPress={() => pick(true)} className={canAdd ? '' : 'opacity-40'}>
+        <Icon name="camera-outline" size={24} color={palette.primary} />
+      </Pressable>
+      <View className="flex-1" />
+      <CharRing used={used} limit={MAX_POST_CHARS} />
+    </View>
+  );
+
   return (
     <SafeAreaView className="flex-1 bg-surface dark:bg-surface-dark">
       <KeyboardAvoidingView className="flex-1" behavior="padding">
@@ -169,7 +185,7 @@ export default function ComposeScreen() {
           </Pressable>
         </View>
 
-        <ScrollView className="flex-1" contentContainerClassName="gap-3 px-4 pb-4" keyboardShouldPersistTaps="handled">
+        <ScrollView testID="compose-body" className="flex-1" contentContainerClassName="gap-3 px-4 pb-4" keyboardShouldPersistTaps="handled">
           <View className="flex-row gap-3">
             <Avatar id={account?.userId} name={account?.handle} />
             <View className="flex-1 gap-2">
@@ -223,19 +239,11 @@ export default function ComposeScreen() {
               ))}
             </ScrollView>
           ) : null}
+          {web ? toolbar : null}
           <ErrorText>{error}</ErrorText>
         </ScrollView>
 
-        <View className="flex-row items-center gap-5 border-t border-border px-4 py-3 dark:border-border-dark">
-          <Pressable accessibilityRole="button" accessibilityLabel="Add photos or video" disabled={!canAdd} onPress={() => pick(false)} className={canAdd ? '' : 'opacity-40'}>
-            <Icon name="image-outline" size={24} color={palette.primary} />
-          </Pressable>
-          <Pressable accessibilityRole="button" accessibilityLabel="Take a photo" disabled={!canAdd} onPress={() => pick(true)} className={canAdd ? '' : 'opacity-40'}>
-            <Icon name="camera-outline" size={24} color={palette.primary} />
-          </Pressable>
-          <View className="flex-1" />
-          <CharRing used={used} limit={MAX_POST_CHARS} />
-        </View>
+        {web ? null : toolbar}
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
