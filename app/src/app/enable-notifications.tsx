@@ -36,8 +36,8 @@ export default function EnableNotificationsScreen() {
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-surface px-6 dark:bg-surface-dark">
-      <ScrollView contentContainerClassName="flex-grow justify-center gap-8 py-6" showsVerticalScrollIndicator={false}>
+    <SafeAreaView className="flex-1 bg-surface dark:bg-surface-dark">
+      <ScrollView contentContainerClassName="flex-grow justify-center gap-8 px-6 py-6" showsVerticalScrollIndicator={false}>
         <PhonePreview />
         <View className="gap-3">
           <Text className="text-center text-3xl font-extrabold text-ink dark:text-ink-dark">Know when something’s new</Text>
@@ -54,7 +54,7 @@ export default function EnableNotificationsScreen() {
           </Text>
         </View>
       </ScrollView>
-      <View className="gap-1 pb-6 pt-3">
+      <View className="gap-1 px-6 pb-6 pt-3">
         <Button size="lg" label="Turn on notifications" loading={busy} onPress={enable} />
         <Pressable accessibilityRole="button" onPress={notNow} disabled={busy} className="items-center rounded-full py-3 active:bg-surface-raised dark:active:bg-surface-raised-dark">
           <Text className="text-[15px] font-bold text-ink dark:text-ink-dark">Not now</Text>

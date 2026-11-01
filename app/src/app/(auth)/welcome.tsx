@@ -26,8 +26,8 @@ const POINTS: Point[] = [
 export default function WelcomeScreen() {
   const palette = usePalette();
   return (
-    <SafeAreaView className="flex-1 bg-surface px-6 dark:bg-surface-dark">
-      <ScrollView contentContainerClassName="flex-grow justify-center gap-8 py-6" showsVerticalScrollIndicator={false}>
+    <SafeAreaView className="flex-1 bg-surface dark:bg-surface-dark">
+      <ScrollView contentContainerClassName="flex-grow justify-center gap-8 px-6 py-6" showsVerticalScrollIndicator={false}>
         <View className="items-center gap-5">
           <CircloWordmark height={52} />
           <Text className="text-center text-lg text-muted dark:text-muted-dark">A private social network for the people you choose.</Text>
@@ -46,7 +46,7 @@ export default function WelcomeScreen() {
           ))}
         </View>
       </ScrollView>
-      <View className="gap-3 pb-6 pt-3">
+      <View className="gap-3 px-6 pb-6 pt-3">
         <Button size="lg" label="Create account" onPress={() => router.push('/signup')} />
         <Button size="lg" label="Log in" variant="outline" onPress={() => router.push('/login')} />
       </View>

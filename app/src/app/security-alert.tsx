@@ -40,8 +40,8 @@ export default function SecurityAlertScreen() {
 
   const latest = signIns[signIns.length - 1];
   return (
-    <SafeAreaView className="flex-1 bg-surface px-6 dark:bg-surface-dark">
-      <ScrollView contentContainerClassName="flex-grow justify-center gap-8 py-6" showsVerticalScrollIndicator={false}>
+    <SafeAreaView className="flex-1 bg-surface dark:bg-surface-dark">
+      <ScrollView contentContainerClassName="flex-grow justify-center gap-8 px-6 py-6" showsVerticalScrollIndicator={false}>
         <View className="items-center">
           <View className="h-20 w-20 items-center justify-center rounded-full bg-primary-soft dark:bg-primary-soft-dark">
             <Icon name="shield-checkmark-outline" size={40} color={palette.primary} />
@@ -64,7 +64,7 @@ export default function SecurityAlertScreen() {
           </Text>
         </View>
       </ScrollView>
-      <View className="gap-1 pb-6 pt-3">
+      <View className="gap-1 px-6 pb-6 pt-3">
         <Button size="lg" label="No, change my password" onPress={secure} />
         <Pressable accessibilityRole="button" onPress={itWasMe} className="items-center rounded-full py-3 active:bg-surface-raised dark:active:bg-surface-raised-dark">
           <Text className="text-[15px] font-bold text-ink dark:text-ink-dark">Yes, it was me</Text>
