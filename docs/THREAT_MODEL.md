@@ -1,138 +1,77 @@
 # Circlo threat model
 
-> **Status: v1.0 — approved 2026-10-25.** Derived from PLAN.md sections 1–2 and docs/CRYPTO.md v1.0.
+> **Status: v2.0, 2026-11-01.** Replaces v1.0 (end-to-end encryption). Owner decision 2026-11-01: Circlo is a
+> traditional circles-based social network. Content travels over HTTPS (TLS) and is stored as sent; the server is
+> trusted to enforce who may see what. In exchange, sign-up and account recovery are simple (email and password, no
+> keys to lose) and a web app is possible.
 
-## Headline guarantee
+## Headline guarantees
 
-**A full copy of the database and the S3 bucket reveals no content, no names, no emails, no handles, no profile data,
-no circle membership, no private keys and no push tokens (there are none), and does not allow offline password guessing.** The few
-server secrets (CRYPTO.md section 13) live outside the database and still cannot decrypt user content.
+1. **Nobody sees what wasn't shared with them.** Every read of a post, reply, like, photo, chat or profile is checked
+   on the server; circle names and memberships, and who a post went to, are only ever returned to their owner.
+2. **Nobody can find you.** There is no search and no public profile; the only way to connect is an invite link or QR
+   code from the person.
+3. **Circlo doesn't track you.** No IPs, locations, device data, analytics or ad identifiers are collected
+   (docs/PRIVACY.md), and photo/video metadata is removed on the device before upload.
+4. **A database dump doesn't give away passwords.** Passwords are Argon2id hashes; codes and tokens are SHA-256 hashes.
 
 ## Assets
 
-1. Post content and media, replies, DMs.
-2. Profile data (display name, avatar, bio).
-3. Circle membership: who is in which circle, and circle labels.
-4. Private keys: identity, device, chain roots (`C1` per epoch), `profile_key`, `data_key`.
-5. Passwords and recovery phrases.
+1. Post content and media, replies, chats.
+2. Profile data (name, photo, bio) and email addresses.
+3. Circle membership and labels; who each post went to.
+4. Accounts: passwords, sessions, email codes.
 
 ## Adversaries
 
 | Adversary | Capabilities |
 |---|---|
-| **Honest-but-curious server operator** | Reads every DB row, S3 object and request; keeps logs. |
-| **Malicious server** | Additionally modifies, drops, replays or injects data; serves fake keys. |
-| **Database / bucket thief** | Gets a full dump of MySQL and S3 at one point in time. |
-| **Network attacker** | Observes and tampers with traffic (TLS in production; release builds pin the API host's keys, docs/HARDENING.md). |
-| **Curious friend** | Holds legitimate keys for their circle; inspects app internals. |
-| **Stranger** | Can register, search handles, use invite links. |
-| **Device thief** | Holds an unlocked or locked phone. |
+| **Stranger** | Can sign up, use invite links they're given, call the API directly. |
+| **Curious friend** | Connected to you; can call the API with their own session and inspect the app. |
+| **Network attacker** | Observes and tampers with traffic. Production uses TLS; release apps pin the API host's keys (HARDENING.md). |
+| **Account attacker** | Guesses passwords, steals a session or an email inbox. |
+| **Database / bucket thief** | Gets a copy of the database, its backups or the bucket. |
+| **Malicious or compelled operator** | Can read everything stored. Out of scope for technical protection since 2026-11-01; limited by policy (PRIVACY.md, LEGAL.md). |
+| **Device thief** | Holds an unlocked or locked phone, or a shared computer with the web app open. |
 
-## What the server never learns
+## Guarantees and how they're enforced
 
-Plaintext content, media, replies, DMs, profile fields, names, emails, private keys, passwords, recovery phrases,
-circle numbers, circle labels, group names.
-
-## Guarantees
-
-| Property | Mechanism |
-|---|---|
-| Confidentiality of posts/media | Per-post `postKey`, wrapped by a circle sub-key; XChaCha20-Poly1305 / STREAM |
-| Audience secrecy from server | Every friend gets one identical-size HPKE payload; `key_ref` doesn't reveal *n* |
-| Audience secrecy from friends | Friends are never told their circle; UI never shows labels to readers |
-| Narrower circles stay closed | HKDF chain is one-way: `Ck` gives `C(k+1..100)`, never `C(k-1)` |
-| Integrity / tamper detection | AEAD with AAD bound to type, ids and version; STREAM detects truncation/reordering |
-| Authenticity | Ed25519 author signatures on posts/replies; HPKE Auth for friend payloads |
-| Login without revealing the password | OPAQUE (RFC 9807); the server never sees the password or anything guessable from a DB dump |
-| No PII at rest | No email/phone exists; handles stored only as keyed HMAC; profiles encrypted; no push tokens |
-| Audience hiding over time | Per-post `key_ref`; every circle change rotates the epoch for all friends |
-| Messaging FS / PCS | MLS (RFC 9420) |
-| Key-substitution detection | Safety numbers; pinned identity keys with change warnings |
-| No location/device leaks in media (to friends) | Photos re-encoded and EXIF/XMP/IPTC/comment segments removed; video `udta`/`meta` boxes zero-filled; checked before encryption |
-| Media bound to its post | Each object has its own random file key; AAD binds the random object id; the signed header lists ids, kinds and lengths |
-
-## Known and accepted leaks
-
-1. **Social graph:** the server sees friendships (`friendships`, `friend_payloads`), who messages whom (MLS groups,
-   delivery), and who likes which post.
-2. **Metadata:** timestamps, padded sizes (Padmé), number of posts, number of media items per post.
-3. **Unreadable posts exist:** a reader fetches every header from an author and can tell that posts exist which they
-   cannot read (not their content or audience). Optional later fix: decoy headers.
-4. **Same-circle comparison:** two friends comparing app internals can tell whether they hold the same `Ck`.
-5. **Relative offset:** a reader learns at which derivation step a post matched. Combined with guesses about which
-   circle the author uses for "everyone", this can hint at their own circle.
-6. **Likes:** a like reveals to the server that the liker could read the post, so like patterns can hint at audiences.
-7. **No revocation of the past:** anyone who already decrypted something keeps it. Epoch rotation only protects new posts.
-8. **Epoch rotations are visible:** the server sees *that* the author changed some circle assignment (all friends get
-   new payloads), not who or how.
-9. **DB + server secrets stolen together:** weak passwords become guessable offline (each guess costs Argon2id 64 MiB);
-   handles become testable. Content stays encrypted.
-10. **Live server compromise:** an attacker running the server sees plaintext handles at login/lookup time and the
-    request metadata above; still no content or keys.
-11. **No push delivery:** APNs and FCM aren't used, so Apple and Google can't time anyone's activity. Background checks
-    tell the Circlo server when a phone checks in (it already sees app use) and return counts only.
-12. **Media shape:** the server sees how many objects a post has, their kinds (full/thumb/poster) and padded sizes, so
-    it can tell a photo post from a video post and roughly how long a video is.
-13. **Video encoder tags:** stripping removes container metadata (location, device, dates in `udta`/`meta`), but the
-    video stream itself is not re-encoded, so encoder settings embedded in the bitstream (e.g. the encoder name)
-    remain visible to friends who play it. They contain no location.
-14. ~~Replies and likes visible as ids to every friend of the author~~ **Closed in Phase 11** by per-post read
-    tokens (CRYPTO.md 13c): only people who can open a post can list, add or count its replies and likes. The server
-    still learns *that* a user interacted with a post (it stores the rows), as before.
-15. **Repliers I don't know:** a reply from someone who isn't my friend is verified against the identity key the
-    server returns for them (self-signed, not pinned). The server can't forge reply text (it never holds the post
-    key), but together with an audience member it could attribute a reply to the wrong user id.
-16. **Messaging metadata:** the delivery service sees which devices are in which group, when messages are sent, and
-    their padded sizes (MLS framing also shows epoch and whether a message is a commit). It never sees names,
-    membership plaintext beyond device ids, or content.
-17. **Reports reveal what was reported:** a report makes the reported post (text, photos, author) readable to whoever
-    holds the moderation secret key, by the reporter's choice. The server stores only ciphertext and learns that a
-    user sent a report, when, and its size. A leaked moderation key exposes every stored report: keep it offline, and
-    rotate it (new keygen, new `CIRCLO_MODERATION_PUBLIC_KEY`) if in doubt.
-
-## Out of scope (for now)
-
-- A compromised, unlocked device (malware with app access sees what the user sees). On a rooted/jailbroken phone the
-  app warns the user but keeps working (docs/HARDENING.md).
-- Traffic analysis by a global network observer; IP addresses at the network layer (we don't log them, but the
-  hosting provider can see them).
-- Code-delivery attacks on a future web client (PLAN.md open decision 2).
-- Coercion of the user.
-
-## Operational rules that support the model
-
-- No logging of request bodies, IPs or decrypted data; no access log.
-- Buckets are private; presigned URLs only (PUT 15 min, GET 5 min). Object keys are random.
-- Leaked-DB drill (`infra/leak-drill.sh`): dump the database and the bucket and confirm nothing readable. Passed on
-  the dev data in Phase 12; repeat before launch and after schema changes.
-- Video playback goes through the core's loopback HTTP server (`core/src/playback.rs`): bound to 127.0.0.1 only, one
-  unguessable 256-bit token per video, plaintext only in memory one 64 KiB chunk at a time; the ciphertext cache file
-  is never decrypted to disk. Another app on the same device would need the token to read a stream.
-- Decrypted photos are kept in memory only; thumbnails are cached sealed with a per-device `local_cache_key` and
-  deleted at sign-out.
-- External cryptography audit before any public launch.
-
-## Comparison with Threema (owner's benchmark)
-
-Threema is a widely respected privacy messenger: anonymous random IDs (no phone number or email required), NaCl
-end-to-end encryption, the Ibex protocol for forward secrecy in one-to-one chats, QR-code contact verification,
-password-encrypted "Threema Safe" backups, open-source apps, and independent audits plus academic analysis.
-Circlo's design aims at the same bar. Where it stands today (design level; Circlo is unaudited):
-
-| Property | Threema | Circlo |
+| Property | Mechanism | Tests |
 |---|---|---|
-| Account without phone/email | Yes (random ID) | Yes (pseudonymous handle; the server stores only a keyed hash of it) |
-| Content end-to-end encrypted | Yes | Yes (posts, media, replies, profiles, address book, backups; messages via MLS in Phase 9) |
-| Profile name/photo hidden from the server | Profile pictures are shared end-to-end; the optional public nickname travels with messages | Yes: profiles are encrypted with a per-epoch key only friends receive |
-| Forward secrecy in chats | Ibex (one-to-one chats) | MLS (RFC 9420): forward secrecy **and** post-compromise security, one-to-one and groups (Phase 9) |
-| Contact verification | QR scan, three verification levels | Safety numbers + QR, pinned identity keys, blocking warning on any key change |
-| Backup protection | Key derived from the backup password | OPAQUE: a stolen database alone doesn't allow password guessing; the OPAQUE server secret is kept outside the DB |
-| Who-talks-to-whom metadata | The server relays messages and sees sender/recipient IDs; contact lists aren't stored on the server | **Weaker today**: the server stores the friendship graph (needed to deliver key payloads). Documented leak; candidate mitigations: no `friendships` table, sealed-sender-style delivery |
-| Audience secrecy (who can see a post) | Not applicable | Server can't tell which circle anyone is in or which posts share an audience |
-| Independent security audit | Yes | **Not yet: required before any public launch** |
-| Maturity | Years in production | Early development |
+| Posts reach only their audience | `PostAccess.VISIBLE`: author; Everyone = current friends; circles = the audience snapshot taken when posting (`post_audience`) intersected with current friendship | `PostsFlowIT` |
+| Moving someone into a circle doesn't open old posts | The snapshot is taken at post time | `PostsFlowIT` |
+| Unfriend/block removes access everywhere | `People.disconnect` deletes the friendship, circle memberships and snapshot rows | `PostsFlowIT`, `SocialFlowIT` |
+| Replies, likes and media follow their post | Every thread endpoint checks the post first; media URLs are only handed out inside views of visible posts | `PostsFlowIT`, `MediaFlowIT` |
+| Circle labels stay private | Audience fields are only set on the author's own posts; `/v1/circles` and circle ids in `/v1/friends` are the caller's own | `PostsFlowIT`, `SocialFlowIT` |
+| Chats are members-only | Membership check on every chat call; only friends can be added | `ChatFlowIT` |
+| No discovery | No search endpoint; requests need a redeemed invite from the target; profiles 404 for strangers | `SocialFlowIT` |
+| Emails stay private | `People.Person` (name, username, photo) is the only shape returned about other people | `SocialFlowIT` |
+| Password guessing is slow | Argon2id hashes; 3 failures lock login (15 min → 1 h → 24 h), per account and per typed name; per-IP limits | `AuthFlowIT`, `LoginThrottleTest` |
+| No account enumeration at login | Unknown accounts answer exactly like wrong passwords (same shape, a dummy hash check) | `AuthFlowIT` |
+| Email codes can't be brute-forced | 6 digits, 15 minutes, 5 guesses, single use, hashed at rest; at most 5 emails per address per hour | `AuthFlowIT` |
+| Stolen refresh tokens are caught | Rotation on every use; reusing a rotated token signs out every device | `AuthFlowIT` |
+| Sessions can be ended | Sign a device out (Devices); password change signs out the others; reset signs out all | `AuthFlowIT` |
+| New sign-ins are visible | Each login is recorded (time only) and shown on the other devices | `AuthFlowIT` |
+| No location/device leaks in media | Photos re-encoded and EXIF/XMP/IPTC/comment segments removed; video `udta`/`meta` boxes zero-filled; on web, photos are redrawn on a canvas | `strip-metadata.test.ts` |
+| Storage isn't public | Private bucket; uploads are presigned PUTs locked to size and type; downloads are presigned GETs (1 hour) | `MediaFlowIT`, `PresignedUploadIT` |
+| No personal data in logs | No access log; errors are fixed codes; nothing from requests is logged | `NoPayloadLoggingIT` |
+| Browsers can't be abused cross-site | Bearer tokens in a header (no cookies, so no CSRF); CORS allows only the web app's origin | `AuthFlowIT` |
 
-**Bottom line:** at design level Circlo matches or exceeds Threema on content secrecy, backup protection and chat
-security, and adds audience secrecy that Threema doesn't need. It is weaker on social-graph metadata (the server
-knows friendships), and it has none of Threema's track record or audits yet. "As secure as Threema" can only be
-claimed after an external audit.
+## Known and accepted risks
+
+1. **The operator and anyone with database or bucket access can read content.** Mitigations: encryption at rest by
+   the hosting and storage providers, restricted production access, encrypted backups, no analytics or third-party
+   agents (PRIVACY.md deployment rules). Lawful requests are handled per LEGAL.md.
+2. **A compromised email inbox can reset the password.** Mitigations: a reset signs out every device and shows a
+   sign-in on them; the code expires in 15 minutes.
+3. **The web app keeps its session in the browser's localStorage**, so script injection (XSS) in the web app could
+   steal it. Mitigations: React escapes all text, no `dangerouslySetInnerHTML`, links are http(s) only, security
+   headers in `app/vercel.json`; access tokens live in memory only and expire in 15 minutes.
+4. **Download links can be forwarded.** A presigned media URL works for anyone for up to an hour.
+5. **Social graph and metadata**: the server knows who is connected, who messages whom, and when.
+6. **Account lockout can be triggered by others** who know your username; resetting the password by email lifts it.
+7. **Screenshots and re-sharing**: anyone who can see a post can copy it. No reposts are offered.
+
+## Out of scope
+
+Malware on the user's device, a compromised operating system or browser, and physical coercion.

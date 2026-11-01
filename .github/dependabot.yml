@@ -1,9 +1,5 @@
 version: 2
 updates:
-  - package-ecosystem: cargo
-    directory: /core
-    schedule:
-      interval: weekly
   - package-ecosystem: maven
     directory: /server
     schedule:

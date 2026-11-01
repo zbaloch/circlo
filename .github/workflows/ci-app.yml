@@ -36,3 +36,6 @@ jobs:
         run: npm run lint
       - if: steps.present.outputs.app == 'yes'
         run: npm test
+      # The web app (app.hellocirclo.com) must build too.
+      - if: steps.present.outputs.app == 'yes'
+        run: npm run build:web

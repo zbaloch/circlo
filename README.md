@@ -1,32 +1,36 @@
 # Circlo
 
-Circlo is an end-to-end encrypted social network. You share posts with **circles**: nested audiences from
-"only me" (1) out to your widest contacts (100). The server only ever stores ciphertext. It never sees
-your posts, media, name, email or which circle anyone is in.
+Circlo is a private, circles-based social network. You share posts with **circles** (Close Friends, Family, Kids,
+Work, or your own), with all your friends, or only with yourself. People connect only through an invite link or QR
+code: there is no search, no public profile, no ads and no tracking. Nobody is ever told which circle they're in.
 
-> **Status: early development. Not audited. Do not use for anything sensitive.**
-> An external cryptography audit is required before any public launch.
+Apps for iOS and Android, and a web app at **app.hellocirclo.com**, all from the same code.
+
+> **Status: early development, not yet launched.**
 
 ## How it works (short version)
 
-- **Circles are a one-way key chain.** `C(n+1) = HKDF(Cn)`. A friend placed in circle *k* receives only `Ck`.
-  From it they can derive wider circles but never narrower ones. Every friend receives one key of identical size,
-  so the server can't tell who is in which circle, and friends are never told their circle.
-- **Messaging uses MLS** (RFC 9420, via OpenMLS) for both 1:1 and group chats.
-- **Login without revealing your password.** Your device derives a signing key from your password with Argon2id;
-  the server stores only the public key and verifies a signed challenge.
+- **Accounts** have a name, @username, email and password. The email is confirmed with a 6-digit code; a forgotten
+  password is reset the same way. Passwords are stored only as Argon2id hashes.
+- **The server decides who sees what.** Everything travels over HTTPS (TLS) and is stored as sent. A post to a
+  circle reaches the people who were in that circle when it was posted; Everyone means all current friends.
+  Unfriending or blocking someone always removes their access. Circle names and memberships, and who a post went to,
+  are shown only to the person who owns them.
+- **Photos and videos** have their location and camera metadata removed on the device before upload, and are served
+  from a private bucket through short-lived links.
+- **No remote push.** A phone that opts in checks for new activity itself and shows a local notification with counts.
 
-Details: [docs/CRYPTO.md](docs/CRYPTO.md), [docs/THREAT_MODEL.md](docs/THREAT_MODEL.md), [docs/PRIVACY.md](docs/PRIVACY.md) (everything the server stores, and what it never collects), [docs/PLAN.md](docs/PLAN.md).
+Details: [docs/THREAT_MODEL.md](docs/THREAT_MODEL.md), [docs/PRIVACY.md](docs/PRIVACY.md) (everything the server
+stores, and what it never collects), [docs/PLAN.md](docs/PLAN.md), the API in [docs/api/openapi.yaml](docs/api/openapi.yaml).
 
 ## Repository layout
 
 | Folder | What | Tooling |
 |---|---|---|
-| `core/` | `circlo-core`, the Rust crypto core, exposed to the app via uniffi | Cargo |
-| `server/` | `circlo-server`, Spring Boot 3 / Java 21 API (ciphertext store and relay) | Maven |
-| `app/` | `@circlo/app`, the Expo / React Native app | npm |
+| `server/` | `circlo-server`, Spring Boot 4 / Java 21 API | Maven |
+| `app/` | `@circlo/app`, the Expo / React Native app for iOS, Android and the web | npm |
 | `infra/` | Local MinIO (Docker Compose) and the dev-up script | Docker |
-| `docs/` | Plan, crypto spec, threat model, dev setup, OpenAPI contract | |
+| `docs/` | Plan, threat model, privacy, hardening, dev setup, OpenAPI contract | |
 
 ## Running locally
 
@@ -37,6 +41,7 @@ cp infra/.env.example infra/.env          # fill in real local values
 cp server/.env.example server/.env        # fill in real local values
 make dev                                  # starts the database (existing install) + MinIO
 make test                                 # runs all test suites
+make web                                  # builds the web app into app/dist
 ```
 
 ## Security
@@ -46,8 +51,3 @@ Please report vulnerabilities privately. See [SECURITY.md](SECURITY.md).
 ## License
 
 See [LICENSE](LICENSE).
-
-
-## Roadmap
-
-Look at Phosphor to use in future

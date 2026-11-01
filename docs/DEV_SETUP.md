@@ -1,7 +1,7 @@
 # Circlo local development setup (Windows + Debian WSL2)
 
 **Windows is the main development platform.** The repo lives on the Windows filesystem
-(e.g. `C:\Users\<you>\code\circlo`) and Rust, Java/Maven and Node run natively on Windows.
+(e.g. `C:\Users\<you>\code\circlo`) and Java/Maven and Node run natively on Windows.
 Debian on WSL2 only hosts the **existing** MySQL/MariaDB and MinIO (Docker).
 
 ## 1. Windows toolchain
@@ -11,18 +11,14 @@ Debian on WSL2 only hosts the **existing** MySQL/MariaDB and MinIO (Docker).
 | Git + Git Bash, GitHub CLI | `winget install Git.Git GitHub.cli`, then `gh auth login` |
 | Java 21 + Maven | Temurin 21 (`winget install EclipseAdoptium.Temurin.21.JDK`), Maven 3.9+ |
 | Node 24 | `winget install OpenJS.NodeJS` |
-| Rust (MSVC) | Visual Studio Build Tools 2022 with "Desktop development with C++", then `winget install Rustlang.Rustup` |
 | Python + pre-commit | Python 3.12, `python -m pip install --user pre-commit`, then `python -m pre_commit install` in the repo |
-| Android (Phase 2+) | Android Studio (SDK + emulator + NDK), `cargo install cargo-ndk`, `rustup target add aarch64-linux-android armv7-linux-androideabi x86_64-linux-android` |
+| Android | Android Studio (SDK + emulator) |
 
 **Windows long paths (required for the Android build).** React Native's native build creates paths over 260
 characters. Once, in an **admin** PowerShell:
 ```powershell
 New-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\FileSystem" -Name LongPathsEnabled -Value 1 -PropertyType DWORD -Force
 ```
-The app pins CMake 4.1.2 (its ninja 1.12 understands long paths; `app/plugins/with-android-cmake.js`). Gradle does
-not download CMake by itself: install it with Android Studio's SDK Manager (SDK Tools → CMake 4.1.2) or unzip
-`https://dl.google.com/android/repository/cmake-4.1.2-windows.zip` into `%LOCALAPPDATA%\Android\Sdk\cmake.1.2`.
 A `subst` drive does **not** work around this (Node and Gradle resolve it back to the real path inconsistently).
 
 `make` is optional on Windows (`winget install ezwinports.make`); every Makefile target has a direct command
@@ -84,14 +80,14 @@ Both `.env` files are git-ignored. Never commit them.
 
 ## 6. Run
 
-The server calls the Rust core over JNI. Build it once (and after core changes), then generate local secrets:
+Generate the local JWT key once:
 ```bash
-cd core && cargo build --features jni-test-client --profile server   # → core/target/server/circlo_core.dll
-cd ../server && mvn -q -DskipTests compile
-java -cp target/classes com.circlo.server.tools.GenerateSecrets >> .env   # local-dev secrets only; never production
+cd server && mvn -q -DskipTests compile
+java -cp target/classes com.circlo.server.tools.GenerateSecrets >> .env   # local-dev secret only; never production
 ```
-Production builds the core with `--features jni` (no test client) and injects secrets from the secret store.
-
+In the `local` profile, **emails aren't sent**: the 6-digit signup and password-reset codes are printed in the server
+console (`[dev mail] ...`). To send real email, set `CIRCLO_MAIL_MODE=smtp` and the `CIRCLO_MAIL_*` SMTP settings in
+`server/.env`. Production always needs SMTP.
 
 ```powershell
 .\infra\dev-up.ps1                       # DB (existing) + MinIO + buckets; keeps WSL awake; prints URLs
@@ -110,8 +106,7 @@ cd server; mvn spring-boot:run "-Dspring-boot.run.profiles=local"
 
 ```powershell
 cd server; mvn verify                    # unit + integration (circlo_test DB, circlo-media-test bucket); needs dev-up
-cd core;   cargo fmt --check; cargo clippy --all-targets -- -D warnings; cargo test
-cd app;    npm run typecheck; npm run lint; npm test
+cd app;    npm run typecheck; npm run lint; npm test; npm run build:web
 python -m pre_commit run --all-files     # secret scan + hygiene hooks
 ```
 
@@ -121,19 +116,24 @@ python -m pre_commit run --all-files     # secret scan + hygiene hooks
 ```bash
 # Git Bash
 export ANDROID_HOME="$LOCALAPPDATA/Android/Sdk"
-export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/30.0.16248370"
-export PATH="$ANDROID_HOME/platform-tools:$USERPROFILE/.cargo/bin:$PATH"
-cd app/modules/circlo-core && npm run ubrn:android   # Rust core → libcirclo_core.so + TS bindings (first run is slow)
-cd ../.. && npx expo run:android                     # builds and installs the dev client on the running emulator
+export PATH="$ANDROID_HOME/platform-tools:$PATH"
+cd app && npx expo run:android                       # builds and installs the dev client on the running emulator
 npx expo start --dev-client                          # Metro; open the app on the emulator
 ```
-The crypto self-test is in the drawer ("Crypto self-test", dev builds only) or at `circlo://dev`.
+
+### Web app
+```bash
+cd app && npm run web                                # Expo dev server in the browser at http://localhost:8081
+npm run build:web                                    # static files in app/dist (deployed to app.hellocirclo.com)
+```
+The local server allows the browser origin `http://localhost:8081` (`CIRCLO_CORS_ORIGINS`). MinIO must allow it too
+for uploads and downloads from the browser: `mc admin config set local api cors_allow_origin="http://localhost:8081"`
+(in the minio container), then restart MinIO.
 
 
 - **Android:** emulator on Windows or a phone on the same Wi-Fi. API base URL `http://<LAN_IP>:8080` in `app/.env`
   (`EXPO_PUBLIC_API_URL`). Cleartext HTTP is allowed in dev builds only.
 - **iOS:** needs a Mac or EAS Build: `eas build --profile development --platform ios`, install on a physical iPhone.
-- The Rust core cross-compiles for Android on Windows with `cargo ndk`; the iOS framework builds in EAS or on a Mac.
 
 ## 9. GitHub required checks
 

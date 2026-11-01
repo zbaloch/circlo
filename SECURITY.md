@@ -1,6 +1,6 @@
 # Security policy
 
-Circlo is an end-to-end encrypted app, so security reports are very welcome.
+Security reports are very welcome.
 
 ## Reporting a vulnerability
 
@@ -8,7 +8,7 @@ Circlo is an end-to-end encrypted app, so security reports are very welcome.
 go to the **Security** tab of this repository and click **Report a vulnerability**.
 
 Include, if you can:
-- what is affected (`core/`, `server/`, `app/`, a spec in `docs/`)
+- what is affected (`server/`, `app/`, the web app, a doc in `docs/`)
 - steps to reproduce or a proof of concept
 - the impact you think it has
 
@@ -17,10 +17,12 @@ We are happy to credit you once a fix is released, unless you prefer to stay ano
 
 ## Scope
 
-In scope: the crypto design (`docs/CRYPTO.md`), the Rust core, the server API and the app.
-Especially interesting: anything that lets the server or a third party learn plaintext content, names,
-circle membership or keys, or lets a friend read posts addressed to a narrower circle than theirs.
+In scope: the server API, the iOS/Android apps and the web app (app.hellocirclo.com).
+Especially interesting: anything that lets someone see a post, reply, photo, message or profile they weren't
+shared with; learn which circle someone is in or who a post went to; find or contact people they aren't connected
+with; take over an account (login, codes, sessions, password reset); or read data in storage or logs that should
+not be there (see [docs/PRIVACY.md](docs/PRIVACY.md)).
 
 ## Status
 
-Circlo has **not** yet had an external cryptography audit. Do not rely on it for sensitive communication yet.
+Circlo has not launched yet and hasn't had an external penetration test.
