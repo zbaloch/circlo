@@ -38,10 +38,13 @@ public class SecurityConfig {
     static final String ISSUER = "circlo-server";
     static final String AUDIENCE = "circlo-app";
 
-    /** Public endpoints: signup, login, refresh, password reset, and the background check (its own token). */
+    /**
+     * Public endpoints: signup, login, refresh, password reset, unsubscribing from emails (a signed link), and the
+     * background check (its own token).
+     */
     static final String[] PUBLIC_POSTS = {
         "/v1/auth/signup", "/v1/auth/signup/resend", "/v1/auth/signup/verify", "/v1/auth/login", "/v1/auth/refresh",
-        "/v1/auth/password/forgot", "/v1/auth/password/reset",
+        "/v1/auth/password/forgot", "/v1/auth/password/reset", "/v1/email/unsubscribe",
     };
 
     @Bean
@@ -59,6 +62,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, PUBLIC_POSTS).permitAll()
                         // Background checks: authenticated by the device's check token instead (ActivityController).
                         .requestMatchers(HttpMethod.GET, "/v1/activity/pending").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/v1/email/unsubscribe").permitAll()
                         .requestMatchers("/dev/**").permitAll() // only exists in profile 'local'
                         .requestMatchers("/error").permitAll()
                         .anyRequest().authenticated())

@@ -52,3 +52,10 @@ export function dayLabel(ms: number, now = Date.now()): string {
   const sameYear = d.getFullYear() === new Date(now).getFullYear();
   return d.toLocaleDateString('en', { month: 'short', day: 'numeric', ...(sameYear ? {} : { year: 'numeric' }) });
 }
+
+/** "iPhone app", "Android app" or "Web browser"; older sign-ins didn't say. */
+export function deviceLabel(d: { kind: 'ios' | 'android' | 'web' | null; current: boolean }): string {
+  const kind = d.kind === 'ios' ? 'iPhone app' : d.kind === 'android' ? 'Android app' : d.kind === 'web' ? 'Web browser' : null;
+  if (d.current) return kind ? `This device · ${kind}` : 'This device';
+  return kind ?? 'Other device';
+}

@@ -18,7 +18,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.context.request.async.DeferredResult;
 
-/** Live updates for open apps (a long-held request), and this device's push token. */
+/** Live updates for open apps (a long-held request), what kind of app this device is, and its push token. */
 @RestController
 public class EventsController {
 
@@ -43,6 +43,21 @@ public class EventsController {
         return signals.await(TokenService.userOf(jwt), since, WAIT_MS);
     }
 
+    public record DeviceKind(@NotNull @Pattern(regexp = "ios|android|web") String kind) {}
+
+    /**
+     * Which kind of app this sign-in is: the iPhone or Android app, or a browser. Only this is recorded (no model, OS
+     * version or browser); it decides whether I'm told about activity by push or by email (see Notifier).
+     */
+    @PutMapping("/v1/devices/current")
+    public Map<String, String> describe(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody DeviceKind k) {
+        if (jdbc.update("UPDATE devices SET kind = ? WHERE id = ? AND user_id = ? AND revoked_at IS NULL", k.kind(),
+                Ids.bytes(TokenService.deviceOf(jwt)), Ids.bytes(TokenService.userOf(jwt))) != 1) {
+            throw ApiException.notFound();
+        }
+        return Map.of("status", "ok");
+    }
+
     public record PushToken(@NotNull @Pattern(regexp = "[A-Za-z0-9_:.-]{1,400}") String token,
             @NotNull @Pattern(regexp = "apns|apns_sandbox|fcm") String service) {}
 
@@ -50,8 +65,9 @@ public class EventsController {
     @PutMapping("/v1/devices/current/push-token")
     public Map<String, String> register(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody PushToken p) {
         byte[] device = Ids.bytes(TokenService.deviceOf(jwt));
-        if (jdbc.update("UPDATE devices SET push_token_enc = ?, push_service = ? WHERE id = ? AND user_id = ? AND revoked_at IS NULL",
-                tokens.seal(device, p.token()), p.service(), device, Ids.bytes(TokenService.userOf(jwt))) != 1) {
+        String kind = p.service().equals("fcm") ? "android" : "ios";
+        if (jdbc.update("UPDATE devices SET push_token_enc = ?, push_service = ?, push_lost = FALSE, kind = ? WHERE id = ? AND user_id = ? AND revoked_at IS NULL",
+                tokens.seal(device, p.token()), p.service(), kind, device, Ids.bytes(TokenService.userOf(jwt))) != 1) {
             throw ApiException.notFound();
         }
         return Map.of("status", "registered");

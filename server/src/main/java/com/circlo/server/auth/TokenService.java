@@ -12,6 +12,7 @@ import java.util.Base64;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
 import org.springframework.security.oauth2.jwt.JwsHeader;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -136,6 +137,22 @@ public class TokenService {
             jdbc.update("UPDATE refresh_tokens SET revoked_at = ? WHERE device_id = ? AND revoked_at IS NULL", now, Ids.bytes(deviceId));
         }
         return n == 1;
+    }
+
+    /**
+     * Marks devices signed out once their session has lapsed (no refresh token left that is unexpired and unrevoked):
+     * an app deleted or a browser left alone for longer than the refresh lifetime. They no longer count as signed in,
+     * e.g. for deciding between push and email.
+     */
+    @Scheduled(fixedDelay = 3_600_000, initialDelay = 300_000)
+    @Transactional
+    public int sweepLapsed() {
+        Instant now = clock.instant();
+        return jdbc.update("""
+                UPDATE devices d SET d.revoked_at = ?, d.check_token_hash = NULL, d.push_token_enc = NULL, d.push_service = NULL
+                WHERE d.revoked_at IS NULL AND d.created_at < ?
+                  AND NOT EXISTS (SELECT 1 FROM refresh_tokens t WHERE t.device_id = d.id AND t.revoked_at IS NULL AND t.expires_at > ?)""",
+                Timestamp.from(now), Timestamp.from(now.minusSeconds(60)), Timestamp.from(now));
     }
 
     public static UUID userOf(Jwt jwt) {

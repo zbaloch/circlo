@@ -59,8 +59,9 @@ public class AccountController {
 
     // ---------- profile ----------
 
-    /** `name` is null until I set one. */
-    public record Me(UUID userId, String name, String username, String email, String bio, String avatarUrl, Instant createdAt) {}
+    /** `name` is null until I set one. `emailNotifications`: emails about activity when I'm not using the phone app. */
+    public record Me(UUID userId, String name, String username, String email, String bio, String avatarUrl, Instant createdAt,
+            boolean emailNotifications) {}
 
     @GetMapping("/v1/me")
     public Me me(@AuthenticationPrincipal Jwt jwt) {
@@ -68,9 +69,9 @@ public class AccountController {
     }
 
     private Me load(byte[] me) {
-        return jdbc.query("SELECT id, name, username, email, bio, avatar_key, created_at FROM users WHERE id = ? AND status = 'active'",
+        return jdbc.query("SELECT id, name, username, email, bio, avatar_key, created_at, email_notifications FROM users WHERE id = ? AND status = 'active'",
                         (rs, i) -> new Me(Ids.uuid(rs.getBytes(1)), rs.getString(2), rs.getString(3), rs.getString(4), rs.getString(5),
-                                signer.url(rs.getString(6)), rs.getTimestamp(7).toInstant()),
+                                signer.url(rs.getString(6)), rs.getTimestamp(7).toInstant(), rs.getBoolean(8)),
                         (Object) me)
                 .stream().findFirst().orElseThrow(ApiException::unauthorized);
     }
@@ -81,6 +82,20 @@ public class AccountController {
     public Me editProfile(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody ProfileEdit r) {
         byte[] me = userId(jwt);
         jdbc.update("UPDATE users SET name = ?, bio = ? WHERE id = ?", Accounts.optionalName(r.name()), Accounts.bio(r.bio()), me);
+        return load(me);
+    }
+
+    public record NotificationSettings(@NotNull Boolean email) {}
+
+    /** Turns emails about activity on or off (they're only sent while I'm not signed in to the phone app). */
+    @PutMapping("/v1/me/notifications")
+    @Transactional
+    public Me notificationSettings(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody NotificationSettings r) {
+        byte[] me = userId(jwt);
+        jdbc.update("UPDATE users SET email_notifications = ? WHERE id = ?", r.email(), me);
+        if (!r.email()) {
+            jdbc.update("DELETE FROM email_digests WHERE user_id = ?", (Object) me);
+        }
         return load(me);
     }
 
@@ -111,14 +126,16 @@ public class AccountController {
 
     // ---------- devices and sign-ins ----------
 
-    public record DeviceView(UUID deviceId, Instant createdAt, boolean current) {}
+    /** `kind`: ios, android or web; null for a sign-in from before this was recorded. */
+    public record DeviceView(UUID deviceId, Instant createdAt, boolean current, String kind) {}
 
     /** The devices and browsers signed in to my account, oldest first. */
     @GetMapping("/v1/devices")
     public List<DeviceView> devices(@AuthenticationPrincipal Jwt jwt) {
         UUID current = TokenService.deviceOf(jwt);
-        return jdbc.query("SELECT id, created_at FROM devices WHERE user_id = ? AND revoked_at IS NULL ORDER BY created_at",
-                (rs, i) -> new DeviceView(Ids.uuid(rs.getBytes(1)), rs.getTimestamp(2).toInstant(), Ids.uuid(rs.getBytes(1)).equals(current)),
+        return jdbc.query("SELECT id, created_at, kind FROM devices WHERE user_id = ? AND revoked_at IS NULL ORDER BY created_at",
+                (rs, i) -> new DeviceView(Ids.uuid(rs.getBytes(1)), rs.getTimestamp(2).toInstant(), Ids.uuid(rs.getBytes(1)).equals(current),
+                        rs.getString(3)),
                 (Object) userId(jwt));
     }
 

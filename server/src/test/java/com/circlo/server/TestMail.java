@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.circlo.server.mail.EmailSender;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.springframework.boot.test.context.TestConfiguration;
@@ -15,16 +16,16 @@ import org.springframework.context.annotation.Primary;
 @TestConfiguration
 public class TestMail {
 
-    public record Sent(String to, String subject, String body) {}
+    public record Sent(String to, String subject, String body, Map<String, String> headers) {}
 
     private final List<Sent> sent = new ArrayList<>();
 
     @Bean
     @Primary
     EmailSender capturingEmailSender() {
-        return (to, subject, body) -> {
+        return (to, subject, body, headers) -> {
             synchronized (sent) {
-                sent.add(new Sent(to, subject, body));
+                sent.add(new Sent(to, subject, body, headers));
             }
         };
     }

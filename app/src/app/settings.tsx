@@ -11,6 +11,7 @@ import { LINKS, openLink } from '@/lib/links';
 import { useIntegrityWarning } from '@/lib/device-integrity';
 import { CHAT_ENABLED } from '@/lib/features';
 import { backgroundChecksOn, disableBackgroundChecks, enableBackgroundChecks, notificationPermission, usesPush } from '@/lib/background-check';
+import { refreshMe, setEmailNotifications, useMe } from '@/lib/me';
 import { deleteAccount, exportMyData } from '@/lib/safety';
 import { useSession } from '@/lib/session';
 import { usePalette } from '@/theme/use-palette';
@@ -25,6 +26,7 @@ export default function SettingsScreen() {
   const integrity = useIntegrityWarning();
   const [error, setError] = useState<string>();
   const blocked = useBlockedPeople();
+  const me = useMe();
   const [exporting, setExporting] = useState(false);
   const [confirm, setConfirm] = useState('');
   const [deleting, setDeleting] = useState(false);
@@ -39,6 +41,7 @@ export default function SettingsScreen() {
     useCallback(() => {
       refreshBlocked().catch((e) => setError(describeError(e)));
       loadChecks().catch(() => {});
+      refreshMe().catch(() => {});
     }, [loadChecks]),
   );
 
@@ -78,9 +81,9 @@ export default function SettingsScreen() {
 
   return (
     <ScrollView className="flex-1 bg-surface dark:bg-surface-dark" contentContainerClassName="pb-10" keyboardShouldPersistTaps="handled">
-      {/* Browsers get no background checks: the web app's Notifications tab updates while it's open. */}
-      {Platform.OS !== 'web' ? (
       <Section title="Notifications">
+        {/* Browsers get no background checks: the web app's Notifications tab updates while it's open. */}
+        {Platform.OS !== 'web' ? (
         <Row
           title={CHECKS_TITLE}
           subtitle={checks === 'blocked' ? `Notifications are blocked in your phone’s settings. ${CHECKS_NOTE}` : CHECKS_NOTE}>
@@ -101,8 +104,24 @@ export default function SettingsScreen() {
             />
           )}
         </Row>
+        ) : null}
+        <Row title={EMAIL_TITLE} subtitle={Platform.OS === 'web' ? EMAIL_NOTE_WEB : EMAIL_NOTE_APP}>
+          {me ? (
+            <Toggle
+              accessibilityLabel={EMAIL_TITLE}
+              value={me.emailNotifications}
+              onValueChange={async (on) => {
+                setError(undefined);
+                try {
+                  await setEmailNotifications(on);
+                } catch (e) {
+                  setError(describeError(e));
+                }
+              }}
+            />
+          ) : null}
+        </Row>
       </Section>
-      ) : null}
 
       <Section title="Password">
         <Pressable
@@ -180,6 +199,11 @@ const CHECKS_TITLE = usesPush ? (CHAT_ENABLED ? 'Notifications for replies, mess
 const CHECKS_NOTE = usesPush
   ? `${CHAT_ENABLED ? 'Replies, messages and friend requests' : 'Replies and friend requests'}, as they happen. Notifications only say “New reply” or “New friend request”: names and words stay in Circlo.`
   : 'Your phone asks Circlo now and then and shows how many new things there are. Nothing goes through Apple or Google. Your phone decides when to check, so it can take a while.';
+
+const EMAIL_TITLE = 'Email me when I’m not using the app';
+const EMAIL_WHAT = CHAT_ENABLED ? 'new replies, messages and friend requests' : 'new replies and friend requests';
+const EMAIL_NOTE_WEB = `Without the Circlo app on a phone, we email you about ${EMAIL_WHAT}, gathered into one short email. With the app, you’re told on your phone instead and get no emails.`;
+const EMAIL_NOTE_APP = `Only while you’re not signed in to the Circlo app on a phone. While you are, you’re told here instead and get no emails.`;
 
 /** A settings group: small heading, rows separated by a hairline (X style). */
 function Section({ title, children }: { title: string; children: ReactNode }) {

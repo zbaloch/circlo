@@ -38,6 +38,13 @@ export async function saveProfile(name: string, bio: string): Promise<Me> {
   return fresh;
 }
 
+/** Emails about activity, sent only while I'm not signed in to the phone app. */
+export async function setEmailNotifications(on: boolean): Promise<Me> {
+  const fresh = ok(await api.PUT('/v1/me/notifications', { body: { email: on } }));
+  setMe(fresh);
+  return fresh;
+}
+
 export function useMe(): Me | null {
   return useSyncExternalStore(
     (l) => {

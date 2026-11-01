@@ -509,6 +509,7 @@ See docs/HARDENING.md for how to repeat each check.
 | 2026-11-01 | Chats stored on the server with per-person read state; a sender can delete a message for everyone | Same chats on every device and on the web |
 | 2026-11-01 | Web app = Expo static web export at app.hellocirclo.com; session refresh token in localStorage there | One codebase; accepted XSS risk documented in THREAT_MODEL.md |
 | 2026-11-01 | Still invite-only (no username search) | "Rest of the flow stays the same"; search can be added later if wanted |
+| 2026-11-01 | **One channel per person for activity** (owner): signed in to the phone app → push only (even with the web signed in; a phone with notifications off still counts, no email); no app → one email gathering replies, messages and requests, 15 min after the first, with a link to the web app and one-click unsubscribe. Devices record their kind (`ios`/`android`/`web`, V22), which the owner confirmed isn't tracking: it's the minimum needed to pick a channel. Lapsed sessions (refresh token expired) are signed out hourly, and a push token Apple/Google call dead stops the phone counting as an app until it registers again | People without the app still hear about replies; people with it never get both |
 
 ## Waiting on owner
 
