@@ -30,7 +30,7 @@ import org.springframework.stereotype.Component;
  * TestFlight and App Store builds use the production service (apns), development builds the sandbox (apns_sandbox).
  */
 @Component
-public class ApnsSender implements PushSender {
+public class ApnsSender implements PushService {
 
     static final Pattern TOKEN = Pattern.compile("[0-9a-fA-F]{32,200}");
     private static final Duration JWT_TTL = Duration.ofMinutes(40);
@@ -57,6 +57,11 @@ public class ApnsSender implements PushSender {
     }
 
     @Override
+    public boolean handles(String service) {
+        return "apns".equals(service) || "apns_sandbox".equals(service);
+    }
+
+    @Override
     public boolean enabled() {
         return key != null;
     }
@@ -77,17 +82,28 @@ public class ApnsSender implements PushSender {
         return jwt;
     }
 
-    /** The JSON body: a fixed alert, the default sound, and the routing ids at the top level. */
-    static String payload(Message m) {
-        StringBuilder b = new StringBuilder("{\"aps\":{\"alert\":{\"title\":\"Circlo\",\"body\":").append(quote(m.alert()))
-                .append("},\"sound\":\"default\",\"thread-id\":").append(quote(m.data().getOrDefault("type", "circlo"))).append('}');
-        for (Map.Entry<String, String> e : new TreeMap<>(m.data()).entrySet()) {
-            b.append(',').append(quote(e.getKey())).append(':').append(quote(e.getValue()));
+    /**
+     * The JSON body: a fixed alert, the default sound, and the routing ids under "body" (where expo-notifications hands
+     * a remote push's data to the app on both platforms).
+     */
+    static String payload(PushSender.Message m) {
+        return "{\"aps\":{\"alert\":{\"title\":\"Circlo\",\"body\":" + quote(m.alert()) + "},\"sound\":\"default\",\"thread-id\":"
+                + quote(m.data().getOrDefault("type", "circlo")) + "},\"body\":" + object(m.data()) + "}";
+    }
+
+    /** A flat JSON object of strings, keys sorted. */
+    static String object(Map<String, String> data) {
+        StringBuilder b = new StringBuilder("{");
+        for (Map.Entry<String, String> e : new TreeMap<>(data).entrySet()) {
+            if (b.length() > 1) {
+                b.append(',');
+            }
+            b.append(quote(e.getKey())).append(':').append(quote(e.getValue()));
         }
         return b.append('}').toString();
     }
 
-    private static String quote(String s) {
+    static String quote(String s) {
         StringBuilder b = new StringBuilder("\"");
         for (char c : s.toCharArray()) {
             if (c == '"' || c == '\\') {
@@ -102,9 +118,9 @@ public class ApnsSender implements PushSender {
     }
 
     @Override
-    public Result send(String service, String token, Message m) {
+    public PushSender.Result send(String service, String token, PushSender.Message m) {
         if (!enabled() || !TOKEN.matcher(token).matches()) {
-            return Result.UNREGISTERED;
+            return PushSender.Result.UNREGISTERED;
         }
         String host = "apns_sandbox".equals(service) ? "api.sandbox.push.apple.com" : "api.push.apple.com";
         HttpRequest req = HttpRequest.newBuilder(URI.create("https://" + host + "/3/device/" + token))
@@ -118,17 +134,17 @@ public class ApnsSender implements PushSender {
         try {
             HttpResponse<String> res = http.send(req, HttpResponse.BodyHandlers.ofString());
             if (res.statusCode() == 200) {
-                return Result.SENT;
+                return PushSender.Result.SENT;
             }
             if (res.statusCode() == 410 || res.body().contains("BadDeviceToken") || res.body().contains("DeviceTokenNotForTopic")) {
-                return Result.UNREGISTERED;
+                return PushSender.Result.UNREGISTERED;
             }
-            return Result.FAILED;
+            return PushSender.Result.FAILED;
         } catch (IOException e) {
-            return Result.FAILED;
+            return PushSender.Result.FAILED;
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            return Result.FAILED;
+            return PushSender.Result.FAILED;
         }
     }
 }

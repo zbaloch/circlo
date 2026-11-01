@@ -17,7 +17,7 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 
 /**
  * Tells people something happened for them, once the change is committed: their open apps wake up (live signal), and
- * for replies, messages and friend requests their phones get a content-free push. Someone I blocked never makes my
+ * for replies, messages and friend requests their phones (iPhone via APNs, Android via FCM) get a content-free push. Someone I blocked never makes my
  * phone buzz. Pushes go out on background threads so a slow Apple never slows a request.
  */
 @Component

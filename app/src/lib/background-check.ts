@@ -1,9 +1,10 @@
 /**
- * Notifications. iPhone (owner decision 2026-11-01): real-time, content-free remote push. The server tells Apple only
- * "New reply", "New message" or "New friend request" plus random ids, so a tap opens the right screen (lib/push-route);
- * names and words stay in Circlo. Android has no remote push yet: a phone that opts in checks in the background now
- * and then (about every 15 minutes at best) and shows a local notification with counts only, using this device's check
- * token, which can read nothing but those counts. The web app uses background-check.web.ts (nothing in browsers).
+ * Notifications (owner decision 2026-11-01): real-time, content-free remote push on iPhone (APNs) and Android (FCM).
+ * The server tells Apple or Google only "New reply", "New message" or "New friend request" plus random ids, so a tap
+ * opens the right screen (lib/push-route); names and words stay in Circlo. An Android build without FCM
+ * (no google-services.json) falls back to background checks: now and then (about every 15 minutes at best) the phone
+ * asks for counts with this device's check token, which can read nothing else, and shows a local notification. The
+ * web app uses background-check.web.ts (nothing in browsers).
  */
 import * as BackgroundTask from 'expo-background-task';
 import Constants from 'expo-constants';
@@ -14,6 +15,7 @@ import { Linking, Platform } from 'react-native';
 
 import { api, API_URL, ok } from '@/api/client';
 
+import { pushServiceFor } from './push-route';
 import { deleteItem, getItem, setItem } from './storage';
 
 export const CHECK_TASK = 'circlo.activity-check';
@@ -23,13 +25,16 @@ const SINCE_KEY = 'circlo.check-since';
 const PROMPT_DISMISSED = 'circlo.notifications-prompt-dismissed';
 const PUSH_ON = 'circlo.push-on';
 
-/** iPhones get remote push; Android uses background checks until it has FCM. */
-export const usesPush = Platform.OS === 'ios';
+/** Remote push on iPhone, and on Android builds made with FCM; otherwise background checks. */
+export const usesPush = Platform.OS === 'ios' || (Platform.OS === 'android' && Constants.expoConfig?.extra?.androidPush === true);
+
 
 /** Sends this phone's push token to the server (tokens can change, so this runs on every launch while push is on). */
 async function registerPush(): Promise<void> {
+  // Android shows pushes on the "activity" channel the server names; it must exist first.
+  if (Platform.OS === 'android') await Notifications.setNotificationChannelAsync(CHANNEL, { name: 'New activity', importance: AndroidImportance.HIGH });
   const token = await Notifications.getDevicePushTokenAsync();
-  const service = Constants.expoConfig?.extra?.pushService === 'apns_sandbox' ? 'apns_sandbox' : 'apns';
+  const service = pushServiceFor(Platform.OS, Constants.expoConfig?.extra);
   ok(await api.PUT('/v1/devices/current/push-token', { body: { token: String(token.data), service } }));
 }
 

@@ -43,8 +43,8 @@ public class EventsController {
         return signals.await(TokenService.userOf(jwt), since, WAIT_MS);
     }
 
-    public record PushToken(@NotNull @Pattern(regexp = "[A-Za-z0-9_:.-]{1,200}") String token,
-            @NotNull @Pattern(regexp = "apns|apns_sandbox") String service) {}
+    public record PushToken(@NotNull @Pattern(regexp = "[A-Za-z0-9_:.-]{1,400}") String token,
+            @NotNull @Pattern(regexp = "apns|apns_sandbox|fcm") String service) {}
 
     /** Registers (or replaces) this device's push token. Signing out or revoking the device forgets it. */
     @PutMapping("/v1/devices/current/push-token")

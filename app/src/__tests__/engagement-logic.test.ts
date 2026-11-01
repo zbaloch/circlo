@@ -1,7 +1,7 @@
 import { activityHref, activityVerb } from '@/app/(drawer)/(tabs)/notifications';
 import type { ActivityItem } from '@/lib/activity';
 import { isChange } from '@/lib/live';
-import { pushRoute } from '@/lib/push-route';
+import { pushRoute, pushServiceFor } from '@/lib/push-route';
 import { reportBody } from '@/lib/report';
 import { fromReplyRow, toggledReplyLike } from '@/lib/thread';
 
@@ -19,7 +19,7 @@ const C = '33333333-3333-4333-8333-333333333333';
 describe('tapping a push', () => {
   it('opens the reply, the chat or the requests', () => {
     expect(pushRoute({ type: 'reply', postId: P, replyId: R })).toEqual({ pathname: '/post/[id]', params: { id: P, reply: R } });
-    expect(pushRoute({ type: 'message', chatId: C })).toEqual({ pathname: '/chat/[id]', params: { id: C } });
+    expect(pushRoute({ type: 'message', chatId: C }, true)).toEqual({ pathname: '/chat/[id]', params: { id: C } });
     expect(pushRoute({ type: 'request' })).toEqual({ pathname: '/search', params: { section: 'friends' } });
   });
 
@@ -27,7 +27,12 @@ describe('tapping a push', () => {
     expect(pushRoute({})).toBe('/notifications');
     expect(pushRoute(null)).toBe('/notifications');
     expect(pushRoute({ type: 'reply', postId: '../settings', replyId: R })).toBe('/notifications');
-    expect(pushRoute({ type: 'message', chatId: 42 })).toBe('/notifications');
+    expect(pushRoute({ type: 'message', chatId: 42 }, true)).toBe('/notifications');
+  });
+
+  it('never opens a chat while chat is hidden', () => {
+    expect(pushRoute({ type: 'message', chatId: C }, false)).toBe('/notifications');
+    expect(pushRoute({ type: 'message', chatId: C })).toBe('/notifications');
   });
 });
 
@@ -71,5 +76,14 @@ describe('reply likes', () => {
 
   it('replies can be reported', () => {
     expect(reportBody('reply', R, 'harassment', '')).toEqual({ kind: 'reply', targetId: R, reason: 'harassment' });
+  });
+});
+
+describe('push service per platform', () => {
+  it('Android tokens are FCM; iPhone tokens follow the build', () => {
+    expect(pushServiceFor('android', { pushService: 'apns' })).toBe('fcm');
+    expect(pushServiceFor('ios', { pushService: 'apns_sandbox' })).toBe('apns_sandbox');
+    expect(pushServiceFor('ios', { pushService: 'apns' })).toBe('apns');
+    expect(pushServiceFor('ios', undefined)).toBe('apns');
   });
 });

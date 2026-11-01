@@ -15,8 +15,9 @@ CREATE INDEX ix_post_replies_author ON post_replies (author_id, created_at);
 -- Replies can be reported like posts and messages.
 ALTER TABLE reports MODIFY target_kind ENUM('post', 'user', 'message', 'reply') NOT NULL;
 
--- Remote push is back (owner decision 2026-11-01, reverses 2026-10-30), content-free: a push says only "New reply",
--- "New message" or "New friend request" plus random ids for opening the right screen. The device's push token is
--- sealed (AES-GCM, key derived from the server secret) and cleared when the device signs out or is revoked.
+-- Remote push is back on iPhone (APNs) and Android (FCM) (owner decision 2026-11-01, reverses 2026-10-30), content-free:
+-- a push says only "New reply", "New message" or "New friend request" plus random ids for opening the right screen. The
+-- device's push token is sealed (AES-GCM, key derived from the server secret) and cleared when the device signs out or
+-- is revoked.
 ALTER TABLE devices ADD COLUMN push_token_enc VARBINARY(512) NULL;
-ALTER TABLE devices ADD COLUMN push_service ENUM('apns', 'apns_sandbox') NULL;
+ALTER TABLE devices ADD COLUMN push_service ENUM('apns', 'apns_sandbox', 'fcm') NULL;

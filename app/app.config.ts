@@ -1,8 +1,11 @@
 import type { ExpoConfig } from 'expo/config';
 
 // Names and identifiers follow docs/PLAN.md section 0A. Secrets never go here: signing keys come from EAS credentials or
-// the release workflow's secrets. Push on iPhone is content-free and sent by Circlo's server straight to Apple; the APNs
-// key lives only on the server (CIRCLO_APNS_*). Android has no remote push yet, so no google-services.json.
+// the release workflow's secrets. Push is content-free and sent by Circlo's server straight to Apple (APNs) and Google
+// (FCM); their keys live only on the server (CIRCLO_APNS_*, CIRCLO_FCM_*). Android builds need the Firebase project's
+// google-services.json for FCM: the release workflow writes it from a secret and passes its path in
+// GOOGLE_SERVICES_FILE. It is git-ignored and never committed. Without it, Android uses background checks instead.
+const googleServicesFile = process.env.GOOGLE_SERVICES_FILE;
 // Development builds talk to the local server over plain HTTP (LAN / emulator). Release builds are HTTPS-only.
 const isDev = process.env.APP_VARIANT !== 'production';
 // Release builds pin the API host's keys; host and pins come from EAS environment variables (plugins/pinning.js).
@@ -48,6 +51,7 @@ const config: ExpoConfig = {
       monochromeImage: './assets/images/adaptive-icon-monochrome.png',
     },
     predictiveBackGestureEnabled: false,
+    ...(googleServicesFile ? { googleServicesFile } : {}),
     // Invite links open the app (www.hellocirclo.com serves the matching assetlinks.json).
     intentFilters: [
       {
@@ -68,8 +72,9 @@ const config: ExpoConfig = {
     themeColor: colors.brand.accent,
     backgroundColor: colors.brand.background,
   },
-  // Which Apple push service this build's tokens belong to (it must match the aps-environment entitlement above).
-  extra: { pushService: isDev ? 'apns_sandbox' : 'apns' },
+  // Which Apple push service this build's tokens belong to (it must match the aps-environment entitlement below), and
+  // whether this Android build can receive FCM pushes.
+  extra: { pushService: isDev ? 'apns_sandbox' : 'apns', androidPush: !!googleServicesFile },
   plugins: [
     'expo-router',
     // No install attribution, advertising ids or tracking on either platform.
@@ -87,8 +92,8 @@ const config: ExpoConfig = {
       },
     ],
     ['expo-video', { supportsPictureInPicture: false, supportsBackgroundPlayback: false }],
-    // iPhone: content-free remote push (lib/background-check); TestFlight and App Store builds use Apple's production
-    // service, development builds the sandbox. Android: local notifications from background checks (no FCM yet).
+    // Content-free remote push on both platforms (lib/background-check). iPhone: TestFlight and App Store builds use
+    // Apple's production service, development builds the sandbox. Android: FCM when built with google-services.json.
     [
       'expo-notifications',
       { icon: './assets/images/notification-icon.png', color: colors.brand.accent, enableRemoteNotifications: true, mode: isDev ? 'development' : 'production' },

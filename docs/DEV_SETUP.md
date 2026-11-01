@@ -135,10 +135,13 @@ for uploads and downloads from the browser: `mc admin config set local api cors_
   (`EXPO_PUBLIC_API_URL`). Cleartext HTTP is allowed in dev builds only.
 - **iOS:** needs a Mac or EAS Build: `eas build --profile development --platform ios`, install on a physical iPhone.
 
-## 8A. Push notifications (iPhone)
+## 8A. Push notifications (iPhone and Android)
 
 Pushes are content-free ("New reply", "New message", "New friend request" plus random ids for opening the right
-screen) and go from the server straight to Apple; no Expo or other push service in between.
+screen) and go from the server straight to Apple (APNs) and Google (FCM); no Expo or other push service in between.
+Both platforms get the same pushes and taps open the same screens.
+
+### iPhone (APNs)
 
 1. **Apple key (once):** developer.apple.com → Certificates, IDs & Profiles → **Keys** → **+** → tick **Apple Push
    Notifications service (APNs)** → download `AuthKey_<KEYID>.p8` (only downloadable once; keep it in a password manager,
@@ -160,7 +163,22 @@ screen) and go from the server straight to Apple; no Expo or other push service 
    friend request. Each arrives within seconds as "Circlo · New reply" etc.; tapping opens that reply, chat or the
    requests. Block B on A: B's messages no longer buzz A. Sign out on A: nothing more arrives there.
 
-Android still uses background checks (counts only, every ~15 minutes); remote push there needs a Firebase project.
+### Android (FCM)
+
+1. **Firebase project (once):** console.firebase.google.com → **Add project** (Analytics off) → **Add app** → Android,
+   package `com.circlo.app` → download **google-services.json** (identifies the app to FCM; keep it out of the repo,
+   it's git-ignored).
+2. **Build secret:** GitHub → Settings → Environments → `release` → add secret **GOOGLE_SERVICES_JSON_BASE64** with the
+   output of `base64 -w0 google-services.json`. The release workflow writes it to a temp file and passes its path to
+   `app.config.ts` (`GOOGLE_SERVICES_FILE`). Without it Android builds fall back to background checks.
+3. **Server key:** Firebase → Project settings → **Service accounts** → **Generate new private key** (a JSON file; treat
+   it like a password). On the server:
+   ```
+   CIRCLO_FCM_SERVICE_ACCOUNT=<output of: base64 -w0 <that file>.json>
+   ```
+   and restart. Firebase Cloud Messaging API (V1) must be enabled (it is by default for new projects).
+4. **Test** on a real Android phone with a release build, the same way as on iPhone above; Android 13+ asks for the
+   notification permission on Circlo's prompt.
 
 ## 9. GitHub required checks
 
