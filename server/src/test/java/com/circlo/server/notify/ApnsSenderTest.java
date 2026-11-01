@@ -58,8 +58,9 @@ class ApnsSenderTest {
     @Test
     void payloadIsAFixedAlertAndRoutingIdsOnly() {
         String json = ApnsSender.payload(new PushSender.Message("New reply", Map.of("type", "reply", "postId", "p-1", "replyId", "r-2")));
+        // Routing ids go under "body": that's where expo-notifications hands a remote push's data to the app.
         assertThat(json).isEqualTo("{\"aps\":{\"alert\":{\"title\":\"Circlo\",\"body\":\"New reply\"},\"sound\":\"default\",\"thread-id\":\"reply\"},"
-                + "\"postId\":\"p-1\",\"replyId\":\"r-2\",\"type\":\"reply\"}");
+                + "\"body\":{\"postId\":\"p-1\",\"replyId\":\"r-2\",\"type\":\"reply\"}}");
         assertThat(ApnsSender.payload(new PushSender.Message("a\"b\\c\n", Map.of()))).contains("\"body\":\"a\\\"b\\\\c\\u000a\"");
     }
 

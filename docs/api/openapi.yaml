@@ -239,7 +239,7 @@ paths:
               required: [token, service]
               properties:
                 token: { type: string }
-                service: { type: string, enum: [apns, apns_sandbox] }
+                service: { type: string, enum: [apns, apns_sandbox, fcm] }
       responses:
         "200": { $ref: "#/components/responses/Status" }
         "400": { $ref: "#/components/responses/Error" }

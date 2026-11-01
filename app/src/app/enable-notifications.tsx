@@ -7,6 +7,7 @@ import { CircloSymbol } from '@/components/circlo-mark';
 import { Button } from '@/components/form';
 import { Icon } from '@/components/ui/icon';
 import { Text } from '@/components/ui/text';
+import { CHAT_ENABLED } from '@/lib/features';
 import { dismissNotificationsPrompt, enableBackgroundChecks, usesPush } from '@/lib/background-check';
 import { useSession } from '@/lib/session';
 import { usePalette } from '@/theme/use-palette';
@@ -14,7 +15,7 @@ import { usePalette } from '@/theme/use-palette';
 /**
  * Asks about notifications before the system popup, which iOS and Android show only once: the popup follows only a
  * "yes" here, and "Not now" leaves it unused so the user can still turn them on later from Settings. A "yes" turns on
- * content-free push on iPhone, and background checks on Android (lib/background-check).
+ * content-free push (iPhone and Android; background checks on an Android build without FCM; lib/background-check).
  */
 export default function EnableNotificationsScreen() {
   const session = useSession();
@@ -43,7 +44,7 @@ export default function EnableNotificationsScreen() {
           <Text className="text-center text-3xl font-extrabold text-ink dark:text-ink-dark">Know when something’s new</Text>
           <Text className="text-center text-base text-muted dark:text-muted-dark">
             {usesPush
-              ? 'Get a notification as soon as someone replies to you, sends you a message or asks to connect.'
+              ? `Get a notification as soon as someone replies to you${CHAT_ENABLED ? ', sends you a message' : ''} or asks to connect.`
               : 'Circlo can check for new replies, likes, messages and requests now and then, and let you know.'}
           </Text>
         </View>
@@ -51,7 +52,7 @@ export default function EnableNotificationsScreen() {
           <Icon name="lock-closed-outline" size={20} color={palette.primary} />
           <Text className="flex-1 text-sm text-muted dark:text-muted-dark">
             {usesPush
-              ? 'Notifications only say “New reply”, “New message” or “New friend request”. Names and words never leave Circlo; you see them when you open it.'
+              ? 'Notifications only say “New reply” or “New friend request”. Names and words never leave Circlo; you see them when you open it.'
               : 'Nothing goes through Apple or Google: your phone checks Circlo itself, and the notification only says how many new things there are. Your phone decides when to check, so it can take a while; Circlo is always up to date when you open it.'}
           </Text>
         </View>

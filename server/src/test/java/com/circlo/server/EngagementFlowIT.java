@@ -95,6 +95,10 @@ class EngagementFlowIT extends IntegrationTest {
         assertThat(a.status("PUT", "/v1/devices/current/push-token", Map.of("token", "tok-a", "service", "apns"))).isEqualTo(200);
         assertThat(b.status("PUT", "/v1/devices/current/push-token", Map.of("token", "tok-b", "service", "apns_sandbox"))).isEqualTo(200);
         assertThat(a.status("PUT", "/v1/devices/current/push-token", Map.of("token", "x", "service", "carrier-pigeon"))).isEqualTo(400);
+        // An Android phone of A's: same pushes, through FCM.
+        Map<String, Object> phone = a.loginAgain();
+        assertThat(call("PUT", "/v1/devices/current/push-token", Map.of("token", "fcm-tok-a", "service", "fcm"), (String) phone.get("accessToken"))
+                .getStatusCode().value()).isEqualTo(200);
 
         String post = a.post("tell me", "everyone", List.of());
         String reply = (String) b.call("POST", "/v1/posts/" + post + "/replies", Map.of("text", "secret words")).getBody().get("replyId");
@@ -103,6 +107,11 @@ class EngagementFlowIT extends IntegrationTest {
         assertThat(toA.get(0).alert()).isEqualTo("New reply");
         assertThat(toA.get(0).service()).isEqualTo("apns");
         assertThat(toA.get(0).data()).isEqualTo(Map.of("type", "reply", "postId", post, "replyId", reply));
+        List<TestPush.Sent> toAndroid = push.await("fcm-tok-a", 1);
+        assertThat(toAndroid).hasSize(1);
+        assertThat(toAndroid.get(0).service()).isEqualTo("fcm");
+        assertThat(toAndroid.get(0).alert()).isEqualTo("New reply");
+        assertThat(toAndroid.get(0).data()).isEqualTo(toA.get(0).data());
         assertThat(push.to("tok-b")).isEmpty(); // never my own activity
 
         // Likes update the app live but don't buzz the phone.
@@ -117,6 +126,7 @@ class EngagementFlowIT extends IntegrationTest {
         assertThat(toB.get(0).data()).isEqualTo(Map.of("type", "message", "chatId", chat));
         Thread.sleep(300);
         assertThat(push.to("tok-a")).hasSize(1);
+        assertThat(push.to("fcm-tok-a")).hasSize(1);
 
         // Nothing a push says names anyone or quotes anything.
         for (TestPush.Sent s : List.of(toA.get(0), toB.get(0))) {
@@ -129,8 +139,11 @@ class EngagementFlowIT extends IntegrationTest {
         Thread.sleep(300);
         assertThat(push.to("tok-b")).hasSize(1);
         assertThat(a.status("POST", "/v1/auth/logout", null)).isEqualTo(200);
+        // Only the device that signed out; A's Android phone is still signed in and keeps its token.
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM devices WHERE push_token_enc IS NOT NULL AND id = ?", Integer.class,
+                (Object) com.circlo.server.web.Ids.bytes(a.deviceId))).isZero();
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM devices WHERE push_token_enc IS NOT NULL AND user_id = ?", Integer.class,
-                (Object) com.circlo.server.web.Ids.bytes(a.userId))).isZero();
+                (Object) com.circlo.server.web.Ids.bytes(a.userId))).isEqualTo(1);
     }
 
     @Test

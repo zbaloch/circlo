@@ -56,6 +56,9 @@ circlo:
     key-id: ${CIRCLO_APNS_KEY_ID:}
     team-id: ${CIRCLO_APNS_TEAM_ID:}
     topic: ${CIRCLO_APNS_TOPIC:com.hellocirclo.app}
+  # Push to Android phones (content-free, same messages). Off unless the Firebase service account is set.
+  fcm:
+    service-account: ${CIRCLO_FCM_SERVICE_ACCOUNT:}
   s3:
     bucket: ${CIRCLO_S3_BUCKET:circlo-media}
     public-endpoint: ${CIRCLO_S3_PUBLIC_ENDPOINT}

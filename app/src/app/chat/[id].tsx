@@ -1,6 +1,8 @@
 import { Icon } from '@/components/ui/icon';
 import * as ImagePicker from 'expo-image-picker';
-import { router, useFocusEffect, useLocalSearchParams, useNavigation } from 'expo-router';
+import { Redirect, router, useFocusEffect, useLocalSearchParams, useNavigation } from 'expo-router';
+
+import { CHAT_ENABLED } from '@/lib/features';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { FlatList, Modal, Pressable, View } from 'react-native';
 import { KeyboardSpacer } from '@/components/keyboard-spacer';
@@ -33,7 +35,12 @@ import { Spinner } from '@/components/ui/spinner';
 type Row = { kind: 'day'; label: string; key: string } | { kind: 'msg'; msg: ChatMessage; key: string; showName: boolean };
 
 /** Chat (PLAN.md 2A): bubbles (mine on the right in the primary colour), date separators, composer. */
-export default function ChatScreen() {
+/** Chat is hidden for now (lib/features): a direct link lands on Home. */
+export default function ChatScreenRoute() {
+  return CHAT_ENABLED ? <ChatScreen /> : <Redirect href="/" />;
+}
+
+export function ChatScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const session = useSession();
   const account = session.status === 'signedIn' ? session.account : null;

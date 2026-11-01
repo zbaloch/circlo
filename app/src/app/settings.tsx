@@ -9,6 +9,7 @@ import { describeError } from '@/lib/account';
 import { refreshBlocked, unblockUser, useBlockedPeople } from '@/lib/blocks';
 import { LINKS, openLink } from '@/lib/links';
 import { useIntegrityWarning } from '@/lib/device-integrity';
+import { CHAT_ENABLED } from '@/lib/features';
 import { backgroundChecksOn, disableBackgroundChecks, enableBackgroundChecks, notificationPermission, usesPush } from '@/lib/background-check';
 import { deleteAccount, exportMyData } from '@/lib/safety';
 import { useSession } from '@/lib/session';
@@ -175,9 +176,9 @@ export default function SettingsScreen() {
   );
 }
 
-const CHECKS_TITLE = usesPush ? 'Notifications for replies, messages and requests' : 'Check for new activity in the background';
+const CHECKS_TITLE = usesPush ? (CHAT_ENABLED ? 'Notifications for replies, messages and requests' : 'Notifications for replies and requests') : 'Check for new activity in the background';
 const CHECKS_NOTE = usesPush
-  ? 'Replies, messages and friend requests, as they happen. Notifications only say “New reply” or “New message”: names and words stay in Circlo.'
+  ? `${CHAT_ENABLED ? 'Replies, messages and friend requests' : 'Replies and friend requests'}, as they happen. Notifications only say “New reply” or “New friend request”: names and words stay in Circlo.`
   : 'Your phone asks Circlo now and then and shows how many new things there are. Nothing goes through Apple or Google. Your phone decides when to check, so it can take a while.';
 
 /** A settings group: small heading, rows separated by a hairline (X style). */

@@ -640,7 +640,7 @@ export interface paths {
                     "application/json": {
                         token: string;
                         /** @enum {string} */
-                        service: "apns" | "apns_sandbox";
+                        service: "apns" | "apns_sandbox" | "fcm";
                     };
                 };
             };
