@@ -85,7 +85,8 @@ export function usePostActions(account: StoredAccount | null, book: AddressBook 
       audience: audienceBadge(book, post),
       onOpen: opts.inThread ? undefined : open,
       // X style: the reply icon opens the reply composer, with the post shown above it.
-      onReply: () => router.push({ pathname: '/reply/[id]', params: { id: post.postId } }),
+      // From the thread, the composer goes back to it with the new reply highlighted; elsewhere it shows a toast.
+      onReply: () => router.push({ pathname: '/reply/[id]', params: { id: post.postId, ...(opts.inThread ? { from: 'thread' } : {}) } }),
       onAuthor: () => openProfile(account, post.authorId),
       onLike: () => like(post),
       onMore: () => more(post),

@@ -21,6 +21,7 @@ import { AppFrame } from '@/components/app-frame';
 import { DialogHost } from '@/components/ui/dialog-host';
 import { BackButton, HeaderBar } from '@/components/ui/header';
 import { Spinner } from '@/components/ui/spinner';
+import { ToastHost } from '@/components/ui/toast-host';
 import { SessionProvider, useSession } from '@/lib/session';
 import { usePalette } from '@/theme/use-palette';
 
@@ -110,6 +111,7 @@ export default function RootLayout() {
           {/* On the web: a centred column instead of the full browser width. Phones: full screen, unchanged. */}
           <AppFrame>
             <Navigator />
+            <ToastHost />
           </AppFrame>
           <DialogHost />
         </SessionProvider>

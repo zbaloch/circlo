@@ -14,8 +14,9 @@ import { loadAddressBook, type AddressBook } from '@/lib/addressbook';
 import { showAlert } from '@/lib/dialog';
 import { putPost, usePost } from '@/lib/feed-store';
 import { useSession } from '@/lib/session';
-import { MAX_REPLY_CHARS, sendReply, validateReply } from '@/lib/thread';
+import { MAX_REPLY_CHARS, noteSentReply, sendReply, validateReply } from '@/lib/thread';
 import { relativeTime } from '@/lib/time';
+import { showToast } from '@/lib/toast';
 import { useNow } from '@/lib/use-now';
 import { usePalette } from '@/theme/use-palette';
 import { Spinner } from '@/components/ui/spinner';
@@ -23,11 +24,12 @@ import { Text, TextInput } from '@/components/ui/text';
 
 /**
  * Reply composer, X style: Cancel and Reply on top, the post being answered with a thread line, "Replying to
- * @handle", then my avatar and the text box. Opened from the reply icon on any post or the thread's reply bar.
+ * @handle", then my avatar and the text box. Opened from the reply icon on any post. After sending it goes back: to
+ * the thread with the new reply highlighted, or elsewhere (the timeline, a profile) with a "Reply sent · View" toast.
  */
 export default function ReplyScreen() {
   const now = useNow();
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, from } = useLocalSearchParams<{ id: string; from?: string }>();
   const session = useSession();
   const account = session.status === 'signedIn' ? session.account : null;
   const palette = usePalette();
@@ -59,11 +61,14 @@ export default function ReplyScreen() {
     if (blocked) return;
     setSendingId(id);
     try {
-      await sendReply(account, post, text);
+      const reply = await sendReply(account, post, text);
       putPost({ ...post, replyCount: post.replyCount + 1 });
       setText('');
       setSendingId(null);
       router.back();
+      // X style: back on the thread the new reply is highlighted; anywhere else a toast offers to open it.
+      if (from === 'thread') noteSentReply(post.postId, reply);
+      else showToast('Reply sent', { text: 'View', onPress: () => router.push({ pathname: '/post/[id]', params: { id: post.postId, reply: reply.replyId } }) });
     } catch {
       showAlert('Couldn’t send reply', 'Check your connection and try again.');
       setSendingId(null);

@@ -13,7 +13,7 @@ import { putPost, usePost } from '@/lib/feed-store';
 import { fetchPost } from '@/lib/posts';
 import { useSession } from '@/lib/session';
 import { blockUser } from '@/lib/blocks';
-import { deleteReply, fetchLikers, fetchReplies, setReplyLiked, toggledReplyLike, type Liker, type Reply } from '@/lib/thread';
+import { deleteReply, fetchLikers, fetchReplies, setReplyLiked, takeSentReply, toggledReplyLike, type Liker, type Reply } from '@/lib/thread';
 import { relativeTime } from '@/lib/time';
 import { useNow } from '@/lib/use-now';
 import { likersLine } from '@/lib/view-logic';
@@ -26,12 +26,15 @@ import { usePalette } from '@/theme/use-palette';
 /**
  * Thread view, X style (PLAN.md 2A): the post in detail (author row, full-width text and media, full time, actions),
  * and its replies in order. Replying starts from the post's reply button (owner decision 2026-10-31: no docked reply bar).
- * Opened from a reply notification (`reply` param), it scrolls to that reply and highlights it. Every reply has a
+ * Opened from a reply notification (`reply` param), or back from replying here, it scrolls to that reply and highlights it. Every reply has a
  * like button and a visible "…" menu (delete, report, block); long-press opens the same menu.
  */
 export default function ThreadScreen() {
   const now = useNow();
-  const { id, reply: focusReply } = useLocalSearchParams<{ id: string; reply?: string }>();
+  const { id, reply: replyParam } = useLocalSearchParams<{ id: string; reply?: string }>();
+  // The reply to bring into view and highlight: the notification's, or one I just sent from here.
+  const [sentId, setSentId] = useState<string | null>(null);
+  const focusReply = sentId ?? replyParam;
   const list = useRef<FlatList<Reply>>(null);
   const scrolledTo = useRef<string | null>(null);
   const session = useSession();
@@ -63,6 +66,15 @@ export default function ThreadScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- reload when the post changes identity, not on like toggles
   }, [account, post?.postId]);
   useFocusEffect(load);
+  // Back from the composer: show my new reply at once (the reload above confirms it) and bring it into view.
+  useFocusEffect(
+    useCallback(() => {
+      const sent = takeSentReply(id);
+      if (!sent) return;
+      setReplies((prev) => (prev && !prev.some((r) => r.replyId === sent.replyId) ? [...prev, sent] : prev));
+      setSentId(sent.replyId);
+    }, [id]),
+  );
   // New replies and likes show up while the thread is open.
   useFocusEffect(useCallback(() => onLiveChange(load), [load]));
 

@@ -2,7 +2,7 @@ import { audienceBadge, authorName } from '@/components/post-actions';
 import { mergeIds } from '@/lib/feed-store';
 import { setMe } from '@/lib/me';
 import type { FeedPost } from '@/lib/posts';
-import { toggledLike, validateReply } from '@/lib/thread';
+import { noteSentReply, takeSentReply, toggledLike, validateReply, type Reply } from '@/lib/thread';
 import { likersLine, linkParts, postsForTab, profileTabs } from '@/lib/view-logic';
 
 // Native modules and navigation don't load under jest; these tests cover the pure logic only.
@@ -102,5 +102,15 @@ describe('timeline and profile tabs', () => {
     expect(postsForTab('posts', [withMedia, plain], []).map((p) => p.postId)).toEqual(['m', 't']);
     expect(postsForTab('media', [withMedia, plain], []).map((p) => p.postId)).toEqual(['m']);
     expect(postsForTab('likes', [withMedia], [liked, plain]).map((p) => p.postId)).toEqual(['l']);
+  });
+});
+
+describe('sent reply handoff', () => {
+  it('is taken once, and only by its own post', () => {
+    const reply = { replyId: 'r1' } as Reply;
+    noteSentReply('p1', reply);
+    expect(takeSentReply('p2')).toBeNull();
+    expect(takeSentReply('p1')).toBe(reply);
+    expect(takeSentReply('p1')).toBeNull();
   });
 });

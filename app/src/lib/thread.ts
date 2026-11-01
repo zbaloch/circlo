@@ -80,6 +80,21 @@ export async function sendReply(account: StoredAccount, post: Pick<FeedPost, 'po
   return fromReplyRow(row, account.userId);
 }
 
+// A reply just sent from the composer opened on a thread, for that thread to show and highlight when it's back on screen.
+let sentReply: { postId: string; reply: Reply } | null = null;
+
+export function noteSentReply(postId: string, reply: Reply): void {
+  sentReply = { postId, reply };
+}
+
+/** The reply just sent to this post, once (null if none). */
+export function takeSentReply(postId: string): Reply | null {
+  if (sentReply?.postId !== postId) return null;
+  const { reply } = sentReply;
+  sentReply = null;
+  return reply;
+}
+
 export async function deleteReply(post: Pick<FeedPost, 'postId'>, replyId: string): Promise<void> {
   ok(await api.DELETE('/v1/posts/{postId}/replies/{replyId}', { params: { path: { postId: post.postId, replyId } } }));
 }
