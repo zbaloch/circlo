@@ -17,6 +17,7 @@ import { View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
 
+import { AppFrame } from '@/components/app-frame';
 import { DialogHost } from '@/components/ui/dialog-host';
 import { BackButton, HeaderBar } from '@/components/ui/header';
 import { Spinner } from '@/components/ui/spinner';
@@ -106,7 +107,10 @@ export default function RootLayout() {
       <KeyboardProvider>
       <ThemeProvider value={theme}>
         <SessionProvider>
-          <Navigator />
+          {/* On the web: a centred column instead of the full browser width. Phones: full screen, unchanged. */}
+          <AppFrame>
+            <Navigator />
+          </AppFrame>
           <DialogHost />
         </SessionProvider>
         <StatusBar style="auto" />
