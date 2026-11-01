@@ -1,7 +1,6 @@
 import { router } from 'expo-router';
 
 import { type AddressBook } from '@/lib/addressbook';
-import { blockUser } from '@/lib/blocks';
 import { audienceLabel } from '@/lib/circles';
 import { getPost, openViewer, putPost, removePost } from '@/lib/feed-store';
 import type { StoredAccount } from '@/lib/keystore';
@@ -44,19 +43,9 @@ export function usePostActions(account: StoredAccount | null, book: AddressBook 
   const more = (post: FeedPost) => {
     if (!account) return;
     if (!post.mine) {
-      const name = post.authorName;
-      const block = () =>
-        showAlert(`Block ${name}?`, 'You’ll stop being connected. They can’t send you requests or see anything new you post, and their messages are hidden. They aren’t told.', [
-          { text: 'Cancel', style: 'cancel' },
-          {
-            text: 'Block',
-            style: 'destructive',
-            onPress: () => blockUser(account, post.authorId, post.authorName, post.authorHandle).then(() => opts.onChange?.(), () => showAlert('Couldn’t block', 'Check your connection and try again.')),
-          },
-        ]);
+      // Blocking lives on the person's profile; a post only offers reporting.
       showAlert('Post options', undefined, [
         { text: 'Report post', style: 'destructive', onPress: () => router.push({ pathname: '/report/[id]', params: { id: post.postId } }) },
-        { text: `Block ${name}`, style: 'destructive', onPress: block },
         { text: 'Cancel', style: 'cancel' },
       ]);
       return;
