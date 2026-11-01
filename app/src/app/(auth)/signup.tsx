@@ -12,9 +12,8 @@ import { LINKS, openLink } from '@/lib/links';
 import { checkPassword } from '@/lib/password-strength';
 import { usePalette } from '@/theme/use-palette';
 
-/** Sign up: name, username, email and password. A code is emailed next to confirm the address. */
+/** Sign up: username, email and password (a name can be added later in Edit profile). A code is emailed next to confirm the address. */
 export default function SignupScreen() {
-  const [name, setName] = useState('');
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -22,18 +21,17 @@ export default function SignupScreen() {
   const [busy, setBusy] = useState(false);
   const [agreed, setAgreed] = useState(false);
   const palette = usePalette();
-  const strength = checkPassword(password, username || name);
+  const strength = checkPassword(password, username);
 
   const submit = async () => {
     setError(undefined);
     const handle = normalizeUsername(username);
-    if (!name.trim()) return setError('Enter your name.');
     if (!handle) return setError('Usernames are 3–30 characters: letters, numbers and _.');
     if (!looksLikeEmail(email)) return setError('That doesn’t look like an email address.');
     if (!strength.ok) return setError(strength.problem ?? 'Choose a stronger password.');
     setBusy(true);
     try {
-      const sentTo = await startSignup({ name: name.trim(), username: handle, email, password });
+      const sentTo = await startSignup({ username: handle, email, password });
       router.push({ pathname: '/verify-email', params: { email: sentTo } });
     } catch (e) {
       setError(describeError(e));
@@ -44,8 +42,7 @@ export default function SignupScreen() {
 
   return (
     <AuthScreen>
-      <Title subtitle="Your name and @username are what your people see. Nobody can look you up: you connect by invite.">Create your account</Title>
-      <TextField label="Name" placeholder="e.g. Sam Khan" value={name} onChangeText={setName} maxLength={50} autoCapitalize="words" textContentType="name" autoComplete="name" />
+      <Title subtitle="Your @username is what your people see; you can add your name later. Nobody can look you up: you connect by invite.">Create your account</Title>
       <TextField label="Username" placeholder="e.g. sam_k" value={username} onChangeText={setUsername} maxLength={31} textContentType="username" autoComplete="username-new" />
       <TextField label="Email" placeholder="you@example.com" value={email} onChangeText={setEmail} keyboardType="email-address" textContentType="emailAddress" autoComplete="email" hint="Only for signing in and resetting your password. It’s never shown to anyone." />
       <TextField label="Password" secureTextEntry value={password} onChangeText={setPassword} textContentType="newPassword" autoComplete="new-password" />

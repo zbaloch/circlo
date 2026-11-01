@@ -59,6 +59,7 @@ public class AccountController {
 
     // ---------- profile ----------
 
+    /** `name` is null until I set one. */
     public record Me(UUID userId, String name, String username, String email, String bio, String avatarUrl, Instant createdAt) {}
 
     @GetMapping("/v1/me")
@@ -79,7 +80,7 @@ public class AccountController {
     @PutMapping("/v1/me/profile")
     public Me editProfile(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody ProfileEdit r) {
         byte[] me = userId(jwt);
-        jdbc.update("UPDATE users SET name = ?, bio = ? WHERE id = ?", Accounts.name(r.name()), Accounts.bio(r.bio()), me);
+        jdbc.update("UPDATE users SET name = ?, bio = ? WHERE id = ?", Accounts.optionalName(r.name()), Accounts.bio(r.bio()), me);
         return load(me);
     }
 
@@ -160,7 +161,7 @@ public class AccountController {
                   WHERE m.owner_id = c.owner_id AND m.circle_id = c.id) AS members
                 FROM circles c WHERE c.owner_id = ? ORDER BY c.id""", (Object) me));
         out.put("friends", jdbc.queryForList("""
-                SELECT u.name, u.username, f.status, f.created_at AS since FROM friendships f
+                SELECT COALESCE(u.name, u.username) AS name, u.username, f.status, f.created_at AS since FROM friendships f
                 JOIN users u ON u.id = IF(f.user_a = ?, f.user_b, f.user_a) WHERE f.user_a = ? OR f.user_b = ?""", me, me, me));
         List<Map<String, Object>> posts = jdbc.queryForList(
                 "SELECT id, body AS text, audience, created_at FROM posts WHERE author_id = ? ORDER BY created_at", (Object) me);

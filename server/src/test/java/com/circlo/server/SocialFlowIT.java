@@ -28,7 +28,7 @@ class SocialFlowIT extends IntegrationTest {
         assertThat(b.status("POST", "/v1/friends/requests", Map.of("toUserId", a.userId.toString(), "circles", List.of(2, 3)))).isEqualTo(201);
 
         // Pending requests: both can see the other's profile, so Ana can see who's asking.
-        assertThat(a.call("GET", "/v1/users/" + b.userId, null).getBody()).containsEntry("relation", "incoming").containsEntry("name", b.name);
+        assertThat(a.call("GET", "/v1/users/" + b.userId, null).getBody()).containsEntry("relation", "incoming").containsEntry("name", b.username);
         assertThat(a.status("POST", "/v1/friends/" + b.userId + "/accept", Map.of("circles", List.of(1)))).isEqualTo(200);
 
         Map<String, Object> benSeenByAna = a.get("/v1/friends").get(0);
@@ -94,11 +94,27 @@ class SocialFlowIT extends IntegrationTest {
     }
 
     @Test
+    void withoutANameOthersSeeTheUsername() {
+        TestUser a = user("soc_noname_a");
+        TestUser b = user("soc_noname_b");
+        a.befriend(b);
+        assertThat(a.get("/v1/friends").get(0)).containsEntry("name", "soc_noname_b").containsEntry("username", "soc_noname_b");
+        b.call("PUT", "/v1/me/profile", Map.of("name", "Bea", "bio", ""));
+        assertThat(a.get("/v1/friends").get(0)).containsEntry("name", "Bea");
+        b.call("PUT", "/v1/me/profile", Map.of("name", "", "bio", ""));
+        assertThat(a.call("GET", "/v1/users/" + b.userId, null).getBody()).containsEntry("name", "soc_noname_b");
+        assertThat(a.status("POST", "/v1/blocks/" + b.userId, null)).isEqualTo(200);
+        assertThat(a.get("/v1/blocks").get(0)).containsEntry("name", "soc_noname_b");
+    }
+
+    @Test
     void myProfileAndPhotoCanBeEdited() {
         TestUser a = user("soc_profile");
         var edited = a.call("PUT", "/v1/me/profile", Map.of("name", "Ana B.", "bio", "Hi there\nsecond line"));
         assertThat(edited.getBody()).containsEntry("name", "Ana B.").containsEntry("bio", "Hi there\nsecond line");
-        assertThat(a.call("PUT", "/v1/me/profile", Map.of("name", "", "bio", "")).getBody()).containsEntry("error", "invalid_name");
+        assertThat(a.call("PUT", "/v1/me/profile", Map.of("name", "x".repeat(51), "bio", "")).getBody()).containsEntry("error", "invalid_name");
+        // An empty name clears it.
+        assertThat(a.call("PUT", "/v1/me/profile", Map.of("name", "  ", "bio", "")).getBody().get("name")).isNull();
         // An avatar must be one of my own uploads.
         assertThat(a.call("PUT", "/v1/me/avatar", Map.of("objectKey", "0".repeat(64))).getBody()).containsEntry("error", "unknown_media");
     }

@@ -52,6 +52,11 @@ public class AuthService {
             return Ids.uuid(id);
         }
 
+        /** For greetings in emails: the name, or the username while none is set. */
+        String displayName() {
+            return Accounts.displayName(name, username);
+        }
+
         boolean active() {
             return status.equals("active");
         }
@@ -85,8 +90,7 @@ public class AuthService {
      * replaced), and emails a code. Usernames and emails of existing accounts are refused.
      */
     @Transactional
-    public SignupStarted signup(String rawName, String rawUsername, String rawEmail, String rawPassword) {
-        String name = Accounts.name(rawName);
+    public SignupStarted signup(String rawUsername, String rawEmail, String rawPassword) {
         String username = Accounts.username(rawUsername);
         String email = Accounts.email(rawEmail);
         String password = Accounts.password(rawPassword);
@@ -102,9 +106,9 @@ public class AuthService {
         // An unfinished signup isn't an account: starting again (or someone else choosing the same name) replaces it.
         jdbc.update("DELETE FROM users WHERE status = 'pending' AND (username = ? OR email = ?)", username, email);
         byte[] id = Ids.bytes(Ids.newId());
-        jdbc.update("INSERT INTO users (id, name, username, email, password_hash, status, created_at) VALUES (?, ?, ?, ?, ?, 'pending', ?)",
-                id, name, username, email, passwords.hash(password), now());
-        codes.send(id, email, name, EmailCodes.Purpose.verify);
+        jdbc.update("INSERT INTO users (id, username, email, password_hash, status, created_at) VALUES (?, ?, ?, ?, 'pending', ?)",
+                id, username, email, passwords.hash(password), now());
+        codes.send(id, email, username, EmailCodes.Purpose.verify);
         return new SignupStarted(email);
     }
 
@@ -114,7 +118,7 @@ public class AuthService {
         String email = Accounts.email(rawEmail);
         for (User u : usersWhere("email = ? AND status = 'pending'", email)) {
             if (mayEmail(email)) {
-                codes.send(u.id(), u.email(), u.name(), EmailCodes.Purpose.verify);
+                codes.send(u.id(), u.email(), u.displayName(), EmailCodes.Purpose.verify);
             }
         }
     }
@@ -183,7 +187,7 @@ public class AuthService {
         throttle.clear(key);
         if (!u.active()) {
             if (mayEmail(u.email())) {
-                codes.send(u.id(), u.email(), u.name(), EmailCodes.Purpose.verify);
+                codes.send(u.id(), u.email(), u.displayName(), EmailCodes.Purpose.verify);
             }
             throw new ApiException(HttpStatus.FORBIDDEN, "email_not_verified", Map.of("email", u.email()));
         }
@@ -201,7 +205,7 @@ public class AuthService {
         String email = Accounts.email(rawEmail);
         for (User u : usersWhere("email = ? AND status = 'active'", email)) {
             if (mayEmail(email)) {
-                codes.send(u.id(), u.email(), u.name(), EmailCodes.Purpose.reset);
+                codes.send(u.id(), u.email(), u.displayName(), EmailCodes.Purpose.reset);
             }
         }
     }

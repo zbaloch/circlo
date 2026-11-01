@@ -78,7 +78,7 @@ public class People {
             return Map.of();
         }
         Map<UUID, Person> out = new HashMap<>();
-        jdbc.query("SELECT id, name, username, avatar_key FROM users WHERE status = 'active' AND id IN ("
+        jdbc.query("SELECT id, COALESCE(name, username), username, avatar_key FROM users WHERE status = 'active' AND id IN ("
                         + String.join(",", Collections.nCopies(ids.size(), "?")) + ")",
                 rs -> {
                     UUID id = Ids.uuid(rs.getBytes(1));

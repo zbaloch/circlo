@@ -28,7 +28,7 @@ export default function EditProfileScreen() {
   useEffect(() => {
     refreshMe().then(
       (m) => {
-        setName((n) => n || m.name);
+        setName((n) => n || (m.name ?? ''));
         setBio((b) => b || m.bio);
       },
       (e) => setError(describeError(e)),
@@ -86,13 +86,12 @@ export default function EditProfileScreen() {
           </View>
         )}
       </View>
-      <TextField label="Name" value={name} onChangeText={setName} maxLength={50} autoCapitalize="words" />
+      <TextField label="Name" placeholder="Optional: shown instead of your @username" value={name} onChangeText={setName} maxLength={50} autoCapitalize="words" />
       <TextField label="Bio" value={bio} onChangeText={setBio} maxLength={160} multiline />
       <ErrorText>{error}</ErrorText>
       <Button
         label="Save"
         loading={busy}
-        disabled={!name.trim()}
         onPress={async () => {
           setBusy(true);
           setError(undefined);

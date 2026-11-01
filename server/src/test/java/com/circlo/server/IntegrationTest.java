@@ -81,6 +81,6 @@ public abstract class IntegrationTest {
 
     /** A new, verified account (signed in on one device). */
     protected TestUser user(String username) {
-        return new TestUser(this, "Name of " + username, username, username + "@example.test", TestUser.PASSWORD).signUp();
+        return new TestUser(this, username, username + "@example.test", TestUser.PASSWORD).signUp();
     }
 }

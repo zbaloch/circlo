@@ -15,7 +15,8 @@ class NoPayloadLoggingIT extends IntegrationTest {
 
     @Test
     void trafficLeavesNothingPersonalInTheLogs(CapturedOutput output) {
-        TestUser a = new TestUser(this, "Distinctive Logname", "logcheck_user", "logcheck@example.test", "a distinctive passphrase").signUp();
+        TestUser a = new TestUser(this, "logcheck_user", "logcheck@example.test", "a distinctive passphrase").signUp();
+        a.call("PUT", "/v1/me/profile", Map.of("name", "Distinctive Logname", "bio", ""));
         TestUser b = user("logcheck_friend");
         a.befriend(b);
         a.login("logcheck_user", "a distinctive passphrase");
