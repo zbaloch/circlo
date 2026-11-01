@@ -78,7 +78,7 @@ public class SafetyController {
                 if (people.relation(me, target) == null && !people.blockedEitherWay(me, target)) {
                     throw ApiException.notFound();
                 }
-                yield jdbc.query("SELECT id, CONCAT('user: ', name, ' @', username, '\\n', bio) FROM users WHERE id = ?",
+                yield jdbc.query("SELECT id, CONCAT('user: ', COALESCE(name, username), ' @', username, '\\n', bio) FROM users WHERE id = ?",
                         (rs, i) -> new Object[] {rs.getBytes(1), rs.getString(2)}, (Object) target).stream().findFirst()
                         .orElseThrow(ApiException::notFound);
             }
@@ -122,7 +122,7 @@ public class SafetyController {
     @GetMapping("/v1/blocks")
     public List<BlockView> blocks(@AuthenticationPrincipal Jwt jwt) {
         return jdbc.query("""
-                SELECT b.blocked_id, u.name, u.username, b.created_at FROM user_blocks b JOIN users u ON u.id = b.blocked_id
+                SELECT b.blocked_id, COALESCE(u.name, u.username) AS name, u.username, b.created_at FROM user_blocks b JOIN users u ON u.id = b.blocked_id
                 WHERE b.blocker_id = ? ORDER BY b.created_at DESC""",
                 (rs, i) -> new BlockView(Ids.uuid(rs.getBytes(1)), rs.getString(2), rs.getString(3), rs.getTimestamp(4).toInstant()),
                 (Object) me(jwt));

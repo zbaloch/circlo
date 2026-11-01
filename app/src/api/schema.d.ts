@@ -24,8 +24,6 @@ export interface paths {
             requestBody: {
                 content: {
                     "application/json": {
-                        /** @description 1-50 characters */
-                        name: string;
                         /** @description 3-30 of [a-z0-9_], case-insensitive */
                         username: string;
                         email: string;
@@ -376,6 +374,7 @@ export interface paths {
             requestBody: {
                 content: {
                     "application/json": {
+                        /** @description 1-50 characters; empty clears it */
                         name: string;
                         /** @description Up to 160 characters */
                         bio: string;
@@ -2146,7 +2145,8 @@ export interface components {
         ObjectKey: string;
         Me: {
             userId: components["schemas"]["Id"];
-            name: string;
+            /** @description Null until I set one */
+            name: string | null;
             username: string;
             email: string;
             bio: string;
@@ -2157,6 +2157,7 @@ export interface components {
         /** @description Someone as shown next to their posts, replies and messages (never their email) */
         Person: {
             userId: components["schemas"]["Id"];
+            /** @description Their name, or their username while they haven't set one */
             name: string;
             username: string;
             avatarUrl?: string | null;

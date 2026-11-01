@@ -16,7 +16,7 @@ class AuthFlowIT extends IntegrationTest {
     private JdbcTemplate jdbc;
 
     private TestUser fresh(String username) {
-        return new TestUser(this, "Ana Example", username, username + "@example.test", TestUser.PASSWORD);
+        return new TestUser(this, username, username + "@example.test", TestUser.PASSWORD);
     }
 
     @Test
@@ -35,7 +35,9 @@ class AuthFlowIT extends IntegrationTest {
         a.take(verified.getBody());
 
         var me = a.call("GET", "/v1/me", null).getBody();
-        assertThat(me).containsEntry("name", "Ana Example").containsEntry("username", "ana_signup").containsEntry("email", a.email);
+        assertThat(me).containsEntry("username", "ana_signup").containsEntry("email", a.email);
+        // Sign-up asks for no name: it stays empty until set in Edit profile.
+        assertThat(me.get("name")).isNull();
         assertThat(a.get("/v1/circles")).extracting(c -> c.get("name")).containsExactly("Close Friends", "Family", "Kids", "Work");
 
         assertThat(a.login("ANA_signup", TestUser.PASSWORD).getStatusCode().value()).isEqualTo(200);
@@ -56,28 +58,26 @@ class AuthFlowIT extends IntegrationTest {
     @Test
     void usernamesAndEmailsAreUniqueAndValidated() {
         user("taken_name");
-        TestUser sameName = new TestUser(this, "Other", "Taken_Name", "other1@example.test", TestUser.PASSWORD);
+        TestUser sameName = new TestUser(this, "Taken_Name", "other1@example.test", TestUser.PASSWORD);
         assertThat(sameName.startSignup().getBody()).containsEntry("error", "username_taken");
-        TestUser sameEmail = new TestUser(this, "Other", "other_name", "TAKEN_NAME@example.test", TestUser.PASSWORD);
+        TestUser sameEmail = new TestUser(this, "other_name", "TAKEN_NAME@example.test", TestUser.PASSWORD);
         assertThat(sameEmail.startSignup().getBody()).containsEntry("error", "email_taken");
 
-        assertThat(new TestUser(this, "X", "a", "a@example.test", TestUser.PASSWORD).startSignup().getBody())
+        assertThat(new TestUser(this, "a", "a@example.test", TestUser.PASSWORD).startSignup().getBody())
                 .containsEntry("error", "invalid_username");
-        assertThat(new TestUser(this, "X", "bad-chars", "b@example.test", TestUser.PASSWORD).startSignup().getBody())
+        assertThat(new TestUser(this, "bad-chars", "b@example.test", TestUser.PASSWORD).startSignup().getBody())
                 .containsEntry("error", "invalid_username");
-        assertThat(new TestUser(this, "X", "good_name", "not-an-email", TestUser.PASSWORD).startSignup().getBody())
+        assertThat(new TestUser(this, "good_name", "not-an-email", TestUser.PASSWORD).startSignup().getBody())
                 .containsEntry("error", "invalid_email");
-        assertThat(new TestUser(this, " ", "good_name", "c@example.test", TestUser.PASSWORD).startSignup().getBody())
-                .containsEntry("error", "invalid_name");
-        assertThat(new TestUser(this, "X", "good_name", "d@example.test", "short").startSignup().getBody())
+        assertThat(new TestUser(this, "good_name", "d@example.test", "short").startSignup().getBody())
                 .containsEntry("error", "weak_password");
     }
 
     @Test
     void anUnfinishedSignupDoesNotHoldTheUsername() {
-        TestUser abandoned = new TestUser(this, "First", "kim_abandon", "kim1@example.test", TestUser.PASSWORD);
+        TestUser abandoned = new TestUser(this, "kim_abandon", "kim1@example.test", TestUser.PASSWORD);
         assertThat(abandoned.startSignup().getStatusCode().value()).isEqualTo(201);
-        TestUser real = new TestUser(this, "Second", "kim_abandon", "kim2@example.test", TestUser.PASSWORD).signUp();
+        TestUser real = new TestUser(this, "kim_abandon", "kim2@example.test", TestUser.PASSWORD).signUp();
         assertThat(real.call("GET", "/v1/me", null).getBody()).containsEntry("email", "kim2@example.test");
         // The first signup's code no longer works.
         assertThat(call("POST", "/v1/auth/signup/verify", Map.of("email", abandoned.email, "code", mail.lastCode(abandoned.email)), null)

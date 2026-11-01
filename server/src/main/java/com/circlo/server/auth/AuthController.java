@@ -31,7 +31,7 @@ public class AuthController {
         this.props = props;
     }
 
-    public record SignupRequest(@NotNull @Size(max = 200) String name, @NotNull @Size(max = 64) String username,
+    public record SignupRequest(@NotNull @Size(max = 64) String username,
             @NotNull @Size(max = 254) String email, @NotNull @Size(max = 512) String password) {}
 
     public record EmailRequest(@NotNull @Size(max = 254) String email) {}
@@ -51,7 +51,7 @@ public class AuthController {
     @PostMapping("/signup")
     @ResponseStatus(HttpStatus.CREATED)
     public AuthService.SignupStarted signup(@Valid @RequestBody SignupRequest r) {
-        return auth.signup(r.name(), r.username(), r.email(), r.password());
+        return auth.signup(r.username(), r.email(), r.password());
     }
 
     @PostMapping("/signup/resend")

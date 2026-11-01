@@ -24,9 +24,8 @@ paths:
           application/json:
             schema:
               type: object
-              required: [name, username, email, password]
+              required: [username, email, password]
               properties:
-                name: { type: string, description: "1-50 characters" }
                 username: { type: string, description: "3-30 of [a-z0-9_], case-insensitive" }
                 email: { type: string }
                 password: { type: string, description: "12-128 characters" }
@@ -154,7 +153,7 @@ paths:
             schema:
               type: object
               required: [name, bio]
-              properties: { name: { type: string }, bio: { type: string, description: "Up to 160 characters" } }
+              properties: { name: { type: string, description: "1-50 characters; empty clears it" }, bio: { type: string, description: "Up to 160 characters" } }
       responses:
         "200": { $ref: "#/components/responses/Me" }
         "400": { $ref: "#/components/responses/Error" }
@@ -902,7 +901,7 @@ components:
       required: [userId, name, username, email, bio, createdAt]
       properties:
         userId: { $ref: "#/components/schemas/Id" }
-        name: { type: string }
+        name: { type: [string, "null"], description: "Null until I set one" }
         username: { type: string }
         email: { type: string }
         bio: { type: string }
@@ -914,7 +913,7 @@ components:
       required: [userId, name, username]
       properties:
         userId: { $ref: "#/components/schemas/Id" }
-        name: { type: string }
+        name: { type: string, description: "Their name, or their username while they haven't set one" }
         username: { type: string }
         avatarUrl: { type: [string, "null"] }
     Circle:

@@ -87,7 +87,7 @@ async function persist(tokens: Tokens): Promise<StoredAccount> {
 
 // ---------------- sign up ----------------
 
-export type SignupForm = { name: string; username: string; email: string; password: string };
+export type SignupForm = { username: string; email: string; password: string };
 
 /** Starts a signup: Circlo emails a code to the address. Returns the address the code went to. */
 export async function startSignup(form: SignupForm): Promise<string> {

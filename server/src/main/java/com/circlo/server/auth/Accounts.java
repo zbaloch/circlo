@@ -46,6 +46,16 @@ public final class Accounts {
         return n;
     }
 
+    /** {@link #name}, or null for a blank one (no name set). */
+    public static String optionalName(String raw) {
+        return raw == null || raw.isBlank() ? null : name(raw);
+    }
+
+    /** What others see: the name, or the username while no name is set. */
+    public static String displayName(String name, String username) {
+        return name == null ? username : name;
+    }
+
     /** Up to 160 characters (line breaks allowed). Throws invalid_bio. */
     public static String bio(String raw) {
         String b = raw == null ? "" : raw.strip();

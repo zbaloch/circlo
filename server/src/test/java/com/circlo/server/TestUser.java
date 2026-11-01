@@ -13,7 +13,6 @@ final class TestUser {
     static final String PASSWORD = "correct horse battery staple";
 
     final IntegrationTest it;
-    final String name;
     final String username;
     final String email;
     String password;
@@ -22,16 +21,15 @@ final class TestUser {
     String accessToken;
     String refreshToken;
 
-    TestUser(IntegrationTest it, String name, String username, String email, String password) {
+    TestUser(IntegrationTest it, String username, String email, String password) {
         this.it = it;
-        this.name = name;
         this.username = username;
         this.email = email;
         this.password = password;
     }
 
     ResponseEntity<Map<String, Object>> startSignup() {
-        return it.call("POST", "/v1/auth/signup", Map.of("name", name, "username", username, "email", email, "password", password), null);
+        return it.call("POST", "/v1/auth/signup", Map.of("username", username, "email", email, "password", password), null);
     }
 
     TestUser signUp() {
