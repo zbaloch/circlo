@@ -7,7 +7,9 @@ import org.springframework.stereotype.Component;
 
 /**
  * Who may see a post: its author; for Everyone posts, the author's current friends; for circle posts, those of the
- * author's current friends who were in the chosen circles when it was posted. Replies and likes follow the post.
+ * author's current friends who are in one of the chosen circles now (owner decision 2026-11-01: taking someone out of
+ * a circle closes its posts to them, earlier ones too, and putting them in opens them). Replies and likes follow the
+ * post.
  */
 @Component
 public class PostAccess {
@@ -18,7 +20,8 @@ public class PostAccess {
 
     /** True for posts `p` the viewer may see; bind with {@link #visibleArgs}. */
     public static final String VISIBLE = "(p.author_id = ? OR (p.author_id IN " + FRIENDS + " AND (p.audience = 'everyone' OR "
-            + "(p.audience = 'circles' AND EXISTS (SELECT 1 FROM post_audience pa WHERE pa.post_id = p.id AND pa.user_id = ?)))))";
+            + "(p.audience = 'circles' AND EXISTS (SELECT 1 FROM post_circles pc JOIN circle_members cm ON cm.owner_id = p.author_id "
+            + "AND cm.circle_id = pc.circle_id WHERE pc.post_id = p.id AND cm.member_id = ?)))))";
 
     public static Object[] visibleArgs(byte[] viewer) {
         return new Object[] {viewer, viewer, viewer, viewer};

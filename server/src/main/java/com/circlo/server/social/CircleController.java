@@ -132,8 +132,8 @@ public class CircleController {
     }
 
     /**
-     * Deletes a circle and its memberships. Posts already shared with it keep the audience they had; their badge stops
-     * naming it. A new circle can reuse the id without inheriting anything.
+     * Deletes a circle and its memberships. Posts shared with it are no longer shared with it: ones shared only with it
+     * are left to me alone. A new circle can reuse the id without inheriting anything.
      */
     @DeleteMapping("/v1/circles/{id}")
     @Transactional

@@ -12,7 +12,7 @@ and there is a web app.
 | Passwords | Stored only as Argon2id hashes (server). Strength checked in the app (zxcvbn, 12+ characters) |
 | Data | Sent over HTTPS (TLS), stored as sent. The **server enforces who sees what** (THREAT_MODEL.md v2.0) |
 | Circles | Kept on the server: up to 8 per person (starters Close Friends, Family, Kids, Work). Names, memberships and a post's audience are returned only to the owner |
-| Post audience | Only me; Everyone (all current friends); or circles: the people in them **when the post was made**. Unfriend/block removes access to everything |
+| Post audience | Only me; Everyone (all current friends); or circles: the people in them **now** (owner decision 2026-11-01: taking someone out of a circle closes its posts to them, earlier ones too; putting them back reopens them; deleting a circle leaves posts shared only with it to the author). Unfriend/block removes access to everything |
 | Chats | Server-stored 1:1 and group chats between friends; read state per person, so it's the same on every device |
 | Media | Metadata removed on the device, then presigned upload to a private bucket; presigned downloads (1 hour) |
 | Clients | iOS, Android and the **web app at app.hellocirclo.com**, all one Expo codebase (`app/`, `.web.ts` siblings for native-only modules) |

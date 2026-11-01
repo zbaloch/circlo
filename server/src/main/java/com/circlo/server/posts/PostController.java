@@ -114,18 +114,13 @@ public class PostController {
         for (int c : circles) {
             jdbc.update("INSERT INTO post_circles (post_id, circle_id) VALUES (?, ?)", id, c);
         }
-        if (!circles.isEmpty()) {
-            // The audience is fixed now: people added to these circles later don't see this post.
-            jdbc.update("INSERT IGNORE INTO post_audience (post_id, user_id) SELECT DISTINCT ?, m.member_id FROM circle_members m "
-                    + "WHERE m.owner_id = ? AND m.circle_id IN (" + String.join(",", Collections.nCopies(circles.size(), "?")) + ")",
-                    concat(new Object[] {id, me}, circles.toArray()));
-        }
         attachments.attach(me, id, null, media);
         // Open timelines of everyone who may see it show "New posts" right away.
         List<UUID> readers = audience.equals("only_me") ? List.of()
                 : audience.equals("everyone")
                         ? jdbc.query(PostAccess.FRIENDS.substring(1, PostAccess.FRIENDS.length() - 1), (rs, i) -> Ids.uuid(rs.getBytes(1)), me, me)
-                        : jdbc.query("SELECT user_id FROM post_audience WHERE post_id = ?", (rs, i) -> Ids.uuid(rs.getBytes(1)), (Object) id);
+                        : jdbc.query("SELECT DISTINCT cm.member_id FROM post_circles pc JOIN circle_members cm ON cm.owner_id = ? "
+                                + "AND cm.circle_id = pc.circle_id WHERE pc.post_id = ?", (rs, i) -> Ids.uuid(rs.getBytes(1)), me, id);
         notifier.changed(readers);
         return views(me, "WHERE p.id = ?", id).get(0);
     }

@@ -43,20 +43,36 @@ class PostsFlowIT extends IntegrationTest {
     }
 
     @Test
-    void aCirclePostKeepsTheAudienceItWasSharedWith() {
-        TestUser a = user("snap_author");
-        TestUser early = user("snap_early");
-        TestUser late = user("snap_late");
+    void aCirclePostFollowsWhoIsInTheCircleNow() {
+        TestUser a = user("live_author");
+        TestUser early = user("live_early");
+        TestUser late = user("live_late");
         a.befriend(early, List.of(1), List.of());
         a.befriend(late);
         a.post("close friends then", "circles", List.of(1));
-        // Moving someone into the circle later doesn't open earlier posts; new posts reach them.
-        a.call("PUT", "/v1/friends/" + late.userId + "/circles", Map.of("circles", List.of(1)));
-        a.post("close friends now", "circles", List.of(1));
-        assertThat(late.feedTexts()).containsExactly("close friends now");
-        assertThat(early.feedTexts()).containsExactly("close friends now", "close friends then");
+        a.post("family", "circles", List.of(2));
+        assertThat(late.feedTexts()).isEmpty();
 
-        // Unfriending removes access to everything, even posts they could see before.
+        // Moving someone into the circle opens its earlier posts too.
+        a.call("PUT", "/v1/friends/" + late.userId + "/circles", Map.of("circles", List.of(1)));
+        assertThat(late.feedTexts()).containsExactly("close friends then");
+        assertThat(a.get("/v1/me/preview/" + late.userId)).extracting(p -> p.get("text")).containsExactly("close friends then");
+
+        // Taking them out closes them again (replies and likes follow the post); putting them back reopens them.
+        String postId = (String) early.get("/v1/feed").get(0).get("postId");
+        a.call("PUT", "/v1/friends/" + early.userId + "/circles", Map.of("circles", List.of(2)));
+        assertThat(early.feedTexts()).containsExactly("family");
+        assertThat(early.status("GET", "/v1/posts/" + postId, null)).isEqualTo(404);
+        a.call("PUT", "/v1/friends/" + early.userId + "/circles", Map.of("circles", List.of(1)));
+        assertThat(early.feedTexts()).containsExactly("close friends then");
+
+        // Deleting the circle leaves its posts with the author only.
+        a.call("DELETE", "/v1/circles/1", null);
+        assertThat(early.feedTexts()).isEmpty();
+        assertThat(a.feedTexts()).containsExactly("family", "close friends then");
+
+        // Unfriending removes access to everything.
+        a.call("PUT", "/v1/friends/" + early.userId + "/circles", Map.of("circles", List.of(2)));
         a.call("DELETE", "/v1/friends/" + early.userId, null);
         assertThat(early.feedTexts()).isEmpty();
     }

@@ -93,14 +93,11 @@ public class People {
     }
 
     /**
-     * Ends any connection between two people: the friendship, each other's circle memberships, and access to earlier
-     * circle posts. Used by unfriend, decline and block.
+     * Ends any connection between two people: the friendship and each other's circle memberships (so access to all
+     * posts). Used by unfriend, decline and block.
      */
     public void disconnect(byte[] a, byte[] b) {
         jdbc.update("DELETE FROM friendships WHERE (user_a = ? AND user_b = ?) OR (user_a = ? AND user_b = ?)", a, b, b, a);
         jdbc.update("DELETE FROM circle_members WHERE (owner_id = ? AND member_id = ?) OR (owner_id = ? AND member_id = ?)", a, b, b, a);
-        jdbc.update("""
-                DELETE pa FROM post_audience pa JOIN posts p ON p.id = pa.post_id
-                WHERE (p.author_id = ? AND pa.user_id = ?) OR (p.author_id = ? AND pa.user_id = ?)""", a, b, b, a);
     }
 }
