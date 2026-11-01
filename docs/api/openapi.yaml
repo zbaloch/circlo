@@ -157,6 +157,33 @@ paths:
       responses:
         "200": { $ref: "#/components/responses/Me" }
         "400": { $ref: "#/components/responses/Error" }
+  /v1/me/notifications:
+    put:
+      summary: Turn emails about activity on or off (only sent while I'm not signed in to the phone app)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [email], properties: { email: { type: boolean } } }
+      responses:
+        "200": { $ref: "#/components/responses/Me" }
+        "400": { $ref: "#/components/responses/Error" }
+  /v1/email/unsubscribe:
+    parameters:
+      - { name: u, in: query, required: true, schema: { $ref: "#/components/schemas/Id" } }
+      - { name: t, in: query, required: true, schema: { type: string } }
+    get:
+      summary: The unsubscribe link in notification emails (public, signed). Shows a page with one button
+      security: []
+      responses:
+        "200": { description: An HTML page, content: { text/html: { schema: { type: string } } } }
+        "404": { description: Not a genuine link, content: { text/html: { schema: { type: string } } } }
+    post:
+      summary: Turn notification emails off (the page's button, or a mail app's one-click unsubscribe, RFC 8058)
+      security: []
+      responses:
+        "200": { description: An HTML page, content: { text/html: { schema: { type: string } } } }
+        "404": { description: Not a genuine link, content: { text/html: { schema: { type: string } } } }
   /v1/me/avatar:
     put:
       summary: Set my photo to an image I just uploaded
@@ -214,11 +241,12 @@ paths:
                 type: array
                 items:
                   type: object
-                  required: [deviceId, createdAt, current]
+                  required: [deviceId, createdAt, current, kind]
                   properties:
                     deviceId: { $ref: "#/components/schemas/Id" }
                     createdAt: { type: string, format: date-time }
                     current: { type: boolean }
+                    kind: { type: [string, "null"], enum: [ios, android, web, null], description: "Null for a sign-in from before this was recorded" }
   /v1/devices/{deviceId}:
     delete:
       summary: Sign a device out
@@ -226,6 +254,18 @@ paths:
         - { name: deviceId, in: path, required: true, schema: { $ref: "#/components/schemas/Id" } }
       responses:
         "200": { $ref: "#/components/responses/Status" }
+        "404": { $ref: "#/components/responses/Error" }
+  /v1/devices/current:
+    put:
+      summary: Say which kind of app this sign-in is (only this; it decides push or email for activity)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [kind], properties: { kind: { type: string, enum: [ios, android, web] } } }
+      responses:
+        "200": { $ref: "#/components/responses/Status" }
+        "400": { $ref: "#/components/responses/Error" }
         "404": { $ref: "#/components/responses/Error" }
   /v1/devices/current/push-token:
     put:
@@ -966,7 +1006,7 @@ components:
     ObjectKey: { type: string, pattern: "^[0-9a-f]{64}$" }
     Me:
       type: object
-      required: [userId, name, username, email, bio, createdAt]
+      required: [userId, name, username, email, bio, createdAt, emailNotifications]
       properties:
         userId: { $ref: "#/components/schemas/Id" }
         name: { type: [string, "null"], description: "Null until I set one" }
@@ -975,6 +1015,7 @@ components:
         bio: { type: string }
         avatarUrl: { type: [string, "null"] }
         createdAt: { type: string, format: date-time }
+        emailNotifications: { type: boolean, description: "Emails about activity while I'm not signed in to the phone app" }
     Person:
       description: Someone as shown next to their posts, replies and messages (never their email)
       type: object

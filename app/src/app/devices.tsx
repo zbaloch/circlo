@@ -8,8 +8,10 @@ import { Spinner } from '@/components/ui/spinner';
 import { Text } from '@/components/ui/text';
 import { describeError } from '@/lib/account';
 import { showAlert } from '@/lib/dialog';
+import { deviceLabel } from '@/lib/view-logic';
 
-type Device = { deviceId: string; createdAt: string; current: boolean };
+type Device = { deviceId: string; createdAt: string; current: boolean; kind: 'ios' | 'android' | 'web' | null };
+
 
 /** Phones and browsers signed in to this account. Signing one out ends its session there. */
 export default function DevicesScreen() {
@@ -80,7 +82,7 @@ export default function DevicesScreen() {
           renderItem={({ item }) => (
             <View className="flex-row items-center gap-3 rounded-xl border border-border p-4 dark:border-border-dark">
               <View className="flex-1">
-                <Text className="font-bold text-ink dark:text-ink-dark">{item.current ? 'This device' : 'Other device'}</Text>
+                <Text className="font-bold text-ink dark:text-ink-dark">{deviceLabel(item)}</Text>
                 <Text className="text-muted dark:text-muted-dark">Signed in {new Date(item.createdAt).toLocaleString()}</Text>
               </View>
               {!item.current ? (

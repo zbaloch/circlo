@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { Platform } from 'react-native';
 
 import { api, ApiError, ok, setAccessToken, setRefresher } from '@/api/client';
 
@@ -113,6 +114,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         return null;
       }
     });
+    // Which kind of app this sign-in is (only that): the server tells me about activity by push while I have the phone
+    // app, and by email while I only use the web. Sent on every launch, so sign-ins from before this was asked catch up.
+    api.PUT('/v1/devices/current', { body: { kind: deviceKind(Platform.OS) } }).catch(() => undefined);
     return () => setRefresher(null);
   }, [signedIn]);
 
@@ -125,6 +129,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo(() => ({ ...state, signIn, signOut }), [state, signIn, signOut]);
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
+}
+
+export function deviceKind(os: string): 'ios' | 'android' | 'web' {
+  return os === 'ios' || os === 'android' ? os : 'web';
 }
 
 export function useSession(): Session {

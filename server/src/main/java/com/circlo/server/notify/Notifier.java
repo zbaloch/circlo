@@ -1,6 +1,8 @@
 package com.circlo.server.notify;
 
 import com.circlo.server.web.Ids;
+import java.sql.Timestamp;
+import java.time.Instant;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
@@ -17,8 +19,15 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 
 /**
  * Tells people something happened for them, once the change is committed: their open apps wake up (live signal), and
- * for replies, messages and friend requests their phones (iPhone via APNs, Android via FCM) get a content-free push. Someone I blocked never makes my
- * phone buzz. Pushes go out on background threads so a slow Apple never slows a request.
+ * for replies, messages and friend requests they're told on one channel (owner decision 2026-11-01):
+ * <ul>
+ *   <li>signed in to the app on a phone: a content-free push (iPhone via APNs, Android via FCM), never an email, even
+ *       if they also use the web app. A phone with notifications turned off still counts: they chose silence.</li>
+ *   <li>no app (only the web app, or nothing): a short email, gathered with what follows (EmailDigests).</li>
+ * </ul>
+ * An app counts while its session is alive (not signed out, not lapsed) and Apple or Google haven't said its push token
+ * is dead. Someone I blocked is never announced to me. Delivery runs on background threads so a slow Apple never slows
+ * a request.
  */
 @Component
 public class Notifier {
@@ -29,13 +38,15 @@ public class Notifier {
     private final Signals signals;
     private final PushSender sender;
     private final PushTokens tokens;
+    private final EmailDigests emails;
     private final ExecutorService pool = Executors.newVirtualThreadPerTaskExecutor();
 
-    public Notifier(JdbcTemplate jdbc, Signals signals, PushSender sender, PushTokens tokens) {
+    public Notifier(JdbcTemplate jdbc, Signals signals, PushSender sender, PushTokens tokens, EmailDigests emails) {
         this.jdbc = jdbc;
         this.signals = signals;
         this.sender = sender;
         this.tokens = tokens;
+        this.emails = emails;
     }
 
     /** Wakes these people's open apps (and my own other devices when I'm one of them). */
@@ -64,7 +75,7 @@ public class Notifier {
     }
 
     private void push(byte[] recipient, byte[] actor, PushSender.Message message) {
-        if (Arrays.equals(recipient, actor) || !sender.enabled()) {
+        if (Arrays.equals(recipient, actor)) {
             return;
         }
         afterCommit(() -> pool.execute(() -> deliver(recipient, actor, message)));
@@ -76,15 +87,28 @@ public class Notifier {
                 return;
             }
             record Device(byte[] id, byte[] sealed, String service) {}
-            List<Device> devices = jdbc.query(
-                    "SELECT id, push_token_enc, push_service FROM devices WHERE user_id = ? AND revoked_at IS NULL AND push_token_enc IS NOT NULL",
-                    (rs, i) -> new Device(rs.getBytes(1), rs.getBytes(2), rs.getString(3)), (Object) recipient);
-            for (Device d : devices) {
+            // My phone apps: signed in with a live session, and not reported gone by Apple or Google. Devices from
+            // before the kind was recorded count when they have a push token.
+            List<Device> apps = jdbc.query("""
+                    SELECT d.id, d.push_token_enc, d.push_service FROM devices d
+                    WHERE d.user_id = ? AND d.revoked_at IS NULL AND d.push_lost = FALSE
+                      AND (d.kind IN ('ios', 'android') OR d.push_token_enc IS NOT NULL)
+                      AND EXISTS (SELECT 1 FROM refresh_tokens t WHERE t.device_id = d.id AND t.revoked_at IS NULL AND t.expires_at > ?)""",
+                    (rs, i) -> new Device(rs.getBytes(1), rs.getBytes(2), rs.getString(3)), recipient, Timestamp.from(Instant.now()));
+            int reachable = apps.size();
+            for (Device d : apps) {
+                if (d.sealed() == null) {
+                    continue; // notifications are off on that phone
+                }
                 String token = tokens.open(d.id(), d.sealed());
                 PushSender.Result result = token == null ? PushSender.Result.UNREGISTERED : sender.send(d.service(), token, message);
                 if (result == PushSender.Result.UNREGISTERED) {
-                    jdbc.update("UPDATE devices SET push_token_enc = NULL, push_service = NULL WHERE id = ?", (Object) d.id());
+                    jdbc.update("UPDATE devices SET push_token_enc = NULL, push_service = NULL, push_lost = TRUE WHERE id = ?", (Object) d.id());
+                    reachable--;
                 }
+            }
+            if (reachable == 0) {
+                emails.add(recipient, message.data().get("type"));
             }
         } catch (RuntimeException e) {
             // No details: they could include tokens or ids.

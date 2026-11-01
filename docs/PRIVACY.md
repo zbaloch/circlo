@@ -28,7 +28,8 @@ lose) and makes the web app possible.
 | Account | Random id, name, @username, email, Argon2id password hash, bio, photo, signup time, when the email was verified | Sign in, reset a forgotten password, show your profile to your people |
 | Email codes | A hash of the latest 6-digit code, its purpose and expiry (15 minutes) | Confirm your email, reset your password |
 | Unfinished signups | As above, deleted after a day if the email is never confirmed | Finish signing up |
-| Devices | Random id, signed-in and signed-out times; if background checks are on, a hash of the device's check token | List and sign out your devices; answer "anything new?" with counts |
+| Devices | Random id, signed-in and signed-out times, which kind of app it is (iPhone app, Android app or web browser: no model, OS version or browser name); if notifications are on, the push token sealed with a server key, or a hash of the background-check token | List and sign out your devices; tell you about activity on your phone when you have the app, by email when you don't |
+| Notification emails | Whether you want them, and until the next email goes out, how many new replies, messages and requests it will mention (counts only) | One short email about activity while you're not signed in to the phone app |
 | Sessions | Hashes of refresh tokens, per device, until they expire (30 days) | Stay signed in |
 | Sign-ins | The time of each login (no device, place or address), kept 30 days | Warn your other devices: "New sign-in to your account" |
 | Login lock | Per account (or per typed name, if no account matches): failed-attempt count and lock time, deleted a week after the last failure | Lock login after 3 wrong passwords (15 min, 1 h, then 24 h) |

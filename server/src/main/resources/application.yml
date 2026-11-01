@@ -59,6 +59,12 @@ circlo:
   # Push to Android phones (content-free, same messages). Off unless the Firebase service account is set.
   fcm:
     service-account: ${CIRCLO_FCM_SERVICE_ACCOUNT:}
+  # Emails about activity for people not signed in to the phone app (Notifier, EmailDigests).
+  notify:
+    email-delay: 15m
+    # The web app (linked from the emails) and this server's public address (for their unsubscribe link).
+    web-base: ${CIRCLO_WEB_BASE:https://app.hellocirclo.com}
+    api-base: ${CIRCLO_API_BASE:https://api.hellocirclo.com}
   s3:
     bucket: ${CIRCLO_S3_BUCKET:circlo-media}
     public-endpoint: ${CIRCLO_S3_PUBLIC_ENDPOINT}

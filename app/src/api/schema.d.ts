@@ -393,6 +393,124 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/me/notifications": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Turn emails about activity on or off (only sent while I'm not signed in to the phone app) */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        email: boolean;
+                    };
+                };
+            };
+            responses: {
+                200: components["responses"]["Me"];
+                400: components["responses"]["Error"];
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/email/unsubscribe": {
+        parameters: {
+            query: {
+                u: components["schemas"]["Id"];
+                t: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The unsubscribe link in notification emails (public, signed). Shows a page with one button */
+        get: {
+            parameters: {
+                query: {
+                    u: components["schemas"]["Id"];
+                    t: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description An HTML page */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/html": string;
+                    };
+                };
+                /** @description Not a genuine link */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/html": string;
+                    };
+                };
+            };
+        };
+        put?: never;
+        /** Turn notification emails off (the page's button, or a mail app's one-click unsubscribe, RFC 8058) */
+        post: {
+            parameters: {
+                query: {
+                    u: components["schemas"]["Id"];
+                    t: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description An HTML page */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/html": string;
+                    };
+                };
+                /** @description Not a genuine link */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/html": string;
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/me/avatar": {
         parameters: {
             query?: never;
@@ -575,6 +693,11 @@ export interface paths {
                             /** Format: date-time */
                             createdAt: string;
                             current: boolean;
+                            /**
+                             * @description Null for a sign-in from before this was recorded
+                             * @enum {string|null}
+                             */
+                            kind: "ios" | "android" | "web" | null;
                         }[];
                     };
                 };
@@ -614,6 +737,43 @@ export interface paths {
                 404: components["responses"]["Error"];
             };
         };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/devices/current": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Say which kind of app this sign-in is (only this; it decides push or email for activity) */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /** @enum {string} */
+                        kind: "ios" | "android" | "web";
+                    };
+                };
+            };
+            responses: {
+                200: components["responses"]["Status"];
+                400: components["responses"]["Error"];
+                404: components["responses"]["Error"];
+            };
+        };
+        post?: never;
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -2335,6 +2495,8 @@ export interface components {
             avatarUrl?: string | null;
             /** Format: date-time */
             createdAt: string;
+            /** @description Emails about activity while I'm not signed in to the phone app */
+            emailNotifications: boolean;
         };
         /** @description Someone as shown next to their posts, replies and messages (never their email) */
         Person: {
