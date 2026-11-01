@@ -3,7 +3,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { router, useFocusEffect, useLocalSearchParams, useNavigation } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { FlatList, Modal, Pressable, View } from 'react-native';
-import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
+import { KeyboardSpacer } from '@/components/keyboard-spacer';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Avatar } from '@/components/avatar';
@@ -159,13 +159,15 @@ export default function ChatScreen() {
 
   return (
     <SafeAreaView edges={['bottom']} className="flex-1 bg-surface dark:bg-surface-dark">
-      <KeyboardAvoidingView className="flex-1" behavior="padding" keyboardVerticalOffset={90}>
+      <View className="flex-1">
         <FlatList
           ref={list}
           data={rows}
           keyExtractor={(r) => r.key}
           contentContainerClassName="gap-1 px-3 py-3"
           onContentSizeChange={() => list.current?.scrollToEnd({ animated: false })}
+          // The list shrinks while the keyboard opens: keep the newest message in view.
+          onLayout={() => list.current?.scrollToEnd({ animated: false })}
           ListEmptyComponent={<Text className="py-10 text-center text-muted dark:text-muted-dark">Say hello. Only the people in this chat can see it.</Text>}
           renderItem={({ item }) =>
             item.kind === 'day' ? (
@@ -219,7 +221,8 @@ export default function ChatScreen() {
             {sending ? <Spinner tone="onPrimary" /> : <Icon name="arrow-up" size={20} color={palette.onPrimary} />}
           </Pressable>
         </View>
-      </KeyboardAvoidingView>
+      </View>
+      <KeyboardSpacer />
 
       <Modal visible={members} transparent animationType="slide" onRequestClose={() => setMembers(false)}>
         <Pressable accessibilityLabel="Close" className="flex-1 bg-black/40" onPress={() => setMembers(false)} />

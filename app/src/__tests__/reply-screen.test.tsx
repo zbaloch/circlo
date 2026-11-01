@@ -10,7 +10,8 @@ jest.mock('expo-router', () => ({
   useLocalSearchParams: () => ({ id: mockId }),
   useFocusEffect: () => {},
 }));
-jest.mock('react-native-keyboard-controller', () => ({ KeyboardAvoidingView: jest.requireActual('react-native').View }));
+// The keyboard spacer runs on Reanimated's native runtime, which doesn't load under jest.
+jest.mock('@/components/keyboard-spacer', () => ({ KeyboardSpacer: () => null }));
 jest.mock('@/components/post-media', () => ({ MediaImage: () => null }));
 jest.mock('@/components/post-card', () => ({ PostText: () => null }));
 jest.mock('@/components/post-actions', () => ({ authorName: () => ({ name: 'Ana', handle: 'ana' }) }));
