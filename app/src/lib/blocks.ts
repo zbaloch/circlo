@@ -67,3 +67,8 @@ export function visibleConversations(conversations: Conversation[], blockedIds: 
     .filter((c) => c.members.length === 0 || c.members.some((u) => !blockedIds.has(u)))
     .map((c) => ({ ...c, messages: visibleMessages(c.messages, blockedIds) }));
 }
+
+/** Pure: whether the Messages tab shows its dot (a chat I'm still in has unread messages). */
+export function hasUnreadChats(conversations: Conversation[], blockedIds: ReadonlySet<string>): boolean {
+  return visibleConversations(conversations, blockedIds).some((c) => c.active && c.unread > 0);
+}

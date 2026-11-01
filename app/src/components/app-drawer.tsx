@@ -21,7 +21,7 @@ export const DRAWER_ITEMS: Item[] = [
   { label: 'Settings', icon: 'settings-outline', href: '/settings' },
 ];
 
-/** Side drawer opened from the Home avatar (PLAN.md 2A app shell). */
+/** Side drawer opened from the Home avatar (PLAN.md 2A app shell). Log out sits apart at the bottom, away from the menu. */
 export function AppDrawer({ navigation, state }: DrawerContentComponentProps) {
   const palette = usePalette();
   const session = useSession();
@@ -40,7 +40,7 @@ export function AppDrawer({ navigation, state }: DrawerContentComponentProps) {
 
   return (
     <SafeAreaView edges={['top', 'bottom']} className="flex-1 bg-surface dark:bg-surface-dark">
-    <ScrollView className="flex-1" contentContainerClassName="px-5 pt-4">
+    <ScrollView testID="drawer-menu" className="flex-1" contentContainerClassName="px-5 pt-4">
       <View className="pb-2">
         <Avatar size="lg" id={account?.userId} name={displayName} uri={me?.avatarUrl} />
         <Text className="mt-3 text-xl font-extrabold text-ink dark:text-ink-dark">{displayName}</Text>
@@ -56,17 +56,17 @@ export function AppDrawer({ navigation, state }: DrawerContentComponentProps) {
           <Text className="text-xl font-bold text-ink dark:text-ink-dark">{item.label}</Text>
         </Pressable>
       ))}
-      <Pressable
-        accessibilityRole="button"
-        onPress={() => {
-          navigation.closeDrawer();
-          void session.signOut();
-        }}
-        className="flex-row items-center gap-4 border-t border-border py-4 dark:border-border-dark">
-        <Icon name="log-out-outline" size={24} color={palette.danger} />
-        <Text className="text-xl font-bold text-danger dark:text-danger-dark">Log out</Text>
-      </Pressable>
     </ScrollView>
+    <Pressable
+      accessibilityRole="button"
+      onPress={() => {
+        navigation.closeDrawer();
+        void session.signOut();
+      }}
+      className="mx-5 flex-row items-center gap-4 border-t border-border py-4 active:opacity-60 dark:border-border-dark">
+      <Icon name="log-out-outline" size={24} color={palette.danger} />
+      <Text className="text-xl font-bold text-danger dark:text-danger-dark">Log out</Text>
+    </Pressable>
     </SafeAreaView>
   );
 }

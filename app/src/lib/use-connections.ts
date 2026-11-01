@@ -7,6 +7,8 @@ import { syncConnections, type Connection } from './friends';
 import type { StoredAccount } from './keystore';
 import { refreshActivity } from './activity';
 import { markActiveNow } from './background-check';
+import { refreshBlocked } from './blocks';
+import { syncMessaging } from './messaging';
 import { useSession } from './session';
 import { deleteItem, getItem, setItem } from './storage';
 
@@ -110,8 +112,10 @@ export function useConnections() {
 }
 
 /**
- * Keeps connections and activity (replies and likes on my posts) fresh while signed in, with a poll while the app is
- * in the foreground. Every switch to or from the foreground tells background checks the app was in use.
+ * Keeps connections, activity (replies and likes on my posts) and the chat inbox fresh while signed in, with a poll
+ * while the app is in the foreground, so the bell and Messages dots show up on any tab. The blocked list is loaded once
+ * so chats with only blocked people never light the dot. Every switch to or from the foreground tells background checks
+ * the app was in use.
  */
 export function useConnectionsSync() {
   const session = useSession();
@@ -122,7 +126,9 @@ export function useConnectionsSync() {
       if (AppState.currentState !== 'active') return;
       void refreshConnections(account);
       refreshActivity(account).catch(() => {});
+      syncMessaging(account).catch(() => {});
     };
+    refreshBlocked().catch(() => undefined);
     tick();
     void markActiveNow();
     const timer = setInterval(tick, POLL_MS);

@@ -25,6 +25,11 @@ export function mergeRows(items: ActivityItem[], signIns: SignIn[]): ({ type: 'a
     .map(({ at: _at, ...row }) => row);
 }
 
+/** Pure: where tapping a row goes. A reply opens the thread scrolled to that reply. Exported for tests. */
+export function activityHref(item: ActivityItem) {
+  return { pathname: '/post/[id]' as const, params: item.kind === 'reply' && item.replyId ? { id: item.postId, reply: item.replyId } : { id: item.postId } };
+}
+
 /**
  * Notifications (PLAN.md 2A): friend requests first (they need an answer), then replies and likes on my posts and
  * sign-ins to my account, newest first. There's no remote push: this tab is where activity shows up, and opting in to
@@ -127,8 +132,8 @@ export default function NotificationsScreen() {
           <Row
             key={key}
             isNew={fresh.has(key)}
-            hint="Opens the post"
-            onPress={() => router.push({ pathname: '/post/[id]', params: { id: item.postId } })}
+            hint={item.kind === 'reply' ? 'Opens the reply' : 'Opens the post'}
+            onPress={() => router.push(activityHref(item))}
             avatar={<Avatar id={item.actorId} name={name} uri={item.actorAvatar} />}
             title={
               <>

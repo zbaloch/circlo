@@ -1,5 +1,5 @@
 import { useFocusEffect, useLocalSearchParams } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { FlatList, Pressable, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -22,10 +22,13 @@ import { Spinner } from '@/components/ui/spinner';
 /**
  * Thread view, X style (PLAN.md 2A): the post in detail (author row, full-width text and media, full time, actions),
  * and its replies in order. Replying starts from the post's reply button (owner decision 2026-10-31: no docked reply bar).
+ * Opened from a reply notification (`reply` param), it scrolls to that reply and highlights it.
  */
 export default function ThreadScreen() {
   const now = useNow();
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, reply: focusReply } = useLocalSearchParams<{ id: string; reply?: string }>();
+  const list = useRef<FlatList<Reply>>(null);
+  const scrolledTo = useRef<string | null>(null);
   const session = useSession();
   const account = session.status === 'signedIn' ? session.account : null;
   const post = usePost(id);
@@ -54,6 +57,15 @@ export default function ThreadScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- reload when the post changes identity, not on like toggles
   }, [account, post?.postId]);
   useFocusEffect(load);
+
+  // Once the replies are in, bring the one from the notification into view (once per notification).
+  useEffect(() => {
+    if (!focusReply || !replies || scrolledTo.current === focusReply) return;
+    const index = replies.findIndex((r) => r.replyId === focusReply);
+    if (index < 0) return;
+    scrolledTo.current = focusReply;
+    requestAnimationFrame(() => list.current?.scrollToIndex({ index, viewPosition: 0.3 }));
+  }, [focusReply, replies]);
 
   if (!account) return null;
   if (!post) {
@@ -87,7 +99,13 @@ export default function ThreadScreen() {
     <SafeAreaView edges={['bottom']} className="flex-1 bg-surface dark:bg-surface-dark">
       <View className="flex-1">
         <FlatList
+          ref={list}
           data={replies ?? []}
+          // Rows aren't measured until rendered: jump near the reply, then try again once it has a size.
+          onScrollToIndexFailed={({ index, averageItemLength }) => {
+            list.current?.scrollToOffset({ offset: index * averageItemLength });
+            setTimeout(() => list.current?.scrollToIndex({ index, viewPosition: 0.3 }), 100);
+          }}
           keyExtractor={(r) => r.replyId}
           ListHeaderComponent={
             <>
@@ -103,7 +121,7 @@ export default function ThreadScreen() {
             return (
               <Pressable
                 onLongPress={item.mine || post.mine ? () => removeReply(item) : undefined}
-                className="flex-row gap-3 border-b border-border px-4 py-3 dark:border-border-dark">
+                className={`flex-row gap-3 border-b border-border px-4 py-3 dark:border-border-dark ${item.replyId === focusReply ? 'bg-primary-soft dark:bg-primary-soft-dark' : ''}`}>
                 <Pressable
                   accessibilityRole="button"
                   accessibilityLabel={`${name}'s profile`}
