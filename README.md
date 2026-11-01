@@ -1,7 +1,6 @@
 # Circlo
 
-Circlo is a private, circles-based social network. You share posts with **circles** (Close Friends, Family, Kids,
-Work, or your own), with all your friends, or only with yourself. People connect only through an invite link or QR
+Circlo is a private, circles-based social network. You share posts with **circles** (Close Friends, Family, Colleagues, or your own), with all your friends, or only with yourself. People connect only through an invite link or QR
 code: there is no search, no public profile, no ads and no tracking. Nobody is ever told which circle they're in.
 
 Apps for iOS and Android, and a web app at **app.hellocirclo.com**, all from the same code.
