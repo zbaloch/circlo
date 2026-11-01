@@ -111,7 +111,7 @@ export async function upload(items: PreparedItem[], onProgress?: (fraction: numb
     const res = await f.file.upload(slot.putUrl, {
       httpMethod: 'PUT',
       uploadType: UploadType.BINARY_CONTENT,
-      mimeType: f.mime,
+      headers: { 'Content-Type': f.mime },
       onProgress: ({ bytesSent }) => onProgress?.((done + bytesSent) / total),
     });
     if (res.status !== 200) throw new Error(`upload failed (${res.status})`);
@@ -133,7 +133,7 @@ export async function uploadAvatar(media: PickedMedia): Promise<string> {
   const photo = await reencodeJpeg(media.uri, media.width, media.height, 1024, 0.85);
   try {
     const [slot] = ok(await api.POST('/v1/media/uploads', { body: { files: [{ size: photo.file.size, mime: 'image/jpeg' }] } }));
-    const res = await photo.file.upload(slot.putUrl, { httpMethod: 'PUT', uploadType: UploadType.BINARY_CONTENT, mimeType: 'image/jpeg' });
+    const res = await photo.file.upload(slot.putUrl, { httpMethod: 'PUT', uploadType: UploadType.BINARY_CONTENT, headers: { 'Content-Type': 'image/jpeg' } });
     if (res.status !== 200) throw new Error(`upload failed (${res.status})`);
     return slot.objectKey;
   } finally {
