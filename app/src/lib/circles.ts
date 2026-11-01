@@ -115,7 +115,7 @@ export async function deleteCircle(account: StoredAccount, id: number): Promise<
   await refreshAddressBook(account);
 }
 
-/** Sets a friend's circles. Silent: nobody is told. New posts follow; earlier posts keep their audience. */
+/** Sets a friend's circles. Silent: nobody is told. Their access follows at once, earlier posts included. */
 export async function setCircles(account: StoredAccount, userId: string, circles: number[]): Promise<void> {
   ok(await api.PUT('/v1/friends/{userId}/circles', { params: { path: { userId } }, body: { circles: [...new Set(circles)].sort((a, b) => a - b) } }));
   await refreshAddressBook(account);

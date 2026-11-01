@@ -39,7 +39,7 @@ class SchemaIT extends IntegrationTest {
     @Test
     void theEncryptedDesignsTablesAreGone() {
         List<String> tables = jdbc.queryForList("SELECT table_name FROM information_schema.tables WHERE table_schema = DATABASE()", String.class);
-        assertThat(tables).contains("users", "email_codes", "devices", "friendships", "circles", "circle_members", "posts", "post_audience",
+        assertThat(tables).contains("users", "email_codes", "devices", "friendships", "circles", "circle_members", "posts",
                 "chats", "chat_messages", "attachments", "reports");
         assertThat(tables).doesNotContain("key_backups", "identity_keys", "friend_payloads", "epochs", "mls_messages", "opaque_login_states",
                 "recovery_methods", "user_blobs");

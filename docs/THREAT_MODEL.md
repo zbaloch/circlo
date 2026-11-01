@@ -38,7 +38,7 @@
 
 | Property | Mechanism | Tests |
 |---|---|---|
-| Posts reach only their audience | `PostAccess.VISIBLE`: author; Everyone = current friends; circles = the audience snapshot taken when posting (`post_audience`) intersected with current friendship | `PostsFlowIT` |
+| Posts reach only their audience | `PostAccess.VISIBLE`: author; Everyone = current friends; circles = current friends who are in one of the post's circles now (`post_circles` × `circle_members`) | `PostsFlowIT` |
 | Moving someone into a circle doesn't open old posts | The snapshot is taken at post time | `PostsFlowIT` |
 | Unfriend/block removes access everywhere | `People.disconnect` deletes the friendship, circle memberships and snapshot rows | `PostsFlowIT`, `SocialFlowIT` |
 | Replies, likes and media follow their post | Every thread endpoint checks the post first; media URLs are only handed out inside views of visible posts | `PostsFlowIT`, `MediaFlowIT` |
