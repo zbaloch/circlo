@@ -106,7 +106,7 @@ export function ProfileFeed({
             <View className="-mt-10 gap-2 px-4">
               <View className="flex-row items-end justify-between">
                 <View className="rounded-full border-4 border-surface dark:border-surface-dark">
-                  <Avatar size="lg" name={name} uri={avatarUrl} />
+                  <Avatar size="lg" id={userId} name={name} uri={avatarUrl} />
                 </View>
                 {headerRight ? <View className="mb-1 flex-row items-center gap-2">{headerRight}</View> : null}
               </View>

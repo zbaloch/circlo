@@ -171,7 +171,7 @@ export default function ComposeScreen() {
 
         <ScrollView className="flex-1" contentContainerClassName="gap-3 px-4 pb-4" keyboardShouldPersistTaps="handled">
           <View className="flex-row gap-3">
-            <Avatar name={account?.handle} />
+            <Avatar id={account?.userId} name={account?.handle} />
             <View className="flex-1 gap-2">
               <TextInput
                 accessibilityLabel="Post text"

@@ -91,7 +91,7 @@ export default function ReplyScreen() {
           {/* The post being answered, joined to my reply by a thread line. */}
           <View className="flex-row gap-3">
             <View className="items-center">
-              <Avatar name={author.name} />
+              <Avatar id={post.authorId} name={author.name} />
               <View className="mt-1 w-0.5 flex-1 rounded-full bg-border dark:bg-border-dark" />
             </View>
             <View className="flex-1 flex-row gap-3 pb-4">
@@ -123,7 +123,7 @@ export default function ReplyScreen() {
 
           {/* My reply. */}
           <View className="flex-row gap-3">
-            <Avatar name={me.name} />
+            <Avatar id={account.userId} name={me.name} />
             <TextInput
               accessibilityLabel="Reply"
               autoFocus

@@ -65,7 +65,7 @@ export function PostDetail({ post, name, handle, avatarUrl, audience, onReply, o
     <View className="gap-3 border-b border-border px-4 pb-1 pt-3 dark:border-border-dark">
       <View className="flex-row items-center gap-3">
         <Pressable accessibilityRole="button" accessibilityLabel={`${name}'s profile`} onPress={onAuthor} disabled={!onAuthor} className="flex-1 flex-row items-center gap-3 active:opacity-70">
-          <Avatar name={name} uri={avatarUrl} />
+          <Avatar id={post.authorId} name={name} uri={avatarUrl} />
           <View className="flex-1">
             <Text numberOfLines={1} className="text-base font-bold text-ink dark:text-ink-dark">{name}</Text>
             {handle ? <Text numberOfLines={1} className="text-[15px] text-muted dark:text-muted-dark">@{handle}</Text> : null}
@@ -102,7 +102,7 @@ export function PostCard({ post, name, handle, avatarUrl, audience, onOpen, onRe
   return (
     <Pressable onPress={onOpen} disabled={!onOpen} className="flex-row gap-3 border-b border-border px-4 py-3 active:bg-surface-raised dark:border-border-dark dark:active:bg-surface-raised-dark">
       <Pressable accessibilityRole="button" accessibilityLabel={`${name}'s profile`} onPress={onAuthor} disabled={!onAuthor} className="self-start active:opacity-70">
-        <Avatar name={name} uri={avatarUrl} />
+        <Avatar id={post.authorId} name={name} uri={avatarUrl} />
       </Pressable>
       <View className="flex-1 gap-2">
         <View className="flex-row items-center gap-1">

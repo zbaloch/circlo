@@ -139,7 +139,7 @@ export default function FriendScreen() {
 
   return (
     <ScrollView className="flex-1 bg-surface dark:bg-surface-dark" contentContainerClassName="items-center gap-3 px-6 pb-10 pt-8">
-      <Avatar size="lg" name={name} uri={profile?.avatarUrl ?? c.profile.avatarUrl} />
+      <Avatar size="lg" id={c.userId} name={name} uri={profile?.avatarUrl ?? c.profile.avatarUrl} />
       <Text className="text-2xl font-bold text-ink dark:text-ink-dark">{name}</Text>
       <Text className="text-muted dark:text-muted-dark">@{c.profile.handle}</Text>
       {profile?.bio ? <Text className="text-center text-base text-ink dark:text-ink-dark">{profile.bio}</Text> : null}

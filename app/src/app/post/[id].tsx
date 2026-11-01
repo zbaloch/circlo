@@ -110,7 +110,7 @@ export default function ThreadScreen() {
                   disabled={!known}
                   onPress={() => openProfile(account, item.authorId)}
                   className="self-start active:opacity-70">
-                  <Avatar size="sm" name={name} uri={item.authorAvatar} />
+                  <Avatar size="sm" id={item.authorId} name={name} uri={item.authorAvatar} />
                 </Pressable>
                 <View className="flex-1 gap-1">
                   <Text className="text-sm text-muted dark:text-muted-dark">

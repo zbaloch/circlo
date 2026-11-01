@@ -97,7 +97,7 @@ export default function NotificationsScreen() {
           isNew={fresh.has(c.userId)}
           hint="Opens your requests"
           onPress={() => router.navigate({ pathname: '/search', params: { section: 'friends' } })}
-          avatar={<Avatar name={displayName(c)} uri={c.profile.avatarUrl} />}
+          avatar={<Avatar id={c.userId} name={displayName(c)} uri={c.profile.avatarUrl} />}
           title={<><Text className="font-bold text-ink dark:text-ink-dark">{displayName(c)}</Text> wants to connect</>}
           line={`@${c.profile.handle} · Tap to review the request`}
         />
@@ -129,7 +129,7 @@ export default function NotificationsScreen() {
             isNew={fresh.has(key)}
             hint="Opens the post"
             onPress={() => router.push({ pathname: '/post/[id]', params: { id: item.postId } })}
-            avatar={<Avatar name={name} uri={item.actorAvatar} />}
+            avatar={<Avatar id={item.actorId} name={name} uri={item.actorAvatar} />}
             title={
               <>
                 <Text className="font-bold text-ink dark:text-ink-dark">{name}</Text>
