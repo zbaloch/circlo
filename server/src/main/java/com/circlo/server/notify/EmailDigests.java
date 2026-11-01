@@ -32,7 +32,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 public class EmailDigests {
 
     private static final Logger log = LoggerFactory.getLogger(EmailDigests.class);
-    private static final Map<String, String> COLUMNS = Map.of("reply", "replies", "message", "messages", "request", "requests");
+    private static final Map<String, String> COLUMNS = Map.of("reply", "replies", "message", "messages", "request", "requests", "joined", "friends");
 
     private final JdbcTemplate jdbc;
     private final TransactionTemplate tx;
@@ -83,15 +83,15 @@ public class EmailDigests {
         return sent;
     }
 
-    private record Digest(int replies, int messages, int requests, String email, boolean on) {}
+    private record Digest(int replies, int messages, int requests, int friends, String email, boolean on) {}
 
     private boolean sendOne(byte[] user) {
         // Taken and removed together, so a notification arriving meanwhile starts the next email instead of being lost.
         List<Digest> rows = tx.execute(s -> {
             List<Digest> r = jdbc.query("""
-                    SELECT d.replies, d.messages, d.requests, u.email, u.email_notifications FROM email_digests d
+                    SELECT d.replies, d.messages, d.requests, d.friends, u.email, u.email_notifications FROM email_digests d
                     JOIN users u ON u.id = d.user_id WHERE d.user_id = ? AND u.status = 'active' FOR UPDATE""",
-                    (rs, i) -> new Digest(rs.getInt(1), rs.getInt(2), rs.getInt(3), rs.getString(4), rs.getBoolean(5)), (Object) user);
+                    (rs, i) -> new Digest(rs.getInt(1), rs.getInt(2), rs.getInt(3), rs.getInt(4), rs.getString(5), rs.getBoolean(6)), (Object) user);
             jdbc.update("DELETE FROM email_digests WHERE user_id = ?", (Object) user);
             return r;
         });
@@ -99,7 +99,7 @@ public class EmailDigests {
             return false;
         }
         Digest d = rows.get(0);
-        String summary = summary(d.replies(), d.messages(), d.requests());
+        String summary = summary(d.replies(), d.messages(), d.requests(), d.friends());
         if (summary.isEmpty()) {
             return false;
         }
@@ -124,8 +124,8 @@ public class EmailDigests {
         }
     }
 
-    /** "2 new replies, a new message and a friend request" (empty if all are zero). */
-    static String summary(int replies, int messages, int requests) {
+    /** "2 new replies, a new message and a friend request" (empty if all are zero). Friends: people who joined with my link. */
+    static String summary(int replies, int messages, int requests, int friends) {
         List<String> parts = new ArrayList<>();
         if (replies > 0) {
             parts.add(replies == 1 ? "a new reply" : replies + " new replies");
@@ -135,6 +135,9 @@ public class EmailDigests {
         }
         if (requests > 0) {
             parts.add(requests == 1 ? "a friend request" : requests + " friend requests");
+        }
+        if (friends > 0) {
+            parts.add(friends == 1 ? "a new friend" : friends + " new friends");
         }
         if (parts.size() <= 1) {
             return String.join("", parts);

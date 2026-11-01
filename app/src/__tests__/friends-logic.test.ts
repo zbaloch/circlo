@@ -1,5 +1,5 @@
 import { bookFrom } from '@/lib/addressbook';
-import { parseInviteLink } from '@/lib/friends';
+import { inviteProblem, justJoined, parseInviteLink, type Connection } from '@/lib/friends';
 
 jest.mock('@/api/client', () => ({}));
 
@@ -19,6 +19,24 @@ describe('invite links', () => {
     expect(parseInviteLink('https://www.hellocirclo.com/i/short')).toBeNull();
     expect(parseInviteLink(`https://www.hellocirclo.com/i/${token}?x=1`)).toBeNull();
     expect(parseInviteLink('not a link')).toBeNull();
+  });
+});
+
+describe('using an invite', () => {
+  it('explains why it can’t be used', () => {
+    expect(inviteProblem(404)).toMatch(/doesn’t work/);
+    expect(inviteProblem(400)).toMatch(/your own/);
+    expect(inviteProblem(409)).toMatch(/already connected/);
+    expect(inviteProblem(429)).toMatch(/tomorrow/);
+    expect(inviteProblem(500)).toBeNull();
+  });
+
+  it('spots who joined since my link was on screen, newest first', () => {
+    const c = (userId: string, status: Connection['status']) => ({ userId, status, profile: { displayName: userId, bio: '', handle: userId } });
+    const known = new Set(['old']);
+    const now = [c('old', 'accepted'), c('new1', 'accepted'), c('asked', 'outgoing'), c('new2', 'accepted'), c('req', 'incoming')];
+    expect(justJoined(now, known).map((x) => x.userId)).toEqual(['new2', 'new1']);
+    expect(justJoined(now, null)).toEqual([]);
   });
 });
 

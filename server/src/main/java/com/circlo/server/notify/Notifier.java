@@ -74,6 +74,11 @@ public class Notifier {
         push(recipient, requester, new PushSender.Message("New friend request", Map.of("type", "request")));
     }
 
+    /** Someone joined with my invite link (we're connected; I may want to choose their circles). */
+    public void joined(byte[] owner, byte[] joiner) {
+        push(owner, joiner, new PushSender.Message("New friend", Map.of("type", "joined")));
+    }
+
     private void push(byte[] recipient, byte[] actor, PushSender.Message message) {
         if (Arrays.equals(recipient, actor)) {
             return;

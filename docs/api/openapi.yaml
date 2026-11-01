@@ -385,9 +385,73 @@ paths:
                   properties:
                     reply: { $ref: "#/components/schemas/Reply" }
                     post: { $ref: "#/components/schemas/Post" }
+  /v1/invites/link:
+    get:
+      summary: My invite link (the same until I reset it; made the first time I ask)
+      responses:
+        "200":
+          description: The link
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/InviteLink" }
+  /v1/invites/link/reset:
+    post:
+      summary: A new invite link; the old one and its QR code stop working (people who joined stay connected)
+      responses:
+        "200":
+          description: The new link
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/InviteLink" }
+  /v1/invites/preview:
+    post:
+      summary: Who an invite is from (changes nothing)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [token], properties: { token: { type: string } } }
+      responses:
+        "200":
+          description: Who it's from
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Person" }
+        "400": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+  /v1/invites/join:
+    post:
+      summary: >-
+        Use an invite, putting its owner in my circles. Someone's link connects at once (status accepted) and they're
+        told; a one-time invite sends a request (status outgoing).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token]
+              properties:
+                token: { type: string }
+                circles: { type: array, items: { type: integer } }
+      responses:
+        "200":
+          description: Connected, or the request sent
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [userId, status]
+                properties:
+                  userId: { $ref: "#/components/schemas/Id" }
+                  status: { type: string, enum: [accepted, outgoing] }
+        "400": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+        "409": { $ref: "#/components/responses/Error" }
+        "429": { $ref: "#/components/responses/Error" }
   /v1/invites:
     post:
-      summary: A single-use invite link (7 days)
+      summary: A single-use invite link (7 days); for older apps
       responses:
         "201":
           description: The invite
@@ -403,7 +467,7 @@ paths:
         "409": { $ref: "#/components/responses/Error" }
   /v1/invites/redeem:
     post:
-      summary: Use an invite; returns who sent it
+      summary: Use an invite; returns who sent it (for older apps; someone's link connects here already)
       requestBody:
         required: true
         content:
@@ -761,7 +825,7 @@ paths:
   # ---------------- activity ----------------
   /v1/activity:
     get:
-      summary: Replies and likes on my posts, and likes on my replies, newest first
+      summary: Replies and likes on my posts, likes on my replies, and people who joined with my link, newest first
       parameters:
         - { $ref: "#/components/parameters/Before" }
         - { $ref: "#/components/parameters/Limit" }
@@ -780,9 +844,9 @@ paths:
                       type: object
                       required: [kind, postId, postText, actorId, actor, createdAt]
                       properties:
-                        kind: { type: string, enum: [reply, like, reply_like] }
-                        postId: { $ref: "#/components/schemas/Id" }
-                        postText: { type: string }
+                        kind: { type: string, enum: [reply, like, reply_like, joined] }
+                        postId: { type: [string, "null"], format: uuid }
+                        postText: { type: [string, "null"] }
                         actorId: { $ref: "#/components/schemas/Id" }
                         actor: { $ref: "#/components/schemas/Person" }
                         replyId: { type: [string, "null"], format: uuid }
@@ -1016,6 +1080,12 @@ components:
         avatarUrl: { type: [string, "null"] }
         createdAt: { type: string, format: date-time }
         emailNotifications: { type: boolean, description: "Emails about activity while I'm not signed in to the phone app" }
+    InviteLink:
+      type: object
+      required: [token, link]
+      properties:
+        token: { type: string }
+        link: { type: string }
     Person:
       description: Someone as shown next to their posts, replies and messages (never their email)
       type: object

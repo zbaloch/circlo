@@ -10,13 +10,15 @@ import { Avatar } from '@/components/avatar';
 import { Button, ErrorText, TextField } from '@/components/form';
 import { describeError } from '@/lib/account';
 import { loadAddressBook, type AddressBook } from '@/lib/addressbook';
-import { acceptInvite, acceptRequest, createInviteLink, declineRequest, InviteError, type Connection } from '@/lib/friends';
+import { setCircles } from '@/lib/circles';
+import { showAlert } from '@/lib/dialog';
+import { acceptRequest, declineRequest, getInviteLink, InviteError, joinInvite, justJoined, previewInvite, resetInviteLink, type Connection } from '@/lib/friends';
 import { takePendingInvite } from '@/lib/pending-invite';
 import { displayName, markRequestsSeen, useConnections } from '@/lib/use-connections';
 import { usePalette } from '@/theme/use-palette';
 import { Text } from '@/components/ui/text';
 
-/** While my QR code is on screen, check this often for the person who scans it. */
+/** While my QR code is on screen, check this often for people who scan it. */
 const INVITE_POLL_MS = 3_000;
 
 type Section = 'friends' | 'join' | 'invite';
@@ -32,8 +34,8 @@ function message(e: unknown) {
 
 /**
  * Friends, in three tabs: Friends (requests to answer, requests I sent, my friends), Got an invite? (scan or paste
- * someone's), and Invite someone (my QR code and link). Invites are the only way to connect; there is no search.
- * When someone scans my code, their request replaces the QR code so I can accept it right there.
+ * someone's), and Invite someone (my QR code and link, the same until I reset it). Invites are the only way to
+ * connect; there is no search. Whoever scans my code while it's on screen shows up above it, to choose their circles.
  */
 export default function SearchScreen() {
   const palette = usePalette();
@@ -48,7 +50,9 @@ export default function SearchScreen() {
     const next = asSection(requested);
     if (next) setSection(next);
   }
-  const [invite, setInvite] = useState<{ link: string; known: ReadonlySet<string> }>();
+  const [link, setLink] = useState<string>();
+  // Who I was connected with when my code went on screen: anyone new since then just joined.
+  const [known, setKnown] = useState<ReadonlySet<string> | null>(null);
   // An invite link that opened the app waits here, ready to send.
   const [pasted, setPasted] = useState(() => takePendingInvite() ?? '');
   const [busy, setBusy] = useState<string | null>(null);
@@ -74,9 +78,7 @@ export default function SearchScreen() {
   const incoming = all.filter((c) => c.status === 'incoming');
   const outgoing = all.filter((c) => c.status === 'outgoing');
   const friends = all.filter((c) => c.status === 'accepted');
-  // The person who used my current invite: anyone new since I created it who asked me (not someone I asked).
-  const scanner = invite ? all.find((c) => c.status !== 'outgoing' && !invite.known.has(c.userId)) : undefined;
-  const otherRequests = incoming.filter((c) => c.userId !== scanner?.userId);
+  const joiners = section === 'invite' ? justJoined(all, known) : [];
 
   // Requests are visible here, so they count as seen (clears the bell's dot).
   const unseenKey = unseenRequests.join(',');
@@ -86,13 +88,21 @@ export default function SearchScreen() {
     }, [account, unseenKey]),
   );
 
-  // Watch for the scan while the QR code is showing.
-  const waiting = !!invite && !scanner;
+  // My link, fetched when its tab opens; who I'm connected with then is noted so new joiners stand out.
+  const showingInvite = section === 'invite' && !!connections;
   useEffect(() => {
-    if (!waiting) return;
-    const timer = setInterval(() => void refresh(), INVITE_POLL_MS);
-    return () => clearInterval(timer);
-  }, [waiting, refresh]);
+    if (!showingInvite || link) return;
+    getInviteLink().then(setLink, (e) => setError(message(e)));
+  }, [showingInvite, link]);
+  if (showingInvite && !known && connections) setKnown(new Set(connections.map((c) => c.userId)));
+  // Watch for scans while the QR code is on screen.
+  useFocusEffect(
+    useCallback(() => {
+      if (!showingInvite) return;
+      const timer = setInterval(() => void refresh(), INVITE_POLL_MS);
+      return () => clearInterval(timer);
+    }, [showingInvite, refresh]),
+  );
 
   if (!account) return null;
 
@@ -144,11 +154,35 @@ export default function SearchScreen() {
     </View>
   );
 
-  const newInvite = () =>
-    run('invite', async () => {
-      const link = await createInviteLink();
-      setInvite({ link, known: new Set(all.map((c) => c.userId)) });
+  const reset = () =>
+    showAlert('Reset your invite link?', 'Your current link and QR code will stop working. People who already joined stay connected.', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Reset', style: 'destructive', onPress: () => void run('reset', async () => { setLink(await resetInviteLink()); setNotice('You have a new invite link.'); }) },
+    ]);
+
+  // Someone's invite: see who it's from, choose their circles, then connect.
+  const connectWith = (text: string) =>
+    run('paste', async () => {
+      const from = await previewInvite(text);
+      const name = from.name || `@${from.handle}`;
+      askCircles(`Add ${name} to circles`, 'Connect', (ids) =>
+        void run('paste', async () => {
+          const status = await joinInvite(account, text, ids);
+          setPasted('');
+          setNotice(status === 'accepted' ? `You and ${name} are now connected.` : 'Request sent. You’ll see their profile once they accept.');
+          await refresh();
+        }),
+      );
     });
+
+  const chooseFor = (c: Connection) =>
+    askCircles(`Add ${displayName(c)} to circles`, 'Save', (ids) =>
+      void run(`circles:${c.userId}`, async () => {
+        await setCircles(account, c.userId, ids);
+        setBook(await loadAddressBook(account));
+        setNotice(ids.length && book ? `${displayName(c)} is in ${circlesLine(book, ids)}.` : `${displayName(c)} sees your Everyone posts.`);
+      }),
+    );
 
 
   const pick = (t: Section) => {
@@ -156,11 +190,11 @@ export default function SearchScreen() {
     setError(undefined);
     setNotice(undefined);
   };
-  // A dot on a section with something waiting: requests in Friends, the scanner's request in Invite someone.
+  // A dot on a section with something waiting: requests in Friends.
   const dots: Record<Section, boolean> = {
-    friends: otherRequests.length > 0,
+    friends: incoming.length > 0,
     join: false,
-    invite: scanner?.status === 'incoming',
+    invite: false,
   };
 
   const tabLabel = (t: { key: Section; label: string }) => (t.key === 'friends' ? `${t.label} (${friends.length})` : t.label);
@@ -174,10 +208,10 @@ export default function SearchScreen() {
 
   const friendsSection = (
     <>
-      {otherRequests.length > 0 ? (
+      {incoming.length > 0 ? (
         <View className="gap-3">
-          <Text className="text-lg font-bold text-ink dark:text-ink-dark">Requests ({otherRequests.length})</Text>
-          {otherRequests.map((c) => (
+          <Text className="text-lg font-bold text-ink dark:text-ink-dark">Requests ({incoming.length})</Text>
+          {incoming.map((c) => (
             <View key={c.userId} className="gap-3 rounded-2xl border border-border p-4 dark:border-border-dark">
               <View className="flex-row items-center gap-3">
                 <Avatar id={c.userId} name={displayName(c)} uri={c.profile.avatarUrl} />
@@ -240,85 +274,52 @@ export default function SearchScreen() {
   const joinSection = (
     <>
       <Text className="text-muted dark:text-muted-dark">
-        Scan the QR code someone shows you, or paste the invite link they sent. You’ll choose their circles next; they’ll get your request to accept.
+        Scan the QR code someone shows you, or paste the invite link they sent. You’ll choose their circles, then you’re connected.
       </Text>
       {Platform.OS !== 'web' ? <Button label="Scan QR code" onPress={() => router.push('/scan')} /> : null}
       <TextField label={Platform.OS === 'web' ? 'Paste the invite link' : 'Or paste an invite link'} placeholder="https://www.hellocirclo.com/i/…" value={pasted} onChangeText={setPasted} />
-      <Button
-        label="Send request"
-        variant="outline"
-        disabled={!pasted}
-        loading={busy === 'paste'}
-        onPress={() =>
-          askCircles('Add to circles', 'Send request', (ids) =>
-            void run('paste', async () => {
-              await acceptInvite(account, pasted, ids);
-              setPasted('');
-              setNotice('Request sent. You’ll see their profile once they accept.');
-              await refresh();
-            }),
-          )
-        }
-      />
+      <Button label="Connect" variant="outline" disabled={!pasted} loading={busy === 'paste'} onPress={() => void connectWith(pasted)} />
       {feedback}
     </>
   );
 
-  const inviteSection = scanner ? (
-    <>
-      <View className="flex-row items-center gap-3">
-        <Avatar id={scanner.userId} name={displayName(scanner)} uri={scanner.profile.avatarUrl} />
-        <View className="flex-1">
-          <Text className="font-bold text-ink dark:text-ink-dark">{displayName(scanner)} used your invite</Text>
-          <Text className="text-muted dark:text-muted-dark">
-            {scanner.status === 'accepted' ? 'You’re now connected.' : 'Accept their request to connect.'}
-          </Text>
+  const inviteSection = (
+    <View className="items-center gap-3">
+      {joiners.map((c) => (
+        <View key={c.userId} className="w-full flex-row items-center gap-3 rounded-2xl border border-border p-4 dark:border-border-dark">
+          <Avatar id={c.userId} name={displayName(c)} uri={c.profile.avatarUrl} />
+          <View className="flex-1">
+            <Text className="font-bold text-ink dark:text-ink-dark">{displayName(c)} joined</Text>
+            <Text className="text-muted dark:text-muted-dark">You’re connected. They see your Everyone posts.</Text>
+          </View>
+          <Button label="Circles" variant="outline" loading={busy === `circles:${c.userId}`} disabled={!!busy} onPress={() => chooseFor(c)} />
         </View>
-        <Icon name="checkmark-circle" size={26} color={palette.primary} />
-      </View>
-      {scanner.status === 'incoming' ? (
+      ))}
+      <Text className="self-start text-muted dark:text-muted-dark">
+        Show this code to someone, or send them your link. Anyone who opens it is connected with you and sees your Everyone
+        posts; you’ll be told, and can choose their circles. It stays the same until you reset it.
+      </Text>
+      {link ? (
         <>
-
-          {requestActions(scanner)}
+          <View className="rounded-xl bg-white p-3">
+            <QRCode value={link} size={200} />
+          </View>
+          <Text selectable accessibilityLabel="Invite link" className="text-center text-sm text-muted dark:text-muted-dark">
+            {link}
+          </Text>
+          <View className="w-full flex-row gap-3">
+            <View className="flex-1">
+              <Button label="Share link" onPress={() => Share.share({ message: `Join me on Circlo: ${link}` })} />
+            </View>
+            <View className="flex-1">
+              <Button label="Copy" variant="outline" onPress={async () => { await Clipboard.setStringAsync(link); setNotice('Invite link copied.'); }} />
+            </View>
+          </View>
+          <Button label="Reset link" variant="outline" loading={busy === 'reset'} disabled={!!busy} onPress={reset} />
         </>
       ) : null}
-      {feedback}
-      <Button label="Invite someone else" variant="outline" loading={busy === 'invite'} onPress={newInvite} />
-    </>
-  ) : invite ? (
-    <View className="items-center gap-3">
-      <Text className="self-start text-muted dark:text-muted-dark">
-        Ask them to scan this in Circlo. Their request will show up here for you to accept.
-      </Text>
-      <View className="rounded-xl bg-white p-3">
-        <QRCode value={invite.link} size={200} />
-      </View>
-      <View className="flex-row items-center gap-2">
-        <Icon name="hourglass-outline" size={16} color={palette.muted} />
-        <Text className="text-sm text-muted dark:text-muted-dark">Waiting for someone to use it…</Text>
-      </View>
-      <Text selectable accessibilityLabel="Invite link" className="text-center text-sm text-muted dark:text-muted-dark">
-        {invite.link}
-      </Text>
-      <View className="w-full flex-row gap-3">
-        <View className="flex-1">
-          <Button label="Share link" onPress={() => Share.share({ message: `Join me on Circlo: ${invite.link}` })} />
-        </View>
-        <View className="flex-1">
-          <Button label="Copy" variant="outline" onPress={async () => { await Clipboard.setStringAsync(invite.link); setNotice('Invite link copied.'); }} />
-        </View>
-      </View>
       <View className="self-stretch">{feedback}</View>
     </View>
-  ) : (
-    <>
-      <Text className="text-muted dark:text-muted-dark">
-        Create a one-time invite to add someone. You’ll get a QR code to show them in person and a link you can send.
-        Each invite works once, for 7 days, and lets their app check it’s really you.
-      </Text>
-      <Button label="Create invite" loading={busy === 'invite'} disabled={!connections} onPress={newInvite} />
-      {feedback}
-    </>
   );
 
   return (

@@ -33,7 +33,7 @@ lose) and makes the web app possible.
 | Sessions | Hashes of refresh tokens, per device, until they expire (30 days) | Stay signed in |
 | Sign-ins | The time of each login (no device, place or address), kept 30 days | Warn your other devices: "New sign-in to your account" |
 | Login lock | Per account (or per typed name, if no account matches): failed-attempt count and lock time, deleted a week after the last failure | Lock login after 3 wrong passwords (15 min, 1 h, then 24 h) |
-| Friends, invites, blocks | Pairs of ids, status, time; invite tokens only as hashes | Who is connected with whom |
+| Friends, invites, blocks | Pairs of ids, status, time, whether someone joined with your link; invite tokens only as hashes (your permanent link is derived from a random value with a server key, never stored); people you removed, so your link stops working for them | Who is connected with whom |
 | Circles | Your circle names and who is in them | Choose who sees each post. Shown only to you |
 | Posts, replies, likes | Text, times, who wrote or liked them; each post's audience (and, for circle posts, who it reached) | Show posts to the people you chose. The audience is shown only to you |
 | Photos and videos | Files with random names in a private bucket, served through links that expire after an hour | Media in posts, chats and profile photos |

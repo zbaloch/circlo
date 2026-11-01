@@ -1,6 +1,6 @@
 import { Icon, type IconName } from '@/components/ui/icon';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Modal, Pressable, ScrollView, View } from 'react-native';
 
 import { Avatar } from '@/components/avatar';
@@ -25,7 +25,9 @@ import { usePalette } from '@/theme/use-palette';
  * showing their circles. It is author-only: they are never told and never see a label (PLAN.md 2A).
  */
 export default function FriendScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  // `circles=1`: opened to choose their circles (someone who just joined with my link).
+  const { id, circles: chooseCircles } = useLocalSearchParams<{ id: string; circles?: string }>();
+  const openOnArrival = useRef(chooseCircles === '1');
   const palette = usePalette();
   const { account, connections, refresh } = useConnections();
   const [book, setBook] = useState<AddressBook | null>(null);
@@ -38,7 +40,9 @@ export default function FriendScreen() {
   }, [id]);
 
   const reloadBook = useCallback(() => {
-    setOpen(false); // the screen stays mounted between visits: always reopen with the sheet closed
+    // The screen stays mounted between visits: reopen with the sheet closed, unless sent here to choose circles.
+    setOpen(openOnArrival.current);
+    openOnArrival.current = false;
     if (account) void loadAddressBook(account).then(setBook);
   }, [account]);
   useFocusEffect(reloadBook);
@@ -63,7 +67,7 @@ export default function FriendScreen() {
   const remove = () =>
     showAlert(
       `Remove ${name}?`,
-      `They won’t see your posts any more, including earlier ones, and they aren’t told. To connect again, you’ll both need to use a new invite.`,
+      `They won’t see your posts any more, including earlier ones, and they aren’t told. Your invite link won’t work for them again; to reconnect, you’d open theirs.`,
       [
         { text: 'Cancel', style: 'cancel' },
         { text: 'Remove', style: 'destructive', onPress: () => run(async () => { setOpen(false); await unfriend(account, c.userId); await refresh(); router.back(); }) },

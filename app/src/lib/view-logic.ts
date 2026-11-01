@@ -64,5 +64,5 @@ export function deviceLabel(d: { kind: 'ios' | 'android' | 'web' | null; current
 
 /** Pure: the items the Notifications tab shows (and its dot counts); likes only while they're shown. */
 export function shownActivity<T extends Pick<ActivityItem, 'kind'>>(items: T[], likes = LIKES_ENABLED): T[] {
-  return likes ? items : items.filter((i) => i.kind === 'reply');
+  return likes ? items : items.filter((i) => i.kind === 'reply' || i.kind === 'joined');
 }

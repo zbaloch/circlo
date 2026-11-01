@@ -25,19 +25,24 @@ export function mergeRows(items: ActivityItem[], signIns: SignIn[]): ({ type: 'a
     .map(({ at: _at, ...row }) => row);
 }
 
-/** Pure: where tapping a row goes. A reply, or a like on my reply, opens the thread at that reply. Exported for tests. */
+/**
+ * Pure: where tapping a row goes. A reply, or a like on my reply, opens the thread at that reply; someone who joined
+ * with my link opens their profile with their circles ready to choose. Exported for tests.
+ */
 export function activityHref(item: ActivityItem) {
+  if (item.kind === 'joined' || !item.postId) return { pathname: '/friend/[id]' as const, params: { id: item.actorId, circles: '1' } };
   return { pathname: '/post/[id]' as const, params: item.kind !== 'like' && item.replyId ? { id: item.postId, reply: item.replyId } : { id: item.postId } };
 }
 
 /** Pure: what the row says after the person's name. Exported for tests. */
 export function activityVerb(kind: ActivityItem['kind']): string {
+  if (kind === 'joined') return ' joined with your invite link';
   return kind === 'reply' ? ' replied to your post' : kind === 'reply_like' ? ' liked your reply' : ' liked your post';
 }
 
 /**
- * Notifications (PLAN.md 2A): friend requests first (they need an answer), then replies and likes on my posts and
- * sign-ins to my account, newest first. There's no remote push: this tab is where activity shows up, and opting in to
+ * Notifications (PLAN.md 2A): friend requests first (they need an answer), then replies and likes on my posts, people
+ * who joined with my invite link and sign-ins to my account, newest first. There's no remote push: this tab is where activity shows up, and opting in to
  * background checks only adds a count on the lock screen. Opening the tab clears the bell's dot; rows that were new on
  * arrival stay highlighted until you leave.
  */
@@ -91,7 +96,7 @@ export default function NotificationsScreen() {
   if (connections && activity.items && incoming.length === 0 && rows.length === 0) {
     return (
       <Screen>
-        <EmptyState icon="notifications-outline" title="Nothing yet" body="Requests, replies and likes show up here." />
+        <EmptyState icon="notifications-outline" title="Nothing yet" body="Replies and new friends show up here." />
       </Screen>
     );
   }
@@ -132,12 +137,14 @@ export default function NotificationsScreen() {
         const key = `${item.kind}:${item.replyId ?? item.actorId}:${item.postId}`;
         const name = item.actorName;
         const said = item.kind !== 'like' && item.replyText ? item.replyText : item.postText;
-        const quote = said ? ` · “${said.length > 60 ? `${said.slice(0, 60)}…` : said}”` : '';
+        const quote = item.kind === 'joined'
+          ? ' · They see your Everyone posts. Tap to choose their circles.'
+          : said ? ` · “${said.length > 60 ? `${said.slice(0, 60)}…` : said}”` : '';
         return (
           <Row
             key={key}
             isNew={fresh.has(key)}
-            hint={item.kind === 'like' ? 'Opens the post' : 'Opens the reply'}
+            hint={item.kind === 'joined' ? 'Opens their profile to choose circles' : item.kind === 'like' ? 'Opens the post' : 'Opens the reply'}
             onPress={() => router.push(activityHref(item))}
             avatar={<Avatar id={item.actorId} name={name} uri={item.actorAvatar} />}
             title={
