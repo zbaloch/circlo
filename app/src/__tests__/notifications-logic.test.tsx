@@ -1,5 +1,4 @@
-// The native core isn't available under jest; only pure helpers and the tab bar dot are tested here.
-jest.mock('@circlo/core', () => ({}));
+// Only pure helpers and the tab bar dot are tested here.
 jest.mock('@/lib/background-check', () => ({ markActiveNow: async () => {} }));
 jest.mock('@/lib/activity', () => ({ refreshActivity: async () => {} }));
 jest.mock('@/lib/session', () => ({ useSession: () => ({ status: 'signedOut' }) }));
@@ -13,7 +12,7 @@ import type { Connection } from '@/lib/friends';
 // eslint-disable-next-line import/first
 import { unseenRequestIds } from '@/lib/use-connections';
 
-const c = (userId: string, status: Connection['status']): Connection => ({ userId, status, verified: false, identityChanged: false });
+const c = (userId: string, status: Connection['status']): Connection => ({ userId, status, profile: { displayName: userId, handle: userId, bio: '' } });
 
 describe('unseen friend requests', () => {
   const connections = [c('a', 'incoming'), c('b', 'incoming'), c('c', 'outgoing'), c('d', 'accepted')];

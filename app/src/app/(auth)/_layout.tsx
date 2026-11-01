@@ -2,7 +2,7 @@ import { Stack } from 'expo-router';
 
 import { usePalette } from '@/theme/use-palette';
 
-/** Signed-out screens: welcome, sign up (+ recovery phrase), log in, recover. */
+/** Signed-out screens: welcome, sign up (+ email code), log in, forgot password. */
 export default function AuthLayout() {
   const palette = usePalette();
   return (
@@ -15,7 +15,6 @@ export default function AuthLayout() {
         contentStyle: { backgroundColor: palette.surface },
       }}>
       <Stack.Screen name="welcome" options={{ headerShown: false }} />
-      <Stack.Screen name="protect-account" />
     </Stack>
   );
 }

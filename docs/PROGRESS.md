@@ -2,6 +2,47 @@
 
 Memory file for Claude Code sessions. Read this first when resuming. Keep it accurate.
 
+## 2026-11-01: no more end-to-end encryption (branch `plain-accounts`)
+
+Owner decision: Circlo becomes a traditional circles-based social network, so people can't lock themselves out by
+losing keys or a phrase, and a web app is possible. The user experience stays the same.
+
+- **Server**: V18 drops every table of the encrypted design and creates a plain schema. Accounts (name, username,
+  email, Argon2id password hash, bio, photo), signup finished with an emailed 6-digit code, login by username or
+  email, password reset by code, devices and rotating sessions, circles and memberships, posts with an audience
+  snapshot, replies, likes, chats with read state, attachments, reports with a copy of the content. CORS for the web
+  app. 52 tests (`mvn verify`, MariaDB + MinIO).
+- **App**: the same screens on plain API data; new signup / verify email / login / forgot password screens; photo
+  upload in Edit profile; Devices = signed-in sessions; recovery, linking, safety numbers and the crypto self-test
+  removed. Web app via Expo's static web export (`npm run build:web`, `app/vercel.json`). 104 tests, lint, typecheck.
+- **Removed**: `core/`, `app/modules/circlo-core`, ubrn, react-native-passkey, docs/CRYPTO.md, docs/PASSKEY_RECOVERY.md,
+  the leak drill, ci-core, cargo audits. THREAT_MODEL.md v2.0, PRIVACY.md, HARDENING.md, LEGAL.md rewritten.
+- **Existing dev/test accounts start over** (nothing encrypted could be migrated). Empty the media bucket once.
+
+### Waiting on owner (2026-11-01)
+
+1. **SMTP provider** for production (Postmark, SES, Resend, ...): set `CIRCLO_MAIL_HOST`, `CIRCLO_MAIL_PORT`,
+   `CIRCLO_MAIL_USERNAME`, `CIRCLO_MAIL_PASSWORD`, `CIRCLO_MAIL_FROM` in the server's secret store, and set up SPF,
+   DKIM and DMARC for the sending domain.
+2. **Web app hosting**: a Vercel project on `app/` (root directory `app`, uses `app/vercel.json`), the domain
+   `app.hellocirclo.com`, and `EXPO_PUBLIC_API_URL` set to the API's HTTPS URL at build time.
+3. **CORS**: `CIRCLO_CORS_ORIGINS=https://app.hellocirclo.com` on the server, and the same origin allowed on the
+   bucket (S3 CORS rule for GET and PUT with `Content-Type`), or the web app can't upload or show photos.
+4. Empty the old ciphertext out of the media bucket (V18 leaves it unreferenced).
+5. Turn on encryption at rest for the database, backups and bucket (HARDENING.md, "Data at rest").
+6. The App Store Connect / Play listings and the website copy no longer say "end-to-end encrypted" (website updated
+   on branch `plain-accounts` of circlo-web); update the store descriptions and the privacy "nutrition labels"
+   (now: email, name, user content, linked to the user).
+7. Rewrite the load test for the new API (HARDENING.md).
+
+### Needs manual check (2026-11-01)
+
+- Phone and web: sign up (code arrives by email), log in by username and by email, forgot password, change password
+  (other device signed out), add/change/remove photo, invite by link and QR, accept into circles, post to a circle
+  and check a friend outside it can't see it, chat with photos, report, block, delete account.
+- Web app: everything above in a desktop and a phone browser, including photo upload (needs bucket CORS) and opening
+  `https://app.hellocirclo.com/i/<token>`.
+
 ## Current status
 
 | Phase | Status |
@@ -451,6 +492,14 @@ See docs/HARDENING.md for how to repeat each check.
 | 2026-10-30 | **No remote push.** FCM removed (server sender, push-token endpoint and columns, CIRCLO_PUSH_TOKEN_KEY/CIRCLO_FCM_*); no APNs. Notifications tab lists requests, replies, likes and sign-ins (`GET /v1/activity`); opt-in background checks (expo-background-task) with a per-device counts-only check token (`GET /v1/activity/pending`) and local notifications | Owner decision: Apple and Google must not learn about users' activity; slower notifications accepted |
 | 2026-10-31 | **iOS bundle ID `com.hellocirclo.app`** (Android stays `com.circlo.app`) | `com.circlo.app` was not available to register at Apple; the App Store Connect app uses `com.hellocirclo.app` |
 | 2026-10-31 | **Root stack + drawer around the tabs only**; no docked "Post your reply" bar | On iOS the left-edge swipe opened the drawer instead of going back (every screen was a drawer screen). Replying starts only from the reply button |
+| 2026-11-01 | **No end-to-end encryption** (owner): content over TLS, stored as sent, server enforces access; Rust core, OPAQUE, MLS, recovery phrases/passkeys, device linking and safety numbers removed | Simple sign-up and recovery (nothing to lose), and a web app |
+| 2026-11-01 | **Accounts: name, username, email, password**; email verified with a 6-digit code (15 min, 5 guesses, hashed) before the account exists; login by username or email; reset by emailed code; Argon2id hashes | Owner request. Unverified signups don't hold a username or email and are deleted after a day |
+| 2026-11-01 | Login lock (3 failures → 15 min / 1 h / 24 h) kept, now keyed by account and counting real failures; a password reset lifts it | The server now sees wrong passwords; reset by email replaces "the recovery phrase always works" |
+| 2026-11-01 | Circle posts reach the circle's members **as they were when posted**; Everyone = current friends; unfriend/block removes access to everything | Keeps "moving someone closer doesn't open earlier posts" (2026-10-29); revocation is now possible, so it's done |
+| 2026-11-01 | Invite links are `https://www.hellocirclo.com/i/<token>` (no key fingerprint); the website forwards browsers to the web app | Nothing to verify without keys |
+| 2026-11-01 | Chats stored on the server with per-person read state; a sender can delete a message for everyone | Same chats on every device and on the web |
+| 2026-11-01 | Web app = Expo static web export at app.hellocirclo.com; session refresh token in localStorage there | One codebase; accepted XSS risk documented in THREAT_MODEL.md |
+| 2026-11-01 | Still invite-only (no username search) | "Rest of the flow stays the same"; search can be added later if wanted |
 
 ## Waiting on owner
 

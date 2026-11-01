@@ -4,9 +4,8 @@ import SignupScreen from '@/app/(auth)/signup';
 
 jest.mock('expo-router', () => ({ router: { push: jest.fn() } }));
 jest.mock('expo-linking', () => ({ openURL: jest.fn() }));
-// Signup runs OPAQUE in the native core; these tests cover only the terms agreement.
-jest.mock('@/lib/account', () => ({ normalizeHandle: (h: string) => h, describeError: String, Signup: { start: jest.fn() } }));
-jest.mock('@/lib/signup-store', () => ({ setPendingSignup: jest.fn() }));
+// These tests cover only the terms agreement; signing up itself is a server call.
+jest.mock('@/lib/account', () => ({ normalizeUsername: (h: string) => h, looksLikeEmail: () => true, describeError: String, startSignup: jest.fn() }));
 
 describe('signup terms', () => {
   it('can’t continue until the terms are agreed to, and links to the terms and privacy policy', async () => {

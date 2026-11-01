@@ -32,16 +32,11 @@ const config: ExpoConfig = {
       tinted: './assets/images/icon-ios-tinted.png',
     },
     supportsTablet: false,
-    // Passkeys for Face ID recovery (docs/PASSKEY_RECOVERY.md): www.hellocirclo.com serves the matching
+    // Invite links (https://www.hellocirclo.com/i/<token>) open the app: www.hellocirclo.com serves the matching
     // apple-app-site-association (circlo-web), and the App ID has the Associated Domains capability.
-    associatedDomains: ['webcredentials:www.hellocirclo.com'],
-    // Export compliance (App Store Connect, 2026-10-31): Circlo uses only standard encryption algorithms (core/:
-    // XChaCha20-Poly1305, X25519, Ed25519, MLS, OPAQUE) and isn't distributed in France, so Apple needs no documentation
-    // and treats it as exempt: NO here, and builds aren't asked the encryption questions. Before adding France (or any
-    // non-standard algorithm), file the documentation and switch to YES plus ITSEncryptionExportComplianceCode.
+    associatedDomains: ['applinks:www.hellocirclo.com'],
+    // Export compliance: Circlo uses only standard HTTPS (TLS) from the operating system, which is exempt.
     config: { usesNonExemptEncryption: false },
-    // Loopback is needed in every build: encrypted video plays through the core's 127.0.0.1 server.
-    infoPlist: { NSAppTransportSecurity: { NSAllowsLocalNetworking: true } },
   },
   android: {
     package: 'com.circlo.app',
@@ -52,21 +47,39 @@ const config: ExpoConfig = {
       monochromeImage: './assets/images/adaptive-icon-monochrome.png',
     },
     predictiveBackGestureEnabled: false,
+    // Invite links open the app (www.hellocirclo.com serves the matching assetlinks.json).
+    intentFilters: [
+      {
+        action: 'VIEW',
+        autoVerify: true,
+        category: ['BROWSABLE', 'DEFAULT'],
+        data: [{ scheme: 'https', host: 'www.hellocirclo.com', pathPrefix: '/i' }],
+      },
+    ],
+  },
+  // The web app (app.hellocirclo.com): the same screens, exported as a static single-page app.
+  web: {
+    bundler: 'metro',
+    output: 'single',
+    favicon: './assets/images/favicon.png',
+    name: 'Circlo',
+    shortName: 'Circlo',
+    themeColor: colors.brand.accent,
+    backgroundColor: colors.brand.background,
   },
   plugins: [
     'expo-router',
-    './plugins/with-android-cmake',
     // No install attribution, advertising ids or tracking on either platform.
     './plugins/with-no-tracking',
-    // Keys live in the Android Keystore / iOS Keychain; excluded from Android Auto Backup.
+    // The session lives in the Android Keystore / iOS Keychain; excluded from Android Auto Backup.
     ['expo-secure-store', { configureAndroidBackup: true }],
     ['./plugins/with-network-security', { allowAllCleartext: isDev, pinning }],
-    ['expo-camera', { cameraPermission: 'Circlo uses the camera to scan friend invites and safety numbers, and to take photos you share.', microphonePermission: false, recordAudioAndroid: false }],
+    ['expo-camera', { cameraPermission: 'Circlo uses the camera to scan friend invites and to take photos you share.', microphonePermission: false, recordAudioAndroid: false }],
     [
       'expo-image-picker',
       {
-        photosPermission: 'Circlo lets you pick photos and videos to share. They are encrypted on your phone before upload.',
-        cameraPermission: 'Circlo uses the camera to scan friend invites and safety numbers, and to take photos you share.',
+        photosPermission: 'Circlo lets you pick photos and videos to share with the people you choose. Location and camera details are removed first.',
+        cameraPermission: 'Circlo uses the camera to scan friend invites and to take photos you share.',
         microphonePermission: false,
       },
     ],

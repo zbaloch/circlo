@@ -2,15 +2,16 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 
 import { api, ApiError, ok, setAccessToken, setRefresher } from '@/api/client';
 
+import { forgetActivity } from './activity';
 import { resetAddressBookCache } from './addressbook';
-import { clearAccount, loadAccount, updateRefreshToken, type StoredAccount } from './keystore';
+import { stopLocally as stopBackgroundChecks } from './background-check';
 import { clearFeed } from './feed-store';
+import { clearAccount, loadAccount, updateRefreshToken, type StoredAccount } from './keystore';
+import { refreshMe, setMe } from './me';
 import { clearMediaCache } from './media';
 import { clearMessaging } from './messaging';
-import { forgetActivity } from './activity';
-import { stopLocally as stopBackgroundChecks } from './background-check';
-import { forgetSignIns } from './security-events';
 import { clearOutbox } from './outbox';
+import { forgetSignIns } from './security-events';
 import { forgetConnections } from './use-connections';
 
 type State = { status: 'loading' } | { status: 'signedOut' } | { status: 'signedIn'; account: StoredAccount };
@@ -23,23 +24,26 @@ type Session = State & {
 const SessionContext = createContext<Session | null>(null);
 
 /**
- * Removes everything the account left on this device: keys, chats, decrypted media, queued posts, caches and local
- * preferences. Used by sign-out and when the server ends the session, so both leave nothing behind for the next account.
+ * Removes everything the account left on this device: the session, cached people and posts, picked media and local
+ * markers. Used by sign-out and when the server ends the session, so both leave nothing behind for the next account.
  */
 async function wipeDevice() {
   const current = await loadAccount();
   await clearAccount();
   setAccessToken(null);
+  setMe(null);
   resetAddressBookCache();
   clearOutbox();
   clearFeed();
+  clearMessaging();
   await stopBackgroundChecks();
-  if (current) await forgetConnections(current.userId).catch(() => {});
-  if (current) await forgetSignIns(current.userId);
-  if (current) await forgetActivity(current.userId);
-  await clearMessaging().catch(() => {});
+  if (current) {
+    await forgetConnections(current.userId).catch(() => {});
+    await forgetSignIns(current.userId);
+    await forgetActivity(current.userId);
+  }
   try {
-    clearMediaCache(); // decrypted photos must not outlive the session
+    clearMediaCache();
   } catch {
     // best effort: the OS may already have purged the cache
   }
@@ -48,9 +52,9 @@ async function wipeDevice() {
 /** Rotates the stored refresh token for a fresh in-memory access token. */
 async function refresh(account: StoredAccount) {
   const tokens = ok(await api.POST('/v1/auth/refresh', { body: { refreshToken: account.refreshToken } }));
-  setAccessToken(tokens.accessToken!);
-  await updateRefreshToken(tokens.refreshToken!);
-  return { ...account, refreshToken: tokens.refreshToken! };
+  setAccessToken(tokens.accessToken);
+  await updateRefreshToken(tokens.refreshToken);
+  return { ...account, refreshToken: tokens.refreshToken };
 }
 
 export function SessionProvider({ children }: { children: ReactNode }) {
@@ -66,14 +70,15 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       }
       try {
         const fresh = await refresh(account);
+        refreshMe().catch(() => {});
         if (!cancelled) setState({ status: 'signedIn', account: fresh });
       } catch (e) {
         if (e instanceof ApiError && e.status === 401) {
-          // Session revoked (e.g. password changed elsewhere): log in again; the keys come back from the backup.
+          // Session ended elsewhere (signed out, password changed or reset): log in again.
           await wipeDevice();
           if (!cancelled) setState({ status: 'signedOut' });
         } else if (!cancelled) {
-          // Offline: keys are on the device, so stay signed in and retry the session later.
+          // Offline: stay signed in and retry the session when a request needs it.
           setState({ status: 'signedIn', account });
         }
       }
@@ -97,12 +102,11 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       if (!account) return null;
       try {
         const tokens = ok(await api.POST('/v1/auth/refresh', { body: { refreshToken: account.refreshToken } }));
-        setAccessToken(tokens.accessToken!);
-        await updateRefreshToken(tokens.refreshToken!);
-        return tokens.accessToken!;
+        setAccessToken(tokens.accessToken);
+        await updateRefreshToken(tokens.refreshToken);
+        return tokens.accessToken;
       } catch (e) {
         if (e instanceof ApiError && e.status === 401) {
-          // The session was revoked elsewhere: sign in again (keys come back from the backup).
           await wipeDevice();
           setState({ status: 'signedOut' });
         }
@@ -113,11 +117,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }, [signedIn]);
 
   const signOut = useCallback(async () => {
-    // Tell the server to forget this device (no more pushes, removed from chats). Best effort: still sign out offline.
-    const current = await loadAccount();
-    if (current) {
-      await api.DELETE('/v1/devices/{deviceId}', { params: { path: { deviceId: current.deviceId } } }).catch(() => undefined);
-    }
+    // Tell the server to end this device's session. Best effort: still sign out offline.
+    await api.POST('/v1/auth/logout').catch(() => undefined);
     await wipeDevice();
     setState({ status: 'signedOut' });
   }, []);

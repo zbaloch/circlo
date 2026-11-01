@@ -4,7 +4,7 @@
  */
 
 export interface paths {
-    "/v1/auth/register/start": {
+    "/v1/auth/signup": {
         parameters: {
             query?: never;
             header?: never;
@@ -13,7 +13,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Start OPAQUE registration; reserves the handle and returns the new user id */
+        /** Start a signup; emails a 6-digit code to verify the address */
         post: {
             parameters: {
                 query?: never;
@@ -24,21 +24,25 @@ export interface paths {
             requestBody: {
                 content: {
                     "application/json": {
-                        /** @description 3-30 chars [a-z0-9_] after NFKC + lowercase */
-                        handle: string;
-                        registrationRequest: components["schemas"]["Bytes"];
+                        /** @description 1-50 characters */
+                        name: string;
+                        /** @description 3-30 of [a-z0-9_], case-insensitive */
+                        username: string;
+                        email: string;
+                        /** @description 12-128 characters */
+                        password: string;
                     };
                 };
             };
             responses: {
-                200: {
+                /** @description Code sent */
+                201: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content: {
                         "application/json": {
-                            userId?: components["schemas"]["Id"];
-                            registrationResponse?: components["schemas"]["Bytes"];
+                            email: string;
                         };
                     };
                 };
@@ -53,7 +57,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/auth/register/finish": {
+    "/v1/auth/signup/resend": {
         parameters: {
             query?: never;
             header?: never;
@@ -62,7 +66,35 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Finish registration with OPAQUE upload, public keys and both encrypted backups */
+        /** Send a new code for an unfinished signup (says nothing about whether one exists) */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: components["requestBodies"]["Email"];
+            responses: {
+                202: components["responses"]["Status"];
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/auth/signup/verify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Finish a signup with the emailed code; signs this device in */
         post: {
             parameters: {
                 query?: never;
@@ -73,24 +105,15 @@ export interface paths {
             requestBody: {
                 content: {
                     "application/json": {
-                        userId: components["schemas"]["Id"];
-                        handle: string;
-                        registrationUpload: components["schemas"]["Bytes"];
-                        /** @description One or more (CRYPTO.md 6.3/6.4). Older apps send recoveryPubkey + recoveryBackup instead. */
-                        recoveryMethods?: components["schemas"]["NewRecoveryMethod"][];
-                        /** @description Deprecated: a single phrase method's key (32 bytes) */
-                        recoveryPubkey?: components["schemas"]["Bytes"];
-                        identity: components["schemas"]["Identity"];
-                        device: components["schemas"]["Device"];
-                        passwordBackup: components["schemas"]["Bytes"];
-                        /** @description Deprecated: a single phrase method's copy */
-                        recoveryBackup?: components["schemas"]["Bytes"];
+                        email: string;
+                        code: string;
                     };
                 };
             };
             responses: {
                 200: components["responses"]["Tokens"];
                 400: components["responses"]["Error"];
+                409: components["responses"]["Error"];
             };
         };
         delete?: never;
@@ -99,7 +122,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/auth/login/start": {
+    "/v1/auth/login": {
         parameters: {
             query?: never;
             header?: never;
@@ -109,8 +132,8 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Start OPAQUE login (unknown handles get an indistinguishable fake response)
-         * @description Every start counts as a failed password attempt until a login finishes (a wrong password fails on the phone). After 3, password login for the handle is locked for 15 minutes, then 1 hour, then 24 hours; a day without attempts starts over. The recovery phrase is never locked, and setting a new password lifts the lock.
+         * Log in with a username or email and password
+         * @description 401 carries `attemptsLeft` (and `lockSeconds` when this failure set a lock); 429 `locked` carries `retryAfter`. An account whose email isn't verified yet answers 403 `email_not_verified` with `email`, and gets a fresh code.
          */
         post: {
             parameters: {
@@ -122,76 +145,16 @@ export interface paths {
             requestBody: {
                 content: {
                     "application/json": {
-                        handle: string;
-                        credentialRequest: components["schemas"]["Bytes"];
-                    };
-                };
-            };
-            responses: {
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            loginId?: components["schemas"]["Id"];
-                            credentialResponse?: components["schemas"]["Bytes"];
-                            /** @description Attempts left after this one before the lock (0: this is the last) */
-                            attemptsLeft?: number;
-                            /** @description At attemptsLeft 0: how long the lock lasts if this attempt fails */
-                            lockSeconds?: number | null;
-                        };
-                    };
-                };
-                /** @description `locked`: password login is locked; `retryAfter` (also the Retry-After header) is in seconds */
-                429: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            error?: string;
-                            retryAfter?: number;
-                        };
-                    };
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/auth/login/finish": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Finish OPAQUE login (single use, 60 s) */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": {
-                        loginId: components["schemas"]["Id"];
-                        handle: string;
-                        credentialFinalization: components["schemas"]["Bytes"];
+                        login: string;
+                        password: string;
                     };
                 };
             };
             responses: {
                 200: components["responses"]["Tokens"];
                 401: components["responses"]["Error"];
+                403: components["responses"]["Error"];
+                429: components["responses"]["Error"];
             };
         };
         delete?: never;
@@ -209,7 +172,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Rotate a refresh token (single use) */
+        /** Rotate the refresh token (single use; reusing an old one signs out every device) */
         post: {
             parameters: {
                 query?: never;
@@ -235,7 +198,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/auth/recovery/start": {
+    "/v1/auth/password/forgot": {
         parameters: {
             query?: never;
             header?: never;
@@ -244,7 +207,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Start recovery-phrase login; returns a challenge to sign with the recovery key */
+        /** Email a password-reset code (says nothing about whether the account exists) */
         post: {
             parameters: {
                 query?: never;
@@ -252,31 +215,9 @@ export interface paths {
                 path?: never;
                 cookie?: never;
             };
-            requestBody: {
-                content: {
-                    "application/json": {
-                        handle: string;
-                    };
-                };
-            };
+            requestBody: components["requestBodies"]["Email"];
             responses: {
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            userId?: components["schemas"]["Id"];
-                            challengeId?: components["schemas"]["Id"];
-                            nonce?: components["schemas"]["Bytes"];
-                            /**
-                             * Format: int64
-                             * @description unix seconds
-                             */
-                            expiresAt?: number;
-                        };
-                    };
-                };
+                202: components["responses"]["Status"];
             };
         };
         delete?: never;
@@ -285,7 +226,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/auth/recovery/finish": {
+    "/v1/auth/password/reset": {
         parameters: {
             query?: never;
             header?: never;
@@ -294,7 +235,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Finish recovery login; returns a recovery-scoped session */
+        /** Set a new password with the emailed code; signs out every device and signs this one in */
         post: {
             parameters: {
                 query?: never;
@@ -305,27 +246,15 @@ export interface paths {
             requestBody: {
                 content: {
                     "application/json": {
-                        challengeId: components["schemas"]["Id"];
-                        /** @description 64 bytes, CRYPTO.md 6.3 */
-                        signature: components["schemas"]["Bytes"];
+                        email: string;
+                        code: string;
+                        password: string;
                     };
                 };
             };
             responses: {
-                /** @description A recovery session and the method that proved it */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["Tokens"] & {
-                            methodId?: components["schemas"]["Id"];
-                            /** @enum {string} */
-                            methodKind?: "phrase" | "passkey";
-                        };
-                    };
-                };
-                401: components["responses"]["Error"];
+                200: components["responses"]["Tokens"];
+                400: components["responses"]["Error"];
             };
         };
         delete?: never;
@@ -334,7 +263,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/auth/password/start": {
+    "/v1/auth/password/change": {
         parameters: {
             query?: never;
             header?: never;
@@ -343,7 +272,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Start setting a new password (OPAQUE re-registration); full or recovery scope */
+        /** Change the password (signed in); other devices are signed out */
         post: {
             parameters: {
                 query?: never;
@@ -354,69 +283,14 @@ export interface paths {
             requestBody: {
                 content: {
                     "application/json": {
-                        handle: string;
-                        registrationRequest: components["schemas"]["Bytes"];
+                        currentPassword: string;
+                        newPassword: string;
                     };
                 };
             };
             responses: {
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            registrationResponse?: components["schemas"]["Bytes"];
-                        };
-                    };
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/auth/password/verify/start": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Prove the current password before changing it (OPAQUE login for the signed-in user; counts towards the lock, no sign-in alert) */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": {
-                        handle: string;
-                        credentialRequest: components["schemas"]["Bytes"];
-                    };
-                };
-            };
-            responses: {
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            loginId?: components["schemas"]["Id"];
-                            credentialResponse?: components["schemas"]["Bytes"];
-                            attemptsLeft?: number;
-                            lockSeconds?: number | null;
-                        };
-                    };
-                };
+                200: components["responses"]["Tokens"];
+                400: components["responses"]["Error"];
                 403: components["responses"]["Error"];
                 429: components["responses"]["Error"];
             };
@@ -427,7 +301,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/auth/password/verify/finish": {
+    "/v1/auth/logout": {
         parameters: {
             query?: never;
             header?: never;
@@ -436,8 +310,63 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Finish proving the current password */
+        /** Sign this device out */
         post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                200: components["responses"]["Status"];
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** My account */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                200: components["responses"]["Me"];
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/me/profile": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Change my name and bio */
+        put: {
             parameters: {
                 query?: never;
                 header?: never;
@@ -447,34 +376,144 @@ export interface paths {
             requestBody: {
                 content: {
                     "application/json": {
-                        loginId: components["schemas"]["Id"];
-                        handle: string;
-                        credentialFinalization: components["schemas"]["Bytes"];
+                        name: string;
+                        /** @description Up to 160 characters */
+                        bio: string;
                     };
                 };
             };
             responses: {
-                /** @description Verified; a one-time token (5 minutes) that removing a recovery method needs */
+                200: components["responses"]["Me"];
+                400: components["responses"]["Error"];
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/me/avatar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Set my photo to an image I just uploaded */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        objectKey: components["schemas"]["ObjectKey"];
+                    };
+                };
+            };
+            responses: {
+                200: components["responses"]["Me"];
+                400: components["responses"]["Error"];
+            };
+        };
+        post?: never;
+        /** Remove my photo */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                200: components["responses"]["Me"];
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/me/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** A copy of my data (profile, circles, friends, posts, replies, chats) as JSON */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description My data */
                 200: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content: {
                         "application/json": {
-                            reauthToken?: string;
+                            [key: string]: unknown;
                         };
                     };
                 };
-                401: components["responses"]["Error"];
             };
         };
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/v1/auth/password/finish": {
+    "/v1/me/preview/{friendId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** My posts exactly as this friend sees them */
+        get: {
+            parameters: {
+                query?: {
+                    before?: components["parameters"]["Before"];
+                    limit?: components["parameters"]["Limit"];
+                };
+                header?: never;
+                path: {
+                    friendId: components["schemas"]["Id"];
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                200: components["responses"]["Posts"];
+                404: components["responses"]["Error"];
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/account": {
         parameters: {
             query?: never;
             header?: never;
@@ -483,8 +522,9 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Finish setting a new password; revokes all sessions and returns a full session */
-        post: {
+        post?: never;
+        /** Delete my account and everything in it (needs my password) */
+        delete: {
             parameters: {
                 query?: never;
                 header?: never;
@@ -494,82 +534,137 @@ export interface paths {
             requestBody: {
                 content: {
                     "application/json": {
-                        registrationUpload: components["schemas"]["Bytes"];
-                        passwordBackup: components["schemas"]["Bytes"];
+                        password: string;
                     };
                 };
             };
             responses: {
-                200: components["responses"]["Tokens"];
+                200: components["responses"]["Status"];
+                403: components["responses"]["Error"];
             };
         };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/devices": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The devices and browsers signed in to my account */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Devices, oldest first */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            deviceId: components["schemas"]["Id"];
+                            /** Format: date-time */
+                            createdAt: string;
+                            current: boolean;
+                        }[];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/v1/backups/{kind}": {
+    "/v1/devices/{deviceId}": {
         parameters: {
             query?: never;
             header?: never;
-            path: {
-                kind: "password" | "recovery";
-            };
+            path?: never;
             cookie?: never;
         };
-        /** Download an encrypted key backup (recovery scope may read only kind=recovery) */
-        get: {
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Sign a device out */
+        delete: {
             parameters: {
                 query?: never;
                 header?: never;
                 path: {
-                    kind: "password" | "recovery";
+                    deviceId: components["schemas"]["Id"];
                 };
                 cookie?: never;
             };
             requestBody?: never;
             responses: {
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["Backup"];
-                    };
-                };
+                200: components["responses"]["Status"];
                 404: components["responses"]["Error"];
             };
         };
-        /** Replace an encrypted key backup; version must be stored version + 1 */
-        put: {
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/devices/current/check-token": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Turn on background checks for this device; returns its check token */
+        post: {
             parameters: {
                 query?: never;
                 header?: never;
-                path: {
-                    kind: "password" | "recovery";
-                };
+                path?: never;
                 cookie?: never;
             };
-            requestBody: {
-                content: {
-                    "application/json": components["schemas"]["Backup"];
-                };
-            };
+            requestBody?: never;
             responses: {
+                /** @description The check token */
                 200: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["Backup"];
+                        "application/json": {
+                            token: string;
+                        };
                     };
                 };
-                409: components["responses"]["Error"];
             };
         };
-        post?: never;
-        delete?: never;
+        /** Turn background checks off for this device */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                200: components["responses"]["Status"];
+            };
+        };
         options?: never;
         head?: never;
         patch?: never;
@@ -582,7 +677,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Recent sign-ins to my account (30 days, newest first); only the kind and time */
+        /** Recent sign-ins to my account (30 days, newest first) */
         get: {
             parameters: {
                 query?: never;
@@ -592,13 +687,14 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
+                /** @description Sign-ins */
                 200: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content: {
                         "application/json": {
-                            events?: {
+                            events: {
                                 id: components["schemas"]["Id"];
                                 /** @enum {string} */
                                 kind: "sign_in";
@@ -618,231 +714,14 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/recovery-methods": {
+    "/v1/users/{userId}": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** My recovery methods (no keys or ciphertext) */
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            methods: {
-                                id: components["schemas"]["Id"];
-                                /** @enum {string} */
-                                kind: "phrase" | "passkey";
-                                /** Format: date-time */
-                                createdAt: string;
-                                /** Format: date-time */
-                                lastUsedAt?: string | null;
-                            }[];
-                        };
-                    };
-                };
-            };
-        };
-        put?: never;
-        /** Add a recovery method (or another wrap of my passkey) */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": components["schemas"]["NewRecoveryMethod"];
-                };
-            };
-            responses: {
-                201: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            id?: components["schemas"]["Id"];
-                        };
-                    };
-                };
-                409: components["responses"]["Error"];
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/recovery-methods/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: components["schemas"]["Id"];
-            };
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        /** Remove a recovery method (needs X-Circlo-Reauth from password/verify; never the last one) */
-        delete: {
-            parameters: {
-                query?: never;
-                header: {
-                    "X-Circlo-Reauth": string;
-                };
-                path: {
-                    id: components["schemas"]["Id"];
-                };
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": Record<string, never>;
-                    };
-                };
-                403: components["responses"]["Error"];
-                404: components["responses"]["Error"];
-                409: components["responses"]["Error"];
-            };
-        };
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/recovery-methods/{id}/backup": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: components["schemas"]["Id"];
-            };
-            cookie?: never;
-        };
-        /** The recovery copy of one of my methods (full or recovery session) */
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    id: components["schemas"]["Id"];
-                };
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            ciphertext: components["schemas"]["Bytes"];
-                        };
-                    };
-                };
-                404: components["responses"]["Error"];
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/devices": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List this account's devices */
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["DeviceView"][];
-                    };
-                };
-            };
-        };
-        put?: never;
-        /** Register another device (certificate signed by the identity key) */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": components["schemas"]["Device"];
-                };
-            };
-            responses: {
-                201: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["DeviceView"];
-                    };
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/users/{userId}/identity": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                userId: components["schemas"]["Id"];
-            };
-            cookie?: never;
-        };
-        /** A user's published identity keys (clients pin them; changes trigger a warning) */
+        /** Someone's profile (mine, or someone I'm connected with) */
         get: {
             parameters: {
                 query?: never;
@@ -854,14 +733,25 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
+                /** @description Their profile */
                 200: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["Identity"];
+                        "application/json": {
+                            userId: components["schemas"]["Id"];
+                            name: string;
+                            username: string;
+                            bio: string;
+                            avatarUrl?: string | null;
+                            /** @enum {string} */
+                            relation: "me" | "accepted" | "incoming" | "outgoing";
+                            friendCount: number;
+                        };
                     };
                 };
+                404: components["responses"]["Error"];
             };
         };
         put?: never;
@@ -872,38 +762,32 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/identity": {
+    "/v1/users/{userId}/posts": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get?: never;
-        /** Publish a new identity key version (rotation); version must increase */
-        put: {
+        /** Someone's posts that I may see, newest first */
+        get: {
             parameters: {
-                query?: never;
+                query?: {
+                    before?: components["parameters"]["Before"];
+                    limit?: components["parameters"]["Limit"];
+                };
                 header?: never;
-                path?: never;
+                path: {
+                    userId: components["schemas"]["Id"];
+                };
                 cookie?: never;
             };
-            requestBody: {
-                content: {
-                    "application/json": components["schemas"]["Identity"];
-                };
-            };
+            requestBody?: never;
             responses: {
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["Identity"];
-                    };
-                };
+                200: components["responses"]["Posts"];
             };
         };
+        put?: never;
         post?: never;
         delete?: never;
         options?: never;
@@ -920,7 +804,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Register an invite by the hash of a client-generated token (7 days, single use) */
+        /** A single-use invite link (7 days) */
         post: {
             parameters: {
                 query?: never;
@@ -928,25 +812,23 @@ export interface paths {
                 path?: never;
                 cookie?: never;
             };
-            requestBody: {
-                content: {
-                    "application/json": {
-                        tokenHash: components["schemas"]["Bytes"];
-                    };
-                };
-            };
+            requestBody?: never;
             responses: {
+                /** @description The invite */
                 201: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content: {
                         "application/json": {
+                            token: string;
+                            link: string;
                             /** Format: date-time */
-                            expiresAt?: string;
+                            expiresAt: string;
                         };
                     };
                 };
+                409: components["responses"]["Error"];
             };
         };
         delete?: never;
@@ -964,7 +846,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Redeem an invite token; returns the inviter's identity (check it against the link's fingerprint) */
+        /** Use an invite; returns who sent it */
         post: {
             parameters: {
                 query?: never;
@@ -975,63 +857,22 @@ export interface paths {
             requestBody: {
                 content: {
                     "application/json": {
-                        token: components["schemas"]["Bytes"];
+                        token: string;
                     };
                 };
             };
             responses: {
+                /** @description Who sent it */
                 200: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["UserWithIdentity"];
+                        "application/json": components["schemas"]["Person"];
                     };
                 };
+                400: components["responses"]["Error"];
                 404: components["responses"]["Error"];
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/epochs": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Register a new active epoch for me */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": {
-                        epochId: components["schemas"]["Id"];
-                    };
-                };
-            };
-            responses: {
-                201: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            epochId?: components["schemas"]["Id"];
-                        };
-                    };
-                };
             };
         };
         delete?: never;
@@ -1047,7 +888,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** My connections (incoming/outgoing requests and accepted friends) */
+        /** My friends and pending requests (with the circles I put each one in) */
         get: {
             parameters: {
                 query?: never;
@@ -1057,17 +898,22 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
+                /** @description Connections */
                 200: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content: {
                         "application/json": {
-                            userId?: components["schemas"]["Id"];
+                            userId: components["schemas"]["Id"];
                             /** @enum {string} */
-                            status?: "incoming" | "outgoing" | "accepted";
+                            status: "accepted" | "incoming" | "outgoing";
                             /** Format: date-time */
-                            since?: string;
+                            since: string;
+                            name: string;
+                            username: string;
+                            avatarUrl?: string | null;
+                            circles: number[];
                         }[];
                     };
                 };
@@ -1090,7 +936,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Send a friend request with my friend payload; only after redeeming their invite (403 otherwise, there is no search) */
+        /** Ask someone whose invite I redeemed to connect, putting them in my circles */
         post: {
             parameters: {
                 query?: never;
@@ -1102,21 +948,14 @@ export interface paths {
                 content: {
                     "application/json": {
                         toUserId: components["schemas"]["Id"];
-                        epochId: components["schemas"]["Id"];
-                        payload: components["schemas"]["Bytes"];
+                        circles?: number[];
                     };
                 };
             };
             responses: {
-                201: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": Record<string, never>;
-                    };
-                };
+                201: components["responses"]["Status"];
                 403: components["responses"]["Error"];
+                404: components["responses"]["Error"];
                 409: components["responses"]["Error"];
             };
         };
@@ -1126,18 +965,47 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/friends/{userId}/accept": {
+    "/v1/friends/{userId}": {
         parameters: {
             query?: never;
             header?: never;
-            path: {
-                userId: components["schemas"]["Id"];
-            };
+            path?: never;
             cookie?: never;
         };
         get?: never;
         put?: never;
-        /** Accept an incoming request with my friend payload */
+        post?: never;
+        /** Unfriend (or cancel my request) */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    userId: components["schemas"]["Id"];
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                200: components["responses"]["Status"];
+                404: components["responses"]["Error"];
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/friends/{userId}/accept": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Accept a request, putting them in my circles */
         post: {
             parameters: {
                 query?: never;
@@ -1147,23 +1015,16 @@ export interface paths {
                 };
                 cookie?: never;
             };
-            requestBody: {
+            requestBody?: {
                 content: {
                     "application/json": {
-                        epochId: components["schemas"]["Id"];
-                        payload: components["schemas"]["Bytes"];
+                        circles?: number[];
                     };
                 };
             };
             responses: {
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": Record<string, never>;
-                    };
-                };
+                200: components["responses"]["Status"];
+                404: components["responses"]["Error"];
             };
         };
         delete?: never;
@@ -1176,14 +1037,12 @@ export interface paths {
         parameters: {
             query?: never;
             header?: never;
-            path: {
-                userId: components["schemas"]["Id"];
-            };
+            path?: never;
             cookie?: never;
         };
         get?: never;
         put?: never;
-        /** Decline an incoming request */
+        /** Decline a request */
         post: {
             parameters: {
                 query?: never;
@@ -1195,14 +1054,8 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": Record<string, never>;
-                    };
-                };
+                200: components["responses"]["Status"];
+                404: components["responses"]["Error"];
             };
         };
         delete?: never;
@@ -1211,67 +1064,44 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/friend-payloads": {
+    "/v1/friends/{userId}/circles": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** Friend payloads addressed to me from one connected user */
-        get: {
+        get?: never;
+        /** Set which of my circles they're in (silent) */
+        put: {
             parameters: {
-                query: {
-                    from: components["schemas"]["Id"];
-                };
+                query?: never;
                 header?: never;
-                path?: never;
+                path: {
+                    userId: components["schemas"]["Id"];
+                };
                 cookie?: never;
             };
-            requestBody?: never;
+            requestBody: {
+                content: {
+                    "application/json": {
+                        circles: number[];
+                    };
+                };
+            };
             responses: {
+                /** @description The circles they're in now */
                 200: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content: {
                         "application/json": {
-                            fromUserId?: components["schemas"]["Id"];
-                            epochId?: components["schemas"]["Id"];
-                            ciphertext?: components["schemas"]["Bytes"];
-                            /** Format: date-time */
-                            createdAt?: string;
-                        }[];
+                            circles: number[];
+                        };
                     };
                 };
-            };
-        };
-        /** Send a (re-)wrapped friend payload to an accepted friend */
-        put: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": {
-                        toUserId: components["schemas"]["Id"];
-                        epochId: components["schemas"]["Id"];
-                        ciphertext: components["schemas"]["Bytes"];
-                    };
-                };
-            };
-            responses: {
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": Record<string, never>;
-                    };
-                };
+                404: components["responses"]["Error"];
             };
         };
         post?: never;
@@ -1281,7 +1111,64 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/friend-payloads/batch": {
+    "/v1/circles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** My circles with their members (only ever shown to me) */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description My circles */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Circle"][];
+                    };
+                };
+            };
+        };
+        put?: never;
+        /** Add a circle (up to 8) */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: components["requestBodies"]["CircleName"];
+            responses: {
+                /** @description The new circle */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Circle"];
+                    };
+                };
+                409: components["responses"]["Error"];
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/circles/{id}": {
         parameters: {
             query?: never;
             header?: never;
@@ -1289,37 +1176,79 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /** Re-wrap for many friends at once after an epoch rotation (all-or-nothing, up to 500) */
+        /** Rename a circle */
         put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: number;
+                };
+                cookie?: never;
+            };
+            requestBody: components["requestBodies"]["CircleName"];
+            responses: {
+                200: components["responses"]["Status"];
+                404: components["responses"]["Error"];
+            };
+        };
+        post?: never;
+        /** Delete a circle (posts already shared with it keep their audience) */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                200: components["responses"]["Status"];
+                404: components["responses"]["Error"];
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/blocks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** People I blocked */
+        get: {
             parameters: {
                 query?: never;
                 header?: never;
                 path?: never;
                 cookie?: never;
             };
-            requestBody: {
-                content: {
-                    "application/json": {
-                        payloads: {
-                            toUserId: components["schemas"]["Id"];
-                            epochId: components["schemas"]["Id"];
-                            ciphertext: components["schemas"]["Bytes"];
-                        }[];
-                    };
-                };
-            };
+            requestBody?: never;
             responses: {
+                /** @description Blocked people, newest first */
                 200: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": Record<string, never>;
+                        "application/json": {
+                            userId: components["schemas"]["Id"];
+                            name: string;
+                            username: string;
+                            /** Format: date-time */
+                            createdAt: string;
+                        }[];
                     };
                 };
-                403: components["responses"]["Error"];
             };
         };
+        put?: never;
         post?: never;
         delete?: never;
         options?: never;
@@ -1327,19 +1256,32 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/friends/{userId}": {
+    "/v1/blocks/{userId}": {
         parameters: {
             query?: never;
             header?: never;
-            path: {
-                userId: components["schemas"]["Id"];
-            };
+            path?: never;
             cookie?: never;
         };
         get?: never;
         put?: never;
-        post?: never;
-        /** Unfriend (removes the friendship and all payloads between us; the client then rotates its epoch) */
+        /** Block someone (ends any connection) */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    userId: components["schemas"]["Id"];
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                200: components["responses"]["Status"];
+                404: components["responses"]["Error"];
+            };
+        };
+        /** Unblock */
         delete: {
             parameters: {
                 query?: never;
@@ -1351,15 +1293,7 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": Record<string, never>;
-                    };
-                };
-                404: components["responses"]["Error"];
+                200: components["responses"]["Status"];
             };
         };
         options?: never;
@@ -1367,106 +1301,39 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/blobs/{kind}": {
+    "/v1/reports": {
         parameters: {
             query?: never;
             header?: never;
-            path: {
-                kind: "address_book" | "settings" | "profile";
-            };
+            path?: never;
             cookie?: never;
         };
-        /** My encrypted blob */
-        get: {
+        get?: never;
+        put?: never;
+        /** Report a post, person or chat message */
+        post: {
             parameters: {
                 query?: never;
                 header?: never;
-                path: {
-                    kind: "address_book" | "settings" | "profile";
-                };
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["Blob"];
-                    };
-                };
-                404: components["responses"]["Error"];
-            };
-        };
-        /** Write my encrypted blob (version 1 creates; then stored version + 1; profile needs epochId) */
-        put: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    kind: "address_book" | "settings" | "profile";
-                };
+                path?: never;
                 cookie?: never;
             };
             requestBody: {
                 content: {
-                    "application/json": components["schemas"]["Blob"];
+                    "application/json": {
+                        /** @enum {string} */
+                        kind: "post" | "user" | "message";
+                        targetId: components["schemas"]["Id"];
+                        reason: string;
+                        note?: string;
+                    };
                 };
             };
             responses: {
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["Blob"];
-                    };
-                };
-                409: components["responses"]["Error"];
-            };
-        };
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/users/{userId}/profile": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                userId: components["schemas"]["Id"];
-            };
-            cookie?: never;
-        };
-        /** A connected user's encrypted profile */
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    userId: components["schemas"]["Id"];
-                };
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["Blob"];
-                    };
-                };
+                201: components["responses"]["Status"];
                 404: components["responses"]["Error"];
             };
         };
-        put?: never;
-        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1482,7 +1349,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Upload slots - random object keys with PUT URLs locked to each declared padded ciphertext size (15 min) */
+        /** Upload slots (presigned PUT URLs locked to each size and type, 15 minutes) */
         post: {
             parameters: {
                 query?: never;
@@ -1493,24 +1360,32 @@ export interface paths {
             requestBody: {
                 content: {
                     "application/json": {
-                        sizes: number[];
+                        files: {
+                            /** Format: int64 */
+                            size: number;
+                            /** @enum {string} */
+                            mime: "image/jpeg" | "image/png" | "image/webp" | "video/mp4" | "video/quicktime" | "video/webm";
+                        }[];
                     };
                 };
             };
             responses: {
+                /** @description One slot per file, in order */
                 200: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content: {
                         "application/json": {
-                            objectKey?: string;
-                            putUrl?: string;
+                            objectKey: components["schemas"]["ObjectKey"];
+                            putUrl: string;
                             /** Format: int64 */
-                            ctSize?: number;
+                            size: number;
+                            mime: string;
                         }[];
                     };
                 };
+                400: components["responses"]["Error"];
             };
         };
         delete?: never;
@@ -1519,45 +1394,31 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/media/download-urls": {
+    "/v1/feed": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get?: never;
-        put?: never;
-        /** 5-minute GET URLs for media attached to posts I may read */
-        post: {
+        /** My posts and my friends' posts that I may see, newest first */
+        get: {
             parameters: {
-                query?: never;
+                query?: {
+                    before?: components["parameters"]["Before"];
+                    limit?: components["parameters"]["Limit"];
+                };
                 header?: never;
                 path?: never;
                 cookie?: never;
             };
-            requestBody: {
-                content: {
-                    "application/json": {
-                        objectKeys: string[];
-                    };
-                };
-            };
+            requestBody?: never;
             responses: {
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            objectKey?: string;
-                            getUrl?: string;
-                        }[];
-                    };
-                };
-                404: components["responses"]["Error"];
+                200: components["responses"]["Posts"];
             };
         };
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1573,7 +1434,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Create a post (encrypted header + key ref + uploaded media objects) */
+        /** Create a post */
         post: {
             parameters: {
                 query?: never;
@@ -1584,26 +1445,21 @@ export interface paths {
             requestBody: {
                 content: {
                     "application/json": {
-                        postId: components["schemas"]["Id"];
-                        epochId: components["schemas"]["Id"];
-                        keyRef: components["schemas"]["Bytes"];
-                        headerCt: components["schemas"]["Bytes"];
-                        readTokenHash: components["schemas"]["Bytes"];
-                        media: {
-                            objectKey: string;
-                            /** @enum {string} */
-                            kind: "full" | "thumb" | "poster";
-                        }[];
+                        /** @description Up to 500 characters; may be empty with media */
+                        text: string;
+                        audience: components["schemas"]["Audience"];
+                        media?: components["schemas"]["NewAttachment"][];
                     };
                 };
             };
             responses: {
+                /** @description The new post */
                 201: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": Record<string, never>;
+                        "application/json": components["schemas"]["Post"];
                     };
                 };
                 400: components["responses"]["Error"];
@@ -1619,12 +1475,33 @@ export interface paths {
         parameters: {
             query?: never;
             header?: never;
-            path: {
-                postId: components["schemas"]["Id"];
-            };
+            path?: never;
             cookie?: never;
         };
-        get?: never;
+        /** One post I may see */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    postId: components["parameters"]["PostId"];
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The post */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Post"];
+                    };
+                };
+                404: components["responses"]["Error"];
+            };
+        };
         put?: never;
         post?: never;
         /** Delete my post */
@@ -1633,65 +1510,16 @@ export interface paths {
                 query?: never;
                 header?: never;
                 path: {
-                    postId: components["schemas"]["Id"];
+                    postId: components["parameters"]["PostId"];
                 };
                 cookie?: never;
             };
             requestBody?: never;
             responses: {
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": Record<string, never>;
-                    };
-                };
-            };
-        };
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/users/{userId}/posts": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                userId: components["schemas"]["Id"];
-            };
-            cookie?: never;
-        };
-        /** An author's posts, newest first (author and accepted friends only) */
-        get: {
-            parameters: {
-                query?: {
-                    before?: string;
-                    limit?: number;
-                };
-                header?: never;
-                path: {
-                    userId: components["schemas"]["Id"];
-                };
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["PostView"][];
-                    };
-                };
+                200: components["responses"]["Status"];
                 404: components["responses"]["Error"];
             };
         };
-        put?: never;
-        post?: never;
-        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -1700,77 +1528,67 @@ export interface paths {
     "/v1/posts/{postId}/replies": {
         parameters: {
             query?: never;
-            header?: {
-                /** @description The post's read token (base64); only its audience can derive it */
-                "X-Circlo-Read-Token"?: components["parameters"]["ReadToken"];
-            };
-            path: {
-                postId: components["schemas"]["Id"];
-            };
+            header?: never;
+            path?: never;
             cookie?: never;
         };
-        /** Encrypted replies, oldest first (readers of the author only) */
+        /** Replies, oldest first */
         get: {
             parameters: {
                 query?: {
                     after?: string;
-                    limit?: number;
+                    limit?: components["parameters"]["Limit"];
                 };
-                header?: {
-                    /** @description The post's read token (base64); only its audience can derive it */
-                    "X-Circlo-Read-Token"?: components["parameters"]["ReadToken"];
-                };
+                header?: never;
                 path: {
-                    postId: components["schemas"]["Id"];
+                    postId: components["parameters"]["PostId"];
                 };
                 cookie?: never;
             };
             requestBody?: never;
             responses: {
+                /** @description Replies */
                 200: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["ReplyView"][];
+                        "application/json": components["schemas"]["Reply"][];
                     };
                 };
                 404: components["responses"]["Error"];
             };
         };
         put?: never;
-        /** Add an encrypted reply (sealed under a key derived from the post key) */
+        /** Reply */
         post: {
             parameters: {
                 query?: never;
-                header?: {
-                    /** @description The post's read token (base64); only its audience can derive it */
-                    "X-Circlo-Read-Token"?: components["parameters"]["ReadToken"];
-                };
+                header?: never;
                 path: {
-                    postId: components["schemas"]["Id"];
+                    postId: components["parameters"]["PostId"];
                 };
                 cookie?: never;
             };
             requestBody: {
                 content: {
                     "application/json": {
-                        replyId: components["schemas"]["Id"];
-                        ciphertext: components["schemas"]["Bytes"];
+                        text: string;
                     };
                 };
             };
             responses: {
+                /** @description The new reply */
                 201: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": Record<string, never>;
+                        "application/json": components["schemas"]["Reply"];
                     };
                 };
+                400: components["responses"]["Error"];
                 404: components["responses"]["Error"];
-                409: components["responses"]["Error"];
             };
         };
         delete?: never;
@@ -1782,43 +1600,27 @@ export interface paths {
     "/v1/posts/{postId}/replies/{replyId}": {
         parameters: {
             query?: never;
-            header?: {
-                /** @description The post's read token (base64); only its audience can derive it */
-                "X-Circlo-Read-Token"?: components["parameters"]["ReadToken"];
-            };
-            path: {
-                postId: components["schemas"]["Id"];
-                replyId: components["schemas"]["Id"];
-            };
+            header?: never;
+            path?: never;
             cookie?: never;
         };
         get?: never;
         put?: never;
         post?: never;
-        /** Delete a reply (its author or the post's author) */
+        /** Delete a reply (mine, or any on my post) */
         delete: {
             parameters: {
                 query?: never;
-                header?: {
-                    /** @description The post's read token (base64); only its audience can derive it */
-                    "X-Circlo-Read-Token"?: components["parameters"]["ReadToken"];
-                };
+                header?: never;
                 path: {
-                    postId: components["schemas"]["Id"];
+                    postId: components["parameters"]["PostId"];
                     replyId: components["schemas"]["Id"];
                 };
                 cookie?: never;
             };
             requestBody?: never;
             responses: {
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": Record<string, never>;
-                    };
-                };
+                200: components["responses"]["Status"];
                 404: components["responses"]["Error"];
             };
         };
@@ -1830,39 +1632,24 @@ export interface paths {
     "/v1/posts/{postId}/like": {
         parameters: {
             query?: never;
-            header?: {
-                /** @description The post's read token (base64); only its audience can derive it */
-                "X-Circlo-Read-Token"?: components["parameters"]["ReadToken"];
-            };
-            path: {
-                postId: components["schemas"]["Id"];
-            };
+            header?: never;
+            path?: never;
             cookie?: never;
         };
         get?: never;
-        /** Like (idempotent) */
+        /** Like */
         put: {
             parameters: {
                 query?: never;
-                header?: {
-                    /** @description The post's read token (base64); only its audience can derive it */
-                    "X-Circlo-Read-Token"?: components["parameters"]["ReadToken"];
-                };
+                header?: never;
                 path: {
-                    postId: components["schemas"]["Id"];
+                    postId: components["parameters"]["PostId"];
                 };
                 cookie?: never;
             };
             requestBody?: never;
             responses: {
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": Record<string, never>;
-                    };
-                };
+                200: components["responses"]["Status"];
                 404: components["responses"]["Error"];
             };
         };
@@ -1871,25 +1658,15 @@ export interface paths {
         delete: {
             parameters: {
                 query?: never;
-                header?: {
-                    /** @description The post's read token (base64); only its audience can derive it */
-                    "X-Circlo-Read-Token"?: components["parameters"]["ReadToken"];
-                };
+                header?: never;
                 path: {
-                    postId: components["schemas"]["Id"];
+                    postId: components["parameters"]["PostId"];
                 };
                 cookie?: never;
             };
             requestBody?: never;
             responses: {
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": Record<string, never>;
-                    };
-                };
+                200: components["responses"]["Status"];
                 404: components["responses"]["Error"];
             };
         };
@@ -1901,544 +1678,37 @@ export interface paths {
     "/v1/posts/{postId}/likes": {
         parameters: {
             query?: never;
-            header?: {
-                /** @description The post's read token (base64); only its audience can derive it */
-                "X-Circlo-Read-Token"?: components["parameters"]["ReadToken"];
-            };
-            path: {
-                postId: components["schemas"]["Id"];
-            };
-            cookie?: never;
-        };
-        /** Who liked a post (clients show it only if they can decrypt the post) */
-        get: {
-            parameters: {
-                query?: never;
-                header?: {
-                    /** @description The post's read token (base64); only its audience can derive it */
-                    "X-Circlo-Read-Token"?: components["parameters"]["ReadToken"];
-                };
-                path: {
-                    postId: components["schemas"]["Id"];
-                };
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            userId?: components["schemas"]["Id"];
-                            /** Format: date-time */
-                            createdAt?: string;
-                        }[];
-                    };
-                };
-                404: components["responses"]["Error"];
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/feed": {
-        parameters: {
-            query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** My posts and my accepted friends' posts, newest first (headers only; readers decrypt locally) */
+        /** Who liked a post */
         get: {
-            parameters: {
-                query?: {
-                    before?: string;
-                    limit?: number;
-                };
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["PostView"][];
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/mls/key-packages": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        /** Upload one-time key packages for my device and replace its last-resort package */
-        put: {
-            parameters: {
-                query?: never;
-                header: {
-                    /** @description The calling device (must be one of the caller's registered devices) */
-                    "X-Circlo-Device": components["parameters"]["Device"];
-                };
-                path?: never;
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": {
-                        keyPackages: components["schemas"]["Bytes"][];
-                        lastResort?: components["schemas"]["Bytes"];
-                    };
-                };
-            };
-            responses: {
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            available?: number;
-                        };
-                    };
-                };
-            };
-        };
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/mls/key-packages/claim": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** One key package per device of each user (me or accepted friends) */
-        post: {
-            parameters: {
-                query?: never;
-                header: {
-                    /** @description The calling device (must be one of the caller's registered devices) */
-                    "X-Circlo-Device": components["parameters"]["Device"];
-                };
-                path?: never;
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": {
-                        userIds: components["schemas"]["Id"][];
-                        deviceIds?: components["schemas"]["Id"][];
-                    };
-                };
-            };
-            responses: {
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            keyPackages?: {
-                                userId?: components["schemas"]["Id"];
-                                deviceId?: components["schemas"]["Id"];
-                                keyPackage?: components["schemas"]["Bytes"];
-                            }[];
-                        };
-                    };
-                };
-                404: components["responses"]["Error"];
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/mls/groups": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Groups this device belongs to */
-        get: {
-            parameters: {
-                query?: never;
-                header: {
-                    /** @description The calling device (must be one of the caller's registered devices) */
-                    "X-Circlo-Device": components["parameters"]["Device"];
-                };
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            groupId?: components["schemas"]["Id"];
-                            /** Format: int64 */
-                            epoch?: number;
-                            /** Format: int64 */
-                            lastSeq?: number;
-                        }[];
-                    };
-                };
-            };
-        };
-        put?: never;
-        /** Register a new group (this device is its first member) */
-        post: {
-            parameters: {
-                query?: never;
-                header: {
-                    /** @description The calling device (must be one of the caller's registered devices) */
-                    "X-Circlo-Device": components["parameters"]["Device"];
-                };
-                path?: never;
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": {
-                        groupId: components["schemas"]["Id"];
-                    };
-                };
-            };
-            responses: {
-                201: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": Record<string, never>;
-                    };
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/mls/groups/{groupId}/messages": {
-        parameters: {
-            query?: never;
-            header: {
-                /** @description The calling device (must be one of the caller's registered devices) */
-                "X-Circlo-Device": components["parameters"]["Device"];
-            };
-            path: {
-                groupId: components["schemas"]["Id"];
-            };
-            cookie?: never;
-        };
-        /** The group's log after a sequence number (members only) */
-        get: {
-            parameters: {
-                query?: {
-                    after?: number;
-                    limit?: number;
-                };
-                header: {
-                    /** @description The calling device (must be one of the caller's registered devices) */
-                    "X-Circlo-Device": components["parameters"]["Device"];
-                };
-                path: {
-                    groupId: components["schemas"]["Id"];
-                };
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            /** Format: int64 */
-                            seq?: number;
-                            message?: components["schemas"]["Bytes"];
-                            /** Format: date-time */
-                            createdAt?: string;
-                        }[];
-                    };
-                };
-                404: components["responses"]["Error"];
-            };
-        };
-        put?: never;
-        /** Append an MLS message; commits must target the current epoch and list their membership changes */
-        post: {
-            parameters: {
-                query?: never;
-                header: {
-                    /** @description The calling device (must be one of the caller's registered devices) */
-                    "X-Circlo-Device": components["parameters"]["Device"];
-                };
-                path: {
-                    groupId: components["schemas"]["Id"];
-                };
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": {
-                        message: components["schemas"]["Bytes"];
-                        addDevices?: components["schemas"]["Id"][];
-                        removeDevices?: components["schemas"]["Id"][];
-                        welcome?: components["schemas"]["Bytes"];
-                    };
-                };
-            };
-            responses: {
-                201: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            /** Format: int64 */
-                            seq?: number;
-                        };
-                    };
-                };
-                400: components["responses"]["Error"];
-                404: components["responses"]["Error"];
-                409: components["responses"]["Error"];
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/mls/welcomes": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Welcomes waiting for this device */
-        get: {
-            parameters: {
-                query?: never;
-                header: {
-                    /** @description The calling device (must be one of the caller's registered devices) */
-                    "X-Circlo-Device": components["parameters"]["Device"];
-                };
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            welcomeId?: components["schemas"]["Id"];
-                            groupId?: components["schemas"]["Id"];
-                            welcome?: components["schemas"]["Bytes"];
-                            /** Format: int64 */
-                            afterSeq?: number;
-                        }[];
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/mls/welcomes/{welcomeId}": {
-        parameters: {
-            query?: never;
-            header: {
-                /** @description The calling device (must be one of the caller's registered devices) */
-                "X-Circlo-Device": components["parameters"]["Device"];
-            };
-            path: {
-                welcomeId: components["schemas"]["Id"];
-            };
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        /** Drop a processed welcome */
-        delete: {
-            parameters: {
-                query?: never;
-                header: {
-                    /** @description The calling device (must be one of the caller's registered devices) */
-                    "X-Circlo-Device": components["parameters"]["Device"];
-                };
-                path: {
-                    welcomeId: components["schemas"]["Id"];
-                };
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": Record<string, never>;
-                    };
-                };
-            };
-        };
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/devices/{deviceId}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                deviceId: components["schemas"]["Id"];
-            };
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        /** Revoke one of my devices (removed from chats, no more pushes, key packages deleted) */
-        delete: {
             parameters: {
                 query?: never;
                 header?: never;
                 path: {
-                    deviceId: components["schemas"]["Id"];
+                    postId: components["parameters"]["PostId"];
                 };
                 cookie?: never;
             };
             requestBody?: never;
             responses: {
+                /** @description Likers, oldest first */
                 200: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": Record<string, never>;
+                        "application/json": components["schemas"]["Person"][];
                     };
                 };
                 404: components["responses"]["Error"];
             };
         };
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/devices/{deviceId}/check-token": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                deviceId: components["schemas"]["Id"];
-            };
-            cookie?: never;
-        };
-        get?: never;
         put?: never;
-        /** Turn on background checks for this device (replaces any earlier check token) */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    deviceId: components["schemas"]["Id"];
-                };
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            /** @description Only for GET /v1/activity/pending (X-Circlo-Check-Token) */
-                            token: string;
-                        };
-                    };
-                };
-                404: components["responses"]["Error"];
-            };
-        };
-        /** Turn off background checks for this device */
-        delete: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    deviceId: components["schemas"]["Id"];
-                };
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": Record<string, never>;
-                    };
-                };
-            };
-        };
+        post?: never;
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -2451,12 +1721,12 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Replies and likes by other people on my posts, newest first (people I blocked are left out) */
+        /** Replies and likes on my posts, newest first */
         get: {
             parameters: {
                 query?: {
-                    before?: string;
-                    limit?: number;
+                    before?: components["parameters"]["Before"];
+                    limit?: components["parameters"]["Limit"];
                 };
                 header?: never;
                 path?: never;
@@ -2464,6 +1734,7 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
+                /** @description Activity */
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -2474,8 +1745,12 @@ export interface paths {
                                 /** @enum {string} */
                                 kind: "reply" | "like";
                                 postId: components["schemas"]["Id"];
+                                postText: string;
                                 actorId: components["schemas"]["Id"];
-                                replyId?: components["schemas"]["Id"];
+                                actor: components["schemas"]["Person"];
+                                /** Format: uuid */
+                                replyId?: string | null;
+                                replyText?: string | null;
                                 /** Format: date-time */
                                 createdAt: string;
                             }[];
@@ -2499,7 +1774,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Counts of new activity since a time, for a background check (no session; the device's check token) */
+        /** Counts of new activity since a time (background checks; authenticated by the check token) */
         get: {
             parameters: {
                 query: {
@@ -2513,6 +1788,7 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
+                /** @description Counts */
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -2528,7 +1804,6 @@ export interface paths {
                     };
                 };
                 401: components["responses"]["Error"];
-                429: components["responses"]["Error"];
             };
         };
         put?: never;
@@ -2539,16 +1814,36 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/device-links": {
+    "/v1/chats": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /** My chats, most recent first */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Chats */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Chat"][];
+                    };
+                };
+            };
+        };
         put?: never;
-        /** Hand off account secrets sealed to a new device's QR key (single use, 10 minutes) */
+        /** Start a chat with friends (a 1:1 chat that exists already is reused) */
         post: {
             parameters: {
                 query?: never;
@@ -2559,20 +1854,22 @@ export interface paths {
             requestBody: {
                 content: {
                     "application/json": {
-                        linkId: components["schemas"]["Bytes"];
-                        sealed: components["schemas"]["Bytes"];
+                        userIds: components["schemas"]["Id"][];
+                        name?: string;
                     };
                 };
             };
             responses: {
+                /** @description The chat */
                 201: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": Record<string, never>;
+                        "application/json": components["schemas"]["Chat"];
                     };
                 };
+                400: components["responses"]["Error"];
             };
         };
         delete?: never;
@@ -2581,38 +1878,32 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/device-links/{linkId}": {
+    "/v1/chats/{chatId}": {
         parameters: {
             query?: never;
             header?: never;
-            path: {
-                linkId: string;
-            };
+            path?: never;
             cookie?: never;
         };
-        /** The new device picks up its hand-off once, with a session (no auth; rate-limited) */
+        /** One chat */
         get: {
             parameters: {
                 query?: never;
                 header?: never;
                 path: {
-                    linkId: string;
+                    chatId: components["parameters"]["ChatId"];
                 };
                 cookie?: never;
             };
             requestBody?: never;
             responses: {
+                /** @description The chat */
                 200: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            userId?: components["schemas"]["Id"];
-                            sealed?: components["schemas"]["Bytes"];
-                            accessToken?: string;
-                            refreshToken?: string;
-                        };
+                        "application/json": components["schemas"]["Chat"];
                     };
                 };
                 404: components["responses"]["Error"];
@@ -2626,95 +1917,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/mls/groups/{groupId}/missing-devices": {
+    "/v1/chats/{chatId}/members": {
         parameters: {
             query?: never;
-            header: {
-                /** @description The calling device (must be one of the caller's registered devices) */
-                "X-Circlo-Device": components["parameters"]["Device"];
-            };
-            path: {
-                groupId: components["schemas"]["Id"];
-            };
-            cookie?: never;
-        };
-        /** Members' active devices that aren't in the group yet (e.g. a new phone) */
-        get: {
-            parameters: {
-                query?: never;
-                header: {
-                    /** @description The calling device (must be one of the caller's registered devices) */
-                    "X-Circlo-Device": components["parameters"]["Device"];
-                };
-                path: {
-                    groupId: components["schemas"]["Id"];
-                };
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            userId?: components["schemas"]["Id"];
-                            deviceId?: components["schemas"]["Id"];
-                        }[];
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/mls/groups/{groupId}/media": {
-        parameters: {
-            query?: never;
-            header: {
-                /** @description The calling device (must be one of the caller's registered devices) */
-                "X-Circlo-Device": components["parameters"]["Device"];
-            };
-            path: {
-                groupId: components["schemas"]["Id"];
-            };
+            header?: never;
+            path?: never;
             cookie?: never;
         };
         get?: never;
         put?: never;
-        /** Attach my uploaded objects to a chat (members-only downloads) */
+        /** Add friends to a chat */
         post: {
             parameters: {
                 query?: never;
-                header: {
-                    /** @description The calling device (must be one of the caller's registered devices) */
-                    "X-Circlo-Device": components["parameters"]["Device"];
-                };
+                header?: never;
                 path: {
-                    groupId: components["schemas"]["Id"];
+                    chatId: components["parameters"]["ChatId"];
                 };
                 cookie?: never;
             };
             requestBody: {
                 content: {
                     "application/json": {
-                        objectKeys: string[];
+                        userIds: components["schemas"]["Id"][];
                     };
                 };
             };
             responses: {
+                /** @description The chat */
                 200: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": Record<string, never>;
+                        "application/json": components["schemas"]["Chat"];
                     };
                 };
                 400: components["responses"]["Error"];
@@ -2726,7 +1962,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/posts/stats": {
+    "/v1/chats/{chatId}/members/{userId}": {
         parameters: {
             query?: never;
             header?: never;
@@ -2734,188 +1970,96 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        put?: never;
-        /** Reply/like counts for posts I can prove I can read (one read token each) */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": {
-                        items: {
-                            postId: components["schemas"]["Id"];
-                            readToken: components["schemas"]["Bytes"];
-                        }[];
-                    };
-                };
-            };
-            responses: {
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            postId?: components["schemas"]["Id"];
-                            replyCount?: number;
-                            likeCount?: number;
-                            likedByMe?: boolean;
-                        }[];
-                    };
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/blocks": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** People I blocked */
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            userId?: components["schemas"]["Id"];
-                            /** Format: date-time */
-                            createdAt?: string;
-                        }[];
-                    };
-                };
-            };
-        };
         put?: never;
         post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/blocks/{userId}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                userId: components["schemas"]["Id"];
-            };
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Block (removes any friendship; no requests or invites either way) */
-        post: {
+        /** Remove someone from a chat, or leave it (my own id) */
+        delete: {
             parameters: {
                 query?: never;
                 header?: never;
                 path: {
+                    chatId: components["parameters"]["ChatId"];
                     userId: components["schemas"]["Id"];
                 };
                 cookie?: never;
             };
             requestBody?: never;
             responses: {
+                200: components["responses"]["Status"];
+                404: components["responses"]["Error"];
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/chats/{chatId}/messages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Messages after `after`, or the latest page before `before` (both oldest first) */
+        get: {
+            parameters: {
+                query?: {
+                    after?: number;
+                    before?: number;
+                    limit?: components["parameters"]["Limit"];
+                };
+                header?: never;
+                path: {
+                    chatId: components["parameters"]["ChatId"];
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Messages */
                 200: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": Record<string, never>;
+                        "application/json": components["schemas"]["Message"][];
                     };
                 };
                 404: components["responses"]["Error"];
             };
         };
-        /** Unblock */
-        delete: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    userId: components["schemas"]["Id"];
-                };
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": Record<string, never>;
-                    };
-                };
-            };
-        };
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/reports": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
         put?: never;
-        /**
-         * Report something to the operator, sealed on the phone to the moderation key (CRYPTO.md 13c)
-         * @description The id is bound into the sealed report's AAD; the server stores ciphertext only.
-         */
+        /** Send a message */
         post: {
             parameters: {
                 query?: never;
                 header?: never;
-                path?: never;
+                path: {
+                    chatId: components["parameters"]["ChatId"];
+                };
                 cookie?: never;
             };
             requestBody: {
                 content: {
                     "application/json": {
-                        reportId: components["schemas"]["Id"];
-                        /** @description HPKE ciphertext, 64 bytes to 4 MiB */
-                        sealed: components["schemas"]["Bytes"];
+                        text: string;
+                        media?: components["schemas"]["NewAttachment"][];
                     };
                 };
             };
             responses: {
+                /** @description The message */
                 201: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": Record<string, never>;
+                        "application/json": components["schemas"]["Message"];
                     };
                 };
                 400: components["responses"]["Error"];
-                409: components["responses"]["Error"];
-                429: components["responses"]["Error"];
+                404: components["responses"]["Error"];
             };
         };
         delete?: never;
@@ -2924,45 +2068,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/config": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Client configuration */
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            /** @description Operator's moderation key (base64); empty = reporting off */
-                            moderationPublicKey: string;
-                        };
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/account": {
+    "/v1/chats/{chatId}/messages/{messageId}": {
         parameters: {
             query?: never;
             header?: never;
@@ -2972,33 +2078,60 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        /** Delete my account and everything I left behind (retype the handle to confirm) */
+        /** Delete one of my messages for everyone */
         delete: {
             parameters: {
                 query?: never;
                 header?: never;
-                path?: never;
+                path: {
+                    chatId: components["parameters"]["ChatId"];
+                    messageId: components["schemas"]["Id"];
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                200: components["responses"]["Status"];
+                404: components["responses"]["Error"];
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/chats/{chatId}/read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Mark messages up to `seq` as read */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    chatId: components["parameters"]["ChatId"];
+                };
                 cookie?: never;
             };
             requestBody: {
                 content: {
                     "application/json": {
-                        handle: string;
+                        /** Format: int64 */
+                        seq: number;
                     };
                 };
             };
             responses: {
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": Record<string, never>;
-                    };
-                };
-                400: components["responses"]["Error"];
+                200: components["responses"]["Status"];
             };
         };
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -3008,109 +2141,187 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
-        PostView: {
-            postId?: components["schemas"]["Id"];
-            authorId?: components["schemas"]["Id"];
-            epochId?: components["schemas"]["Id"];
-            keyRef?: components["schemas"]["Bytes"];
-            headerCt?: components["schemas"]["Bytes"];
-            /** Format: date-time */
-            createdAt?: string;
-            media?: {
-                objectKey?: string;
-                /** @enum {string} */
-                kind?: "full" | "thumb" | "poster";
-                /** Format: int64 */
-                ctSize?: number;
-            }[];
-        };
-        ReplyView: {
-            replyId?: components["schemas"]["Id"];
-            authorId?: components["schemas"]["Id"];
-            ciphertext?: components["schemas"]["Bytes"];
-            /** Format: date-time */
-            createdAt?: string;
-        };
-        UserWithIdentity: {
-            userId?: components["schemas"]["Id"];
-            identity?: components["schemas"]["Identity"];
-        };
-        Blob: {
-            epochId?: components["schemas"]["Id"];
-            ciphertext: components["schemas"]["Bytes"];
-            version: number;
-        };
         /** Format: uuid */
         Id: string;
-        Bytes: string;
-        Identity: {
-            x25519Pub: components["schemas"]["Bytes"];
-            ed25519Pub: components["schemas"]["Bytes"];
-            /** @description CRYPTO.md section 7 */
-            signature: components["schemas"]["Bytes"];
-            version: number;
-        };
-        Device: {
-            deviceId: components["schemas"]["Id"];
-            devicePubkey: components["schemas"]["Bytes"];
-            deviceCert: components["schemas"]["Bytes"];
-        };
-        DeviceView: components["schemas"]["Device"] & {
+        ObjectKey: string;
+        Me: {
+            userId: components["schemas"]["Id"];
+            name: string;
+            username: string;
+            email: string;
+            bio: string;
+            avatarUrl?: string | null;
             /** Format: date-time */
-            createdAt?: string;
-            revoked?: boolean;
+            createdAt: string;
         };
-        Backup: {
-            ciphertext: components["schemas"]["Bytes"];
-            version: number;
+        /** @description Someone as shown next to their posts, replies and messages (never their email) */
+        Person: {
+            userId: components["schemas"]["Id"];
+            name: string;
+            username: string;
+            avatarUrl?: string | null;
         };
-        NewRecoveryMethod: {
+        Circle: {
+            id: number;
+            name: string;
+            members: components["schemas"]["Id"][];
+        };
+        Audience: {
             /** @enum {string} */
-            kind: "phrase" | "passkey";
-            /** @description 32 bytes: the method's recovery_auth / passkey_auth key */
-            authPubkey: components["schemas"]["Bytes"];
-            /** @description The method's recovery copy of the key backup */
-            ciphertext: components["schemas"]["Bytes"];
+            kind: "onlyMe" | "everyone" | "circles";
+            circles?: number[];
         };
-        Tokens: {
-            userId?: components["schemas"]["Id"];
-            accessToken?: string;
-            refreshToken?: string;
-            /** @description seconds */
-            expiresIn?: number;
+        /** @description A photo (with its thumbnail) or a video (with its poster frame), both uploaded first */
+        NewAttachment: {
             /** @enum {string} */
-            scope?: "full" | "recovery";
+            type: "image" | "video";
+            objectKey: components["schemas"]["ObjectKey"];
+            previewKey: components["schemas"]["ObjectKey"];
+            width: number;
+            height: number;
+            durationMs: number;
+        };
+        Attachment: {
+            /** @enum {string} */
+            type: "image" | "video";
+            mime: string;
+            width: number;
+            height: number;
+            durationMs: number;
+            objectKey: components["schemas"]["ObjectKey"];
+            /** @description Presigned GET URL (1 hour) */
+            url: string;
+            previewKey: components["schemas"]["ObjectKey"];
+            previewUrl: string;
+        };
+        Post: {
+            postId: components["schemas"]["Id"];
+            authorId: components["schemas"]["Id"];
+            author: components["schemas"]["Person"];
+            text: string;
+            /** Format: date-time */
+            createdAt: string;
+            media: components["schemas"]["Attachment"][];
+            replyCount: number;
+            likeCount: number;
+            likedByMe: boolean;
+            /** @description Only on my own posts */
+            audience?: components["schemas"]["Audience"] | null;
+        };
+        Reply: {
+            replyId: components["schemas"]["Id"];
+            authorId: components["schemas"]["Id"];
+            author: components["schemas"]["Person"];
+            text: string;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        Message: {
+            /** Format: int64 */
+            seq: number;
+            messageId: components["schemas"]["Id"];
+            senderId: components["schemas"]["Id"];
+            text: string;
+            media: components["schemas"]["Attachment"][];
+            /** Format: date-time */
+            createdAt: string;
+        };
+        Chat: {
+            chatId: components["schemas"]["Id"];
+            name?: string | null;
+            members: components["schemas"]["Person"][];
+            lastMessage?: components["schemas"]["Message"] | null;
+            unread: number;
+            /** Format: int64 */
+            readSeq: number;
+            /** Format: date-time */
+            updatedAt: string;
         };
     };
     responses: {
-        /** @description Session tokens */
-        Tokens: {
-            headers: {
-                [name: string]: unknown;
-            };
-            content: {
-                "application/json": components["schemas"]["Tokens"];
-            };
-        };
-        /** @description Error with a fixed code */
+        /** @description A fixed error code, plus fixed details for some codes */
         Error: {
             headers: {
                 [name: string]: unknown;
             };
             content: {
                 "application/json": {
-                    error?: string;
+                    error: string;
+                    attemptsLeft?: number;
+                    lockSeconds?: number;
+                    retryAfter?: number;
+                    email?: string;
                 };
+            };
+        };
+        /** @description OK */
+        Status: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": {
+                    status?: string;
+                };
+            };
+        };
+        /** @description A signed-in session for one device */
+        Tokens: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": {
+                    userId: components["schemas"]["Id"];
+                    deviceId: components["schemas"]["Id"];
+                    accessToken: string;
+                    refreshToken: string;
+                    expiresIn: number;
+                };
+            };
+        };
+        /** @description My account */
+        Me: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["Me"];
+            };
+        };
+        /** @description Posts, newest first */
+        Posts: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["Post"][];
             };
         };
     };
     parameters: {
-        /** @description The post's read token (base64); only its audience can derive it */
-        ReadToken: string;
-        /** @description The calling device (must be one of the caller's registered devices) */
-        Device: components["schemas"]["Id"];
+        Before: string;
+        Limit: number;
+        PostId: components["schemas"]["Id"];
+        ChatId: components["schemas"]["Id"];
     };
-    requestBodies: never;
+    requestBodies: {
+        Email: {
+            content: {
+                "application/json": {
+                    email: string;
+                };
+            };
+        };
+        CircleName: {
+            content: {
+                "application/json": {
+                    /** @description 1-40 characters */
+                    name: string;
+                };
+            };
+        };
+    };
     headers: never;
     pathItems: never;
 }

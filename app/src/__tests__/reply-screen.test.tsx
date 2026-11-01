@@ -3,7 +3,7 @@ import { fireEvent, render, screen } from '@testing-library/react-native';
 import ReplyScreen from '@/app/reply/[id]';
 
 let mockId = 'p1';
-const mockPost = (postId: string) => ({ postId, authorId: 'a1', text: 'hello', media: [], createdAt: new Date().toISOString(), replyCount: 0 });
+const mockPost = (postId: string) => ({ postId, authorId: 'a1', authorName: 'Ana', authorHandle: 'ana', text: 'hello', media: [], createdAtMs: Date.now(), replyCount: 0 });
 
 jest.mock('expo-router', () => ({
   router: { back: jest.fn() },
@@ -11,7 +11,7 @@ jest.mock('expo-router', () => ({
   useFocusEffect: () => {},
 }));
 jest.mock('react-native-keyboard-controller', () => ({ KeyboardAvoidingView: jest.requireActual('react-native').View }));
-jest.mock('@/components/encrypted-media', () => ({ EncryptedImage: () => null }));
+jest.mock('@/components/post-media', () => ({ MediaImage: () => null }));
 jest.mock('@/components/post-card', () => ({ PostText: () => null }));
 jest.mock('@/components/post-actions', () => ({ authorName: () => ({ name: 'Ana', handle: 'ana' }) }));
 jest.mock('@/lib/addressbook', () => ({ loadAddressBook: jest.fn(() => new Promise(() => {})) }));

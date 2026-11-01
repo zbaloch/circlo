@@ -10,17 +10,16 @@ import { usePalette } from '@/theme/use-palette';
 
 type Point = { icon: IconName; title: string; body: string };
 
-// Circles are independent: a post to a circle reaches only its members (CRYPTO.md 8.6).
 const POINTS: Point[] = [
   {
     icon: 'people-outline',
     title: 'Share with your circles',
-    body: 'Put people in circles like Family, Kids or Close Friends. Post to one or more circles and only the people in them can read it, or share with Everyone, or keep it for yourself.',
+    body: 'Put people in circles like Family, Kids or Close Friends. Post to one or more circles and only the people in them can see it, or share with Everyone, or keep it for yourself.',
   },
   {
-    icon: 'lock-closed-outline',
-    title: 'End-to-end encrypted',
-    body: 'Posts, photos and messages are encrypted on your phone before they leave it. Not even Circlo can read them.',
+    icon: 'eye-off-outline',
+    title: 'Only the people you choose',
+    body: 'You connect by invite only, nobody can look you up, and nobody is ever told which circle they’re in. No ads and no tracking.',
   },
 ];
 

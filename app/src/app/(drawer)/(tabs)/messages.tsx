@@ -5,18 +5,16 @@ import { FlatList, Pressable, RefreshControl, View } from 'react-native';
 import { Avatar } from '@/components/avatar';
 import { EmptyState } from '@/components/empty-state';
 import { Fab } from '@/components/fab';
-import { authorName } from '@/components/post-actions';
 import { Screen } from '@/components/screen';
-import { loadAddressBook, type AddressBook } from '@/lib/addressbook';
 import { refreshBlocked, useBlocked, visibleConversations } from '@/lib/blocks';
-import { syncMessaging, unreadCount, useConversations, type Conversation } from '@/lib/messaging';
+import { memberName, syncMessaging, unreadCount, useConversations, type Conversation } from '@/lib/messaging';
 import { useSession } from '@/lib/session';
 import { relativeTime } from '@/lib/time';
 import { useNow } from '@/lib/use-now';
 import { chatTitle } from '@/lib/view-logic';
 import { Text } from '@/components/ui/text';
 
-/** Messages inbox (PLAN.md 2A): conversations newest first, unread counts kept on this device. */
+/** Messages inbox (PLAN.md 2A): conversations newest first, with unread counts. */
 export default function MessagesScreen() {
   const now = useNow();
   const session = useSession();
@@ -24,7 +22,6 @@ export default function MessagesScreen() {
   const blocked = useBlocked();
   const all = useConversations();
   const conversations = useMemo(() => visibleConversations(all, blocked), [all, blocked]);
-  const [book, setBook] = useState<AddressBook | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string>();
 
@@ -32,7 +29,6 @@ export default function MessagesScreen() {
     if (!account) return;
     setRefreshing(true);
     try {
-      setBook(await loadAddressBook(account));
       await refreshBlocked().catch(() => undefined);
       await syncMessaging(account);
       setError(undefined);
@@ -52,7 +48,7 @@ export default function MessagesScreen() {
   );
 
   if (!account) return null;
-  const title = (c: Conversation) => chatTitle(c.members.map((u) => authorName(account, book, u).name));
+  const title = (c: Conversation) => c.name || chatTitle(c.members.map((u) => memberName(c, u, account)));
 
   return (
     <Screen>
@@ -64,19 +60,19 @@ export default function MessagesScreen() {
         ListEmptyComponent={
           refreshing ? undefined : (
             <View className="h-[520px]">
-              <EmptyState icon="chatbubble-outline" title="No messages" body="Messages are end-to-end encrypted. Start a chat with someone or a group." />
+              <EmptyState icon="chatbubble-outline" title="No messages" body="Only the people in a chat can see it. Start a chat with someone or a group." />
             </View>
           )
         }
         renderItem={({ item }) => {
-          const last = item.messages[item.messages.length - 1];
+          const last = item.messages[item.messages.length - 1] ?? item.lastMessage;
           const unread = unreadCount(item);
           return (
             <Pressable
               accessibilityRole="button"
               onPress={() => router.push({ pathname: '/chat/[id]', params: { id: item.groupId } })}
               className="flex-row items-center gap-3 border-b border-border px-4 py-3 active:bg-surface-raised dark:border-border-dark dark:active:bg-surface-raised-dark">
-              <Avatar name={title(item)} />
+              <Avatar name={title(item)} uri={item.members.length === 1 ? item.people[item.members[0]]?.avatarUrl : undefined} />
               <View className="flex-1 gap-0.5">
                 <View className="flex-row items-center gap-2">
                   <Text numberOfLines={1} className={`flex-1 text-base text-ink dark:text-ink-dark ${unread ? 'font-bold' : 'font-semibold'}`}>

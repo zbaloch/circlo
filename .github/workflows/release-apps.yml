@@ -54,25 +54,9 @@ jobs:
         with:
           distribution: temurin
           java-version: "17"
-      - uses: dtolnay/rust-toolchain@v1
-        with:
-          toolchain: stable
-          targets: aarch64-linux-android, x86_64-linux-android
-      - uses: Swatinem/rust-cache@v2.9.3
-        with:
-          workspaces: core
-      - run: cargo install cargo-ndk --locked
       - name: Install app dependencies
         working-directory: app
-        run: |
-          npm ci
-          (cd modules/circlo-core && npm ci)
-      # The runner's own NDK (ANDROID_NDK_ROOT is set by the runner image, so it isn't in the `env` context).
-      - name: Build the Rust core for Android
-        working-directory: app/modules/circlo-core
-        run: |
-          export ANDROID_NDK_HOME="$ANDROID_NDK_ROOT"
-          npm run ubrn:android:release
+        run: npm ci
       - name: Generate the Android project
         working-directory: app
         run: npx expo prebuild --platform android --clean --no-install
@@ -128,21 +112,9 @@ jobs:
           node-version: "24"
           cache: npm
           cache-dependency-path: app/package-lock.json
-      - uses: dtolnay/rust-toolchain@v1
-        with:
-          toolchain: stable
-          targets: aarch64-apple-ios, aarch64-apple-ios-sim, x86_64-apple-ios
-      - uses: Swatinem/rust-cache@v2.9.3
-        with:
-          workspaces: core
       - name: Install app dependencies
         working-directory: app
-        run: |
-          npm ci
-          (cd modules/circlo-core && npm ci)
-      - name: Build the Rust core for iOS
-        working-directory: app/modules/circlo-core
-        run: npm run ubrn:ios:release
+        run: npm ci
       # expo prebuild only warns when `pod install` fails, so check for the workspace here rather than failing later.
       - name: Generate the iOS project
         working-directory: app

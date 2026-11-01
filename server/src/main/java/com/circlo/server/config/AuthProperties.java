@@ -8,17 +8,15 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 public record AuthProperties(
         Duration accessTtl,
         Duration refreshTtl,
-        Duration recoveryTtl,
-        Duration challengeTtl,
-        Duration pendingRegistrationTtl,
+        Duration codeTtl,
+        Duration pendingSignupTtl,
         Integer ipRequestsPerMinute) {
 
     public AuthProperties {
         accessTtl = accessTtl == null ? Duration.ofMinutes(15) : accessTtl;
         refreshTtl = refreshTtl == null ? Duration.ofDays(30) : refreshTtl;
-        recoveryTtl = recoveryTtl == null ? Duration.ofMinutes(15) : recoveryTtl;
-        challengeTtl = challengeTtl == null ? Duration.ofSeconds(60) : challengeTtl;
-        pendingRegistrationTtl = pendingRegistrationTtl == null ? Duration.ofMinutes(30) : pendingRegistrationTtl;
+        codeTtl = codeTtl == null ? Duration.ofMinutes(15) : codeTtl;
+        pendingSignupTtl = pendingSignupTtl == null ? Duration.ofDays(1) : pendingSignupTtl;
         ipRequestsPerMinute = ipRequestsPerMinute == null ? 30 : ipRequestsPerMinute;
     }
 }

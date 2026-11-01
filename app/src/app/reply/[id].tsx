@@ -7,7 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Avatar } from '@/components/avatar';
 import { CharRing } from '@/components/char-ring';
-import { EncryptedImage } from '@/components/encrypted-media';
+import { MediaImage } from '@/components/post-media';
 import { authorName } from '@/components/post-actions';
 import { PostText } from '@/components/post-card';
 import { loadAddressBook, type AddressBook } from '@/lib/addressbook';
@@ -48,12 +48,12 @@ export default function ReplyScreen() {
   );
 
   if (!account || !post) return null;
-  const author = authorName(account, book, post.authorId);
+  const author = { name: post.authorName, handle: post.authorHandle };
   const me = authorName(account, book, account.userId);
   const blocked = !!validateReply(text) || sending;
   // X shows a small preview of the media on the right: a photo's thumbnail or a video's poster.
-  const isVideo = post.media.some((m) => m.kind === 'full' && m.item.mime.startsWith('video/'));
-  const preview = post.media.find((m) => m.kind === (isVideo ? 'poster' : 'thumb')) ?? (isVideo ? undefined : post.media.find((m) => m.kind === 'full'));
+  const preview = post.media[0];
+  const isVideo = preview?.type === 'video';
 
   const send = async () => {
     if (blocked) return;
@@ -108,7 +108,7 @@ export default function ReplyScreen() {
             </View>
             {preview ? (
               <View className="h-20 w-20 overflow-hidden rounded-xl">
-                <EncryptedImage media={preview} className="h-full w-full" />
+                <MediaImage objectKey={preview.previewKey} url={preview.previewUrl} className="h-full w-full" />
                 {isVideo ? (
                   <View className="absolute inset-0 items-center justify-center">
                     <View className="h-8 w-8 items-center justify-center rounded-full bg-black/50">

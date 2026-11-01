@@ -3,3 +3,11 @@
 spring:
   config:
     import: optional:file:./.env[.properties]
+
+circlo:
+  mail:
+    # Codes are printed to the console unless server/.env sets CIRCLO_MAIL_MODE=smtp and an SMTP server.
+    mode: ${CIRCLO_MAIL_MODE:log}
+  # The Expo web dev server.
+  cors:
+    origins: ${CIRCLO_CORS_ORIGINS:http://localhost:8081}

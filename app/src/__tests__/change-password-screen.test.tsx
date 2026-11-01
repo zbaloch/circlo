@@ -34,7 +34,7 @@ describe('change password screen', () => {
     const { router } = jest.requireMock('expo-router');
     await render(<ChangePasswordScreen />);
     await fill('old password here', 'copper lantern violet harbour');
-    expect(changePassword).toHaveBeenCalledWith(expect.objectContaining({ userId: 'me' }), 'old password here', 'copper lantern violet harbour');
+    expect(changePassword).toHaveBeenCalledWith('old password here', 'copper lantern violet harbour');
     expect(showAlert).toHaveBeenCalledWith('Password changed', expect.stringMatching(/signed out/));
     expect(router.back).toHaveBeenCalled();
   });

@@ -3,26 +3,23 @@
  * activity. A phone that opts in checks in the background now and then (the OS decides when: on Android about every
  * 15 minutes at best, on iOS a few times a day) and shows a local notification with counts only. The check uses this
  * device's check token, which can read nothing but those counts; it's kept readable while the phone is locked, unlike
- * the account keys.
+ * the session. The web app uses background-check.web.ts (no background checks in browsers).
  */
 import * as BackgroundTask from 'expo-background-task';
 import * as Notifications from 'expo-notifications';
 import { AndroidImportance } from 'expo-notifications';
-import * as SecureStore from 'expo-secure-store';
 import * as TaskManager from 'expo-task-manager';
 import { Linking, Platform } from 'react-native';
 
 import { api, API_URL, ok } from '@/api/client';
 
-import type { StoredAccount } from './keystore';
+import { deleteItem, getItem, setItem } from './storage';
 
 export const CHECK_TASK = 'circlo.activity-check';
 const CHANNEL = 'activity';
 const TOKEN_KEY = 'circlo.check-token';
 const SINCE_KEY = 'circlo.check-since';
 const PROMPT_DISMISSED = 'circlo.notifications-prompt-dismissed';
-// Readable in the background while the phone is locked (after its first unlock); never in backups.
-const LOCKED_OK: SecureStore.SecureStoreOptions = { keychainAccessible: SecureStore.AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY };
 
 export type Pending = { requests: number; replies: number; likes: number; messages: number; signIns: number };
 
@@ -56,10 +53,10 @@ TaskManager.defineTask(CHECK_TASK, async () => {
 
 /** One background check: counts since the app was last used (or the last notification), then a local notification. */
 export async function checkNow(): Promise<void> {
-  const token = await SecureStore.getItemAsync(TOKEN_KEY, LOCKED_OK);
+  const token = await getItem(TOKEN_KEY, 'background');
   if (!token) return;
   const now = new Date().toISOString();
-  const since = (await SecureStore.getItemAsync(SINCE_KEY, LOCKED_OK)) ?? now;
+  const since = (await getItem(SINCE_KEY, 'background')) ?? now;
   // A plain request: no session involved, so a dead token never triggers a session refresh.
   const res = await fetch(`${API_URL}/v1/activity/pending?since=${encodeURIComponent(since)}`, { headers: { 'X-Circlo-Check-Token': token } });
   if (res.status === 401) return stopLocally(); // the device was revoked or checks were turned off elsewhere
@@ -71,13 +68,13 @@ export async function checkNow(): Promise<void> {
       trigger: Platform.OS === 'android' ? { channelId: CHANNEL } : null,
     });
   }
-  await SecureStore.setItemAsync(SINCE_KEY, now, LOCKED_OK);
+  await setItem(SINCE_KEY, now, 'background');
 }
 
 /** The app is in use: anything up to now is seen there, so later checks only count what's newer. */
 export async function markActiveNow(): Promise<void> {
-  if (await SecureStore.getItemAsync(TOKEN_KEY, LOCKED_OK).catch(() => null)) {
-    await SecureStore.setItemAsync(SINCE_KEY, new Date().toISOString(), LOCKED_OK).catch(() => undefined);
+  if (await getItem(TOKEN_KEY, 'background')) {
+    await setItem(SINCE_KEY, new Date().toISOString(), 'background').catch(() => undefined);
   }
 }
 
@@ -98,7 +95,7 @@ export async function notificationPermission(): Promise<NotificationPermission> 
 
 /** Whether background checks are on for this phone. */
 export async function backgroundChecksOn(): Promise<boolean> {
-  const token = await SecureStore.getItemAsync(TOKEN_KEY, LOCKED_OK).catch(() => null);
+  const token = await getItem(TOKEN_KEY, 'background');
   return !!token && (await notificationPermission()) === 'on';
 }
 
@@ -106,7 +103,7 @@ export async function backgroundChecksOn(): Promise<boolean> {
  * The user said yes on Circlo's screen or in Settings: ask for permission (the system popup, or the phone's settings
  * if it can't be shown again), then get this device's check token and schedule the checks.
  */
-export async function enableBackgroundChecks(account: StoredAccount): Promise<NotificationPermission> {
+export async function enableBackgroundChecks(): Promise<NotificationPermission> {
   if (Platform.OS === 'android') {
     // Android 13+ shows the permission popup only once a channel exists.
     await Notifications.setNotificationChannelAsync(CHANNEL, { name: 'New activity', importance: AndroidImportance.DEFAULT });
@@ -118,23 +115,23 @@ export async function enableBackgroundChecks(account: StoredAccount): Promise<No
   }
   if (state === 'ask') state = permissionFrom(await Notifications.requestPermissionsAsync());
   if (state !== 'on') return state;
-  const { token } = ok(await api.POST('/v1/devices/{deviceId}/check-token', { params: { path: { deviceId: account.deviceId } } }));
-  await SecureStore.setItemAsync(TOKEN_KEY, token, LOCKED_OK);
-  await SecureStore.setItemAsync(SINCE_KEY, new Date().toISOString(), LOCKED_OK);
+  const { token } = ok(await api.POST('/v1/devices/current/check-token'));
+  await setItem(TOKEN_KEY, token, 'background');
+  await setItem(SINCE_KEY, new Date().toISOString(), 'background');
   await BackgroundTask.registerTaskAsync(CHECK_TASK, { minimumInterval: 15 });
   return 'on';
 }
 
 /** Off in Settings: the server forgets the token, and the phone stops checking. */
-export async function disableBackgroundChecks(account: StoredAccount): Promise<void> {
-  await api.DELETE('/v1/devices/{deviceId}/check-token', { params: { path: { deviceId: account.deviceId } } }).catch(() => undefined);
+export async function disableBackgroundChecks(): Promise<void> {
+  await api.DELETE('/v1/devices/current/check-token').catch(() => undefined);
   await stopLocally();
 }
 
 /** Forgets the token and stops the task (also on sign-out, when the server revokes the device anyway). */
 export async function stopLocally(): Promise<void> {
-  await SecureStore.deleteItemAsync(TOKEN_KEY, LOCKED_OK).catch(() => undefined);
-  await SecureStore.deleteItemAsync(SINCE_KEY, LOCKED_OK).catch(() => undefined);
+  await deleteItem(TOKEN_KEY, 'background');
+  await deleteItem(SINCE_KEY, 'background');
   if (await TaskManager.isTaskRegisteredAsync(CHECK_TASK).catch(() => false)) {
     await BackgroundTask.unregisterTaskAsync(CHECK_TASK).catch(() => undefined);
   }
@@ -154,7 +151,7 @@ export async function offerBackgroundChecksNow(): Promise<boolean> {
   if (offered) return false;
   offered = true;
   try {
-    const dismissed = (await SecureStore.getItemAsync(PROMPT_DISMISSED)) === '1';
+    const dismissed = (await getItem(PROMPT_DISMISSED)) === '1';
     return shouldOffer(await notificationPermission(), dismissed);
   } catch {
     return false;
@@ -163,7 +160,7 @@ export async function offerBackgroundChecksNow(): Promise<boolean> {
 
 /** "Not now" (or done): don't open the screen again; Settings still has the switch. */
 export function dismissNotificationsPrompt() {
-  SecureStore.setItemAsync(PROMPT_DISMISSED, '1').catch(() => undefined);
+  setItem(PROMPT_DISMISSED, '1').catch(() => undefined);
 }
 
 /** Tapping one of these notifications opens the Notifications tab. */

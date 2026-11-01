@@ -33,7 +33,7 @@ function pinningFromEnv(env) {
   return { host: url.hostname, pins, ...(expires ? { expires } : {}) };
 }
 
-/** Android network_security_config.xml: loopback HTTP for the core's video server always works. */
+/** Android network_security_config.xml: HTTPS only (plus cleartext to the dev server in development builds). */
 function networkSecurityXml({ allowAllCleartext, pinning }) {
   const pinned = pinning
     ? `
@@ -46,10 +46,7 @@ ${pinning.pins.map((p) => `            <pin digest="SHA-256">${p}</pin>`).join('
     : '';
   return `<?xml version="1.0" encoding="utf-8"?>
 <network-security-config>
-    <base-config cleartextTrafficPermitted="${allowAllCleartext}" />
-    <domain-config cleartextTrafficPermitted="true">
-        <domain includeSubdomains="false">127.0.0.1</domain>
-    </domain-config>${pinned}
+    <base-config cleartextTrafficPermitted="${allowAllCleartext}" />${pinned}
 </network-security-config>
 `;
 }

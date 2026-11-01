@@ -1,6 +1,5 @@
-# Every change needs the owner's review; crypto and security-relevant paths especially.
+# Every change needs the owner's review; security-relevant paths especially.
 *                   @zbaloch
-/core/              @zbaloch
-/docs/CRYPTO.md     @zbaloch
+/server/            @zbaloch
 /.gitleaks.toml     @zbaloch
 /.github/           @zbaloch

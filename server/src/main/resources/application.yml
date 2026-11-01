@@ -10,6 +10,16 @@ spring:
       maximum-pool-size: ${CIRCLO_DB_POOL_SIZE:24}
   flyway:
     clean-disabled: true
+  # Verification and password-reset codes. Any SMTP provider works (Postmark, SES, Resend, Mailgun, ...).
+  mail:
+    host: ${CIRCLO_MAIL_HOST:}
+    port: ${CIRCLO_MAIL_PORT:587}
+    username: ${CIRCLO_MAIL_USERNAME:}
+    password: ${CIRCLO_MAIL_PASSWORD:}
+    properties:
+      mail.smtp.auth: true
+      mail.smtp.starttls.enable: true
+      mail.smtp.starttls.required: true
 
 server:
   port: ${CIRCLO_SERVER_PORT:8080}
@@ -25,24 +35,21 @@ server:
       internal-proxies: ${CIRCLO_TRUSTED_PROXIES:}
 
 circlo:
-  core:
-    # Native circlo-core built with: cargo build --features jni --profile server (in core/)
-    library: ${CIRCLO_CORE_LIBRARY:}
   secrets:
-    opaque-server-setup: ${CIRCLO_OPAQUE_SERVER_SETUP:}
-    handle-key: ${CIRCLO_HANDLE_KEY:}
     jwt-key: ${CIRCLO_JWT_KEY:}
-  # Operator's moderation public key (core CLI: circlo-moderation keygen). The secret half stays offline. Empty = the
-  # app hides Report.
-  moderation:
-    public-key: ${CIRCLO_MODERATION_PUBLIC_KEY:}
+  mail:
+    # smtp (default), or log to print emails to the console (local development only).
+    mode: ${CIRCLO_MAIL_MODE:smtp}
+    from: ${CIRCLO_MAIL_FROM:Circlo <no-reply@hellocirclo.com>}
+  # Browser origins allowed to call the API (the web app), comma-separated, e.g. https://app.hellocirclo.com
+  cors:
+    origins: ${CIRCLO_CORS_ORIGINS:}
+  invite-base: ${CIRCLO_INVITE_BASE:https://www.hellocirclo.com/i/}
   auth:
     access-ttl: 15m
     refresh-ttl: 30d
-    recovery-ttl: 15m
-    challenge-ttl: 60s
-    # Time to write down and confirm the 24-word phrase.
-    pending-registration-ttl: 30m
+    code-ttl: 15m
+    pending-signup-ttl: 1d
   s3:
     bucket: ${CIRCLO_S3_BUCKET:circlo-media}
     public-endpoint: ${CIRCLO_S3_PUBLIC_ENDPOINT}
@@ -50,7 +57,7 @@ circlo:
     access-key: ${CIRCLO_S3_ACCESS_KEY}
     secret-key: ${CIRCLO_S3_SECRET_KEY}
     put-ttl: 15m
-    get-ttl: 5m
+    get-ttl: 1h
 
 logging:
   level:

@@ -1,7 +1,5 @@
-// Network security for both platforms. Encrypted video plays through the core's loopback server
-// (core/src/playback.rs), so plain HTTP to 127.0.0.1 must work in every build. Everything else is HTTPS-only in
-// release builds; development builds also allow plain HTTP to the local server on the LAN. Release builds pin the
-// API host's keys (see pinning.js).
+// Network security for both platforms: HTTPS-only in release builds; development builds also allow plain HTTP to the
+// local server on the LAN. Release builds pin the API host's keys (see pinning.js).
 const fs = require('fs');
 const path = require('path');
 const { withAndroidManifest, withDangerousMod, withInfoPlist } = require('expo/config-plugins');

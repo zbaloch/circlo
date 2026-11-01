@@ -7,8 +7,8 @@ import { AudienceBadge, CircleBadge } from '@/components/circle-badge';
 import { ErrorText } from '@/components/form';
 import { Screen } from '@/components/screen';
 import { describeError } from '@/lib/account';
-import { loadAddressBook, MAX_CIRCLES, type AddressBook } from '@/lib/addressbook';
-import { circleDefs, membersOf, nextCircleId, ONLY_ME, resumePendingRotation, TO_EVERYONE } from '@/lib/circles';
+import { MAX_CIRCLES, refreshAddressBook, type AddressBook } from '@/lib/addressbook';
+import { circleDefs, membersOf, nextCircleId, ONLY_ME, TO_EVERYONE } from '@/lib/circles';
 import { useSession } from '@/lib/session';
 import { usePalette } from '@/theme/use-palette';
 import { Text } from '@/components/ui/text';
@@ -29,10 +29,8 @@ export default function CirclesScreen() {
   useFocusEffect(
     useCallback(() => {
       if (!account) return;
-      loadAddressBook(account)
+      refreshAddressBook(account)
         .then(setBook)
-        .then(() => resumePendingRotation(account))
-        .then((resumed) => (resumed ? loadAddressBook(account).then(setBook) : undefined))
         .catch((e) => setError(describeError(e)));
     }, [account]),
   );
@@ -48,7 +46,6 @@ export default function CirclesScreen() {
           Posts to a circle are seen only by the people in it. Put someone in as many circles as you like; changes are
           silent: nobody is told, and Circlo can’t see them either.
         </Text>
-        {book.pendingRotation ? <Text className="text-primary dark:text-primary-dark">Updating keys…</Text> : null}
         <ErrorText>{error}</ErrorText>
         <View className={row}>
           <AudienceBadge book={book} audience={ONLY_ME} />
@@ -61,7 +58,7 @@ export default function CirclesScreen() {
           <AudienceBadge book={book} audience={TO_EVERYONE} />
           <View className="flex-1">
             <Text className="text-base font-bold text-ink dark:text-ink-dark">Everyone</Text>
-            <Text className="text-muted dark:text-muted-dark">All your people · {people(Object.keys(book.contacts).length)}</Text>
+            <Text className="text-muted dark:text-muted-dark">All your people · {people(Object.values(book.contacts).filter((c) => c.status === 'accepted').length)}</Text>
           </View>
         </View>
         <Text className="pt-4 text-xs font-semibold uppercase text-muted dark:text-muted-dark">Your circles</Text>

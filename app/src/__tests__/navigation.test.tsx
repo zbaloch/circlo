@@ -52,8 +52,8 @@ describe('app shell', () => {
     }
   });
 
-  it('drawer has Profile, Circles, Devices, Settings and Account recovery', () => {
-    expect(DRAWER_ITEMS.map((i) => i.label)).toEqual(['Profile', 'Circles', 'Devices', 'Settings', 'Account recovery']);
+  it('drawer has Profile, Circles, Devices and Settings', () => {
+    expect(DRAWER_ITEMS.map((i) => i.label)).toEqual(['Profile', 'Circles', 'Devices', 'Settings']);
   });
 
   it('Home shows the empty state and a labelled compose button', async () => {

@@ -28,10 +28,10 @@ describe('certificate pinning config', () => {
     expect(pinningFromEnv({ APP_VARIANT: 'production', EXPO_PUBLIC_API_URL: 'https://api.example.test', CIRCLO_ALLOW_UNPINNED: '1' })).toBeNull();
   });
 
-  it('writes an Android pin-set that keeps loopback video working and blocks other cleartext', () => {
+  it('writes an Android pin-set and blocks cleartext', () => {
     const xml = networkSecurityXml({ allowAllCleartext: false, pinning: { host: 'api.example.test', pins: [PIN_A, PIN_B], expires: '2027-06-01' } });
     expect(xml).toContain('<base-config cleartextTrafficPermitted="false" />');
-    expect(xml).toContain('<domain includeSubdomains="false">127.0.0.1</domain>');
+    expect(xml).not.toContain('127.0.0.1');
     expect(xml).toContain('<domain includeSubdomains="false">api.example.test</domain>');
     expect(xml).toContain('<pin-set expiration="2027-06-01">');
     expect(xml).toContain(`<pin digest="SHA-256">${PIN_A}</pin>`);

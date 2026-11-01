@@ -26,7 +26,7 @@ export default function EnableNotificationsScreen() {
   const enable = async () => {
     if (!account) return;
     setBusy(true);
-    await enableBackgroundChecks(account).catch(() => undefined);
+    await enableBackgroundChecks().catch(() => undefined);
     dismissNotificationsPrompt();
     close();
   };

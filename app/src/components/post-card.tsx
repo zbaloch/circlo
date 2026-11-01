@@ -4,7 +4,7 @@ import { Linking, Pressable, View } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 
 import { Avatar } from '@/components/avatar';
-import { MediaGrid } from '@/components/encrypted-media';
+import { MediaGrid } from '@/components/post-media';
 import type { OutboxItem } from '@/lib/outbox';
 import type { FeedPost } from '@/lib/posts';
 import { fullTime, relativeTime } from '@/lib/time';
@@ -17,6 +17,7 @@ type Props = {
   post: FeedPost;
   name: string;
   handle?: string;
+  avatarUrl?: string | null;
   /** Author-only audience label for my own posts, e.g. "Closest friends+". Never passed for other people's posts. */
   audience?: string;
   /** Opens the thread. Omitted inside the thread itself. */
@@ -58,13 +59,13 @@ export function PostText({ text, className }: { text: string; className: string 
 }
 
 /** The thread's main post, X style: author row, full-width text and media, the full time, then actions. */
-export function PostDetail({ post, name, handle, audience, onReply, onLike, onMore, onMediaPress, onAuthor }: Props) {
+export function PostDetail({ post, name, handle, avatarUrl, audience, onReply, onLike, onMore, onMediaPress, onAuthor }: Props) {
   const palette = usePalette();
   return (
     <View className="gap-3 border-b border-border px-4 pb-1 pt-3 dark:border-border-dark">
       <View className="flex-row items-center gap-3">
         <Pressable accessibilityRole="button" accessibilityLabel={`${name}'s profile`} onPress={onAuthor} disabled={!onAuthor} className="flex-1 flex-row items-center gap-3 active:opacity-70">
-          <Avatar name={name} />
+          <Avatar name={name} uri={avatarUrl} />
           <View className="flex-1">
             <Text numberOfLines={1} className="text-base font-bold text-ink dark:text-ink-dark">{name}</Text>
             {handle ? <Text numberOfLines={1} className="text-[15px] text-muted dark:text-muted-dark">@{handle}</Text> : null}
@@ -95,13 +96,13 @@ export function PostDetail({ post, name, handle, audience, onReply, onLike, onMo
   );
 }
 
-export function PostCard({ post, name, handle, audience, onOpen, onReply, onLike, onMore, onMediaPress, onAuthor }: Props) {
+export function PostCard({ post, name, handle, avatarUrl, audience, onOpen, onReply, onLike, onMore, onMediaPress, onAuthor }: Props) {
   const now = useNow();
   const palette = usePalette();
   return (
     <Pressable onPress={onOpen} disabled={!onOpen} className="flex-row gap-3 border-b border-border px-4 py-3 active:bg-surface-raised dark:border-border-dark dark:active:bg-surface-raised-dark">
       <Pressable accessibilityRole="button" accessibilityLabel={`${name}'s profile`} onPress={onAuthor} disabled={!onAuthor} className="self-start active:opacity-70">
-        <Avatar name={name} />
+        <Avatar name={name} uri={avatarUrl} />
       </Pressable>
       <View className="flex-1 gap-2">
         <View className="flex-row items-center gap-1">
@@ -149,7 +150,7 @@ function ProgressFill({ fraction }: { fraction: number }) {
   return <Animated.View className="h-1 bg-primary dark:bg-primary-dark" style={animated} />;
 }
 
-/** The inline "uploading…" card for a post still being encrypted and uploaded. */
+/** The inline "uploading…" card for a post still being uploaded. */
 export function OutboxCard({ item, onRetry, onDismiss }: { item: OutboxItem; onRetry: () => void; onDismiss: () => void }) {
   const pct = Math.round(item.progress * 100);
   return (
@@ -169,7 +170,7 @@ export function OutboxCard({ item, onRetry, onDismiss }: { item: OutboxItem; onR
         </View>
       ) : (
         <View className="gap-1">
-          <Text className="text-sm text-muted dark:text-muted-dark">Encrypting and uploading… {pct}%</Text>
+          <Text className="text-sm text-muted dark:text-muted-dark">Uploading… {pct}%</Text>
           <View className="h-1 overflow-hidden rounded-full bg-border dark:bg-border-dark">
             <ProgressFill fraction={item.progress} />
           </View>

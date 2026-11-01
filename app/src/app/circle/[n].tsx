@@ -17,7 +17,7 @@ function name(c: Contact) {
 
 /**
  * One circle: name it, see who's in it, add or remove friends, or delete it. `n` is the circle's id, or "new" to make
- * one. Every membership change is silent and rotates keys.
+ * one. Every membership change is silent: nobody is told.
  */
 export default function CircleScreen() {
   const { n } = useLocalSearchParams<{ n: string }>();

@@ -1,23 +1,24 @@
 package com.circlo.server.posts;
 
-import com.circlo.server.storage.MediaStore;
-import com.circlo.server.storage.MediaUrlSigner;
+import com.circlo.server.auth.TokenService;
+import com.circlo.server.media.Attachments;
+import com.circlo.server.media.MediaSweeper;
+import com.circlo.server.social.People;
 import com.circlo.server.web.ApiException;
 import com.circlo.server.web.Ids;
 import com.circlo.server.web.RateLimiter;
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.Max;
-import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.OptionalLong;
 import java.util.Set;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
@@ -25,6 +26,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -34,217 +36,212 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Posts and encrypted media (PLAN.md Phase 7). The server stores an opaque header ciphertext, a per-post key ref that
- * reveals neither the circle nor which posts share an audience, and random object keys for ciphertext blobs.
+ * Posts: text up to 500 characters and up to 4 photos or 1 video, shared with Only me, Everyone (all my friends) or
+ * one or more of my circles. The audience is returned only to the author; readers never learn which circle a post
+ * went to.
  */
 @RestController
 public class PostController {
 
-    static final int CHUNK_SIZE = 65_536;
-    static final long MAX_OBJECT = 512L * 1024 * 1024; // padded ciphertext
-    static final int MAX_OBJECTS_PER_POST = 12;
+    public static final int MAX_CHARS = 500;
 
     private final JdbcTemplate jdbc;
-    private final MediaUrlSigner signer;
-    private final MediaStore store;
-    private final RateLimiter limiter;
     private final PostAccess access;
+    private final People people;
+    private final Attachments attachments;
+    private final RateLimiter limiter;
 
-    public PostController(JdbcTemplate jdbc, MediaUrlSigner signer, MediaStore store, RateLimiter limiter, PostAccess access) {
+    public PostController(JdbcTemplate jdbc, PostAccess access, People people, Attachments attachments, RateLimiter limiter) {
         this.jdbc = jdbc;
-        this.signer = signer;
-        this.store = store;
-        this.limiter = limiter;
         this.access = access;
+        this.people = people;
+        this.attachments = attachments;
+        this.limiter = limiter;
     }
 
     private static byte[] me(Jwt jwt) {
-        return Ids.bytes(UUID.fromString(jwt.getSubject()));
-    }
-
-    private static Timestamp now() {
-        return Timestamp.from(Instant.now());
-    }
-
-    private boolean canRead(byte[] me, byte[] author) {
-        return access.canRead(me, author);
-    }
-
-    // ---------- uploads ----------
-
-    public record UploadRequest(@NotNull @Size(min = 1, max = MAX_OBJECTS_PER_POST) List<@Min(1) @Max(MAX_OBJECT) Long> sizes) {}
-
-    public record UploadSlot(String objectKey, String putUrl, long ctSize) {}
-
-    /** Random object keys with PUT URLs locked to each declared (padded, encrypted) size. Valid for 15 minutes. */
-    @PostMapping("/v1/media/uploads")
-    @Transactional
-    public List<UploadSlot> uploads(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody UploadRequest r) {
-        byte[] me = me(jwt);
-        if (!limiter.tryAcquire("uploads", me, 60, 60_000)) {
-            throw new ApiException(HttpStatus.TOO_MANY_REQUESTS, "rate_limited");
-        }
-        List<UploadSlot> slots = new ArrayList<>();
-        for (long size : r.sizes()) {
-            String key = MediaUrlSigner.newObjectKey();
-            jdbc.update("INSERT INTO media_uploads (object_key, owner_id, ct_size, created_at) VALUES (?, ?, ?, ?)", key, me, size, now());
-            slots.add(new UploadSlot(key, signer.presignPut(key, size).toString(), size));
-        }
-        return slots;
+        return Ids.bytes(TokenService.userOf(jwt));
     }
 
     // ---------- create ----------
 
-    public record MediaRef(@NotNull @Pattern(regexp = "[0-9a-f]{64}") String objectKey,
-            @NotNull @Pattern(regexp = "full|thumb|poster") String kind) {}
+    /** `kind`: onlyMe, everyone or circles (with `circles`: one or more of my circle ids). */
+    public record Audience(@NotNull @Pattern(regexp = "onlyMe|everyone|circles") String kind, @Size(max = 8) List<Integer> circles) {}
 
-    public record NewPost(@NotNull UUID postId, @NotNull UUID epochId,
-            @NotNull @Size(min = 32, max = 32) byte[] keyRef,
-            @NotNull @Size(min = 64, max = 65_536) byte[] headerCt,
-            @NotNull @Size(max = MAX_OBJECTS_PER_POST) List<@Valid MediaRef> media,
-            @NotNull @Size(min = 32, max = 32) byte[] readTokenHash) {}
+    public record NewPost(@NotNull @Size(max = 4 * MAX_CHARS) String text, @NotNull @Valid Audience audience,
+            @Size(max = Attachments.MAX_PER_ITEM) List<Attachments.@Valid NewAttachment> media) {}
+
+    static String cleanText(String text, int max, boolean allowEmpty) {
+        String t = text == null ? "" : text.strip();
+        int n = t.codePointCount(0, t.length());
+        if (n > max || (!allowEmpty && n == 0)) {
+            throw ApiException.badRequest("invalid_text");
+        }
+        return t;
+    }
 
     @PostMapping("/v1/posts")
     @ResponseStatus(HttpStatus.CREATED)
     @Transactional
-    public Map<String, Object> create(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody NewPost p) {
+    public PostView create(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody NewPost p) {
         byte[] me = me(jwt);
-        if (jdbc.queryForList("SELECT 1 FROM epochs WHERE id = ? AND owner_id = ?", Ids.bytes(p.epochId()), me).isEmpty()) {
-            throw ApiException.badRequest("unknown_epoch");
+        if (!limiter.tryAcquire("posts", me, 30, 60_000)) {
+            throw ApiException.rateLimited();
         }
-        Set<String> seen = new HashSet<>();
-        for (MediaRef m : p.media()) {
-            if (!seen.add(m.objectKey())) {
-                throw ApiException.badRequest("duplicate_media");
-            }
-            List<Long> declared = jdbc.query(
-                    "SELECT ct_size FROM media_uploads WHERE object_key = ? AND owner_id = ? AND post_id IS NULL AND group_id IS NULL AND created_at > ? FOR UPDATE",
-                    (rs, i) -> rs.getLong(1), m.objectKey(), me, Timestamp.from(Instant.now().minus(MediaSweeper.ATTACH_WINDOW)));
-            if (declared.isEmpty()) {
-                throw ApiException.badRequest("unknown_media");
-            }
-            OptionalLong stored = store.size(m.objectKey());
-            if (stored.isEmpty() || stored.getAsLong() != declared.get(0)) {
-                throw ApiException.badRequest("media_not_uploaded");
+        List<Attachments.NewAttachment> media = p.media() == null ? List.of() : p.media();
+        String text = cleanText(p.text(), MAX_CHARS, !media.isEmpty());
+        String audience = switch (p.audience().kind()) {
+            case "onlyMe" -> "only_me";
+            case "everyone" -> "everyone";
+            default -> "circles";
+        };
+        List<Integer> circles = List.of();
+        if (audience.equals("circles")) {
+            Set<Integer> mine = new HashSet<>(jdbc.queryForList("SELECT id FROM circles WHERE owner_id = ?", Integer.class, (Object) me));
+            circles = p.audience().circles() == null ? List.of() : p.audience().circles().stream().distinct().sorted().toList();
+            if (circles.isEmpty() || !mine.containsAll(circles)) {
+                throw ApiException.badRequest("invalid_audience");
             }
         }
-        byte[] postId = Ids.bytes(p.postId());
-        jdbc.update("INSERT INTO posts (id, author_id, epoch_id, key_ref, header_ct, created_at, size_bucket, read_token_hash) "
-                + "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                postId, me, Ids.bytes(p.epochId()), p.keyRef(), p.headerCt(), now(), sizeBucket(p.headerCt().length), p.readTokenHash());
-        for (MediaRef m : p.media()) {
-            long size = jdbc.queryForObject("SELECT ct_size FROM media_uploads WHERE object_key = ?", Long.class, m.objectKey());
-            jdbc.update("INSERT INTO post_media (id, post_id, object_key, ct_size_padded, chunk_size, kind) VALUES (?, ?, ?, ?, ?, ?)",
-                    Ids.bytes(Ids.newId()), postId, m.objectKey(), size, CHUNK_SIZE, m.kind());
-            jdbc.update("UPDATE media_uploads SET post_id = ? WHERE object_key = ?", postId, m.objectKey());
+        UUID postId = Ids.newId();
+        byte[] id = Ids.bytes(postId);
+        jdbc.update("INSERT INTO posts (id, author_id, body, audience, created_at) VALUES (?, ?, ?, ?, ?)", id, me, text, audience,
+                Timestamp.from(Instant.now()));
+        for (int c : circles) {
+            jdbc.update("INSERT INTO post_circles (post_id, circle_id) VALUES (?, ?)", id, c);
         }
-        return Map.of("postId", p.postId());
+        if (!circles.isEmpty()) {
+            // The audience is fixed now: people added to these circles later don't see this post.
+            jdbc.update("INSERT IGNORE INTO post_audience (post_id, user_id) SELECT DISTINCT ?, m.member_id FROM circle_members m "
+                    + "WHERE m.owner_id = ? AND m.circle_id IN (" + String.join(",", Collections.nCopies(circles.size(), "?")) + ")",
+                    concat(new Object[] {id, me}, circles.toArray()));
+        }
+        attachments.attach(me, id, null, media);
+        return views(me, "WHERE p.id = ?", id).get(0);
     }
 
-    static int sizeBucket(int len) {
-        return 32 - Integer.numberOfLeadingZeros(Math.max(1, len - 1));
+    private static Object[] concat(Object[] a, Object[] b) {
+        Object[] out = new Object[a.length + b.length];
+        System.arraycopy(a, 0, out, 0, a.length);
+        System.arraycopy(b, 0, out, a.length, b.length);
+        return out;
     }
 
     // ---------- read ----------
 
-    public record Media(String objectKey, String kind, long ctSize) {}
+    /** The audience of my own post. Never present on other people's posts. */
+    public record AudienceView(String kind, List<Integer> circles) {}
 
-    public record PostView(UUID postId, UUID authorId, UUID epochId, byte[] keyRef, byte[] headerCt, Instant createdAt,
-            List<Media> media) {}
+    public record PostView(UUID postId, UUID authorId, People.Person author, String text, Instant createdAt,
+            List<Attachments.AttachmentView> media, int replyCount, int likeCount, boolean likedByMe, AudienceView audience) {}
 
-    // Counts aren't here: they reveal who interacted, so they come from /v1/posts/stats with the post's read token.
-    private static final String VIEW_SELECT = "SELECT p.id, p.author_id, p.epoch_id, p.key_ref, p.header_ct, p.created_at FROM posts p ";
+    private static final String SELECT = "SELECT p.id, p.author_id, p.body, p.audience, p.created_at FROM posts p ";
 
-    private List<PostView> views(String where, Object... args) {
-        List<PostView> posts = jdbc.query(VIEW_SELECT + where,
-                (rs, i) -> new PostView(Ids.uuid(rs.getBytes(1)), Ids.uuid(rs.getBytes(2)), Ids.uuid(rs.getBytes(3)), rs.getBytes(4),
-                        rs.getBytes(5), rs.getTimestamp(6).toInstant(), new ArrayList<>()),
-                args);
-        if (posts.isEmpty()) {
-            return posts;
+    /** Posts matching `where` (which must already limit them to what `viewer` may see), with everything a card needs. */
+    List<PostView> views(byte[] viewer, String where, Object... args) {
+        record Row(UUID id, UUID author, String body, String audience, Instant createdAt) {}
+        List<Row> rows = jdbc.query(SELECT + where, (rs, i) -> new Row(Ids.uuid(rs.getBytes(1)), Ids.uuid(rs.getBytes(2)), rs.getString(3),
+                rs.getString(4), rs.getTimestamp(5).toInstant()), args);
+        if (rows.isEmpty()) {
+            return List.of();
         }
-        // All media for the page in one query (not one per post).
-        Map<UUID, List<Media>> media = new java.util.HashMap<>();
-        jdbc.query("SELECT post_id, object_key, kind, ct_size_padded FROM post_media WHERE post_id IN ("
-                + String.join(",", java.util.Collections.nCopies(posts.size(), "?")) + ") ORDER BY post_id, id",
+        List<UUID> ids = rows.stream().map(Row::id).toList();
+        String marks = String.join(",", Collections.nCopies(ids.size(), "?"));
+        Object[] idArgs = ids.stream().map(Ids::bytes).toArray();
+        Map<UUID, People.Person> authors = people.persons(rows.stream().map(Row::author).toList());
+        Map<UUID, List<Attachments.AttachmentView>> media = attachments.of("post_id", ids);
+        Map<UUID, Integer> replies = counts("SELECT post_id, COUNT(*) FROM post_replies WHERE post_id IN (" + marks + ") GROUP BY post_id", idArgs);
+        Map<UUID, Integer> likes = counts("SELECT post_id, COUNT(*) FROM post_likes WHERE post_id IN (" + marks + ") GROUP BY post_id", idArgs);
+        Set<UUID> liked = new HashSet<>(jdbc.query("SELECT post_id FROM post_likes WHERE liker_id = ? AND post_id IN (" + marks + ")",
+                (rs, i) -> Ids.uuid(rs.getBytes(1)), concat(new Object[] {viewer}, idArgs)));
+        Map<UUID, List<Integer>> circles = new HashMap<>();
+        jdbc.query("SELECT post_id, circle_id FROM post_circles WHERE post_id IN (" + marks + ") ORDER BY circle_id",
                 rs -> {
-                    media.computeIfAbsent(Ids.uuid(rs.getBytes(1)), k -> new ArrayList<>())
-                            .add(new Media(rs.getString(2), rs.getString(3), rs.getLong(4)));
-                }, posts.stream().map(p -> Ids.bytes(p.postId())).toArray());
-        posts.forEach(p -> p.media().addAll(media.getOrDefault(p.postId(), List.of())));
-        return posts;
+                    circles.computeIfAbsent(Ids.uuid(rs.getBytes(1)), k -> new ArrayList<>()).add(rs.getInt(2));
+                }, idArgs);
+        UUID me = Ids.uuid(viewer);
+        return rows.stream().filter(r -> authors.containsKey(r.author())).map(r -> {
+            AudienceView audience = null;
+            if (r.author().equals(me)) {
+                audience = switch (r.audience()) {
+                    case "only_me" -> new AudienceView("onlyMe", List.of());
+                    case "everyone" -> new AudienceView("everyone", List.of());
+                    default -> new AudienceView("circles", circles.getOrDefault(r.id(), List.of()));
+                };
+            }
+            return new PostView(r.id(), r.author(), authors.get(r.author()), r.body(), r.createdAt(), media.getOrDefault(r.id(), List.of()),
+                    replies.getOrDefault(r.id(), 0), likes.getOrDefault(r.id(), 0), liked.contains(r.id()), audience);
+        }).toList();
+    }
+
+    private Map<UUID, Integer> counts(String sql, Object[] ids) {
+        Map<UUID, Integer> out = new HashMap<>();
+        jdbc.query(sql, rs -> {
+            out.put(Ids.uuid(rs.getBytes(1)), rs.getInt(2));
+        }, ids);
+        return out;
     }
 
     private static Timestamp cursor(Instant before) {
         return Timestamp.from(before == null ? Instant.now().plusSeconds(60) : before);
     }
 
-    /** An author's posts, newest first. Readers try their chain keys locally; the server can't tell who can read what. */
+    private static int clamp(int limit, int max) {
+        return Math.max(1, Math.min(limit, max));
+    }
+
+    /** My posts and my friends' posts that I may see, newest first. */
+    @GetMapping("/v1/feed")
+    public List<PostView> feed(@AuthenticationPrincipal Jwt jwt, @RequestParam(value = "before", required = false) Instant before,
+            @RequestParam(value = "limit", defaultValue = "30") int limit) {
+        byte[] me = me(jwt);
+        return views(me, "WHERE " + PostAccess.VISIBLE + " AND p.created_at < ? ORDER BY p.created_at DESC LIMIT ?",
+                concat(PostAccess.visibleArgs(me), new Object[] {cursor(before), clamp(limit, 100)}));
+    }
+
+    /** One person's posts that I may see (mine, or a friend's), newest first. */
     @GetMapping("/v1/users/{userId}/posts")
     public List<PostView> posts(@AuthenticationPrincipal Jwt jwt, @PathVariable("userId") UUID userId,
             @RequestParam(value = "before", required = false) Instant before,
-            @RequestParam(value = "limit", defaultValue = "20") int limit) {
+            @RequestParam(value = "limit", defaultValue = "30") int limit) {
         byte[] me = me(jwt);
-        byte[] author = Ids.bytes(userId);
-        if (!canRead(me, author)) {
+        return views(me, "WHERE p.author_id = ? AND " + PostAccess.VISIBLE + " AND p.created_at < ? ORDER BY p.created_at DESC LIMIT ?",
+                concat(concat(new Object[] {Ids.bytes(userId)}, PostAccess.visibleArgs(me)), new Object[] {cursor(before), clamp(limit, 100)}));
+    }
+
+    /** "See what they can see": my posts exactly as this friend sees them (without my audience badges). */
+    @GetMapping("/v1/me/preview/{friendId}")
+    public List<PostView> previewAs(@AuthenticationPrincipal Jwt jwt, @PathVariable("friendId") UUID friendId,
+            @RequestParam(value = "before", required = false) Instant before,
+            @RequestParam(value = "limit", defaultValue = "30") int limit) {
+        byte[] me = me(jwt);
+        byte[] friend = Ids.bytes(friendId);
+        if (!people.friends(me, friend)) {
             throw ApiException.notFound();
         }
-        return views("WHERE p.author_id = ? AND p.created_at < ? ORDER BY p.created_at DESC LIMIT ?",
-                author, cursor(before), Math.max(1, Math.min(limit, 100)));
+        return views(friend, "WHERE p.author_id = ? AND " + PostAccess.VISIBLE + " AND p.created_at < ? ORDER BY p.created_at DESC LIMIT ?",
+                concat(concat(new Object[] {me}, PostAccess.visibleArgs(friend)), new Object[] {cursor(before), clamp(limit, 100)}));
     }
 
-    /** My posts and my accepted friends' posts in one newest-first page (same headers a per-author fetch returns). */
-    @GetMapping("/v1/feed")
-    public List<PostView> feed(@AuthenticationPrincipal Jwt jwt,
-            @RequestParam(value = "before", required = false) Instant before,
-            @RequestParam(value = "limit", defaultValue = "50") int limit) {
+    @GetMapping("/v1/posts/{postId}")
+    public PostView post(@AuthenticationPrincipal Jwt jwt, @PathVariable("postId") UUID postId) {
         byte[] me = me(jwt);
-        return views("""
-                WHERE (p.author_id = ? OR p.author_id IN (
-                        SELECT user_b FROM friendships WHERE user_a = ? AND status = 'accepted'
-                        UNION SELECT user_a FROM friendships WHERE user_b = ? AND status = 'accepted'))
-                  AND p.created_at < ? ORDER BY p.created_at DESC LIMIT ?""",
-                me, me, me, cursor(before), Math.max(1, Math.min(limit, 200)));
-    }
-
-    public record DownloadRequest(@NotNull @Size(min = 1, max = 50) List<@Pattern(regexp = "[0-9a-f]{64}") String> objectKeys) {}
-
-    public record DownloadUrl(String objectKey, String getUrl) {}
-
-    /** 5-minute GET URLs, only for media attached to posts I may read or to chats I'm in. */
-    @PostMapping("/v1/media/download-urls")
-    public List<DownloadUrl> downloadUrls(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody DownloadRequest r) {
-        byte[] me = me(jwt);
-        List<DownloadUrl> out = new ArrayList<>();
-        for (String key : r.objectKeys()) {
-            List<byte[]> author = jdbc.query(
-                    "SELECT p.author_id FROM post_media m JOIN posts p ON p.id = m.post_id WHERE m.object_key = ?",
-                    (rs, i) -> rs.getBytes(1), key);
-            boolean readable = !author.isEmpty() && canRead(me, author.get(0));
-            // Chat media: readable by users with an active device in the chat.
-            readable = readable || !jdbc.queryForList("""
-                    SELECT 1 FROM media_uploads u JOIN mls_group_members gm ON gm.group_id = u.group_id
-                    WHERE u.object_key = ? AND gm.user_id = ?""", key, me).isEmpty();
-            if (!readable) {
-                throw ApiException.notFound();
-            }
-            out.add(new DownloadUrl(key, signer.presignGet(key).toString()));
+        List<PostView> v = views(me, "WHERE p.id = ? AND " + PostAccess.VISIBLE, concat(new Object[] {Ids.bytes(postId)}, PostAccess.visibleArgs(me)));
+        if (v.isEmpty()) {
+            throw ApiException.notFound();
         }
-        return out;
+        return v.get(0);
     }
 
-    // ---------- delete ----------
-
-    /** Deletes my post. Its media objects are handed to {@link MediaSweeper}, which removes them from the bucket. */
-    @org.springframework.web.bind.annotation.DeleteMapping("/v1/posts/{postId}")
+    /** Deletes my post with its replies and likes; its files are removed from the bucket by the sweeper. */
+    @DeleteMapping("/v1/posts/{postId}")
     @Transactional
     public Map<String, String> delete(@AuthenticationPrincipal Jwt jwt, @PathVariable("postId") UUID postId) {
         byte[] id = Ids.bytes(postId);
-        int n = jdbc.update("DELETE FROM posts WHERE id = ? AND author_id = ?", id, me(jwt));
-        if (n != 1) {
+        if (jdbc.update("DELETE FROM posts WHERE id = ? AND author_id = ?", id, me(jwt)) != 1) {
             throw ApiException.notFound();
         }
-        jdbc.update("UPDATE media_uploads SET post_id = NULL, created_at = ? WHERE post_id = ?", Timestamp.from(Instant.EPOCH), id);
+        MediaSweeper.release(jdbc, "post_id = ?", (Object) id);
         return Map.of("status", "deleted");
     }
 }

@@ -7,14 +7,21 @@ import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Avatar } from '@/components/avatar';
-import { MediaGrid } from '@/components/encrypted-media';
-import { authorName } from '@/components/post-actions';
-import { loadAddressBook, type AddressBook } from '@/lib/addressbook';
+import { MediaGrid } from '@/components/post-media';
 import { blockUser, refreshBlocked, useBlocked, visibleMessages } from '@/lib/blocks';
 import { openViewer } from '@/lib/feed-store';
-import { discardPicked, discardPrepared, encryptAndUpload, MAX_IMAGES, prepare, type PickedMedia } from '@/lib/media';
-import { markRead, removePerson, sendMessage, syncMessaging, useConversations, type ChatMessage } from '@/lib/messaging';
-import { loadModerationKey } from '@/lib/report';
+import { useMe } from '@/lib/me';
+import { discardPicked, discardPrepared, MAX_IMAGES, prepare, upload, type PickedMedia, type PreparedItem } from '@/lib/media';
+import {
+  deleteMessage,
+  markRead,
+  memberName,
+  removePerson,
+  sendMessage,
+  syncMessaging,
+  useConversations,
+  type ChatMessage,
+} from '@/lib/messaging';
 import { useSession } from '@/lib/session';
 import { chatTitle, dayLabel } from '@/lib/view-logic';
 import { usePalette } from '@/theme/use-palette';
@@ -32,31 +39,28 @@ export default function ChatScreen() {
   const navigation = useNavigation();
   const palette = usePalette();
   const conv = useConversations().find((c) => c.groupId === id);
-  const [book, setBook] = useState<AddressBook | null>(null);
   const [text, setText] = useState('');
   const [sending, setSending] = useState(false);
   const [members, setMembers] = useState(false);
   const [hidden, setHidden] = useState<Set<number>>(new Set());
-  const [canReport, setCanReport] = useState(false);
+  const me = useMe();
   const blocked = useBlocked();
   const list = useRef<FlatList<Row>>(null);
 
   const sync = useCallback(() => {
-    if (account) syncMessaging(account).catch(() => {});
-  }, [account]);
+    if (account) syncMessaging(account, id).catch(() => {});
+  }, [account, id]);
   useFocusEffect(
     useCallback(() => {
-      if (account) loadAddressBook(account).then(setBook, () => {});
       refreshBlocked().catch(() => {});
-      loadModerationKey().then((k) => setCanReport(!!k), () => setCanReport(false));
       sync();
       const timer = setInterval(sync, 5_000); // while the chat is open
       return () => clearInterval(timer);
-    }, [account, sync]),
+    }, [sync]),
   );
 
-  const names = account && conv ? conv.members.map((u) => authorName(account, book, u).name) : [];
-  const title = chatTitle(names);
+  const names = account && conv ? conv.members.map((u) => memberName(conv, u, account)) : [];
+  const title = conv?.name || chatTitle(names);
   useEffect(() => {
     navigation.setOptions({
       title,
@@ -98,11 +102,11 @@ export default function ChatScreen() {
     const t = text.trim();
     if ((!t && picked.length === 0) || sending) return;
     setSending(true);
-    const prepared = [];
+    const prepared: PreparedItem[] = [];
     try {
-      // Same pipeline as posts: strip metadata, encrypt per file, size-locked upload; keys travel inside MLS.
-      for (const m of picked) prepared.push(...(await prepare(m)));
-      const uploaded = prepared.length ? await encryptAndUpload(prepared) : [];
+      // Same pipeline as posts: metadata removed, then a size-locked upload.
+      for (const m of picked) prepared.push(await prepare(m));
+      const uploaded = await upload(prepared);
       await sendMessage(account, conv.groupId, t, uploaded);
       discardPicked(picked);
       setText('');
@@ -130,20 +134,23 @@ export default function ChatScreen() {
     await send(video ? [video] : picked.slice(0, MAX_IMAGES));
   };
 
-  const canSend = conv.active && !conv.unverified;
+  const canSend = conv.active;
 
-  // Long press: delete for me; on someone else's message, also report it or block them.
+  // Long press: delete my own message for everyone, or hide someone else's here; report it or block them.
   const messageMenu = (msg: ChatMessage) => {
-    const { name } = authorName(account, book, msg.senderUser);
+    const name = memberName(conv, msg.senderUser, account);
+    const person = conv.people[msg.senderUser];
     const block = () =>
       showAlert(`Block ${name}?`, 'You’ll stop being connected. They can’t send you requests or see anything new you post, and their messages are hidden. They aren’t told.', [
         { text: 'Cancel', style: 'cancel' },
-        { text: 'Block', style: 'destructive', onPress: () => blockUser(account, msg.senderUser).catch(() => showAlert('Couldn’t block', 'Check your connection and try again.')) },
+        { text: 'Block', style: 'destructive', onPress: () => blockUser(account, msg.senderUser, person?.name, person?.handle).catch(() => showAlert('Couldn’t block', 'Check your connection and try again.')) },
       ]);
     showAlert('Message', undefined, [
-      { text: 'Delete for me', style: 'destructive', onPress: () => setHidden(new Set([...hidden, msg.seq])) },
-      ...(!msg.mine && canReport
-        ? [{ text: 'Report message', style: 'destructive' as const, onPress: () => router.push({ pathname: '/report/[id]', params: { id: conv.groupId, kind: 'message', seq: String(msg.seq) } }) }]
+      msg.mine
+        ? { text: 'Delete for everyone', style: 'destructive', onPress: () => deleteMessage(conv.groupId, msg).catch(() => showAlert('Couldn’t delete', 'Check your connection and try again.')) }
+        : { text: 'Hide here', style: 'destructive', onPress: () => setHidden(new Set([...hidden, msg.seq])) },
+      ...(!msg.mine
+        ? [{ text: 'Report message', style: 'destructive' as const, onPress: () => router.push({ pathname: '/report/[id]', params: { id: msg.messageId, kind: 'message', chat: conv.groupId } }) }]
         : []),
       ...(!msg.mine ? [{ text: `Block ${name}`, style: 'destructive' as const, onPress: block }] : []),
       { text: 'Cancel', style: 'cancel' },
@@ -153,18 +160,13 @@ export default function ChatScreen() {
   return (
     <SafeAreaView edges={['bottom']} className="flex-1 bg-surface dark:bg-surface-dark">
       <KeyboardAvoidingView className="flex-1" behavior="padding" keyboardVerticalOffset={90}>
-        {conv.unverified ? (
-          <Text className="bg-danger/10 px-4 py-2 text-sm text-danger dark:text-danger-dark">
-            Someone’s security keys in this chat don’t match what you verified. Sending is paused until you check their safety number.
-          </Text>
-        ) : null}
         <FlatList
           ref={list}
           data={rows}
           keyExtractor={(r) => r.key}
           contentContainerClassName="gap-1 px-3 py-3"
           onContentSizeChange={() => list.current?.scrollToEnd({ animated: false })}
-          ListEmptyComponent={<Text className="py-10 text-center text-muted dark:text-muted-dark">Say hello. Messages are end-to-end encrypted.</Text>}
+          ListEmptyComponent={<Text className="py-10 text-center text-muted dark:text-muted-dark">Say hello. Only the people in this chat can see it.</Text>}
           renderItem={({ item }) =>
             item.kind === 'day' ? (
               <Text className="py-2 text-center text-xs text-muted dark:text-muted-dark">{item.label}</Text>
@@ -172,13 +174,13 @@ export default function ChatScreen() {
               <Pressable
                 onLongPress={() => messageMenu(item.msg)}
                 className={`max-w-[80%] ${item.msg.mine ? 'self-end' : 'self-start'}`}>
-                {item.showName ? <Text className="px-2 pb-0.5 text-xs text-muted dark:text-muted-dark">{authorName(account, book, item.msg.senderUser).name}</Text> : null}
+                {item.showName ? <Text className="px-2 pb-0.5 text-xs text-muted dark:text-muted-dark">{memberName(conv, item.msg.senderUser, account)}</Text> : null}
                 {item.msg.media.length ? (
                   <View className="mb-1 w-64">
                     <MediaGrid
                       media={item.msg.media}
                       onPress={(i) => {
-                        openViewer(item.msg.media.filter((m) => m.kind === 'full'), i);
+                        openViewer(item.msg.media.filter((m) => m.type === 'image'), i);
                         router.push('/viewer');
                       }}
                     />
@@ -225,8 +227,8 @@ export default function ChatScreen() {
           <Text className="px-5 pb-2 text-xl font-bold text-ink dark:text-ink-dark">People</Text>
           {[account.userId, ...conv.members].map((u) => (
             <View key={u} className="flex-row items-center gap-3 px-5 py-2">
-              <Avatar size="sm" name={authorName(account, book, u).name} />
-              <Text className="flex-1 text-base text-ink dark:text-ink-dark">{u === account.userId ? 'You' : authorName(account, book, u).name}</Text>
+              <Avatar size="sm" name={memberName(conv, u, account, me?.name)} uri={u === account.userId ? me?.avatarUrl : conv.people[u]?.avatarUrl} />
+              <Text className="flex-1 text-base text-ink dark:text-ink-dark">{u === account.userId ? 'You' : memberName(conv, u, account)}</Text>
               {u !== account.userId && conv.active ? (
                 <Pressable
                   accessibilityRole="button"
@@ -250,6 +252,30 @@ export default function ChatScreen() {
               }}
               className="mx-5 mt-3 items-center rounded-full border border-primary py-3 dark:border-primary-dark">
               <Text className="font-bold text-primary dark:text-primary-dark">Add people</Text>
+            </Pressable>
+          ) : null}
+          {conv.active ? (
+            <Pressable
+              accessibilityRole="button"
+              onPress={() =>
+                showAlert('Leave this chat?', 'You won’t see new messages, and it disappears from your inbox.', [
+                  { text: 'Cancel', style: 'cancel' },
+                  {
+                    text: 'Leave',
+                    style: 'destructive',
+                    onPress: () =>
+                      removePerson(account, conv.groupId, account.userId).then(
+                        () => {
+                          setMembers(false);
+                          router.back();
+                        },
+                        () => showAlert('Couldn’t leave', 'Check your connection and try again.'),
+                      ),
+                  },
+                ])
+              }
+              className="mx-5 mt-2 items-center py-3">
+              <Text className="font-bold text-danger dark:text-danger-dark">Leave chat</Text>
             </Pressable>
           ) : null}
         </View>

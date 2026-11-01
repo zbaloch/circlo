@@ -1,28 +1,27 @@
 import { audienceBadge, authorName } from '@/components/post-actions';
 import { mergeIds } from '@/lib/feed-store';
-import { setMyName } from '@/lib/my-name';
+import { setMe } from '@/lib/me';
 import type { FeedPost } from '@/lib/posts';
 import { toggledLike, validateReply } from '@/lib/thread';
 import { likersLine, linkParts, postsForTab, profileTabs } from '@/lib/view-logic';
 
 // Native modules and navigation don't load under jest; these tests cover the pure logic only.
-jest.mock('@circlo/core', () => ({}));
 jest.mock('expo-file-system', () => ({}));
 jest.mock('expo-image-manipulator', () => ({}));
 jest.mock('expo-video-thumbnails', () => ({}));
 jest.mock('expo-secure-store', () => ({}));
+jest.mock('@/api/client', () => ({}));
 jest.mock('expo-router', () => ({ router: { push: jest.fn(), back: jest.fn() }, useFocusEffect: jest.fn(), useLocalSearchParams: () => ({}) }));
 
 const post = (over: Partial<FeedPost> = {}): FeedPost => ({
   postId: 'p1',
   authorId: 'a',
-  epochId: 'e',
+  authorName: 'Ana',
+  authorHandle: 'ana',
   createdAtMs: 1,
   text: '',
   media: [],
   mine: false,
-  postKey: new ArrayBuffer(32),
-  readToken: new ArrayBuffer(32),
   replyCount: 0,
   likeCount: 0,
   likedByMe: false,
@@ -45,12 +44,12 @@ describe('audience badges', () => {
 describe('author names', () => {
   const account = { userId: 'me', handle: 'zaheer' };
   const book = { contacts: { b: { displayName: 'Bob', handle: 'bob' } as never, c: { handle: 'carol' } as never } };
-  it('names me, friends by profile, and strangers neutrally', () => {
+  it('names me, connections by their profile, and strangers neutrally', () => {
     expect(authorName(account, book, 'me').name).toBe('zaheer');
     // Once my profile has loaded, my own posts show my display name.
-    setMyName('Zaheer B');
+    setMe({ userId: 'me', name: 'Zaheer B', username: 'zaheer', email: 'z@example.test', bio: '', createdAt: '' });
     expect(authorName(account, book, 'me')).toEqual({ name: 'Zaheer B', handle: 'zaheer' });
-    setMyName(null);
+    setMe(null);
     expect(authorName(account, book, 'b')).toEqual({ name: 'Bob', handle: 'bob' });
     expect(authorName(account, book, 'c').name).toBe('@carol');
     expect(authorName(account, book, 'x').name).toBe('Someone');

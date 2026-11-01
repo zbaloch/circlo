@@ -44,8 +44,8 @@ function Navigator() {
   const signedIn = session.status === 'signedIn';
   // Screens with their own Cancel or close button: no swipe, so a half-finished post or reply isn't dismissed by accident.
   const own = { headerShown: false, gestureEnabled: false };
-  // Keyed on the auth state: signing in or out drops all navigation history, so finished onboarding screens
-  // (including the recovery phrase) are unmounted and can never be navigated back to.
+  // Keyed on the auth state: signing in or out drops all navigation history, so finished onboarding screens are
+  // unmounted and can never be navigated back to.
   return (
     <Stack
       key={signedIn ? 'signed-in' : 'signed-out'}
@@ -65,11 +65,8 @@ function Navigator() {
         <Stack.Screen name="circles" options={{ title: 'Circles' }} />
         <Stack.Screen name="devices" options={{ title: 'Devices' }} />
         <Stack.Screen name="settings" options={{ title: 'Settings' }} />
-        <Stack.Screen name="recovery" options={{ title: 'Account recovery' }} />
-        <Stack.Screen name="dev" options={{ title: 'Crypto self-test' }} />
         <Stack.Screen name="edit-profile" options={{ title: 'Edit profile' }} />
         <Stack.Screen name="friend/[id]" options={{ title: 'Profile' }} />
-        <Stack.Screen name="safety/[id]" options={{ title: 'Safety number' }} />
         <Stack.Screen name="scan" options={{ title: 'Scan code' }} />
         <Stack.Screen name="circle/[n]" options={{ title: 'Circle' }} />
         <Stack.Screen name="compose" options={own} />
@@ -79,7 +76,6 @@ function Navigator() {
         <Stack.Screen name="preview/[id]" options={{ title: 'What they can see' }} />
         <Stack.Screen name="chat/[id]" options={{ title: 'Chat' }} />
         <Stack.Screen name="new-message" options={{ title: 'New message' }} />
-        <Stack.Screen name="link-confirm" options={{ title: 'Link a device' }} />
         <Stack.Screen name="report/[id]" options={{ title: 'Report' }} />
         <Stack.Screen name="enable-notifications" options={own} />
         <Stack.Screen name="security-alert" options={own} />

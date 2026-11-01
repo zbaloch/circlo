@@ -2,7 +2,7 @@ import { Icon } from '@/components/ui/icon';
 import * as Clipboard from 'expo-clipboard';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { Pressable, RefreshControl, ScrollView, Share, View } from 'react-native';
+import { Platform, Pressable, RefreshControl, ScrollView, Share, View } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
 
 import { CirclePickerSheet, circlesLine } from '@/components/circle-choice';
@@ -11,6 +11,7 @@ import { Button, ErrorText, TextField } from '@/components/form';
 import { describeError } from '@/lib/account';
 import { loadAddressBook, type AddressBook } from '@/lib/addressbook';
 import { acceptInvite, acceptRequest, createInviteLink, declineRequest, InviteError, type Connection } from '@/lib/friends';
+import { takePendingInvite } from '@/lib/pending-invite';
 import { displayName, markRequestsSeen, useConnections } from '@/lib/use-connections';
 import { usePalette } from '@/theme/use-palette';
 import { Text } from '@/components/ui/text';
@@ -48,7 +49,8 @@ export default function SearchScreen() {
     if (next) setSection(next);
   }
   const [invite, setInvite] = useState<{ link: string; known: ReadonlySet<string> }>();
-  const [pasted, setPasted] = useState('');
+  // An invite link that opened the app waits here, ready to send.
+  const [pasted, setPasted] = useState(() => takePendingInvite() ?? '');
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string>();
   const [notice, setNotice] = useState<string>();
@@ -133,7 +135,7 @@ export default function SearchScreen() {
             loading={busy === `decline:${c.userId}`}
             disabled={!!busy}
             onPress={() => run(`decline:${c.userId}`, async () => {
-              await declineRequest(c.userId);
+              await declineRequest(account, c.userId);
               await refresh();
             })}
           />
@@ -142,14 +144,9 @@ export default function SearchScreen() {
     </View>
   );
 
-  const keysWarning = (c: Connection) =>
-    c.identityChanged ? (
-      <Text className="text-danger dark:text-danger-dark">Their security keys changed since you last saw them.</Text>
-    ) : null;
-
   const newInvite = () =>
     run('invite', async () => {
-      const link = await createInviteLink(account);
+      const link = await createInviteLink();
       setInvite({ link, known: new Set(all.map((c) => c.userId)) });
     });
 
@@ -183,7 +180,7 @@ export default function SearchScreen() {
           {otherRequests.map((c) => (
             <View key={c.userId} className="gap-3 rounded-2xl border border-border p-4 dark:border-border-dark">
               <View className="flex-row items-center gap-3">
-                <Avatar name={displayName(c)} />
+                <Avatar name={displayName(c)} uri={c.profile.avatarUrl} />
                 <View className="flex-1">
                   <Text className="font-bold text-ink dark:text-ink-dark">{displayName(c)}</Text>
                   <Text className="text-muted dark:text-muted-dark">
@@ -191,7 +188,7 @@ export default function SearchScreen() {
                   </Text>
                 </View>
               </View>
-              {keysWarning(c)}
+
               {requestActions(c)}
             </View>
           ))}
@@ -205,7 +202,7 @@ export default function SearchScreen() {
           <Text className="text-lg font-bold text-ink dark:text-ink-dark">Sent ({outgoing.length})</Text>
           {outgoing.map((c) => (
             <View key={c.userId} className="flex-row items-center gap-3 py-2">
-              <Avatar name={c.profile ? displayName(c) : '?'} />
+              <Avatar name={displayName(c)} uri={c.profile.avatarUrl} />
               <View className="flex-1">
                 <Text className="font-bold text-ink dark:text-ink-dark">{c.profile ? displayName(c) : 'Request sent'}</Text>
                 <Text className="text-muted dark:text-muted-dark">Waiting for them to accept</Text>
@@ -229,16 +226,11 @@ export default function SearchScreen() {
             accessibilityRole="button"
             onPress={() => router.push({ pathname: '/friend/[id]', params: { id: f.userId } })}
             className="flex-row items-center gap-3 py-2 active:opacity-60">
-            <Avatar name={displayName(f)} />
+            <Avatar name={displayName(f)} uri={f.profile.avatarUrl} />
             <View className="flex-1">
               <Text className="font-bold text-ink dark:text-ink-dark">{displayName(f)}</Text>
-              {f.profile?.handle ? <Text className="text-muted dark:text-muted-dark">@{f.profile.handle}</Text> : null}
+              <Text className="text-muted dark:text-muted-dark">@{f.profile.handle}</Text>
             </View>
-            {f.identityChanged ? (
-              <Icon name="warning" size={20} color={palette.danger} accessibilityLabel="Security keys changed" />
-            ) : f.verified ? (
-              <Icon name="shield-checkmark" size={20} color={palette.primary} accessibilityLabel="Verified" />
-            ) : null}
           </Pressable>
         ))}
       </View>
@@ -250,8 +242,8 @@ export default function SearchScreen() {
       <Text className="text-muted dark:text-muted-dark">
         Scan the QR code someone shows you, or paste the invite link they sent. You’ll choose their circles next; they’ll get your request to accept.
       </Text>
-      <Button label="Scan QR code" onPress={() => router.push('/scan')} />
-      <TextField label="Or paste an invite link" placeholder="https://circlo.com/i/…" value={pasted} onChangeText={setPasted} />
+      {Platform.OS !== 'web' ? <Button label="Scan QR code" onPress={() => router.push('/scan')} /> : null}
+      <TextField label={Platform.OS === 'web' ? 'Paste the invite link' : 'Or paste an invite link'} placeholder="https://www.hellocirclo.com/i/…" value={pasted} onChangeText={setPasted} />
       <Button
         label="Send request"
         variant="outline"
@@ -275,7 +267,7 @@ export default function SearchScreen() {
   const inviteSection = scanner ? (
     <>
       <View className="flex-row items-center gap-3">
-        <Avatar name={displayName(scanner)} />
+        <Avatar name={displayName(scanner)} uri={scanner.profile.avatarUrl} />
         <View className="flex-1">
           <Text className="font-bold text-ink dark:text-ink-dark">{displayName(scanner)} used your invite</Text>
           <Text className="text-muted dark:text-muted-dark">
@@ -286,7 +278,7 @@ export default function SearchScreen() {
       </View>
       {scanner.status === 'incoming' ? (
         <>
-          {keysWarning(scanner)}
+
           {requestActions(scanner)}
         </>
       ) : null}

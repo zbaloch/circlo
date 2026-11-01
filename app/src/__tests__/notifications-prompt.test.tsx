@@ -31,7 +31,7 @@ describe('enable notifications screen', () => {
     await render(<EnableNotificationsScreen />);
     expect(checks.enableBackgroundChecks).not.toHaveBeenCalled();
     await fireEvent.press(screen.getByRole('button', { name: 'Turn on notifications' }));
-    expect(checks.enableBackgroundChecks).toHaveBeenCalledWith({ deviceId: 'd1' });
+    expect(checks.enableBackgroundChecks).toHaveBeenCalled();
     expect(router.back).toHaveBeenCalled();
   });
 });

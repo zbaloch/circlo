@@ -1,4 +1,32 @@
-# Circlo: E2EE Social Network, Build Plan for Claude Code
+# Circlo: Circles Social Network, Build Plan for Claude Code
+
+## Current design (owner decision 2026-11-01), read this first
+
+Circlo is a **traditional circles-based social network**, no longer end-to-end encrypted. For people using it nothing
+changes (circles, the timeline, threads, chats, invites, no search, no tracking), but sign-up and recovery are simple
+and there is a web app.
+
+| Area | Now |
+|---|---|
+| Accounts | Name, @username, email and password. The email is confirmed with a 6-digit code before the account exists; a forgotten password is reset with an emailed code. The photo can be added or changed later in Edit profile |
+| Passwords | Stored only as Argon2id hashes (server). Strength checked in the app (zxcvbn, 12+ characters) |
+| Data | Sent over HTTPS (TLS), stored as sent. The **server enforces who sees what** (THREAT_MODEL.md v2.0) |
+| Circles | Kept on the server: up to 8 per person (starters Close Friends, Family, Kids, Work). Names, memberships and a post's audience are returned only to the owner |
+| Post audience | Only me; Everyone (all current friends); or circles: the people in them **when the post was made**. Unfriend/block removes access to everything |
+| Chats | Server-stored 1:1 and group chats between friends; read state per person, so it's the same on every device |
+| Media | Metadata removed on the device, then presigned upload to a private bucket; presigned downloads (1 hour) |
+| Clients | iOS, Android and the **web app at app.hellocirclo.com**, all one Expo codebase (`app/`, `.web.ts` siblings for native-only modules) |
+| Email | SMTP (`CIRCLO_MAIL_*`); the local profile prints codes to the console |
+| Removed | `core/` (Rust crypto core), OPAQUE, MLS, key backups, recovery phrases and passkeys, device linking, safety numbers, sealed reports, the leaked-database drill |
+
+Sections 1–3 and the crypto parts of the phases below describe the original end-to-end encrypted design. They are
+kept as history and are **superseded** where they conflict with this table. Section 2A (UI) and the repo rules
+(0A, 0B) still apply, minus the crypto rows.
+
+---
+
+# Original plan (2026-10-25)
+
 
 Hand this to Claude Code one phase at a time. Put this file in the repo at `docs/PLAN.md`, and tell Claude Code: *"Read docs/PLAN.md. Implement Phase N only. Write tests first. Stop and summarise when the phase's done-criteria pass."*
 
@@ -19,7 +47,7 @@ Hand this to Claude Code one phase at a time. Put this file in the repo at `docs
 | Messaging | **MLS (RFC 9420) via OpenMLS** for both 1:1 and group chats | One protocol for everything. A 1:1 chat is a 2-member group. Gives forward secrecy and post-compromise security |
 | Rust crates | `chacha20poly1305`, `x25519-dalek`, `ed25519-dalek`, `hpke`, `argon2`, `hkdf`, `blake3` or `sha2`, `openmls`, `bip39` | Audited, widely used |
 
-**Rule for Claude Code: the server must never receive plaintext content, plaintext names or emails, private keys, or circle numbers.** If a feature seems to need any of these, stop and ask.
+~~**Rule for Claude Code: the server must never receive plaintext content, plaintext names or emails, private keys, or circle numbers.**~~ Superseded 2026-11-01 (see "Current design"): the server stores content and enforces access; circle data is returned only to its owner.
 
 ---
 

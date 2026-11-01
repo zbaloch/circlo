@@ -1,14 +1,12 @@
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState, type ReactNode } from 'react';
-import { Pressable, ScrollView, View } from 'react-native';
+import { Platform, Pressable, ScrollView, View } from 'react-native';
 
 import { Button, ErrorText } from '@/components/form';
-import { authorName } from '@/components/post-actions';
 import { Icon } from '@/components/ui/icon';
 import { Toggle } from '@/components/ui/toggle';
 import { describeError } from '@/lib/account';
-import { loadAddressBook, type AddressBook } from '@/lib/addressbook';
-import { refreshBlocked, unblockUser, useBlocked } from '@/lib/blocks';
+import { refreshBlocked, unblockUser, useBlockedPeople } from '@/lib/blocks';
 import { LINKS, openLink } from '@/lib/links';
 import { useIntegrityWarning } from '@/lib/device-integrity';
 import { backgroundChecksOn, disableBackgroundChecks, enableBackgroundChecks, notificationPermission } from '@/lib/background-check';
@@ -25,9 +23,8 @@ export default function SettingsScreen() {
   const palette = usePalette();
   const integrity = useIntegrityWarning();
   const [error, setError] = useState<string>();
-  const blocked = useBlocked();
-  const [book, setBook] = useState<AddressBook | null>(null);
-  const [exporting, setExporting] = useState<string | null>(null);
+  const blocked = useBlockedPeople();
+  const [exporting, setExporting] = useState(false);
   const [confirm, setConfirm] = useState('');
   const [deleting, setDeleting] = useState(false);
   // Background checks: on, off, or off because notifications are blocked in the phone's settings.
@@ -41,8 +38,7 @@ export default function SettingsScreen() {
     useCallback(() => {
       refreshBlocked().catch((e) => setError(describeError(e)));
       loadChecks().catch(() => {});
-      if (account) loadAddressBook(account).then(setBook, () => {});
-    }, [account, loadChecks]),
+    }, [loadChecks]),
   );
 
   if (!account) return null;
@@ -50,17 +46,18 @@ export default function SettingsScreen() {
   const runExport = async () => {
     setError(undefined);
     try {
-      const name = await exportMyData(account, setExporting);
-      showAlert('Export saved', `${name} is in the folder you chose. It isn’t encrypted, so keep it somewhere safe.`);
+      setExporting(true);
+      const name = await exportMyData();
+      showAlert('Export saved', Platform.OS === 'web' ? `${name} was downloaded. Keep it somewhere safe.` : `${name} is in the folder you chose. Keep it somewhere safe.`);
     } catch (e) {
       setError(describeError(e));
     } finally {
-      setExporting(null);
+      setExporting(false);
     }
   };
 
   const runDelete = () =>
-    showAlert('Delete your account?', 'Your posts, photos, replies, likes, people, chats and keys are deleted from Circlo for good. This can’t be undone.', [
+    showAlert('Delete your account?', 'Your profile, posts, photos, replies, likes, people and chats are deleted from Circlo for good. This can’t be undone.', [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Delete forever',
@@ -68,7 +65,7 @@ export default function SettingsScreen() {
         onPress: async () => {
           setDeleting(true);
           try {
-            await deleteAccount(confirm.trim());
+            await deleteAccount(confirm);
             await session.signOut();
           } catch (e) {
             setError(describeError(e));
@@ -80,6 +77,8 @@ export default function SettingsScreen() {
 
   return (
     <ScrollView className="flex-1 bg-surface dark:bg-surface-dark" contentContainerClassName="pb-10" keyboardShouldPersistTaps="handled">
+      {/* Browsers get no background checks: the web app's Notifications tab updates while it's open. */}
+      {Platform.OS !== 'web' ? (
       <Section title="Notifications">
         <Row
           title="Check for new activity in the background"
@@ -91,8 +90,8 @@ export default function SettingsScreen() {
               onValueChange={async (on) => {
                 setError(undefined);
                 try {
-                  if (on) await enableBackgroundChecks(account);
-                  else await disableBackgroundChecks(account);
+                  if (on) await enableBackgroundChecks();
+                  else await disableBackgroundChecks();
                 } catch (e) {
                   setError(describeError(e));
                 }
@@ -102,6 +101,7 @@ export default function SettingsScreen() {
           )}
         </Row>
       </Section>
+      ) : null}
 
       <Section title="Password">
         <Pressable
@@ -111,7 +111,7 @@ export default function SettingsScreen() {
           <View className="flex-1 gap-0.5">
             <Text className="text-[15px] font-semibold text-ink dark:text-ink-dark">Change password</Text>
             <Text className="text-[13px] leading-[18px] text-muted dark:text-muted-dark">
-              Signs out every other device. After 3 wrong passwords, password login locks for a while; your recovery phrase always works.
+              Signs out every other device. After 3 wrong passwords, login locks for a while; resetting your password by email always works.
             </Text>
           </View>
           <Icon name="chevron-forward" size={18} color={palette.muted} />
@@ -124,12 +124,12 @@ export default function SettingsScreen() {
       </Section>
 
       <Section title="Blocked people">
-        {blocked.size === 0 ? <Row subtitle="You haven’t blocked anyone." /> : null}
-        {[...blocked].map((u) => (
-          <Row key={u} title={book?.contacts[u] ? authorName(account, book, u).name : 'Someone you blocked'}>
+        {blocked.length === 0 ? <Row subtitle="You haven’t blocked anyone." /> : null}
+        {blocked.map((p) => (
+          <Row key={p.userId} title={p.name || 'Someone you blocked'} subtitle={p.handle ? `@${p.handle}` : undefined}>
             <Pressable
               accessibilityRole="button"
-              onPress={() => unblockUser(u).catch((e) => setError(describeError(e)))}
+              onPress={() => unblockUser(p.userId).catch((e) => setError(describeError(e)))}
               className="rounded-full border border-border px-4 py-1.5 active:bg-surface-raised dark:border-border-dark dark:active:bg-surface-raised-dark">
               <Text className="text-sm font-bold text-ink dark:text-ink-dark">Unblock</Text>
             </Pressable>
@@ -138,26 +138,27 @@ export default function SettingsScreen() {
       </Section>
 
       <Section title="Your data">
-        <Row title="Export my data" subtitle="Your profile, people, posts (with photos) and chats, decrypted on this phone and saved as a file in a folder you pick. Nothing is sent to Circlo." />
+        <Row title="Export my data" subtitle="A copy of your profile, circles, people, posts, replies and chats as one file (photos and videos as download links)." />
         <View className="px-4 pb-4">
-          <Button label={exporting ?? 'Export'} variant="outline" loading={!!exporting} onPress={runExport} />
+          <Button label="Export" variant="outline" loading={exporting} onPress={runExport} />
         </View>
       </Section>
 
       <Section title="Delete account">
-        <Row subtitle={`Deletes everything you have on Circlo: posts, photos, replies, likes, people, chats and keys. Type your handle (${account.handle}) to confirm.`} />
+        <Row subtitle="Deletes everything you have on Circlo: your profile, posts, photos, replies, likes, people and chats. Enter your password to confirm." />
         <View className="gap-3 px-4 pb-4">
           <TextInput
-            accessibilityLabel="Type your handle to confirm"
+            accessibilityLabel="Your password, to confirm"
             autoCapitalize="none"
             autoCorrect={false}
+            secureTextEntry
             value={confirm}
             onChangeText={setConfirm}
-            placeholder={account.handle}
+            placeholder="Password"
             placeholderTextColor={palette.muted}
             className="rounded-lg border border-border px-4 py-3 text-[15px] text-ink dark:border-border-dark dark:text-ink-dark"
           />
-          <Button label="Delete my account" variant="danger" disabled={confirm.trim().toLowerCase() !== account.handle.toLowerCase()} loading={deleting} onPress={runDelete} />
+          <Button label="Delete my account" variant="danger" disabled={!confirm} loading={deleting} onPress={runDelete} />
         </View>
       </Section>
 

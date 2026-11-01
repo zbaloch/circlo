@@ -5,6 +5,7 @@
 import { useSyncExternalStore } from 'react';
 
 import type { StoredAccount } from './keystore';
+import { putPost } from './feed-store';
 import { publishPost, type Draft } from './posts';
 
 export type OutboxItem = {
@@ -32,8 +33,9 @@ function run(account: StoredAccount, id: string, onDone?: () => void) {
   const item = items.find((i) => i.id === id);
   if (!item) return;
   publishPost(account, item.draft, (progress) => patch(id, { progress })).then(
-    (postId) => {
-      patch(id, { status: 'done', progress: 1, postId });
+    (post) => {
+      putPost(post);
+      patch(id, { status: 'done', progress: 1, postId: post.postId });
       onDone?.();
     },
     (e: unknown) => patch(id, { status: 'failed', error: e instanceof Error ? e.message : 'Upload failed' }),
