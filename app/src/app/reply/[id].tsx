@@ -2,7 +2,7 @@ import { Icon } from '@/components/ui/icon';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
-import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
+import { KeyboardSpacer } from '@/components/keyboard-spacer';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Avatar } from '@/components/avatar';
@@ -72,7 +72,7 @@ export default function ReplyScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-surface dark:bg-surface-dark">
-      <KeyboardAvoidingView className="flex-1" behavior="padding">
+      <View className="flex-1">
         <View className="flex-row items-center justify-between px-4 py-2">
           <Pressable accessibilityRole="button" onPress={() => router.back()} hitSlop={8} className="active:opacity-60">
             <Text className="text-base text-ink dark:text-ink-dark">Cancel</Text>
@@ -140,7 +140,8 @@ export default function ReplyScreen() {
         <View className="flex-row items-center justify-end border-t border-border px-4 py-2 dark:border-border-dark">
           <CharRing used={[...text].length} limit={MAX_REPLY_CHARS} />
         </View>
-      </KeyboardAvoidingView>
+      </View>
+      <KeyboardSpacer />
     </SafeAreaView>
   );
 }

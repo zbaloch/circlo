@@ -4,7 +4,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { BackHandler, Platform, Pressable, ScrollView, View } from 'react-native';
-import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
+import { KeyboardSpacer } from '@/components/keyboard-spacer';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AudiencePicker, audienceLine } from '@/components/audience-sheet';
@@ -163,7 +163,7 @@ export default function ComposeScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-surface dark:bg-surface-dark">
-      <KeyboardAvoidingView className="flex-1" behavior="padding">
+      <View className="flex-1">
         <View className="flex-row items-center justify-between px-4 py-2">
           <Pressable
             accessibilityRole="button"
@@ -244,7 +244,8 @@ export default function ComposeScreen() {
         </ScrollView>
 
         {web ? null : toolbar}
-      </KeyboardAvoidingView>
+      </View>
+      <KeyboardSpacer />
     </SafeAreaView>
   );
 }
