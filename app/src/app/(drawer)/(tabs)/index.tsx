@@ -168,27 +168,27 @@ export default function HomeScreen() {
         renderItem={({ item }: { item: FeedPost }) => <PostCard post={item} {...actions.cardProps(item)} />}
       />
 
-      <Animated.View
-        className="absolute left-0 right-0 top-0"
-        style={headerStyle}
-        onLayout={(e) => setHeaderHeight(e.nativeEvent.layout.height)}>
-        <HomeHeader />
-        {feed.pending.length ? (
-          <View pointerEvents="box-none" className="absolute left-0 right-0 top-full items-center pt-3">
-            <Pressable
-              accessibilityRole="button"
-              onPress={() => {
-                showPendingPosts();
-                list.current?.scrollToOffset({ offset: 0, animated: true });
-              }}
-              className="rounded-full bg-primary px-4 py-2 shadow-lg active:bg-primary-pressed dark:bg-primary-dark dark:active:bg-primary-pressed-dark">
-              <Text className="font-bold text-on-primary dark:text-on-primary-dark">
-                ↑ {feed.pending.length} new {feed.pending.length === 1 ? 'post' : 'posts'}
-              </Text>
-            </Pressable>
-          </View>
-        ) : null}
-      </Animated.View>
+      {/* Positioned by a plain View: the web drops classes on Reanimated views (reanimated-classes.test.ts). */}
+      <View pointerEvents="box-none" className="absolute left-0 right-0 top-0">
+        <Animated.View style={headerStyle} onLayout={(e) => setHeaderHeight(e.nativeEvent.layout.height)}>
+          <HomeHeader />
+          {feed.pending.length ? (
+            <View pointerEvents="box-none" className="absolute left-0 right-0 top-full items-center pt-3">
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => {
+                  showPendingPosts();
+                  list.current?.scrollToOffset({ offset: 0, animated: true });
+                }}
+                className="rounded-full bg-primary px-4 py-2 shadow-lg active:bg-primary-pressed dark:bg-primary-dark dark:active:bg-primary-pressed-dark">
+                <Text className="font-bold text-on-primary dark:text-on-primary-dark">
+                  ↑ {feed.pending.length} new {feed.pending.length === 1 ? 'post' : 'posts'}
+                </Text>
+              </Pressable>
+            </View>
+          ) : null}
+        </Animated.View>
+      </View>
 
       <Fab accessibilityLabel="Compose post" icon="add" onPress={() => router.push('/compose')} />
       {actions.sheet}

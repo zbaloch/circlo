@@ -45,8 +45,10 @@ function ZoomableImage({ media, width, height, onDismiss }: { media: Attachment;
   const style = useAnimatedStyle(() => ({ transform: [{ translateY: dy.value }, { scale: scale.value }], opacity: 1 - Math.min(dy.value / 400, 0.6) }));
   return (
     <GestureDetector gesture={Gesture.Simultaneous(pinch, pan, doubleTap)}>
-      <Animated.View className="items-center justify-center" style={[{ width, height }, style]}>
-        <MediaImage objectKey={media.objectKey} url={media.url} className="h-full w-full" fit="contain" />
+      <Animated.View style={[{ width, height }, style]}>
+        <View className="flex-1 items-center justify-center">
+          <MediaImage objectKey={media.objectKey} url={media.url} className="h-full w-full" fit="contain" />
+        </View>
       </Animated.View>
     </GestureDetector>
   );

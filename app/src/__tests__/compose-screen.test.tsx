@@ -1,4 +1,5 @@
-import { act, fireEvent, render, screen } from '@testing-library/react-native';
+import { act, fireEvent, render, screen, within } from '@testing-library/react-native';
+import { Platform } from 'react-native';
 
 import ComposeScreen from '@/app/compose';
 
@@ -85,5 +86,23 @@ describe('compose screen', () => {
     await open();
     await write('Next meeting?');
     expect(screen.getByText('Book club')).toBeTruthy();
+  });
+
+  it('keeps the photo and camera buttons above the keyboard on phones, and right under the text on the web', async () => {
+    const { loadAddressBook } = jest.requireMock('@/lib/addressbook');
+    loadAddressBook.mockResolvedValue(book(['Family']));
+    await render(<ComposeScreen />);
+    await open();
+    expect(within(screen.getByTestId('compose-body')).queryByLabelText('Add photos or video')).toBeNull();
+    expect(screen.getByLabelText('Add photos or video')).toBeTruthy();
+
+    const os = jest.replaceProperty(Platform, 'OS', 'web');
+    try {
+      await render(<ComposeScreen />);
+      await open();
+      expect(within(screen.getByTestId('compose-body')).getByLabelText('Add photos or video')).toBeTruthy();
+    } finally {
+      os.restore();
+    }
   });
 });

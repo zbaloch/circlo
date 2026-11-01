@@ -147,7 +147,11 @@ function ProgressFill({ fraction }: { fraction: number }) {
     width.value = withTiming(fraction, { duration: 250 });
   }, [fraction, width]);
   const animated = useAnimatedStyle(() => ({ width: `${width.value * 100}%` }));
-  return <Animated.View className="h-1 bg-primary dark:bg-primary-dark" style={animated} />;
+  return (
+    <Animated.View style={animated}>
+      <View className="h-1 w-full bg-primary dark:bg-primary-dark" />
+    </Animated.View>
+  );
 }
 
 /** The inline "uploading…" card for a post still being uploaded. */
