@@ -11,7 +11,8 @@ import org.springframework.stereotype.Component;
 
 /**
  * Account events, emailed straight away and whatever the notification settings (owner decision 2026-11-01): a new
- * sign-in, a password changed or reset, a device signed out. They say what happened and, for a device, only its kind
+ * sign-in, a password changed or reset, another device signed out from the Devices list (signing myself out sends
+ * nothing). They say what happened and, for a device, only its kind
  * (iPhone, Android phone, browser): never where from, never an address, never which network.
  */
 @Component

@@ -49,7 +49,7 @@ a link to your account) and your reports lose their link to you.
   few new things waiting. Catch up when you're ready.": no names, words, ids or counts (owner decision 2026-11-01).
 - **The email provider** sees your email address and what Circlo emails you: codes, the daily note if you don't have
   the app (the kinds of things waiting, never who, what or how many), and security emails straight away (a new
-  sign-in, a password change, a device signed out, naming only the kind of device: never where from).
+  sign-in, a password change, another device signed out from your Devices list, naming only the kind of device: never where from).
 - **The hosting provider and the storage (S3) provider** see IP addresses of connections at the network level, and
   hold the stored data. Our code doesn't record IPs, but their logs might (see the deployment rules below).
 

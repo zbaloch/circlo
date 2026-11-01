@@ -5,6 +5,7 @@ import com.circlo.server.auth.AuthService;
 import com.circlo.server.auth.TokenService;
 import com.circlo.server.media.Attachments;
 import com.circlo.server.media.MediaSweeper;
+import com.circlo.server.notify.SecurityEmails;
 import com.circlo.server.storage.MediaStore;
 import com.circlo.server.storage.MediaUrlSigner;
 import com.circlo.server.web.ApiException;
@@ -44,9 +45,11 @@ public class AccountController {
     private final Attachments attachments;
     private final TokenService tokens;
     private final AuthService auth;
+    private final SecurityEmails security;
 
     public AccountController(JdbcTemplate jdbc, MediaUrlSigner signer, MediaStore store, Attachments attachments, TokenService tokens,
-            AuthService auth) {
+            AuthService auth, SecurityEmails security) {
+        this.security = security;
         this.jdbc = jdbc;
         this.signer = signer;
         this.store = store;
@@ -146,11 +149,21 @@ public class AccountController {
                 (Object) userId(jwt));
     }
 
-    /** Signs a device out (it can't refresh its session or run background checks any more). */
+    /**
+     * Signs a device out (it can't refresh its session or run background checks any more). Another device than this
+     * one is emailed about (naming only its kind), in case it wasn't me; signing out the device I'm on isn't.
+     */
     @DeleteMapping("/v1/devices/{deviceId}")
+    @Transactional
     public Map<String, String> revoke(@AuthenticationPrincipal Jwt jwt, @PathVariable("deviceId") UUID deviceId) {
+        byte[] me = userId(jwt);
+        List<String> kind = jdbc.query("SELECT kind FROM devices WHERE id = ? AND user_id = ? AND revoked_at IS NULL",
+                (rs, i) -> rs.getString(1), Ids.bytes(deviceId), me);
         if (!tokens.revokeDevice(TokenService.userOf(jwt), deviceId)) {
             throw ApiException.notFound();
+        }
+        if (!deviceId.equals(TokenService.deviceOf(jwt))) {
+            security.signedOut(me, kind.isEmpty() ? null : kind.get(0));
         }
         return Map.of("status", "revoked");
     }

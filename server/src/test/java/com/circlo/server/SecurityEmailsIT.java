@@ -9,7 +9,8 @@ import org.junit.jupiter.api.Test;
 
 /**
  * Account events are emailed straight away, whatever the notification settings (owner decision 2026-11-01): a new
- * sign-in, a password changed or reset, and a device signed out. They say what happened and to which kind of device
+ * sign-in, a password changed or reset, and another device signed out from the Devices list (signing myself out sends
+ * nothing). They say what happened and to which kind of device
  * (iPhone, Android, browser), never where from.
  */
 class SecurityEmailsIT extends IntegrationTest {
@@ -62,15 +63,19 @@ class SecurityEmailsIT extends IntegrationTest {
         String access = (String) phone.get("accessToken");
         assertThat(call("PUT", "/v1/devices/current", Map.of("kind", "ios"), access).getStatusCode().value()).isEqualTo(200);
 
-        // Signed out from the web: the iPhone.
+        // Signed out from the Devices list on the web: the iPhone.
         UUID phoneId = UUID.fromString((String) phone.get("deviceId"));
         assertThat(a.status("DELETE", "/v1/devices/" + phoneId, null)).isEqualTo(200);
         List<TestMail.Sent> sent = await(a, "An iPhone was signed out of your Circlo account", 1);
         assertThat(sent).hasSize(1);
         assertThat(sent.get(0).body()).contains("An iPhone was just signed out of your Circlo account");
 
-        // Signing out of this browser.
+        // Signing myself out, whether with Sign out or from the Devices list, isn't news to me: no email.
+        Map<String, Object> other = a.loginAgain();
+        String otherAccess = (String) other.get("accessToken");
+        assertThat(call("DELETE", "/v1/devices/" + other.get("deviceId"), null, otherAccess).getStatusCode().value()).isEqualTo(200);
         assertThat(a.status("POST", "/v1/auth/logout", null)).isEqualTo(200);
-        assertThat(await(a, "A browser was signed out of your Circlo account", 1)).hasSize(1);
+        Thread.sleep(300);
+        assertThat(mail.to(a.email).stream().filter(s -> s.subject().endsWith("was signed out of your Circlo account"))).hasSize(1);
     }
 }
