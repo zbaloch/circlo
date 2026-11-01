@@ -1,6 +1,7 @@
 package com.circlo.server.chats;
 
 import com.circlo.server.auth.TokenService;
+import com.circlo.server.notify.Notifier;
 import com.circlo.server.media.Attachments;
 import com.circlo.server.media.MediaSweeper;
 import com.circlo.server.social.People;
@@ -50,7 +51,10 @@ public class ChatController {
     private final Attachments attachments;
     private final RateLimiter limiter;
 
-    public ChatController(JdbcTemplate jdbc, People people, Attachments attachments, RateLimiter limiter) {
+    private final Notifier notifier;
+
+    public ChatController(JdbcTemplate jdbc, People people, Attachments attachments, RateLimiter limiter, Notifier notifier) {
+        this.notifier = notifier;
         this.jdbc = jdbc;
         this.people = people;
         this.attachments = attachments;
@@ -283,6 +287,11 @@ public class ChatController {
         attachments.attach(me, null, Ids.bytes(id), media);
         MessageView sent = messages("WHERE id = ?", (Object) Ids.bytes(id)).get(0);
         jdbc.update("UPDATE chat_members SET read_seq = GREATEST(read_seq, ?) WHERE chat_id = ? AND user_id = ?", sent.seq(), chat, me);
+        List<UUID> everyone = members(chat);
+        notifier.changed(everyone);
+        for (UUID u : everyone) {
+            notifier.message(Ids.bytes(u), me, chatId);
+        }
         return sent;
     }
 
@@ -297,6 +306,7 @@ public class ChatController {
             throw ApiException.notFound();
         }
         MediaSweeper.release(jdbc, "message_id = ?", (Object) id);
+        notifier.changed(members(Ids.bytes(chatId)));
         return Map.of("status", "deleted");
     }
 
@@ -308,6 +318,7 @@ public class ChatController {
         byte[] chat = Ids.bytes(chatId);
         requireMember(chat, me);
         jdbc.update("UPDATE chat_members SET read_seq = GREATEST(read_seq, ?) WHERE chat_id = ? AND user_id = ?", r.seq(), chat, me);
+        notifier.changed(me);
         return Map.of("status", "read");
     }
 }

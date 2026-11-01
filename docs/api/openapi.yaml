@@ -227,6 +227,37 @@ paths:
       responses:
         "200": { $ref: "#/components/responses/Status" }
         "404": { $ref: "#/components/responses/Error" }
+  /v1/devices/current/push-token:
+    put:
+      summary: Register this device's push token (content-free pushes; forgotten on sign-out or revoke)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token, service]
+              properties:
+                token: { type: string }
+                service: { type: string, enum: [apns, apns_sandbox] }
+      responses:
+        "200": { $ref: "#/components/responses/Status" }
+        "400": { $ref: "#/components/responses/Error" }
+    delete:
+      summary: Stop pushes to this device
+      responses:
+        "200": { $ref: "#/components/responses/Status" }
+  /v1/events:
+    get:
+      summary: Live updates. Answers with my version as soon as it differs from `since` (at once if it already does), else after 25 s
+      parameters:
+        - { name: since, in: query, required: true, schema: { type: integer, format: int64 } }
+      responses:
+        "200":
+          description: My current version; the app refreshes what it shows when it changes
+          content:
+            application/json:
+              schema: { type: object, required: [version], properties: { version: { type: integer, format: int64 } } }
   /v1/devices/current/check-token:
     post:
       summary: Turn on background checks for this device; returns its check token
@@ -294,6 +325,26 @@ paths:
         - { $ref: "#/components/parameters/Limit" }
       responses:
         "200": { $ref: "#/components/responses/Posts" }
+  /v1/users/{userId}/replies:
+    get:
+      summary: Someone's replies on posts I may see, newest first, each with its post
+      parameters:
+        - { name: userId, in: path, required: true, schema: { $ref: "#/components/schemas/Id" } }
+        - { $ref: "#/components/parameters/Before" }
+        - { $ref: "#/components/parameters/Limit" }
+      responses:
+        "200":
+          description: Replies with their posts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  required: [reply, post]
+                  properties:
+                    reply: { $ref: "#/components/schemas/Reply" }
+                    post: { $ref: "#/components/schemas/Post" }
   /v1/invites:
     post:
       summary: A single-use invite link (7 days)
@@ -488,7 +539,7 @@ paths:
               type: object
               required: [kind, targetId, reason]
               properties:
-                kind: { type: string, enum: [post, user, message] }
+                kind: { type: string, enum: [post, user, message, reply] }
                 targetId: { $ref: "#/components/schemas/Id" }
                 reason: { type: string }
                 note: { type: string }
@@ -622,6 +673,23 @@ paths:
       responses:
         "200": { $ref: "#/components/responses/Status" }
         "404": { $ref: "#/components/responses/Error" }
+  /v1/posts/{postId}/replies/{replyId}/like:
+    put:
+      summary: Like a reply
+      parameters:
+        - { $ref: "#/components/parameters/PostId" }
+        - { name: replyId, in: path, required: true, schema: { $ref: "#/components/schemas/Id" } }
+      responses:
+        "200": { $ref: "#/components/responses/Status" }
+        "404": { $ref: "#/components/responses/Error" }
+    delete:
+      summary: Unlike a reply
+      parameters:
+        - { $ref: "#/components/parameters/PostId" }
+        - { name: replyId, in: path, required: true, schema: { $ref: "#/components/schemas/Id" } }
+      responses:
+        "200": { $ref: "#/components/responses/Status" }
+        "404": { $ref: "#/components/responses/Error" }
   /v1/posts/{postId}/like:
     put:
       summary: Like
@@ -653,7 +721,7 @@ paths:
   # ---------------- activity ----------------
   /v1/activity:
     get:
-      summary: Replies and likes on my posts, newest first
+      summary: Replies and likes on my posts, and likes on my replies, newest first
       parameters:
         - { $ref: "#/components/parameters/Before" }
         - { $ref: "#/components/parameters/Limit" }
@@ -672,7 +740,7 @@ paths:
                       type: object
                       required: [kind, postId, postText, actorId, actor, createdAt]
                       properties:
-                        kind: { type: string, enum: [reply, like] }
+                        kind: { type: string, enum: [reply, like, reply_like] }
                         postId: { $ref: "#/components/schemas/Id" }
                         postText: { type: string }
                         actorId: { $ref: "#/components/schemas/Id" }
@@ -973,13 +1041,15 @@ components:
             - { type: "null" }
     Reply:
       type: object
-      required: [replyId, authorId, author, text, createdAt]
+      required: [replyId, authorId, author, text, createdAt, likeCount, likedByMe]
       properties:
         replyId: { $ref: "#/components/schemas/Id" }
         authorId: { $ref: "#/components/schemas/Id" }
         author: { $ref: "#/components/schemas/Person" }
         text: { type: string }
         createdAt: { type: string, format: date-time }
+        likeCount: { type: integer }
+        likedByMe: { type: boolean }
     Message:
       type: object
       required: [seq, messageId, senderId, text, media, createdAt]

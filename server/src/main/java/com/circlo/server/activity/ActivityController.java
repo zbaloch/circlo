@@ -1,6 +1,7 @@
 package com.circlo.server.activity;
 
 import com.circlo.server.auth.TokenService;
+import com.circlo.server.posts.PostAccess;
 import com.circlo.server.social.People;
 import com.circlo.server.web.ApiException;
 import com.circlo.server.web.Ids;
@@ -49,7 +50,10 @@ public class ActivityController {
 
     public record Activity(List<Item> items) {}
 
-    /** Replies and likes by other people on my posts, newest first; people I blocked are left out. */
+    /**
+     * Replies and likes by other people on my posts, and likes on my replies (on posts I can still see), newest first;
+     * people I blocked are left out.
+     */
     @GetMapping("/v1/activity")
     public Activity activity(@AuthenticationPrincipal Jwt jwt, @RequestParam(value = "before", required = false) Instant before,
             @RequestParam(value = "limit", defaultValue = "50") int limit) {
@@ -66,12 +70,16 @@ public class ActivityController {
                   SELECT 'like', l.post_id, p.body, l.liker_id, NULL, NULL, l.created_at
                     FROM post_likes l JOIN posts p ON p.id = l.post_id
                    WHERE p.author_id = ? AND l.liker_id <> ? AND l.created_at < ?
+                  UNION ALL
+                  SELECT 'reply_like', r.post_id, p.body, rl.liker_id, r.id, r.body, rl.created_at
+                    FROM reply_likes rl JOIN post_replies r ON r.id = rl.reply_id JOIN posts p ON p.id = r.post_id
+                   WHERE r.author_id = ? AND rl.liker_id <> ? AND rl.created_at < ? AND """ + PostAccess.VISIBLE + """
                 ) a
                 WHERE a.actor NOT IN (SELECT blocked_id FROM user_blocks WHERE blocker_id = ?)
                 ORDER BY a.created_at DESC LIMIT ?""",
                 (rs, i) -> new Row(rs.getString(1), Ids.uuid(rs.getBytes(2)), rs.getString(3), Ids.uuid(rs.getBytes(4)),
                         rs.getBytes(5) == null ? null : Ids.uuid(rs.getBytes(5)), rs.getString(6), rs.getTimestamp(7).toInstant()),
-                me, me, cursor, me, me, cursor, me, n);
+                me, me, cursor, me, me, cursor, me, me, cursor, me, me, me, me, me, n);
         Map<UUID, People.Person> actors = people.persons(rows.stream().map(Row::actor).toList());
         return new Activity(rows.stream().filter(r -> actors.containsKey(r.actor()))
                 .map(r -> new Item(r.kind(), r.post(), r.postText(), r.actor(), actors.get(r.actor()), r.reply(), r.replyText(), r.at()))

@@ -619,6 +619,96 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/devices/current/push-token": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Register this device's push token (content-free pushes; forgotten on sign-out or revoke) */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        token: string;
+                        /** @enum {string} */
+                        service: "apns" | "apns_sandbox";
+                    };
+                };
+            };
+            responses: {
+                200: components["responses"]["Status"];
+                400: components["responses"]["Error"];
+            };
+        };
+        post?: never;
+        /** Stop pushes to this device */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                200: components["responses"]["Status"];
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Live updates. Answers with my version as soon as it differs from `since` (at once if it already does), else after 25 s */
+        get: {
+            parameters: {
+                query: {
+                    since: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description My current version; the app refreshes what it shows when it changes */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** Format: int64 */
+                            version: number;
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/devices/current/check-token": {
         parameters: {
             query?: never;
@@ -784,6 +874,50 @@ export interface paths {
             requestBody?: never;
             responses: {
                 200: components["responses"]["Posts"];
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/users/{userId}/replies": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Someone's replies on posts I may see, newest first, each with its post */
+        get: {
+            parameters: {
+                query?: {
+                    before?: components["parameters"]["Before"];
+                    limit?: components["parameters"]["Limit"];
+                };
+                header?: never;
+                path: {
+                    userId: components["schemas"]["Id"];
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Replies with their posts */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            reply: components["schemas"]["Reply"];
+                            post: components["schemas"]["Post"];
+                        }[];
+                    };
+                };
             };
         };
         put?: never;
@@ -1321,7 +1455,7 @@ export interface paths {
                 content: {
                     "application/json": {
                         /** @enum {string} */
-                        kind: "post" | "user" | "message";
+                        kind: "post" | "user" | "message" | "reply";
                         targetId: components["schemas"]["Id"];
                         reason: string;
                         note?: string;
@@ -1628,6 +1762,54 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/posts/{postId}/replies/{replyId}/like": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Like a reply */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    postId: components["parameters"]["PostId"];
+                    replyId: components["schemas"]["Id"];
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                200: components["responses"]["Status"];
+                404: components["responses"]["Error"];
+            };
+        };
+        post?: never;
+        /** Unlike a reply */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    postId: components["parameters"]["PostId"];
+                    replyId: components["schemas"]["Id"];
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                200: components["responses"]["Status"];
+                404: components["responses"]["Error"];
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/posts/{postId}/like": {
         parameters: {
             query?: never;
@@ -1720,7 +1902,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Replies and likes on my posts, newest first */
+        /** Replies and likes on my posts, and likes on my replies, newest first */
         get: {
             parameters: {
                 query?: {
@@ -1742,7 +1924,7 @@ export interface paths {
                         "application/json": {
                             items: {
                                 /** @enum {string} */
-                                kind: "reply" | "like";
+                                kind: "reply" | "like" | "reply_like";
                                 postId: components["schemas"]["Id"];
                                 postText: string;
                                 actorId: components["schemas"]["Id"];
@@ -2216,6 +2398,8 @@ export interface components {
             text: string;
             /** Format: date-time */
             createdAt: string;
+            likeCount: number;
+            likedByMe: boolean;
         };
         Message: {
             /** Format: int64 */
