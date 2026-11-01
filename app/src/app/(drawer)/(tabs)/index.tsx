@@ -95,6 +95,13 @@ export default function HomeScreen() {
     setBook(await loadAddressBook(account).catch(() => null));
     await refreshFeed(account);
   }, [account]);
+  // The spinner shows only for a pull: switching it on from code (focus refreshes) makes iOS push the timeline down.
+  const [pulling, setPulling] = useState(false);
+  const pull = useCallback(async () => {
+    setPulling(true);
+    await refresh();
+    setPulling(false);
+  }, [refresh]);
 
   // Load on focus; while focused, look for new posts every minute (they wait behind the pill).
   useFocusEffect(
@@ -141,7 +148,7 @@ export default function HomeScreen() {
         keyExtractor={(p: FeedPost) => p.postId}
         onScroll={onScroll}
         scrollEventThrottle={16}
-        refreshControl={<RefreshControl refreshing={feed.refreshing} onRefresh={refresh} progressViewOffset={headerHeight} />}
+        refreshControl={<RefreshControl refreshing={pulling} onRefresh={pull} progressViewOffset={headerHeight} />}
         onEndReached={() => loadMoreFeed(account)}
         onEndReachedThreshold={0.5}
         ListHeaderComponent={
