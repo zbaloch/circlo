@@ -88,7 +88,7 @@ jobs:
               --symmetric --cipher-algo AES256 -o "$f.gpg" "$f"
             rm "$f"
           done
-      - uses: actions/upload-artifact@v4.6.2
+      - uses: actions/upload-artifact@v7.0.2
         with:
           name: circlo-android-${{ github.run_number }}
           path: out/*.gpg
@@ -183,7 +183,7 @@ jobs:
       - name: Remove the API key
         if: always()
         run: rm -rf ~/.appstoreconnect
-      - uses: actions/upload-artifact@v4.6.2
+      - uses: actions/upload-artifact@v7.0.2
         with:
           name: circlo-ios-${{ github.run_number }}
           path: out/*.gpg
