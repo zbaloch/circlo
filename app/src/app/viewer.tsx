@@ -2,7 +2,7 @@ import { Icon } from '@/components/ui/icon';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useState } from 'react';
-import { FlatList, Pressable, useWindowDimensions, View } from 'react-native';
+import { FlatList, Pressable, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -57,26 +57,30 @@ function ZoomableImage({ media, width, height, onDismiss }: { media: Attachment;
 /** Full-screen media viewer (PLAN.md 2A): swipe between images, pinch to zoom, swipe down to dismiss. */
 export default function ViewerScreen() {
   const state = viewerState();
-  const { width, height } = useWindowDimensions();
+  // Sized to the space the viewer really has: on the web that's the app's centred column, not the browser window
+  // (window-sized pages put the photo off to the side, out of view).
+  const [size, setSize] = useState<{ width: number; height: number } | null>(null);
   const [index, setIndex] = useState(state?.index ?? 0);
   if (!state || state.media.length === 0) {
     router.back();
     return null;
   }
   return (
-    <View className="flex-1 bg-black">
+    <View className="flex-1 bg-black" onLayout={(e) => setSize({ width: e.nativeEvent.layout.width, height: e.nativeEvent.layout.height })}>
       <StatusBar style="light" />
+      {size ? (
       <FlatList
         data={state.media}
         horizontal
         pagingEnabled
         initialScrollIndex={state.index}
-        getItemLayout={(_, i) => ({ length: width, offset: width * i, index: i })}
+        getItemLayout={(_, i) => ({ length: size.width, offset: size.width * i, index: i })}
         keyExtractor={(m) => m.objectKey}
         showsHorizontalScrollIndicator={false}
-        onMomentumScrollEnd={(e) => setIndex(Math.round(e.nativeEvent.contentOffset.x / width))}
-        renderItem={({ item }) => <ZoomableImage media={item} width={width} height={height} onDismiss={() => router.back()} />}
+        onMomentumScrollEnd={(e) => setIndex(Math.round(e.nativeEvent.contentOffset.x / size.width))}
+        renderItem={({ item }) => <ZoomableImage media={item} width={size.width} height={size.height} onDismiss={() => router.back()} />}
       />
+      ) : null}
       <SafeAreaView edges={['top']} className="absolute left-0 right-0 top-0">
         <View className="flex-row items-center justify-between px-3">
           <Pressable accessibilityRole="button" accessibilityLabel="Close" onPress={() => router.back()} className="h-11 w-11 items-center justify-center rounded-full bg-black/50">
