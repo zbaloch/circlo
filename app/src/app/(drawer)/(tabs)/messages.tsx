@@ -1,4 +1,6 @@
-import { router, useFocusEffect } from 'expo-router';
+import { Redirect, router, useFocusEffect } from 'expo-router';
+
+import { CHAT_ENABLED } from '@/lib/features';
 import { useCallback, useMemo, useState } from 'react';
 import { FlatList, Pressable, RefreshControl, View } from 'react-native';
 
@@ -15,7 +17,12 @@ import { chatTitle } from '@/lib/view-logic';
 import { Text } from '@/components/ui/text';
 
 /** Messages inbox (PLAN.md 2A): conversations newest first, with unread counts. */
-export default function MessagesScreen() {
+/** Chat is hidden for now (lib/features): a direct link lands on Home. */
+export default function MessagesScreenRoute() {
+  return CHAT_ENABLED ? <MessagesScreen /> : <Redirect href="/" />;
+}
+
+export function MessagesScreen() {
   const now = useNow();
   const session = useSession();
   const account = session.status === 'signedIn' ? session.account : null;

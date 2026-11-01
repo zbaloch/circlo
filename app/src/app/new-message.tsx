@@ -1,5 +1,7 @@
 import { Icon } from '@/components/ui/icon';
-import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { Redirect, router, useFocusEffect, useLocalSearchParams } from 'expo-router';
+
+import { CHAT_ENABLED } from '@/lib/features';
 import { useCallback, useState } from 'react';
 import { FlatList, Pressable, View } from 'react-native';
 
@@ -13,7 +15,12 @@ import { usePalette } from '@/theme/use-palette';
 import { Text } from '@/components/ui/text';
 
 /** Pick friends for a new chat, or (with `group`) people to add to an existing one. */
-export default function NewMessageScreen() {
+/** Chat is hidden for now (lib/features): a direct link lands on Home. */
+export default function NewMessageScreenRoute() {
+  return CHAT_ENABLED ? <NewMessageScreen /> : <Redirect href="/" />;
+}
+
+export function NewMessageScreen() {
   const { group, exclude } = useLocalSearchParams<{ group?: string; exclude?: string }>();
   const session = useSession();
   const account = session.status === 'signedIn' ? session.account : null;

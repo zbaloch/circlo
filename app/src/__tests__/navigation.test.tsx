@@ -1,9 +1,9 @@
 import { render, screen } from '@testing-library/react-native';
 import { useEffect as mockUseEffect } from 'react';
 
-import { TABS } from '@/app/(drawer)/(tabs)/_layout';
+import { TABS, visibleTabs } from '@/app/(drawer)/(tabs)/_layout';
 import HomeScreen from '@/app/(drawer)/(tabs)/index';
-import MessagesScreen from '@/app/(drawer)/(tabs)/messages';
+import { MessagesScreen } from '@/app/(drawer)/(tabs)/messages';
 import { DRAWER_ITEMS } from '@/components/app-drawer';
 
 // Jest hoists this above the imports; Home reads the session.
@@ -44,9 +44,11 @@ jest.mock('@/lib/feed-store', () => ({
 // The full drawer + tabs navigator needs Reanimated's native runtime, which doesn't load under jest-expo;
 // it is checked on the emulator (docs/PROGRESS.md "Needs manual check").
 describe('app shell', () => {
-  it('has exactly the four icon-only tabs from PLAN.md 2A, each with a screen-reader label', () => {
-    expect(TABS.map((t) => t.label)).toEqual(['Home', 'People', 'Notifications', 'Messages']);
-    for (const t of TABS) {
+  it('has the icon-only tabs from PLAN.md 2A, each with a screen-reader label; Messages only while chat is on', () => {
+    // Chat is hidden for now (owner decision 2026-11-01): Circlo is about posts in circles.
+    expect(TABS.map((t) => t.label)).toEqual(['Home', 'People', 'Notifications']);
+    expect(visibleTabs(true).map((t) => t.label)).toEqual(['Home', 'People', 'Notifications', 'Messages']);
+    for (const t of visibleTabs(true)) {
       expect(t.icon).toBeTruthy();
       expect(t.iconActive).toBeTruthy();
     }
