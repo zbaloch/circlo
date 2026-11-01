@@ -13,7 +13,8 @@ export function Avatar({ name, uri, size = 'md' }: Props) {
     // Photo URLs are presigned and change on every fetch; cache by the URL's path (the file itself).
     return <Image source={{ uri, cacheKey: uri.split('?')[0] }} className={`rounded-full ${SIZES[size]}`} accessibilityIgnoresInvertColors />;
   }
-  const initial = name?.trim().charAt(0).toUpperCase() || '?';
+  // As written ("zaheer" → z), and a whole character, so an emoji isn't cut in half.
+  const initial = [...(name?.trim() ?? '')][0] ?? '?';
   return (
     <View
       className={`items-center justify-center rounded-full bg-primary-soft dark:bg-primary-soft-dark ${SIZES[size]}`}>
