@@ -135,6 +135,33 @@ for uploads and downloads from the browser: `mc admin config set local api cors_
   (`EXPO_PUBLIC_API_URL`). Cleartext HTTP is allowed in dev builds only.
 - **iOS:** needs a Mac or EAS Build: `eas build --profile development --platform ios`, install on a physical iPhone.
 
+## 8A. Push notifications (iPhone)
+
+Pushes are content-free ("New reply", "New message", "New friend request" plus random ids for opening the right
+screen) and go from the server straight to Apple; no Expo or other push service in between.
+
+1. **Apple key (once):** developer.apple.com → Certificates, IDs & Profiles → **Keys** → **+** → tick **Apple Push
+   Notifications service (APNs)** → download `AuthKey_<KEYID>.p8` (only downloadable once; keep it in a password manager,
+   never in the repo). Note the **Key ID** and your **Team ID** (top right of the developer site).
+2. **App ID:** the release workflow signs automatically, so Xcode adds the Push capability to `com.hellocirclo.app`
+   from the `aps-environment` entitlement (`app.config.ts`). If it doesn't, tick **Push Notifications** on the App ID.
+3. **Server:** in the server's env file (production: `/opt/circlo/.env`), then restart the server:
+   ```
+   CIRCLO_APNS_KEY=<output of: base64 -w0 AuthKey_<KEYID>.p8>
+   CIRCLO_APNS_KEY_ID=<Key ID>
+   CIRCLO_APNS_TEAM_ID=<Team ID>
+   ```
+   Without them push is off and everything else works (live updates still reach open apps).
+4. **Build:** a new store build (release workflow, `APP_VARIANT=production`). TestFlight and App Store builds use Apple's
+   **production** push service; development builds register as `apns_sandbox` and use the sandbox. The same .p8 key works
+   for both.
+5. **Test on real iPhones** (the simulator isn't reliable for push): sign in on two phones, accept the notifications
+   prompt (or Settings → Notifications), lock phone A, then from phone B reply to A's post, send A a message and send a
+   friend request. Each arrives within seconds as "Circlo · New reply" etc.; tapping opens that reply, chat or the
+   requests. Block B on A: B's messages no longer buzz A. Sign out on A: nothing more arrives there.
+
+Android still uses background checks (counts only, every ~15 minutes); remote push there needs a Firebase project.
+
 ## 9. GitHub required checks
 
 Only `secret-scan / gitleaks` should be a *required* status check. The per-folder CI workflows use path filters and

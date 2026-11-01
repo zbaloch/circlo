@@ -1,7 +1,8 @@
 import type { ExpoConfig } from 'expo/config';
 
 // Names and identifiers follow docs/PLAN.md section 0A. Secrets never go here: signing keys come from EAS credentials or
-// the release workflow's secrets. There is no remote push, so no APNs key or google-services.json.
+// the release workflow's secrets. Push on iPhone is content-free and sent by Circlo's server straight to Apple; the APNs
+// key lives only on the server (CIRCLO_APNS_*). Android has no remote push yet, so no google-services.json.
 // Development builds talk to the local server over plain HTTP (LAN / emulator). Release builds are HTTPS-only.
 const isDev = process.env.APP_VARIANT !== 'production';
 // Release builds pin the API host's keys; host and pins come from EAS environment variables (plugins/pinning.js).
@@ -67,6 +68,8 @@ const config: ExpoConfig = {
     themeColor: colors.brand.accent,
     backgroundColor: colors.brand.background,
   },
+  // Which Apple push service this build's tokens belong to (it must match the aps-environment entitlement above).
+  extra: { pushService: isDev ? 'apns_sandbox' : 'apns' },
   plugins: [
     'expo-router',
     // No install attribution, advertising ids or tracking on either platform.
@@ -84,8 +87,12 @@ const config: ExpoConfig = {
       },
     ],
     ['expo-video', { supportsPictureInPicture: false, supportsBackgroundPlayback: false }],
-    // Local notifications only (lib/background-check): no remote push, so no APNs entitlement and no FCM.
-    ['expo-notifications', { icon: './assets/images/notification-icon.png', color: colors.brand.accent, enableRemoteNotifications: false }],
+    // iPhone: content-free remote push (lib/background-check); TestFlight and App Store builds use Apple's production
+    // service, development builds the sandbox. Android: local notifications from background checks (no FCM yet).
+    [
+      'expo-notifications',
+      { icon: './assets/images/notification-icon.png', color: colors.brand.accent, enableRemoteNotifications: true, mode: isDev ? 'development' : 'production' },
+    ],
     // Background checks for new activity (iOS BGTaskScheduler, Android WorkManager).
     'expo-background-task',
     // The wordmark: gray-900 with a sky-500 dot on white; white with a sky-400 dot on gray-950 in dark mode.

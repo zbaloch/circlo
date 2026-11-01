@@ -19,7 +19,12 @@ losing keys or a phrase, and a web app is possible. The user experience stays th
   the leak drill, ci-core, cargo audits. THREAT_MODEL.md v2.0, PRIVACY.md, HARDENING.md, LEGAL.md rewritten.
 - **Existing dev/test accounts start over** (nothing encrypted could be migrated). Empty the media bucket once.
 
-### Waiting on owner (2026-11-01)
+#| 2026-11-01 | **Remote push is back on iPhone** (owner; reverses 2026-10-30), **content-free**: "New reply" / "New message" / "New friend request" + random ids, sent straight to APNs (no third-party push service). Android keeps background checks until FCM. Names/text on the lock screen later via an iOS Notification Service Extension that fetches them from our server ("option C") | Real-time notifications matter for a social app; Apple learns only timing. Option C keeps content off Apple |
+| 2026-11-01 | **Live updates** for open apps: `GET /v1/events` long-poll on an in-memory per-person version (single server instance), bumped after commit; polling kept as a slower fallback | Instant dots, messages and "New posts" without WebSockets; works through any HTTP proxy and on the web |
+| 2026-11-01 | **Likes on replies**, a **Replies tab** on every profile (replies on posts the viewer can see, each with its post), replies reportable; visible "…" menus on replies and chat messages (long-press still works) | Owner request: X-style engagement; delete wasn't discoverable behind long-press |
+| 2026-11-01 | No over-the-air JS updates (expo-updates); every change ships through store review | Owner decision: expected user numbers exceed EAS Update's free tier |
+
+## Waiting on owner (2026-11-01)
 
 1. **SMTP provider** for production (Postmark, SES, Resend, ...): set `CIRCLO_MAIL_HOST`, `CIRCLO_MAIL_PORT`,
    `CIRCLO_MAIL_USERNAME`, `CIRCLO_MAIL_PASSWORD`, `CIRCLO_MAIL_FROM` in the server's secret store, and set up SPF,

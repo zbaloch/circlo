@@ -9,7 +9,7 @@ import { describeError } from '@/lib/account';
 import { refreshBlocked, unblockUser, useBlockedPeople } from '@/lib/blocks';
 import { LINKS, openLink } from '@/lib/links';
 import { useIntegrityWarning } from '@/lib/device-integrity';
-import { backgroundChecksOn, disableBackgroundChecks, enableBackgroundChecks, notificationPermission } from '@/lib/background-check';
+import { backgroundChecksOn, disableBackgroundChecks, enableBackgroundChecks, notificationPermission, usesPush } from '@/lib/background-check';
 import { deleteAccount, exportMyData } from '@/lib/safety';
 import { useSession } from '@/lib/session';
 import { usePalette } from '@/theme/use-palette';
@@ -81,11 +81,11 @@ export default function SettingsScreen() {
       {Platform.OS !== 'web' ? (
       <Section title="Notifications">
         <Row
-          title="Check for new activity in the background"
+          title={CHECKS_TITLE}
           subtitle={checks === 'blocked' ? `Notifications are blocked in your phone’s settings. ${CHECKS_NOTE}` : CHECKS_NOTE}>
           {checks === null ? null : (
             <Toggle
-              accessibilityLabel="Check for new activity in the background"
+              accessibilityLabel={CHECKS_TITLE}
               value={checks === 'on'}
               onValueChange={async (on) => {
                 setError(undefined);
@@ -175,8 +175,10 @@ export default function SettingsScreen() {
   );
 }
 
-const CHECKS_NOTE =
-  'Your phone asks Circlo now and then and shows how many new things there are. Nothing goes through Apple or Google. Your phone decides when to check, so it can take a while.';
+const CHECKS_TITLE = usesPush ? 'Notifications for replies, messages and requests' : 'Check for new activity in the background';
+const CHECKS_NOTE = usesPush
+  ? 'Replies, messages and friend requests, as they happen. Notifications only say “New reply” or “New message”: names and words stay in Circlo.'
+  : 'Your phone asks Circlo now and then and shows how many new things there are. Nothing goes through Apple or Google. Your phone decides when to check, so it can take a while.';
 
 /** A settings group: small heading, rows separated by a hairline (X style). */
 function Section({ title, children }: { title: string; children: ReactNode }) {

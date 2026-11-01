@@ -15,7 +15,9 @@ jest.mock('@/lib/addressbook', () => ({}));
 jest.mock('@/lib/storage', () => ({ getItem: async () => null, setItem: async () => {}, deleteItem: async () => {} }));
 jest.mock('@/lib/friends', () => ({ syncConnections: jest.fn(async () => []) }));
 jest.mock('@/lib/activity', () => ({ refreshActivity: jest.fn(async () => {}) }));
-jest.mock('@/lib/background-check', () => ({ markActiveNow: async () => {} }));
+jest.mock('@/lib/background-check', () => ({ markActiveNow: async () => {}, refreshPushToken: async () => {} }));
+const mockStartLive = jest.fn(() => () => {});
+jest.mock('@/lib/live', () => ({ startLive: (...a: unknown[]) => mockStartLive(...(a as [])), onLiveChange: () => () => {} }));
 jest.mock('@/lib/me', () => ({ useMe: () => null, refreshMe: async () => {} }));
 jest.mock('@/lib/posts', () => ({}));
 jest.mock('@/components/post-actions', () => ({}));
@@ -41,6 +43,8 @@ describe('Messages tab dot', () => {
     Object.defineProperty(AppState, 'currentState', { value: 'active', configurable: true });
     await renderHook(() => useConnectionsSync());
     expect(mockSyncMessaging).toHaveBeenCalledWith(mockSession.account);
+    // ...and listens for live updates, so dots appear the moment something happens.
+    expect(mockStartLive).toHaveBeenCalled();
   });
 });
 

@@ -5,16 +5,20 @@ import { FlatList, Pressable, View } from "react-native";
 import { Avatar } from "@/components/avatar";
 import { usePostActions } from "@/components/post-actions";
 import { PostCard } from "@/components/post-card";
+import { ReplyCard } from "@/components/reply-card";
 import { Spinner } from "@/components/ui/spinner";
 import { Text } from "@/components/ui/text";
 import { loadAddressBook, type AddressBook } from "@/lib/addressbook";
 import { putPosts, useFeed } from "@/lib/feed-store";
 import type { StoredAccount } from "@/lib/keystore";
 import { fetchAuthorPosts, type FeedPost } from "@/lib/posts";
+import { fetchUserReplies, type UserReply } from "@/lib/thread";
+import { useNow } from "@/lib/use-now";
 import { postsForTab, profileTabs, type ProfileTab } from "@/lib/view-logic";
 
 const TAB_LABEL: Record<ProfileTab, string> = {
   posts: "Posts",
+  replies: "Replies",
   media: "Media",
   likes: "Likes",
 };
@@ -35,7 +39,10 @@ type Props = {
   extra?: ReactElement;
 };
 
-/** Profile (PLAN.md 2A): banner, avatar, name, @handle, bio, friend count, then Posts | Media | Likes. */
+/**
+ * Profile (PLAN.md 2A): banner, avatar, name, @handle, bio, friend count, then Posts | Replies | Media | Likes. Replies
+ * lists their replies on posts I can see, each with the post it answers.
+ */
 export function ProfileFeed({
   account,
   userId,
@@ -56,6 +63,19 @@ export function ProfileFeed({
   const [cursor, setCursor] = useState<string>();
   const [hasMore, setHasMore] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [replies, setReplies] = useState<UserReply[] | null>(null);
+  const [repliesMore, setRepliesMore] = useState(true);
+  const now = useNow();
+
+  const loadReplies = useCallback(() => {
+    fetchUserReplies(account, userId).then(
+      (r) => {
+        setReplies(r);
+        setRepliesMore(r.length >= 30);
+      },
+      () => setReplies([]),
+    );
+  }, [account, userId]);
 
   const load = useCallback(() => {
     loadAddressBook(account).then(setBook, () => {});
@@ -70,9 +90,27 @@ export function ProfileFeed({
     );
   }, [account, userId]);
   useFocusEffect(load);
+  useFocusEffect(
+    useCallback(() => {
+      if (tab === "replies") loadReplies();
+    }, [tab, loadReplies]),
+  );
   const actionsFor = usePostActions(account, book, { onChange: load });
 
   const more = async () => {
+    if (tab === "replies") {
+      const last = replies?.[replies.length - 1];
+      if (!last || !repliesMore || loadingMore) return;
+      setLoadingMore(true);
+      try {
+        const page = await fetchUserReplies(account, userId, new Date(last.reply.createdAtMs).toISOString());
+        setReplies((prev) => [...(prev ?? []), ...page]);
+        setRepliesMore(page.length >= 30);
+      } finally {
+        setLoadingMore(false);
+      }
+      return;
+    }
     if (!hasMore || loadingMore || !cursor) return;
     setLoadingMore(true);
     try {
@@ -90,14 +128,19 @@ export function ProfileFeed({
   const live = (authored ?? []).map(
     (p) => timeline.posts.find((t) => t.postId === p.postId) ?? p,
   );
-  const data = postsForTab(tab, live, timeline.posts);
+  type Row = { key: string; post?: FeedPost; reply?: UserReply };
+  const data: Row[] =
+    tab === "replies"
+      ? (replies ?? []).map((r) => ({ key: r.reply.replyId, reply: r }))
+      : postsForTab(tab, live, timeline.posts).map((p) => ({ key: p.postId, post: p }));
+  const waiting = tab === "replies" ? replies === null : authored === null;
 
   return (
     <>
       <FlatList
         className="flex-1 bg-surface dark:bg-surface-dark"
         data={data}
-        keyExtractor={(p) => p.postId}
+        keyExtractor={(r) => r.key}
         onEndReached={tab === "likes" ? undefined : more}
         onEndReachedThreshold={0.5}
         ListHeaderComponent={
@@ -143,7 +186,10 @@ export function ProfileFeed({
                   key={t}
                   accessibilityRole="tab"
                   accessibilityState={{ selected: tab === t }}
-                  onPress={() => setTab(t)}
+                  onPress={() => {
+                    setTab(t);
+                    if (t === "replies" && replies === null) loadReplies();
+                  }}
                   className="flex-1 items-center pt-3"
                 >
                   <Text
@@ -161,14 +207,16 @@ export function ProfileFeed({
                 </Pressable>
               ))}
             </View>
-            {authored === null ? <Spinner className="py-8" /> : null}
+            {waiting ? <Spinner className="py-8" /> : null}
           </View>
         }
         ListEmptyComponent={
-          authored === null ? undefined : (
+          waiting ? undefined : (
             <Text className="px-6 py-10 text-center text-muted dark:text-muted-dark">
               {tab === "likes"
                 ? "Posts you like appear here."
+                : tab === "replies"
+                  ? "No replies yet."
                 : tab === "media"
                   ? "No photos or videos yet."
                   : "No posts yet."}
@@ -178,9 +226,13 @@ export function ProfileFeed({
         ListFooterComponent={
           loadingMore ? <Spinner className="py-6" /> : undefined
         }
-        renderItem={({ item }) => (
-          <PostCard post={item} {...actionsFor.cardProps(item)} />
-        )}
+        renderItem={({ item }) =>
+          item.reply ? (
+            <ReplyCard item={item.reply} now={now} />
+          ) : item.post ? (
+            <PostCard post={item.post} {...actionsFor.cardProps(item.post)} />
+          ) : null
+        }
       />
       {actionsFor.sheet}
     </>

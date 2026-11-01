@@ -91,9 +91,9 @@ describe('timeline and profile tabs', () => {
     const t: Record<string, number> = { a: 3, b: 2, c: 1, d: 4 };
     expect(mergeIds(['a', 'c'], ['b', 'a', 'd'], (id) => t[id])).toEqual(['d', 'a', 'b', 'c']);
   });
-  it('shows Likes only on my own profile', () => {
-    expect(profileTabs(true)).toEqual(['posts', 'media', 'likes']);
-    expect(profileTabs(false)).toEqual(['posts', 'media']);
+  it('shows Replies on every profile and Likes only on my own', () => {
+    expect(profileTabs(true)).toEqual(['posts', 'replies', 'media', 'likes']);
+    expect(profileTabs(false)).toEqual(['posts', 'replies', 'media']);
   });
   it('filters posts per tab', () => {
     const withMedia = post({ postId: 'm', media: [{} as never] });

@@ -7,14 +7,14 @@ import { CircloSymbol } from '@/components/circlo-mark';
 import { Button } from '@/components/form';
 import { Icon } from '@/components/ui/icon';
 import { Text } from '@/components/ui/text';
-import { dismissNotificationsPrompt, enableBackgroundChecks } from '@/lib/background-check';
+import { dismissNotificationsPrompt, enableBackgroundChecks, usesPush } from '@/lib/background-check';
 import { useSession } from '@/lib/session';
 import { usePalette } from '@/theme/use-palette';
 
 /**
  * Asks about notifications before the system popup, which iOS and Android show only once: the popup follows only a
- * "yes" here, and "Not now" leaves it unused so the user can still turn them on later from Settings. There's no remote
- * push: a "yes" turns on background checks, and the phone shows its own notifications (lib/background-check).
+ * "yes" here, and "Not now" leaves it unused so the user can still turn them on later from Settings. A "yes" turns on
+ * content-free push on iPhone, and background checks on Android (lib/background-check).
  */
 export default function EnableNotificationsScreen() {
   const session = useSession();
@@ -42,15 +42,17 @@ export default function EnableNotificationsScreen() {
         <View className="gap-3">
           <Text className="text-center text-3xl font-extrabold text-ink dark:text-ink-dark">Know when something’s new</Text>
           <Text className="text-center text-base text-muted dark:text-muted-dark">
-            Circlo can check for new replies, likes, messages and requests now and then, and let you know.
+            {usesPush
+              ? 'Get a notification as soon as someone replies to you, sends you a message or asks to connect.'
+              : 'Circlo can check for new replies, likes, messages and requests now and then, and let you know.'}
           </Text>
         </View>
         <View className="flex-row gap-3 rounded-2xl bg-surface-raised p-4 dark:bg-surface-raised-dark">
           <Icon name="lock-closed-outline" size={20} color={palette.primary} />
           <Text className="flex-1 text-sm text-muted dark:text-muted-dark">
-            Nothing goes through Apple or Google: your phone checks Circlo itself, and the notification only says how many
-            new things there are. Your phone decides when to check, so it can take a while; Circlo is always up to date
-            when you open it.
+            {usesPush
+              ? 'Notifications only say “New reply”, “New message” or “New friend request”. Names and words never leave Circlo; you see them when you open it.'
+              : 'Nothing goes through Apple or Google: your phone checks Circlo itself, and the notification only says how many new things there are. Your phone decides when to check, so it can take a while; Circlo is always up to date when you open it.'}
           </Text>
         </View>
       </ScrollView>

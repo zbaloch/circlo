@@ -7,11 +7,11 @@ import { useSession } from './session';
 import { deleteItem, getItem, setItem } from './storage';
 
 /**
- * Replies and likes on my posts, for the Notifications tab (no remote push: the app fetches them itself). Which items
+ * Replies and likes on my posts and likes on my replies, for the Notifications tab (no remote push: the app fetches them itself). Which items
  * I've seen is a time kept on this device, and drives the bell's dot.
  */
 export type ActivityItem = {
-  kind: 'reply' | 'like';
+  kind: 'reply' | 'like' | 'reply_like';
   postId: string;
   postText: string;
   actorId: string;

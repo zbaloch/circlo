@@ -15,7 +15,7 @@ export const REPORT_REASONS = [
 ] as const;
 export type ReportReason = (typeof REPORT_REASONS)[number]['id'];
 
-export type ReportKind = 'post' | 'user' | 'message';
+export type ReportKind = 'post' | 'user' | 'message' | 'reply';
 
 const MAX_NOTE = 1000;
 
