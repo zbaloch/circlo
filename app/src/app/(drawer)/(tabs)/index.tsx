@@ -13,6 +13,8 @@ import { usePostActions } from '@/components/post-actions';
 import { Screen } from '@/components/screen';
 import { loadAddressBook, type AddressBook } from '@/lib/addressbook';
 import { checkForNewPosts, loadMoreFeed, refreshFeed, showPendingPosts, useFeed } from '@/lib/feed-store';
+import { onLiveChange } from '@/lib/live';
+import { pushRoute } from '@/lib/push-route';
 import { dismissPost, retryPost, useOutbox } from '@/lib/outbox';
 import { offerBackgroundChecksNow, onNotificationOpened } from '@/lib/background-check';
 import type { StoredAccount } from '@/lib/keystore';
@@ -85,7 +87,8 @@ export default function HomeScreen() {
   useEffect(() => {
     if (!account) return;
     offerBackgroundChecksNow().then((offer) => offer && router.push('/enable-notifications'));
-    return onNotificationOpened(() => router.navigate('/notifications'));
+    // A tapped notification opens what it's about: the reply, the chat or the requests.
+    return onNotificationOpened((data) => router.navigate(pushRoute(data)));
   }, [account]);
 
   const refresh = useCallback(async () => {
@@ -110,7 +113,12 @@ export default function HomeScreen() {
       refresh();
       checkSignIns(account);
       const timer = setInterval(() => checkForNewPosts(account), NEW_POSTS_INTERVAL);
-      return () => clearInterval(timer);
+      // A friend's new post shows the "New posts" pill right away.
+      const off = onLiveChange(() => checkForNewPosts(account));
+      return () => {
+        clearInterval(timer);
+        off();
+      };
     }, [account, refresh]),
   );
 

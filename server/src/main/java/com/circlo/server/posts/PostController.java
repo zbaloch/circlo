@@ -1,6 +1,7 @@
 package com.circlo.server.posts;
 
 import com.circlo.server.auth.TokenService;
+import com.circlo.server.notify.Notifier;
 import com.circlo.server.media.Attachments;
 import com.circlo.server.media.MediaSweeper;
 import com.circlo.server.social.People;
@@ -50,13 +51,16 @@ public class PostController {
     private final People people;
     private final Attachments attachments;
     private final RateLimiter limiter;
+    private final Notifier notifier;
 
-    public PostController(JdbcTemplate jdbc, PostAccess access, People people, Attachments attachments, RateLimiter limiter) {
+    public PostController(JdbcTemplate jdbc, PostAccess access, People people, Attachments attachments, RateLimiter limiter,
+            Notifier notifier) {
         this.jdbc = jdbc;
         this.access = access;
         this.people = people;
         this.attachments = attachments;
         this.limiter = limiter;
+        this.notifier = notifier;
     }
 
     private static byte[] me(Jwt jwt) {
@@ -117,6 +121,12 @@ public class PostController {
                     concat(new Object[] {id, me}, circles.toArray()));
         }
         attachments.attach(me, id, null, media);
+        // Open timelines of everyone who may see it show "New posts" right away.
+        List<UUID> readers = audience.equals("only_me") ? List.of()
+                : audience.equals("everyone")
+                        ? jdbc.query(PostAccess.FRIENDS.substring(1, PostAccess.FRIENDS.length() - 1), (rs, i) -> Ids.uuid(rs.getBytes(1)), me, me)
+                        : jdbc.query("SELECT user_id FROM post_audience WHERE post_id = ?", (rs, i) -> Ids.uuid(rs.getBytes(1)), (Object) id);
+        notifier.changed(readers);
         return views(me, "WHERE p.id = ?", id).get(0);
     }
 

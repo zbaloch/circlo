@@ -6,18 +6,20 @@ import { describeError } from './account';
 import { syncConnections, type Connection } from './friends';
 import type { StoredAccount } from './keystore';
 import { refreshActivity } from './activity';
-import { markActiveNow } from './background-check';
+import { markActiveNow, refreshPushToken } from './background-check';
 import { refreshBlocked } from './blocks';
+import { onLiveChange, startLive } from './live';
 import { syncMessaging } from './messaging';
 import { useSession } from './session';
 import { deleteItem, getItem, setItem } from './storage';
 
 /**
  * Connections (requests + friends) shared by every screen, so the bell's dot, Notifications and Friends agree.
- * Refreshed when a screen gains focus and every POLL_MS while the app is open (there is no remote push).
+ * Refreshed when a screen gains focus, the moment the server signals a change (lib/live), and every POLL_MS as a
+ * fallback while the app is open.
  * Which requests I've already seen is kept on this device only.
  */
-const POLL_MS = 15_000;
+const POLL_MS = 30_000;
 const MAX_SEEN = 500;
 
 type State = { owner: string | null; connections: Connection[] | null; error?: string; seen: ReadonlySet<string> | null };
@@ -112,8 +114,9 @@ export function useConnections() {
 }
 
 /**
- * Keeps connections, activity (replies and likes on my posts) and the chat inbox fresh while signed in, with a poll
- * while the app is in the foreground, so the bell and Messages dots show up on any tab. The blocked list is loaded once
+ * Keeps connections, activity (replies and likes on my posts) and the chat inbox fresh while signed in: live updates
+ * while the app is in the foreground, with a slower poll as a fallback, so the bell and Messages dots show up at once
+ * on any tab. The blocked list is loaded once
  * so chats with only blocked people never light the dot. Every switch to or from the foreground tells background checks
  * the app was in use.
  */
@@ -129,15 +132,20 @@ export function useConnectionsSync() {
       syncMessaging(account).catch(() => {});
     };
     refreshBlocked().catch(() => undefined);
+    refreshPushToken().catch(() => undefined);
     tick();
     void markActiveNow();
     const timer = setInterval(tick, POLL_MS);
+    const stopLive = startLive(() => AppState.currentState === 'active');
+    const offLive = onLiveChange(tick);
     const appState = AppState.addEventListener('change', (s) => {
       void markActiveNow();
       if (s === 'active') tick();
     });
     return () => {
       clearInterval(timer);
+      stopLive();
+      offLive();
       appState.remove();
     };
   }, [account]);

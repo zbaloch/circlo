@@ -1,6 +1,7 @@
 package com.circlo.server.social;
 
 import com.circlo.server.auth.TokenService;
+import com.circlo.server.notify.Notifier;
 import com.circlo.server.web.ApiException;
 import com.circlo.server.web.Ids;
 import jakarta.validation.Valid;
@@ -45,12 +46,14 @@ public class SocialController {
     private final JdbcTemplate jdbc;
     private final People people;
     private final String inviteBase;
+    private final Notifier notifier;
 
-    public SocialController(JdbcTemplate jdbc, People people,
+    public SocialController(JdbcTemplate jdbc, People people, Notifier notifier,
             @Value("${circlo.invite-base:https://www.hellocirclo.com/i/}") String inviteBase) {
         this.jdbc = jdbc;
         this.people = people;
         this.inviteBase = inviteBase;
+        this.notifier = notifier;
     }
 
     private static byte[] me(Jwt jwt) {
@@ -131,6 +134,8 @@ public class SocialController {
         jdbc.update("INSERT INTO friendships (id, user_a, user_b, status, created_at) VALUES (?, ?, ?, 'pending', ?)",
                 Ids.bytes(Ids.newId()), me, to, now());
         CircleController.setMemberships(jdbc, me, to, r.circles());
+        notifier.changed(to);
+        notifier.request(to, me);
         return Map.of("status", "outgoing");
     }
 
@@ -147,6 +152,7 @@ public class SocialController {
         }
         jdbc.update("UPDATE friendships SET status = 'accepted' WHERE user_a = ? AND user_b = ?", other, me);
         CircleController.setMemberships(jdbc, me, other, a == null ? List.of() : a.circles());
+        notifier.changed(other);
         return Map.of("status", "accepted");
     }
 

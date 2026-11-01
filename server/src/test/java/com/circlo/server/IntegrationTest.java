@@ -26,7 +26,7 @@ import org.springframework.web.client.RestClient;
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @ActiveProfiles("test")
-@Import(TestMail.class)
+@Import({TestMail.class, TestPush.class})
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public abstract class IntegrationTest {
 
@@ -41,6 +41,9 @@ public abstract class IntegrationTest {
 
     @Autowired
     protected TestMail mail;
+
+    @Autowired
+    protected TestPush push;
 
     @LocalServerPort
     protected int port;

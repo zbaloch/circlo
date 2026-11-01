@@ -50,6 +50,12 @@ circlo:
     refresh-ttl: 30d
     code-ttl: 15m
     pending-signup-ttl: 1d
+  # Push to iPhones (content-free). Off unless the key, key id and team id are set; see docs/DEV_SETUP.md "Push".
+  apns:
+    key: ${CIRCLO_APNS_KEY:}
+    key-id: ${CIRCLO_APNS_KEY_ID:}
+    team-id: ${CIRCLO_APNS_TEAM_ID:}
+    topic: ${CIRCLO_APNS_TOPIC:com.hellocirclo.app}
   s3:
     bucket: ${CIRCLO_S3_BUCKET:circlo-media}
     public-endpoint: ${CIRCLO_S3_PUBLIC_ENDPOINT}

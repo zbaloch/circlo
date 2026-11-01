@@ -1,11 +1,12 @@
 /**
- * Notifications without remote push (owner decision 2026-10-30): Apple and Google never learn when someone gets
- * activity. A phone that opts in checks in the background now and then (the OS decides when: on Android about every
- * 15 minutes at best, on iOS a few times a day) and shows a local notification with counts only. The check uses this
- * device's check token, which can read nothing but those counts; it's kept readable while the phone is locked, unlike
- * the session. The web app uses background-check.web.ts (no background checks in browsers).
+ * Notifications. iPhone (owner decision 2026-11-01): real-time, content-free remote push. The server tells Apple only
+ * "New reply", "New message" or "New friend request" plus random ids, so a tap opens the right screen (lib/push-route);
+ * names and words stay in Circlo. Android has no remote push yet: a phone that opts in checks in the background now
+ * and then (about every 15 minutes at best) and shows a local notification with counts only, using this device's check
+ * token, which can read nothing but those counts. The web app uses background-check.web.ts (nothing in browsers).
  */
 import * as BackgroundTask from 'expo-background-task';
+import Constants from 'expo-constants';
 import * as Notifications from 'expo-notifications';
 import { AndroidImportance } from 'expo-notifications';
 import * as TaskManager from 'expo-task-manager';
@@ -20,6 +21,23 @@ const CHANNEL = 'activity';
 const TOKEN_KEY = 'circlo.check-token';
 const SINCE_KEY = 'circlo.check-since';
 const PROMPT_DISMISSED = 'circlo.notifications-prompt-dismissed';
+const PUSH_ON = 'circlo.push-on';
+
+/** iPhones get remote push; Android uses background checks until it has FCM. */
+export const usesPush = Platform.OS === 'ios';
+
+/** Sends this phone's push token to the server (tokens can change, so this runs on every launch while push is on). */
+async function registerPush(): Promise<void> {
+  const token = await Notifications.getDevicePushTokenAsync();
+  const service = Constants.expoConfig?.extra?.pushService === 'apns_sandbox' ? 'apns_sandbox' : 'apns';
+  ok(await api.PUT('/v1/devices/current/push-token', { body: { token: String(token.data), service } }));
+}
+
+/** On launch: re-sends the token if push is on and still allowed. */
+export async function refreshPushToken(): Promise<void> {
+  if (!usesPush || (await getItem(PUSH_ON, 'background')) !== '1' || (await notificationPermission()) !== 'on') return;
+  await registerPush();
+}
 
 export type Pending = { requests: number; replies: number; likes: number; messages: number; signIns: number };
 
@@ -95,6 +113,7 @@ export async function notificationPermission(): Promise<NotificationPermission> 
 
 /** Whether background checks are on for this phone. */
 export async function backgroundChecksOn(): Promise<boolean> {
+  if (usesPush) return (await getItem(PUSH_ON, 'background')) === '1' && (await notificationPermission()) === 'on';
   const token = await getItem(TOKEN_KEY, 'background');
   return !!token && (await notificationPermission()) === 'on';
 }
@@ -115,6 +134,11 @@ export async function enableBackgroundChecks(): Promise<NotificationPermission> 
   }
   if (state === 'ask') state = permissionFrom(await Notifications.requestPermissionsAsync());
   if (state !== 'on') return state;
+  if (usesPush) {
+    await registerPush();
+    await setItem(PUSH_ON, '1', 'background');
+    return 'on';
+  }
   const { token } = ok(await api.POST('/v1/devices/current/check-token'));
   await setItem(TOKEN_KEY, token, 'background');
   await setItem(SINCE_KEY, new Date().toISOString(), 'background');
@@ -124,6 +148,7 @@ export async function enableBackgroundChecks(): Promise<NotificationPermission> 
 
 /** Off in Settings: the server forgets the token, and the phone stops checking. */
 export async function disableBackgroundChecks(): Promise<void> {
+  if (usesPush) await api.DELETE('/v1/devices/current/push-token').catch(() => undefined);
   await api.DELETE('/v1/devices/current/check-token').catch(() => undefined);
   await stopLocally();
 }
@@ -132,6 +157,7 @@ export async function disableBackgroundChecks(): Promise<void> {
 export async function stopLocally(): Promise<void> {
   await deleteItem(TOKEN_KEY, 'background');
   await deleteItem(SINCE_KEY, 'background');
+  await deleteItem(PUSH_ON, 'background');
   if (await TaskManager.isTaskRegisteredAsync(CHECK_TASK).catch(() => false)) {
     await BackgroundTask.unregisterTaskAsync(CHECK_TASK).catch(() => undefined);
   }
@@ -163,16 +189,16 @@ export function dismissNotificationsPrompt() {
   setItem(PROMPT_DISMISSED, '1').catch(() => undefined);
 }
 
-/** Tapping one of these notifications opens the Notifications tab. */
-export function onNotificationOpened(open: () => void): () => void {
+/** A tapped notification, with its routing data (see lib/push-route), also when it launched the app. */
+export function onNotificationOpened(open: (data: Record<string, unknown>) => void): () => void {
   Notifications.getLastNotificationResponseAsync()
     .then((r) => {
       if (r) {
         Notifications.clearLastNotificationResponseAsync().catch(() => undefined);
-        open();
+        open(r.notification.request.content.data ?? {});
       }
     })
     .catch(() => undefined);
-  const sub = Notifications.addNotificationResponseReceivedListener(() => open());
+  const sub = Notifications.addNotificationResponseReceivedListener((r) => open(r.notification.request.content.data ?? {}));
   return () => sub.remove();
 }

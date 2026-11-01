@@ -24,6 +24,8 @@ export async function offerBackgroundChecksNow(): Promise<boolean> {
   return false;
 }
 export function dismissNotificationsPrompt() {}
-export function onNotificationOpened(_open: () => void): () => void {
+export const usesPush = false;
+export async function refreshPushToken(): Promise<void> {}
+export function onNotificationOpened(_open: (data: Record<string, unknown>) => void): () => void {
   return () => undefined;
 }

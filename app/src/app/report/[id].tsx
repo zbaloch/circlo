@@ -16,21 +16,23 @@ import { useSession } from '@/lib/session';
 import { displayName, useConnections } from '@/lib/use-connections';
 import { usePalette } from '@/theme/use-palette';
 
-type Kind = 'post' | 'user' | 'message';
+type Kind = 'post' | 'user' | 'message' | 'reply';
 
 const COPY: Record<Kind, { title: string; question: string; includes: string; gone: string }> = {
   post: { title: 'Report post', question: 'What’s wrong with this post?', includes: 'this post’s text and photos', gone: 'This post isn’t available any more.' },
   user: { title: 'Report account', question: 'What’s wrong with this account?', includes: 'their name, username and bio', gone: 'This account isn’t available any more.' },
+  reply: { title: 'Report reply', question: 'What’s wrong with this reply?', includes: 'this reply’s text', gone: 'This reply isn’t available any more.' },
   message: { title: 'Report message', question: 'What’s wrong with this message?', includes: 'this message’s text and photos (not the rest of the chat)', gone: 'This message isn’t available any more.' },
 };
 
 /**
- * Report a post, a person or a chat message (PLAN.md Phase 11). Circlo's moderators get a copy of it; the person
- * reported isn't told. `id` is the post id, the user id, or the message id (with `chat` for its chat).
+ * Report a post, a reply, a person or a chat message (PLAN.md Phase 11). Circlo's moderators get a copy of it; the
+ * person reported isn't told. `id` is the post id, the reply id (with its `author` and their `name`), the user id, or
+ * the message id (with `chat` for its chat).
  */
 export default function ReportScreen() {
-  const params = useLocalSearchParams<{ id: string; kind?: Kind; chat?: string }>();
-  const kind: Kind = params.kind === 'user' || params.kind === 'message' ? params.kind : 'post';
+  const params = useLocalSearchParams<{ id: string; kind?: Kind; chat?: string; author?: string; name?: string }>();
+  const kind: Kind = params.kind === 'user' || params.kind === 'message' || params.kind === 'reply' ? params.kind : 'post';
   const session = useSession();
   const palette = usePalette();
   const account = session.status === 'signedIn' ? session.account : null;
@@ -53,8 +55,8 @@ export default function ReportScreen() {
   const chat = kind === 'message' ? conversations.find((c) => c.groupId === params.chat) : undefined;
   const message = chat?.messages.find((m) => m.messageId === params.id);
   // Whoever the report is about, so the reporter can block them afterwards.
-  const subjectId = post?.authorId ?? connection?.userId ?? message?.senderUser;
-  const subjectName = !account || !subjectId ? '' : connection ? displayName(connection) : post ? post.authorName : chat ? memberName(chat, subjectId, account) : '';
+  const subjectId = post?.authorId ?? connection?.userId ?? message?.senderUser ?? (kind === 'reply' ? params.author : undefined);
+  const subjectName = !account || !subjectId ? '' : connection ? displayName(connection) : post ? post.authorName : chat ? memberName(chat, subjectId, account) : (params.name ?? '');
 
   if (!account || !subjectId || subjectId === account.userId) {
     return (

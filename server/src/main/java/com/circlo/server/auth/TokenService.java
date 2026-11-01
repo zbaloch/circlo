@@ -122,7 +122,7 @@ public class TokenService {
         byte[] kept = keep == null ? new byte[16] : Ids.bytes(keep);
         jdbc.update("UPDATE refresh_tokens SET revoked_at = ? WHERE user_id = ? AND device_id <> ? AND revoked_at IS NULL",
                 now, Ids.bytes(userId), kept);
-        jdbc.update("UPDATE devices SET revoked_at = ?, check_token_hash = NULL WHERE user_id = ? AND id <> ? AND revoked_at IS NULL",
+        jdbc.update("UPDATE devices SET revoked_at = ?, check_token_hash = NULL, push_token_enc = NULL, push_service = NULL WHERE user_id = ? AND id <> ? AND revoked_at IS NULL",
                 now, Ids.bytes(userId), kept);
     }
 
@@ -130,7 +130,7 @@ public class TokenService {
     @Transactional
     public boolean revokeDevice(UUID userId, UUID deviceId) {
         Timestamp now = Timestamp.from(clock.instant());
-        int n = jdbc.update("UPDATE devices SET revoked_at = ?, check_token_hash = NULL WHERE id = ? AND user_id = ? AND revoked_at IS NULL",
+        int n = jdbc.update("UPDATE devices SET revoked_at = ?, check_token_hash = NULL, push_token_enc = NULL, push_service = NULL WHERE id = ? AND user_id = ? AND revoked_at IS NULL",
                 now, Ids.bytes(deviceId), Ids.bytes(userId));
         if (n == 1) {
             jdbc.update("UPDATE refresh_tokens SET revoked_at = ? WHERE device_id = ? AND revoked_at IS NULL", now, Ids.bytes(deviceId));

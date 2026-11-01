@@ -21,17 +21,18 @@ export function likersLine(names: string[], others: number): string | null {
   return `Liked by ${shown.join(rest ? ', ' : ' and ')}${rest ? ` and ${rest} ${rest === 1 ? 'other' : 'others'}` : ''}`;
 }
 
-export type ProfileTab = 'posts' | 'media' | 'likes';
+export type ProfileTab = 'posts' | 'replies' | 'media' | 'likes';
 
-/** Tabs for a profile: Likes only on my own (PLAN.md 2A). */
+/** Tabs for a profile, as on X: Posts, Replies, Media, and Likes only on my own (PLAN.md 2A). */
 export function profileTabs(own: boolean): ProfileTab[] {
-  return own ? ['posts', 'media', 'likes'] : ['posts', 'media'];
+  return own ? ['posts', 'replies', 'media', 'likes'] : ['posts', 'replies', 'media'];
 }
 
 /** Posts shown under each tab. Likes come from the timeline I've loaded (posts I can read and liked). */
 export function postsForTab(tab: ProfileTab, authored: FeedPost[], timeline: FeedPost[]): FeedPost[] {
   if (tab === 'media') return authored.filter((p) => p.media.length > 0);
   if (tab === 'likes') return timeline.filter((p) => p.likedByMe);
+  if (tab === 'replies') return [];
   return authored;
 }
 

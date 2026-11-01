@@ -54,6 +54,9 @@
 | New sign-ins are visible | Each login is recorded (time only) and shown on the other devices | `AuthFlowIT` |
 | No location/device leaks in media | Photos re-encoded and EXIF/XMP/IPTC/comment segments removed; video `udta`/`meta` boxes zero-filled; on web, photos are redrawn on a canvas | `strip-metadata.test.ts` |
 | Storage isn't public | Private bucket; uploads are presigned PUTs locked to size and type; downloads are presigned GETs (1 hour) | `MediaFlowIT`, `PresignedUploadIT` |
+| Pushes say nothing | APNs payload is a fixed alert ("New reply" / "New message" / "New friend request") plus a type and random ids; never names, text or counts. Sent only to the recipient, never for my own actions, never from someone the recipient blocked. Apple learns *when* a device gets a push (accepted, owner decision 2026-11-01) | `EngagementFlowIT`, `ApnsSenderTest` |
+| Push tokens aren't readable from a DB copy | Sealed per device with AES-256-GCM (key derived from CIRCLO_JWT_KEY, bound to the device row); cleared on sign-out, revoke, or when Apple reports the token gone | `EngagementFlowIT` |
+| Live updates leak nothing | `GET /v1/events` returns only a version number for the caller; the app then fetches through the usual access-checked endpoints | `EngagementFlowIT` |
 | No personal data in logs | No access log; errors are fixed codes; nothing from requests is logged | `NoPayloadLoggingIT` |
 | Browsers can't be abused cross-site | Bearer tokens in a header (no cookies, so no CSRF); CORS allows only the web app's origin | `AuthFlowIT` |
 

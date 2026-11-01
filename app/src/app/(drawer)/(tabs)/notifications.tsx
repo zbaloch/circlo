@@ -25,9 +25,14 @@ export function mergeRows(items: ActivityItem[], signIns: SignIn[]): ({ type: 'a
     .map(({ at: _at, ...row }) => row);
 }
 
-/** Pure: where tapping a row goes. A reply opens the thread scrolled to that reply. Exported for tests. */
+/** Pure: where tapping a row goes. A reply, or a like on my reply, opens the thread at that reply. Exported for tests. */
 export function activityHref(item: ActivityItem) {
-  return { pathname: '/post/[id]' as const, params: item.kind === 'reply' && item.replyId ? { id: item.postId, reply: item.replyId } : { id: item.postId } };
+  return { pathname: '/post/[id]' as const, params: item.kind !== 'like' && item.replyId ? { id: item.postId, reply: item.replyId } : { id: item.postId } };
+}
+
+/** Pure: what the row says after the person's name. Exported for tests. */
+export function activityVerb(kind: ActivityItem['kind']): string {
+  return kind === 'reply' ? ' replied to your post' : kind === 'reply_like' ? ' liked your reply' : ' liked your post';
 }
 
 /**
@@ -126,19 +131,19 @@ export default function NotificationsScreen() {
         const { item } = row;
         const key = `${item.kind}:${item.replyId ?? item.actorId}:${item.postId}`;
         const name = item.actorName;
-        const said = item.kind === 'reply' && item.replyText ? item.replyText : item.postText;
+        const said = item.kind !== 'like' && item.replyText ? item.replyText : item.postText;
         const quote = said ? ` · “${said.length > 60 ? `${said.slice(0, 60)}…` : said}”` : '';
         return (
           <Row
             key={key}
             isNew={fresh.has(key)}
-            hint={item.kind === 'reply' ? 'Opens the reply' : 'Opens the post'}
+            hint={item.kind === 'like' ? 'Opens the post' : 'Opens the reply'}
             onPress={() => router.push(activityHref(item))}
             avatar={<Avatar id={item.actorId} name={name} uri={item.actorAvatar} />}
             title={
               <>
                 <Text className="font-bold text-ink dark:text-ink-dark">{name}</Text>
-                {item.kind === 'reply' ? ' replied to your post' : ' liked your post'}
+                {activityVerb(item.kind)}
               </>
             }
             line={`${relativeTime(Date.parse(item.createdAt), now)}${quote}`}

@@ -24,6 +24,7 @@ import {
 } from '@/lib/messaging';
 import { useSession } from '@/lib/session';
 import { chatTitle, dayLabel } from '@/lib/view-logic';
+import { onLiveChange } from '@/lib/live';
 import { usePalette } from '@/theme/use-palette';
 import { Text, TextInput } from '@/components/ui/text';
 import { showAlert } from '@/lib/dialog';
@@ -54,8 +55,13 @@ export default function ChatScreen() {
     useCallback(() => {
       refreshBlocked().catch(() => {});
       sync();
-      const timer = setInterval(sync, 5_000); // while the chat is open
-      return () => clearInterval(timer);
+      // New messages arrive the moment the server signals them; the timer is only a fallback.
+      const off = onLiveChange(sync);
+      const timer = setInterval(sync, 15_000);
+      return () => {
+        off();
+        clearInterval(timer);
+      };
     }, [sync]),
   );
 
@@ -173,27 +179,32 @@ export default function ChatScreen() {
             item.kind === 'day' ? (
               <Text className="py-2 text-center text-xs text-muted dark:text-muted-dark">{item.label}</Text>
             ) : (
-              <Pressable
-                onLongPress={() => messageMenu(item.msg)}
-                className={`max-w-[80%] ${item.msg.mine ? 'self-end' : 'self-start'}`}>
-                {item.showName ? <Text className="px-2 pb-0.5 text-xs text-muted dark:text-muted-dark">{memberName(conv, item.msg.senderUser, account)}</Text> : null}
-                {item.msg.media.length ? (
-                  <View className="mb-1 w-64">
-                    <MediaGrid
-                      media={item.msg.media}
-                      onPress={(i) => {
-                        openViewer(item.msg.media.filter((m) => m.type === 'image'), i);
-                        router.push('/viewer');
-                      }}
-                    />
-                  </View>
-                ) : null}
-                {item.msg.text ? (
-                  <View className={`rounded-2xl px-4 py-2 ${item.msg.mine ? 'rounded-br-md bg-primary dark:bg-primary-dark' : 'rounded-bl-md bg-surface-raised dark:bg-surface-raised-dark'}`}>
-                    <Text className={item.msg.mine ? 'text-base text-on-primary dark:text-on-primary-dark' : 'text-base text-ink dark:text-ink-dark'}>{item.msg.text}</Text>
-                  </View>
-                ) : null}
-              </Pressable>
+              // A visible "…" beside each bubble (on the inner side) opens the same menu as a long-press.
+              <View className={`max-w-[85%] flex-row items-center gap-1 ${item.msg.mine ? 'self-end' : 'self-start'}`}>
+                {item.msg.mine ? <MessageMenuButton onPress={() => messageMenu(item.msg)} color={palette.muted} /> : null}
+                <Pressable
+                  onLongPress={() => messageMenu(item.msg)}
+                  className="shrink">
+                  {item.showName ? <Text className="px-2 pb-0.5 text-xs text-muted dark:text-muted-dark">{memberName(conv, item.msg.senderUser, account)}</Text> : null}
+                  {item.msg.media.length ? (
+                    <View className="mb-1 w-64">
+                      <MediaGrid
+                        media={item.msg.media}
+                        onPress={(i) => {
+                          openViewer(item.msg.media.filter((m) => m.type === 'image'), i);
+                          router.push('/viewer');
+                        }}
+                      />
+                    </View>
+                  ) : null}
+                  {item.msg.text ? (
+                    <View className={`rounded-2xl px-4 py-2 ${item.msg.mine ? 'rounded-br-md bg-primary dark:bg-primary-dark' : 'rounded-bl-md bg-surface-raised dark:bg-surface-raised-dark'}`}>
+                      <Text className={item.msg.mine ? 'text-base text-on-primary dark:text-on-primary-dark' : 'text-base text-ink dark:text-ink-dark'}>{item.msg.text}</Text>
+                    </View>
+                  ) : null}
+                </Pressable>
+                {!item.msg.mine ? <MessageMenuButton onPress={() => messageMenu(item.msg)} color={palette.muted} /> : null}
+              </View>
             )
           }
         />
@@ -284,5 +295,13 @@ export default function ChatScreen() {
         </View>
       </Modal>
     </SafeAreaView>
+  );
+}
+
+function MessageMenuButton({ onPress, color }: { onPress: () => void; color: string }) {
+  return (
+    <Pressable accessibilityRole="button" accessibilityLabel="Message options" hitSlop={10} onPress={onPress} className="px-1 py-2 active:opacity-60">
+      <Icon name="ellipsis-horizontal" size={16} color={color} />
+    </Pressable>
   );
 }

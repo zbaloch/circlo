@@ -13,14 +13,14 @@ import org.springframework.stereotype.Component;
 public class PostAccess {
 
     /** My accepted friends' ids (two parameters: me, me). */
-    static final String FRIENDS = "(SELECT user_b FROM friendships WHERE user_a = ? AND status = 'accepted' "
+    public static final String FRIENDS = "(SELECT user_b FROM friendships WHERE user_a = ? AND status = 'accepted' "
             + "UNION SELECT user_a FROM friendships WHERE user_b = ? AND status = 'accepted')";
 
     /** True for posts `p` the viewer may see; bind with {@link #visibleArgs}. */
-    static final String VISIBLE = "(p.author_id = ? OR (p.author_id IN " + FRIENDS + " AND (p.audience = 'everyone' OR "
+    public static final String VISIBLE = "(p.author_id = ? OR (p.author_id IN " + FRIENDS + " AND (p.audience = 'everyone' OR "
             + "(p.audience = 'circles' AND EXISTS (SELECT 1 FROM post_audience pa WHERE pa.post_id = p.id AND pa.user_id = ?)))))";
 
-    static Object[] visibleArgs(byte[] viewer) {
+    public static Object[] visibleArgs(byte[] viewer) {
         return new Object[] {viewer, viewer, viewer, viewer};
     }
 
