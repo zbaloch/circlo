@@ -23,7 +23,7 @@
         <project.build.outputTimestamp>2026-01-01T00:00:00Z</project.build.outputTimestamp>
         <!-- The load test (LoadIT, tag "load") runs only on request: mvn verify -Dcirclo.excludedGroups= -Dit.test=LoadIT -->
         <circlo.excludedGroups>load</circlo.excludedGroups>
-        <awssdk.version>2.57.3</awssdk.version>
+        <awssdk.version>2.57.6</awssdk.version>
     </properties>
 
     <dependencyManagement>
