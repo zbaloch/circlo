@@ -401,7 +401,7 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /** Turn emails about activity on or off (only sent while I'm not signed in to the phone app) */
+        /** The daily email about activity on or off (only sent while I'm not signed in to the phone app), and the hour (UTC) the daily note comes at; either may be left out */
         put: {
             parameters: {
                 query?: never;
@@ -412,7 +412,8 @@ export interface paths {
             requestBody: {
                 content: {
                     "application/json": {
-                        email: boolean;
+                        email?: boolean;
+                        digestHour?: number;
                     };
                 };
             };

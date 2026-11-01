@@ -36,10 +36,10 @@ public class TestMail {
         }
     }
 
-    /** The 6-digit code in the latest email to this address. */
+    /** The 6-digit code in the latest email with a code to this address (security emails may come after it). */
     public String lastCode(String email) {
-        List<Sent> mine = to(email);
-        assertThat(mine).as("an email to " + email).isNotEmpty();
+        List<Sent> mine = to(email).stream().filter(s -> s.subject().matches(".*\\b\\d{6}$")).toList();
+        assertThat(mine).as("an email with a code to " + email).isNotEmpty();
         Matcher m = Pattern.compile("\\b(\\d{6})\\b").matcher(mine.get(mine.size() - 1).body());
         assertThat(m.find()).isTrue();
         return m.group(1);

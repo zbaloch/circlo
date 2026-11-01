@@ -20,9 +20,9 @@ public class UnsubscribeController {
     static final String PATH = "/v1/email/unsubscribe";
     private static final Pattern TOKEN = Pattern.compile("[A-Za-z0-9_-]{24}");
 
-    private final EmailDigests digests;
+    private final DailyDigests digests;
 
-    public UnsubscribeController(EmailDigests digests) {
+    public UnsubscribeController(DailyDigests digests) {
         this.digests = digests;
     }
 

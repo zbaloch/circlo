@@ -159,12 +159,18 @@ paths:
         "400": { $ref: "#/components/responses/Error" }
   /v1/me/notifications:
     put:
-      summary: Turn emails about activity on or off (only sent while I'm not signed in to the phone app)
+      summary: >-
+        The daily email about activity on or off (only sent while I'm not signed in to the phone app), and the hour
+        (UTC) the daily note comes at; either may be left out
       requestBody:
         required: true
         content:
           application/json:
-            schema: { type: object, required: [email], properties: { email: { type: boolean } } }
+            schema:
+              type: object
+              properties:
+                email: { type: boolean }
+                digestHour: { type: integer, minimum: 0, maximum: 23 }
       responses:
         "200": { $ref: "#/components/responses/Me" }
         "400": { $ref: "#/components/responses/Error" }

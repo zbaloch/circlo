@@ -61,7 +61,6 @@ circlo:
     service-account: ${CIRCLO_FCM_SERVICE_ACCOUNT:}
   # Emails about activity for people not signed in to the phone app (Notifier, EmailDigests).
   notify:
-    email-delay: 15m
     # The web app (linked from the emails) and this server's public address (for their unsubscribe link).
     web-base: ${CIRCLO_WEB_BASE:https://app.hellocirclo.com}
     api-base: ${CIRCLO_API_BASE:https://api.hellocirclo.com}
