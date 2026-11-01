@@ -100,9 +100,9 @@ describe('timeline and profile tabs', () => {
   });
   it('drops like notifications while likes are hidden', () => {
     const item = (kind: ActivityItem['kind']) => ({ kind, postId: 'p', postText: '', actorId: 'a', actorName: 'A', actorHandle: 'a', createdAt: '' }) as ActivityItem;
-    const all = [item('reply'), item('like'), item('reply_like')];
-    expect(shownActivity(all, false).map((i) => i.kind)).toEqual(['reply']);
-    expect(shownActivity(all, true)).toHaveLength(3);
+    const all = [item('reply'), item('like'), item('reply_like'), item('joined')];
+    expect(shownActivity(all, false).map((i) => i.kind)).toEqual(['reply', 'joined']);
+    expect(shownActivity(all, true)).toHaveLength(4);
   });
   it('filters posts per tab', () => {
     const withMedia = post({ postId: 'm', media: [{} as never] });

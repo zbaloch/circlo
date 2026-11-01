@@ -1,7 +1,8 @@
 /**
- * Friends (PLAN.md Phase 5): an invite link or QR code is the only way to connect (no search). The person who opens
- * it sends a request and puts the inviter in their circles; the inviter accepts and picks circles too. Profiles are
- * visible to people you're connected with, never to strangers.
+ * Friends (PLAN.md Phase 5): an invite link or QR code is the only way to connect (no search). Everyone has one link
+ * that stays the same until they reset it (owner decision 2026-11-01). The person who opens it puts the inviter in
+ * their circles and is connected at once; the inviter is told and can choose circles for them (until then: Everyone).
+ * Profiles are visible to people you're connected with, never to strangers.
  */
 import { api, ApiError, ok } from '@/api/client';
 
@@ -21,38 +22,61 @@ export function parseInviteLink(link: string): string | null {
   return m ? m[1] : null;
 }
 
-/** A single-use invite link (valid 7 days). */
-export async function createInviteLink(): Promise<string> {
-  return ok(await api.POST('/v1/invites')).link;
+/** My invite link: the same every time, until I reset it. */
+export async function getInviteLink(): Promise<string> {
+  return ok(await api.GET('/v1/invites/link')).link;
+}
+
+/** A new link; the old one and its QR code stop working. People who joined stay connected. */
+export async function resetInviteLink(): Promise<string> {
+  return ok(await api.POST('/v1/invites/link/reset')).link;
 }
 
 export class InviteError extends Error {}
 
-export type Inviter = { userId: string; name: string; handle: string; avatarUrl?: string | null };
+/** Pure: why an invite can't be used, from the server's answer (null: some other failure). Exported for tests. */
+export function inviteProblem(status: number): string | null {
+  if (status === 404) return 'This invite link doesn’t work any more. Ask them for their current link.';
+  if (status === 400) return 'That’s your own invite link.';
+  if (status === 409) return 'You’re already connected.';
+  if (status === 429) return 'Too many people joined with this link today. Try again tomorrow.';
+  return null;
+}
 
-/** Uses an invite (link or QR) and returns who sent it. */
-export async function redeemInvite(link: string): Promise<Inviter> {
+function tokenOf(link: string): string {
   const token = parseInviteLink(link);
   if (!token) throw new InviteError('That isn’t a Circlo invite link.');
-  const res = await api.POST('/v1/invites/redeem', { body: { token } });
-  if (res.response.status === 404) throw new InviteError('This invite has expired or was already used. Ask for a new one.');
-  if (res.response.status === 400) throw new InviteError('That’s your own invite.');
-  const p = ok(res);
+  return token;
+}
+
+function check<T extends { response: Response }>(res: T): T {
+  const problem = inviteProblem(res.response.status);
+  if (problem) throw new InviteError(problem);
+  return res;
+}
+
+export type Inviter = { userId: string; name: string; handle: string; avatarUrl?: string | null };
+
+/** Who an invite (link or QR) is from, without using it. */
+export async function previewInvite(link: string): Promise<Inviter> {
+  const p = ok(check(await api.POST('/v1/invites/preview', { body: { token: tokenOf(link) } })));
   return { userId: p.userId, name: p.name, handle: p.username, avatarUrl: p.avatarUrl };
 }
 
-/** Asks someone whose invite I used to connect, putting them in `circles` (they aren't told which). */
-export async function sendRequest(account: StoredAccount, toUserId: string, circles: number[] = []): Promise<void> {
-  const res = await api.POST('/v1/friends/requests', { body: { toUserId, circles } });
-  if (res.response.status !== 409) ok(res); // already connected: nothing to do
+/**
+ * Uses an invite, putting its owner in my `circles` (they aren't told which). Someone's link connects us at once
+ * ('accepted'); an old one-time invite sends a request ('outgoing').
+ */
+export async function joinInvite(account: StoredAccount, link: string, circles: number[] = []): Promise<'accepted' | 'outgoing'> {
+  const r = ok(check(await api.POST('/v1/invites/join', { body: { token: tokenOf(link), circles } })));
   await refreshAddressBook(account);
+  return r.status;
 }
 
-/** Uses an invite and sends the request in one go. Returns the inviter's user id. */
-export async function acceptInvite(account: StoredAccount, link: string, circles: number[] = []): Promise<string> {
-  const inviter = await redeemInvite(link);
-  await sendRequest(account, inviter.userId, circles);
-  return inviter.userId;
+/** Pure: people who joined me since `known` was noted (while my link was on screen), newest first. Exported for tests. */
+export function justJoined(connections: Connection[], known: ReadonlySet<string> | null): Connection[] {
+  if (!known) return [];
+  return connections.filter((c) => c.status === 'accepted' && !known.has(c.userId)).reverse();
 }
 
 // ---------------- requests and friends ----------------

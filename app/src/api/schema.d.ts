@@ -1088,6 +1088,173 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/invites/link": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** My invite link (the same until I reset it; made the first time I ask) */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The link */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["InviteLink"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/invites/link/reset": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** A new invite link; the old one and its QR code stop working (people who joined stay connected) */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The new link */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["InviteLink"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/invites/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Who an invite is from (changes nothing) */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        token: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Who it's from */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Person"];
+                    };
+                };
+                400: components["responses"]["Error"];
+                404: components["responses"]["Error"];
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/invites/join": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Use an invite, putting its owner in my circles. Someone's link connects at once (status accepted) and they're told; a one-time invite sends a request (status outgoing). */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        token: string;
+                        circles?: number[];
+                    };
+                };
+            };
+            responses: {
+                /** @description Connected, or the request sent */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            userId: components["schemas"]["Id"];
+                            /** @enum {string} */
+                            status: "accepted" | "outgoing";
+                        };
+                    };
+                };
+                400: components["responses"]["Error"];
+                404: components["responses"]["Error"];
+                409: components["responses"]["Error"];
+                429: components["responses"]["Error"];
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/invites": {
         parameters: {
             query?: never;
@@ -1097,7 +1264,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** A single-use invite link (7 days) */
+        /** A single-use invite link (7 days); for older apps */
         post: {
             parameters: {
                 query?: never;
@@ -1139,7 +1306,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Use an invite; returns who sent it */
+        /** Use an invite; returns who sent it (for older apps; someone's link connects here already) */
         post: {
             parameters: {
                 query?: never;
@@ -2062,7 +2229,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Replies and likes on my posts, and likes on my replies, newest first */
+        /** Replies and likes on my posts, likes on my replies, and people who joined with my link, newest first */
         get: {
             parameters: {
                 query?: {
@@ -2084,9 +2251,10 @@ export interface paths {
                         "application/json": {
                             items: {
                                 /** @enum {string} */
-                                kind: "reply" | "like" | "reply_like";
-                                postId: components["schemas"]["Id"];
-                                postText: string;
+                                kind: "reply" | "like" | "reply_like" | "joined";
+                                /** Format: uuid */
+                                postId: string | null;
+                                postText: string | null;
                                 actorId: components["schemas"]["Id"];
                                 actor: components["schemas"]["Person"];
                                 /** Format: uuid */
@@ -2497,6 +2665,10 @@ export interface components {
             createdAt: string;
             /** @description Emails about activity while I'm not signed in to the phone app */
             emailNotifications: boolean;
+        };
+        InviteLink: {
+            token: string;
+            link: string;
         };
         /** @description Someone as shown next to their posts, replies and messages (never their email) */
         Person: {

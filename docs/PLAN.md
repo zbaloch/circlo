@@ -571,6 +571,7 @@ Rate limiting. **Do not log request bodies or IPs.**
 
 ### Phase 5: Friends
 - Invite by QR code or link (token plus inviter public-key fingerprint). No handle search: invites are the only way to connect (owner decision 2026-10-28).
+- Update 2026-11-01 (owner): each person has one permanent invite link (and QR code) until they reset it; opening it connects at once, into the owner's Everyone, and the owner is told and can choose circles. See PROGRESS.md.
 - Friend request, then accept.
 - Both sides exchange `profileKey` and their current `Ck` via `friend_payloads`.
 - Safety-number screen for verification.

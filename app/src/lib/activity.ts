@@ -8,13 +8,14 @@ import { deleteItem, getItem, setItem } from './storage';
 import { shownActivity } from './view-logic';
 
 /**
- * Replies and likes on my posts and likes on my replies, for the Notifications tab (no remote push: the app fetches them itself). Which items
+ * Replies and likes on my posts, likes on my replies and people who joined with my invite link, for the Notifications tab (no remote push: the app fetches them itself). Which items
  * I've seen is a time kept on this device, and drives the bell's dot.
  */
 export type ActivityItem = {
-  kind: 'reply' | 'like' | 'reply_like';
-  postId: string;
-  postText: string;
+  kind: 'reply' | 'like' | 'reply_like' | 'joined';
+  /** None for 'joined'. */
+  postId: string | null;
+  postText: string | null;
   actorId: string;
   actorName: string;
   actorHandle: string;

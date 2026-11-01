@@ -7,7 +7,7 @@ import { CirclePickerSheet, circlesLine } from '@/components/circle-choice';
 import { Button, ErrorText } from '@/components/form';
 import { describeError } from '@/lib/account';
 import { loadAddressBook, type AddressBook } from '@/lib/addressbook';
-import { acceptInvite, InviteError } from '@/lib/friends';
+import { InviteError, joinInvite, previewInvite, type Inviter } from '@/lib/friends';
 import { useSession } from '@/lib/session';
 import { Text } from '@/components/ui/text';
 
@@ -18,7 +18,7 @@ export default function ScanScreen() {
   const [status, setStatus] = useState<string>();
   const [error, setError] = useState<string>();
   // A scanned invite waits here while I choose the person's circles (none: Everyone only).
-  const [pending, setPending] = useState<{ data: string; book: AddressBook }>();
+  const [pending, setPending] = useState<{ data: string; book: AddressBook; from: Inviter }>();
   const chosen = useRef(false);
   const handled = useRef(false);
   const account = session.status === 'signedIn' ? session.account : null;
@@ -39,16 +39,19 @@ export default function ScanScreen() {
     if (handled.current) return;
     handled.current = true;
     try {
-      setPending({ data, book: await loadAddressBook(account) });
+      const [from, book] = await Promise.all([previewInvite(data), loadAddressBook(account)]);
+      setPending({ data, book, from });
     } catch (e) {
       setError(e instanceof InviteError ? e.message : describeError(e));
     }
   };
 
-  const sendInvite = async (data: string, book: AddressBook, circles: number[]) => {
+  const connect = async ({ data, book, from }: { data: string; book: AddressBook; from: Inviter }, circles: number[]) => {
+    const name = from.name || `@${from.handle}`;
+    const where = circles.length ? `, in ${circlesLine(book, circles)}` : '';
     try {
-      await acceptInvite(account, data, circles);
-      setStatus(`Request sent${circles.length ? `, in ${circlesLine(book, circles)}` : ''}. You’ll see their profile once they accept.`);
+      const status = await joinInvite(account, data, circles);
+      setStatus(status === 'accepted' ? `You and ${name} are now connected${where}.` : `Request sent${where}. You’ll see their profile once they accept.`);
     } catch (e) {
       setError(e instanceof InviteError ? e.message : describeError(e));
     }
@@ -75,11 +78,11 @@ export default function ScanScreen() {
           visible
           book={pending.book}
           selected={[]}
-          title="Add to circles"
-          confirmLabel="Send request"
+          title={`Add ${pending.from.name || `@${pending.from.handle}`} to circles`}
+          confirmLabel="Connect"
           onDone={(ids) => {
             chosen.current = true;
-            void sendInvite(pending.data, pending.book, ids);
+            void connect(pending, ids);
           }}
           onClose={() => {
             setPending(undefined);

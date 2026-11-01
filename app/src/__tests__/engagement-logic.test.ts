@@ -74,6 +74,12 @@ describe('reply likes', () => {
     expect(activityVerb('like')).toBe(' liked your post');
   });
 
+  it('someone who joined with my link opens their profile, ready to choose circles', () => {
+    const item = { kind: 'joined', postId: null, postText: null, actorId: 'b', actorName: 'Bo', actorHandle: 'bo', createdAt: '' } as ActivityItem;
+    expect(activityHref(item)).toEqual({ pathname: '/friend/[id]', params: { id: 'b', circles: '1' } });
+    expect(activityVerb('joined')).toBe(' joined with your invite link');
+  });
+
   it('replies can be reported', () => {
     expect(reportBody('reply', R, 'harassment', '')).toEqual({ kind: 'reply', targetId: R, reason: 'harassment' });
   });
