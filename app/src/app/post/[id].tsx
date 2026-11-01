@@ -12,7 +12,6 @@ import { loadAddressBook, type AddressBook } from '@/lib/addressbook';
 import { putPost, usePost } from '@/lib/feed-store';
 import { fetchPost } from '@/lib/posts';
 import { useSession } from '@/lib/session';
-import { blockUser } from '@/lib/blocks';
 import { deleteReply, fetchLikers, fetchReplies, setReplyLiked, takeSentReply, toggledReplyLike, type Liker, type Reply } from '@/lib/thread';
 import { relativeTime } from '@/lib/time';
 import { useNow } from '@/lib/use-now';
@@ -123,24 +122,13 @@ export default function ThreadScreen() {
     setReplyLiked(post, r.replyId, next.likedByMe).catch(() => replace(r));
   };
 
-  // What I may do with a reply: delete my own or any on my post; report or block someone else.
+  // What I may do with a reply: delete my own or any on my post; report someone else's. Blocking lives on their profile.
   const replyMenu = (r: Reply) => {
     const name = r.authorName;
     const options = [
       ...(r.mine || post.mine ? [{ text: 'Delete reply', style: 'destructive' as const, onPress: () => removeReply(r) }] : []),
       ...(!r.mine
-        ? [
-            { text: 'Report reply', style: 'destructive' as const, onPress: () => router.push({ pathname: '/report/[id]', params: { id: r.replyId, kind: 'reply', author: r.authorId, name } }) },
-            {
-              text: `Block ${name}`,
-              style: 'destructive' as const,
-              onPress: () =>
-                blockUser(account, r.authorId, name, r.authorHandle).then(
-                  () => setReplies((prev) => (prev ?? []).filter((x) => x.authorId !== r.authorId)),
-                  () => showAlert('Couldn’t block', 'Check your connection and try again.'),
-                ),
-            },
-          ]
+        ? [{ text: 'Report reply', style: 'destructive' as const, onPress: () => router.push({ pathname: '/report/[id]', params: { id: r.replyId, kind: 'reply', author: r.authorId, name } }) }]
         : []),
       { text: 'Cancel', style: 'cancel' as const },
     ];
