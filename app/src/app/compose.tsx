@@ -201,7 +201,9 @@ export default function ComposeScreen() {
                 // (Android adds it above the text). 4 pt puts the first line's centre on the 40 pt avatar's, as
                 // measured on screen; Android snaps the text, so 5 pt already lands about 5 pt too low.
                 textAlignVertical="top"
-                className="min-h-24 p-0 pt-1 text-lg text-ink dark:text-ink-dark"
+                // Room to tap while empty; with photos the field fits its text, so they sit right under it and move
+                // down as it grows (as on X).
+                className={`${media.length ? 'min-h-8' : 'min-h-24'} p-0 pt-1 text-lg text-ink dark:text-ink-dark`}
               />
             </View>
           </View>

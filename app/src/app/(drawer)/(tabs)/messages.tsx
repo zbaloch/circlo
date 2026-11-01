@@ -22,12 +22,14 @@ export default function MessagesScreen() {
   const blocked = useBlocked();
   const all = useConversations();
   const conversations = useMemo(() => visibleConversations(all, blocked), [all, blocked]);
-  const [refreshing, setRefreshing] = useState(false);
+  // The spinner shows only for a pull. Background refreshes stay silent: switching it on from code makes iOS push the
+  // list down by the spinner's height, and it doesn't always come back (a blank band under the header).
+  const [pulling, setPulling] = useState(false);
+  const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState<string>();
 
   const sync = useCallback(async () => {
     if (!account) return;
-    setRefreshing(true);
     try {
       await refreshBlocked().catch(() => undefined);
       await syncMessaging(account);
@@ -35,9 +37,14 @@ export default function MessagesScreen() {
     } catch {
       setError('Couldn’t check for messages. Pull to try again.');
     } finally {
-      setRefreshing(false);
+      setLoaded(true);
     }
   }, [account]);
+  const pull = useCallback(async () => {
+    setPulling(true);
+    await sync();
+    setPulling(false);
+  }, [sync]);
 
   useFocusEffect(
     useCallback(() => {
@@ -55,10 +62,10 @@ export default function MessagesScreen() {
       <FlatList
         data={conversations}
         keyExtractor={(c) => c.groupId}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={sync} />}
+        refreshControl={<RefreshControl refreshing={pulling} onRefresh={pull} />}
         ListHeaderComponent={error ? <Text className="px-4 py-2 text-center text-sm text-danger dark:text-danger-dark">{error}</Text> : undefined}
         ListEmptyComponent={
-          refreshing ? undefined : (
+          !loaded ? undefined : (
             <View className="h-[520px]">
               <EmptyState icon="chatbubble-outline" title="No messages" body="Only the people in a chat can see it. Start a chat with someone or a group." />
             </View>
