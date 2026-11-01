@@ -117,7 +117,7 @@ export default function CircleScreen() {
       {members.length === 0 ? <Text className="text-muted dark:text-muted-dark">Nobody yet.</Text> : null}
       {members.map((userId) => (
         <View key={userId} className="flex-row items-center gap-3">
-          <Avatar name={name(book.contacts[userId])} />
+          <Avatar id={userId} name={name(book.contacts[userId])} />
           <Text className="flex-1 font-semibold text-ink dark:text-ink-dark">{name(book.contacts[userId])}</Text>
           <Pressable accessibilityRole="button" disabled={!!busy} onPress={() => change(userId, false)} className="px-2 py-1 active:opacity-60">
             <Text className="font-semibold text-danger dark:text-danger-dark">{busy === userId ? 'Updating…' : 'Remove'}</Text>
@@ -127,7 +127,7 @@ export default function CircleScreen() {
       {others.length > 0 ? <Text className="pt-2 text-lg font-bold text-ink dark:text-ink-dark">Add to this circle</Text> : null}
       {others.map((userId) => (
         <View key={userId} className="flex-row items-center gap-3">
-          <Avatar name={name(book.contacts[userId])} />
+          <Avatar id={userId} name={name(book.contacts[userId])} />
           <Text className="flex-1 font-semibold text-ink dark:text-ink-dark">{name(book.contacts[userId])}</Text>
           <Pressable accessibilityRole="button" disabled={!!busy} onPress={() => change(userId, true)} className="px-2 py-1 active:opacity-60">
             <Text className="font-semibold text-primary dark:text-primary-dark">{busy === userId ? 'Updating…' : 'Add'}</Text>

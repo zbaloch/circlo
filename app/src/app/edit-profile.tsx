@@ -70,7 +70,7 @@ export default function EditProfileScreen() {
     <AuthScreen>
       <Title subtitle="Your people see your name, photo and bio. Nobody else can.">Edit profile</Title>
       <View className="flex-row items-center gap-4">
-        <Avatar size="lg" name={name || account.handle} uri={me?.avatarUrl} />
+        <Avatar size="lg" id={account.userId} name={name || account.handle} uri={me?.avatarUrl} />
         {photoBusy ? (
           <Spinner />
         ) : (

@@ -42,7 +42,7 @@ export function AppDrawer({ navigation, state }: DrawerContentComponentProps) {
     <SafeAreaView edges={['top', 'bottom']} className="flex-1 bg-surface dark:bg-surface-dark">
     <ScrollView className="flex-1" contentContainerClassName="px-5 pt-4">
       <View className="pb-2">
-        <Avatar size="lg" name={displayName} uri={me?.avatarUrl} />
+        <Avatar size="lg" id={account?.userId} name={displayName} uri={me?.avatarUrl} />
         <Text className="mt-3 text-xl font-extrabold text-ink dark:text-ink-dark">{displayName}</Text>
         <Text className="text-base text-muted dark:text-muted-dark">@{handle}</Text>
       </View>

@@ -227,7 +227,7 @@ export default function ChatScreen() {
           <Text className="px-5 pb-2 text-xl font-bold text-ink dark:text-ink-dark">People</Text>
           {[account.userId, ...conv.members].map((u) => (
             <View key={u} className="flex-row items-center gap-3 px-5 py-2">
-              <Avatar size="sm" name={memberName(conv, u, account, me?.name)} uri={u === account.userId ? me?.avatarUrl : conv.people[u]?.avatarUrl} />
+              <Avatar size="sm" id={u} name={memberName(conv, u, account, me?.name)} uri={u === account.userId ? me?.avatarUrl : conv.people[u]?.avatarUrl} />
               <Text className="flex-1 text-base text-ink dark:text-ink-dark">{u === account.userId ? 'You' : memberName(conv, u, account)}</Text>
               {u !== account.userId && conv.active ? (
                 <Pressable

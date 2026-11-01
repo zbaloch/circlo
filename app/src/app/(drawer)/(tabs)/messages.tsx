@@ -72,7 +72,7 @@ export default function MessagesScreen() {
               accessibilityRole="button"
               onPress={() => router.push({ pathname: '/chat/[id]', params: { id: item.groupId } })}
               className="flex-row items-center gap-3 border-b border-border px-4 py-3 active:bg-surface-raised dark:border-border-dark dark:active:bg-surface-raised-dark">
-              <Avatar name={title(item)} uri={item.members.length === 1 ? item.people[item.members[0]]?.avatarUrl : undefined} />
+              <Avatar id={item.members.length === 1 ? item.members[0] : item.groupId} name={title(item)} uri={item.members.length === 1 ? item.people[item.members[0]]?.avatarUrl : undefined} />
               <View className="flex-1 gap-0.5">
                 <View className="flex-row items-center gap-2">
                   <Text numberOfLines={1} className={`flex-1 text-base text-ink dark:text-ink-dark ${unread ? 'font-bold' : 'font-semibold'}`}>

@@ -73,7 +73,7 @@ export default function NewMessageScreen() {
               accessibilityState={{ checked: on }}
               onPress={() => setPicked(on ? picked.filter((x) => x !== item) : [...picked, item])}
               className="flex-row items-center gap-3 border-b border-border px-4 py-3 dark:border-border-dark">
-              <Avatar name={name} />
+              <Avatar id={item} name={name} />
               <View className="flex-1">
                 <Text className="text-base font-semibold text-ink dark:text-ink-dark">{name}</Text>
                 {handle ? <Text className="text-muted dark:text-muted-dark">@{handle}</Text> : null}

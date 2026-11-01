@@ -48,9 +48,10 @@ export function DrawerAvatarButton() {
   const navigation = useNavigation();
   const session = useSession();
   const handle = session.status === 'signedIn' ? session.account.handle : undefined;
+  const userId = session.status === 'signedIn' ? session.account.userId : undefined;
   return (
     <Pressable accessibilityRole="button" accessibilityLabel="Open menu" hitSlop={8} onPress={() => navigation.dispatch({ type: 'OPEN_DRAWER' })} className="active:opacity-70">
-      <Avatar size="sm" name={handle} />
+      <Avatar size="sm" id={userId} name={handle} />
     </Pressable>
   );
 }

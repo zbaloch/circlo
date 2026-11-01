@@ -180,7 +180,7 @@ export default function SearchScreen() {
           {otherRequests.map((c) => (
             <View key={c.userId} className="gap-3 rounded-2xl border border-border p-4 dark:border-border-dark">
               <View className="flex-row items-center gap-3">
-                <Avatar name={displayName(c)} uri={c.profile.avatarUrl} />
+                <Avatar id={c.userId} name={displayName(c)} uri={c.profile.avatarUrl} />
                 <View className="flex-1">
                   <Text className="font-bold text-ink dark:text-ink-dark">{displayName(c)}</Text>
                   <Text className="text-muted dark:text-muted-dark">
@@ -202,7 +202,7 @@ export default function SearchScreen() {
           <Text className="text-lg font-bold text-ink dark:text-ink-dark">Sent ({outgoing.length})</Text>
           {outgoing.map((c) => (
             <View key={c.userId} className="flex-row items-center gap-3 py-2">
-              <Avatar name={displayName(c)} uri={c.profile.avatarUrl} />
+              <Avatar id={c.userId} name={displayName(c)} uri={c.profile.avatarUrl} />
               <View className="flex-1">
                 <Text className="font-bold text-ink dark:text-ink-dark">{c.profile ? displayName(c) : 'Request sent'}</Text>
                 <Text className="text-muted dark:text-muted-dark">Waiting for them to accept</Text>
@@ -226,7 +226,7 @@ export default function SearchScreen() {
             accessibilityRole="button"
             onPress={() => router.push({ pathname: '/friend/[id]', params: { id: f.userId } })}
             className="flex-row items-center gap-3 py-2 active:opacity-60">
-            <Avatar name={displayName(f)} uri={f.profile.avatarUrl} />
+            <Avatar id={f.userId} name={displayName(f)} uri={f.profile.avatarUrl} />
             <View className="flex-1">
               <Text className="font-bold text-ink dark:text-ink-dark">{displayName(f)}</Text>
               <Text className="text-muted dark:text-muted-dark">@{f.profile.handle}</Text>
@@ -267,7 +267,7 @@ export default function SearchScreen() {
   const inviteSection = scanner ? (
     <>
       <View className="flex-row items-center gap-3">
-        <Avatar name={displayName(scanner)} uri={scanner.profile.avatarUrl} />
+        <Avatar id={scanner.userId} name={displayName(scanner)} uri={scanner.profile.avatarUrl} />
         <View className="flex-1">
           <Text className="font-bold text-ink dark:text-ink-dark">{displayName(scanner)} used your invite</Text>
           <Text className="text-muted dark:text-muted-dark">
