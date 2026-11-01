@@ -36,7 +36,7 @@ export default function NewMessageScreen() {
   if (!account) return null;
   const skip = new Set((exclude ?? '').split(',').filter(Boolean));
   const friends = Object.entries(book?.contacts ?? {})
-    .filter(([id, c]) => !skip.has(id) && !c.identityChanged)
+    .filter(([id, c]) => !skip.has(id) && c.status === 'accepted')
     .map(([id]) => id)
     .sort((a, b) => authorName(account, book, a).name.localeCompare(authorName(account, book, b).name));
 

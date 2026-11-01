@@ -38,7 +38,7 @@ export default function ChangePasswordScreen() {
     if (next === current) return setError('Choose a password different from your current one.');
     setBusy(true);
     try {
-      await changePassword(account, current, next);
+      await changePassword(current, next);
       showAlert('Password changed', 'Every other device has been signed out. Sign in there again with your new password.');
       router.back();
     } catch (e) {
@@ -50,7 +50,7 @@ export default function ChangePasswordScreen() {
 
   return (
     <AuthScreen>
-      <Title subtitle="Your password never leaves this phone. Changing it signs out every other device, including anyone else who knew the old one.">
+      <Title subtitle="Changing it signs out every other device, including anyone else who knew the old one.">
         Change password
       </Title>
       <TextField label="Current password" secureTextEntry value={current} onChangeText={setCurrent} textContentType="password" />

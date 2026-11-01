@@ -1,15 +1,22 @@
 import { unseenCount, type ActivityItem } from '@/lib/activity';
 import { mergeRows } from '@/app/(drawer)/(tabs)/notifications';
 
-jest.mock('@circlo/core', () => ({}));
-jest.mock('expo-secure-store', () => ({}));
+jest.mock('@/lib/storage', () => ({}));
 jest.mock('@/api/client', () => ({}));
 jest.mock('@/lib/session', () => ({ useSession: () => ({ status: 'signedOut' }) }));
 jest.mock('@/lib/posts', () => ({}));
 jest.mock('@/components/post-actions', () => ({}));
 jest.mock('@/lib/background-check', () => ({}));
 
-const item = (createdAt: string, kind: ActivityItem['kind'] = 'like'): ActivityItem => ({ kind, postId: 'p1', actorId: 'a1', createdAt });
+const item = (createdAt: string, kind: ActivityItem['kind'] = 'like'): ActivityItem => ({
+  kind,
+  postId: 'p1',
+  postText: 'hello',
+  actorId: 'a1',
+  actorName: 'Ana',
+  actorHandle: 'ana',
+  createdAt,
+});
 
 describe('activity', () => {
   it('counts what is newer than the seen time for the bell dot', () => {

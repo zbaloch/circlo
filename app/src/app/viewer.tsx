@@ -7,12 +7,12 @@ import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { EncryptedImage } from '@/components/encrypted-media';
+import { MediaImage } from '@/components/post-media';
 import { viewerState } from '@/lib/feed-store';
-import type { UploadedMedia } from '@/lib/media';
+import type { Attachment } from '@/lib/media';
 import { Text } from '@/components/ui/text';
 
-function ZoomableImage({ media, width, height, onDismiss }: { media: UploadedMedia; width: number; height: number; onDismiss: () => void }) {
+function ZoomableImage({ media, width, height, onDismiss }: { media: Attachment; width: number; height: number; onDismiss: () => void }) {
   const scale = useSharedValue(1);
   const saved = useSharedValue(1);
   const dy = useSharedValue(0);
@@ -46,7 +46,7 @@ function ZoomableImage({ media, width, height, onDismiss }: { media: UploadedMed
   return (
     <GestureDetector gesture={Gesture.Simultaneous(pinch, pan, doubleTap)}>
       <Animated.View className="items-center justify-center" style={[{ width, height }, style]}>
-        <EncryptedImage media={media} className="h-full w-full" fit="contain" />
+        <MediaImage objectKey={media.objectKey} url={media.url} className="h-full w-full" fit="contain" />
       </Animated.View>
     </GestureDetector>
   );

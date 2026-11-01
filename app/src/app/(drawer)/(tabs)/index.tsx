@@ -8,19 +8,18 @@ import { EmptyState } from '@/components/empty-state';
 import { Fab } from '@/components/fab';
 import { HomeHeader } from '@/components/home-header';
 import { IntegrityBanner } from '@/components/integrity-banner';
-import { RecoveryReminder } from '@/components/recovery-reminder';
 import { OutboxCard, PostCard } from '@/components/post-card';
 import { usePostActions } from '@/components/post-actions';
 import { Screen } from '@/components/screen';
 import { loadAddressBook, type AddressBook } from '@/lib/addressbook';
-import { resumePendingRotation } from '@/lib/circles';
 import { checkForNewPosts, loadMoreFeed, refreshFeed, showPendingPosts, useFeed } from '@/lib/feed-store';
 import { dismissPost, retryPost, useOutbox } from '@/lib/outbox';
 import { offerBackgroundChecksNow, onNotificationOpened } from '@/lib/background-check';
 import type { StoredAccount } from '@/lib/keystore';
 import { newSignIns } from '@/lib/security-events';
 import type { FeedPost } from '@/lib/posts';
-import { loadMyProfile, type Connection } from '@/lib/friends';
+import type { Connection } from '@/lib/friends';
+import { refreshMe } from '@/lib/me';
 import { useSession } from '@/lib/session';
 import { useConnections } from '@/lib/use-connections';
 import { Text } from '@/components/ui/text';
@@ -43,7 +42,7 @@ function HomeEmptyState({ connections }: { connections: Connection[] | null }) {
       <EmptyState
         icon="pencil-outline"
         title="No posts yet"
-        body={`You have ${friends} ${friends === 1 ? 'person' : 'people'} here. When they share something with you, it shows up here. Why not start? Only the circles you choose can read it.`}
+        body={`You have ${friends} ${friends === 1 ? 'person' : 'people'} here. When they share something with you, it shows up here. Why not start? Only the circles you choose can see it.`}
         actionLabel="Write a post"
         onAction={() => router.push('/compose')}
       />
@@ -64,7 +63,7 @@ function HomeEmptyState({ connections }: { connections: Connection[] | null }) {
     <EmptyState
       icon="people-outline"
       title="Your timeline is quiet"
-      body="Posts from your people appear here. Only people in the circles you choose can read what you share."
+      body="Posts from your people appear here. Only people in the circles you choose can see what you share."
       actionLabel="Invite your first person"
       onAction={() => router.navigate({ pathname: '/search', params: { section: 'invite' } })}
     />
@@ -81,11 +80,6 @@ export default function HomeScreen() {
   const actions = usePostActions(account, book);
   const list = useRef<{ scrollToOffset: (o: { offset: number; animated?: boolean }) => void } | null>(null);
 
-  // Finish any key rotation that was interrupted (app closed mid-way, offline): it retries quietly in the background.
-  useEffect(() => {
-    if (account) resumePendingRotation(account).catch(() => {});
-  }, [account]);
-
   // No remote push: if notifications haven't been asked about yet, Circlo's own screen offers background checks first
   // (the system popup only follows a "yes" there). Tapping one of their notifications opens the Notifications tab.
   useEffect(() => {
@@ -96,8 +90,8 @@ export default function HomeScreen() {
 
   const refresh = useCallback(async () => {
     if (!account) return;
-    // My display name for my own posts (cached by loadMyProfile).
-    await loadMyProfile(account).catch(() => null);
+    // My name and photo for my own posts.
+    await refreshMe().catch(() => null);
     setBook(await loadAddressBook(account).catch(() => null));
     await refreshFeed(account);
   }, [account]);
@@ -157,7 +151,6 @@ export default function HomeScreen() {
               <HomeHeader />
             </View>
             <IntegrityBanner />
-            <RecoveryReminder account={account} />
             {pending.map((i) => (
               <OutboxCard key={i.id} item={i} onRetry={() => retryPost(account, i.id)} onDismiss={() => dismissPost(i.id)} />
             ))}

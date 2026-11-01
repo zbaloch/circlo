@@ -1,82 +1,22 @@
-/**
- * Safety and legal (PLAN.md Phase 11): account deletion and an export of your own data decrypted on this
- * device. No cryptography is implemented here.
- */
+/** Account deletion and a copy of my data (PLAN.md Phase 11). The web app uses safety.web.ts for saving the copy. */
 import { Directory } from 'expo-file-system';
 
 import { api, ok } from '@/api/client';
 
-import { loadAddressBook } from './addressbook';
-import { audienceLabel, circleDefs, circleName, circlesOf } from './circles';
-import { loadMyProfile } from './friends';
-import type { StoredAccount } from './keystore';
-import { imageUri } from './media';
-import { conversationsSnapshot } from './messaging';
-import { fetchAuthorPosts } from './posts';
-
-/** Deletes the account on the server (after the user retypes their handle). The caller then signs out locally. */
-export async function deleteAccount(handle: string): Promise<void> {
-  ok(await api.DELETE('/v1/account', { body: { handle } }));
+/** Deletes the account on the server (after checking the password). The caller then signs out locally. */
+export async function deleteAccount(password: string): Promise<void> {
+  ok(await api.DELETE('/v1/account', { body: { password } }));
 }
 
-// ---------------- data export ----------------
+export function exportFileName(now = new Date()): string {
+  return `circlo-export-${now.toISOString().slice(0, 10)}.json`;
+}
 
-type ExportProgress = (step: string) => void;
-
-/**
- * Exports my data, decrypted on this device: profile, friends (names as I see them) and their circles, my posts (text,
- * time, audience, photos), and my chats. Saved as one JSON file in a folder the user picks; nothing goes to the
- * server.
- */
-export async function exportMyData(account: StoredAccount, onProgress?: ExportProgress): Promise<string> {
+/** Saves a copy of my data (profile, circles, friends, posts, replies, chats) as one JSON file in a folder I pick. */
+export async function exportMyData(): Promise<string> {
   const folder = await Directory.pickDirectoryAsync();
-  onProgress?.('Reading your profile and people…');
-  const [profile, book] = await Promise.all([loadMyProfile(account), loadAddressBook(account)]);
-  onProgress?.('Decrypting your posts…');
-  const posts: Record<string, unknown>[] = [];
-  let cursor: string | undefined;
-  for (let page = 0; page < 200; page++) {
-    const res = await fetchAuthorPosts(account, account.userId, { before: cursor, limit: 50 });
-    for (const p of res.posts) {
-      const photos: string[] = [];
-      for (const m of p.media.filter((x) => x.kind === 'full' && x.item.mime.startsWith('image/'))) {
-        photos.push(await imageUri(m).catch(() => ''));
-      }
-      posts.push({
-        postId: p.postId,
-        createdAt: new Date(p.createdAtMs).toISOString(),
-        text: p.text,
-        audience: book.postAudiences?.[p.postId] ? audienceLabel(book, book.postAudiences[p.postId]) : null,
-        photos: photos.filter(Boolean),
-        videos: p.media.filter((m) => m.kind === 'full' && m.item.mime.startsWith('video/')).length,
-      });
-    }
-    if (!res.hasMore || !res.cursor) break;
-    cursor = res.cursor;
-  }
-  onProgress?.('Collecting your chats…');
-  const chats = conversationsSnapshot().map((c) => ({
-    members: c.members.map((u) => book.contacts[u]?.displayName || book.contacts[u]?.handle || u),
-    messages: c.messages.map((m) => ({ at: new Date(m.createdAtMs).toISOString(), fromMe: m.mine, text: m.text })),
-  }));
-  const data = {
-    exportedAt: new Date().toISOString(),
-    app: 'Circlo',
-    account: { handle: account.handle, userId: account.userId },
-    profile,
-    circles: circleDefs(book).map((c) => c.name),
-    friends: Object.entries(book.contacts).map(([id, c]) => ({
-      userId: id,
-      name: c.displayName ?? null,
-      handle: c.handle ?? null,
-      circles: circlesOf(book, c).map((n) => circleName(book, n)),
-      verified: c.verified,
-    })),
-    posts,
-    chats,
-  };
-  onProgress?.('Saving…');
-  const name = `circlo-export-${new Date().toISOString().slice(0, 10)}.json`;
+  const data = ok(await api.GET('/v1/me/export'));
+  const name = exportFileName();
   const file = folder.createFile(name, 'application/json');
   await file.write(JSON.stringify(data, null, 2));
   return name;

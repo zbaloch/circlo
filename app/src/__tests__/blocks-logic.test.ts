@@ -1,13 +1,12 @@
 import { visibleConversations, visibleMessages } from '@/lib/blocks';
 import type { ChatMessage, Conversation } from '@/lib/messaging';
 
-jest.mock('@circlo/core', () => ({}));
-jest.mock('expo-file-system', () => ({}));
-jest.mock('expo-secure-store', () => ({}));
+jest.mock('@/api/client', () => ({}));
+jest.mock('@/lib/addressbook', () => ({}));
 
-const msg = (seq: number, senderUser: string, mine = false): ChatMessage => ({ seq, senderUser, senderDevice: 'd', text: `m${seq}`, media: [], createdAtMs: seq, mine });
+const msg = (seq: number, senderUser: string, mine = false): ChatMessage => ({ seq, messageId: `id${seq}`, senderUser, text: `m${seq}`, media: [], createdAtMs: seq, mine });
 const conv = (groupId: string, members: string[], messages: ChatMessage[]): Conversation =>
-  ({ groupId, members, messages, cursor: 0, readSeq: 0, active: true, unverified: false, updatedAtMs: 0 }) as Conversation;
+  ({ groupId, members, people: {}, messages, readSeq: 0, unread: 0, active: true, updatedAtMs: 0 }) as Conversation;
 
 describe('blocked people in chats', () => {
   const blocked = new Set(['bad']);

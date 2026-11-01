@@ -1,5 +1,5 @@
 import { CameraView, useCameraPermissions } from 'expo-camera';
-import { router, useLocalSearchParams } from 'expo-router';
+import { router } from 'expo-router';
 import { useRef, useState } from 'react';
 import { View } from 'react-native';
 
@@ -7,14 +7,12 @@ import { CirclePickerSheet, circlesLine } from '@/components/circle-choice';
 import { Button, ErrorText } from '@/components/form';
 import { describeError } from '@/lib/account';
 import { loadAddressBook, type AddressBook } from '@/lib/addressbook';
-import { parseLinkQr, setScannedLink } from '@/lib/device-link';
-import { acceptInvite, getContact, InviteError, safetyNumber, setVerified } from '@/lib/friends';
+import { acceptInvite, InviteError } from '@/lib/friends';
 import { useSession } from '@/lib/session';
 import { Text } from '@/components/ui/text';
 
-/** Scans an invite QR, a friend's safety-number QR, or a new device's link code (Devices: Link a new device). */
+/** Scans someone's invite QR code. */
 export default function ScanScreen() {
-  const { safetyFor } = useLocalSearchParams<{ safetyFor?: string }>();
   const session = useSession();
   const [permission, requestPermission] = useCameraPermissions();
   const [status, setStatus] = useState<string>();
@@ -30,7 +28,7 @@ export default function ScanScreen() {
     return (
       <View className="flex-1 items-center justify-center gap-4 bg-surface p-6 dark:bg-surface-dark">
         <Text className="text-center text-ink dark:text-ink-dark">
-          Circlo uses the camera only to scan invite and safety-number codes. Nothing is recorded.
+          Circlo uses the camera only to scan invite codes. Nothing is recorded.
         </Text>
         <Button label="Allow camera" onPress={requestPermission} />
       </View>
@@ -41,24 +39,7 @@ export default function ScanScreen() {
     if (handled.current) return;
     handled.current = true;
     try {
-      if (parseLinkQr(data)) {
-        // A new device's link code: confirm the 6-digit code before anything is sent.
-        setScannedLink(data);
-        router.replace('/link-confirm');
-        return;
-      }
-      if (safetyFor) {
-        const contact = await getContact(account, safetyFor);
-        const mine = contact && `circlo-safety:${safetyNumber(account, safetyFor, contact).qr}`;
-        if (mine && data === mine) {
-          await setVerified(account, safetyFor, true);
-          setStatus('Safety numbers match. Marked as verified.');
-        } else {
-          setError('These safety numbers don’t match. Don’t mark this person as verified.');
-        }
-      } else {
-        setPending({ data, book: await loadAddressBook(account) });
-      }
+      setPending({ data, book: await loadAddressBook(account) });
     } catch (e) {
       setError(e instanceof InviteError ? e.message : describeError(e));
     }

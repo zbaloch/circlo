@@ -1,11 +1,10 @@
 /**
- * The decrypted timeline, shared by Home, the thread view, profiles and the media viewer. Memory only: decrypted
- * posts (and their post keys) never touch disk and are dropped at sign-out.
+ * The timeline, shared by Home, the thread view, profiles and the media viewer. Memory only; dropped at sign-out.
  */
 import { useSyncExternalStore } from 'react';
 
 import type { StoredAccount } from './keystore';
-import type { UploadedMedia } from './media';
+import type { Attachment } from './media';
 import { fetchFeedPage, type FeedPost } from './posts';
 
 type State = {
@@ -137,11 +136,11 @@ export function usePost(id: string | undefined): FeedPost | undefined {
   return useSyncExternalStore(subscribe, () => (id ? posts.get(id) : undefined));
 }
 
-// ---------------- media viewer hand-off (keys stay in memory, never in route params) ----------------
+// ---------------- media viewer hand-off (download URLs stay in memory, never in route params) ----------------
 
-let viewer: { media: UploadedMedia[]; index: number } | null = null;
+let viewer: { media: Attachment[]; index: number } | null = null;
 
-export function openViewer(media: UploadedMedia[], index: number) {
+export function openViewer(media: Attachment[], index: number) {
   viewer = { media, index };
 }
 

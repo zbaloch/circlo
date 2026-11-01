@@ -1,11 +1,11 @@
 import { Icon, type IconName } from '@/components/ui/icon';
 import type { DrawerContentComponentProps } from 'expo-router/drawer';
 import { router, type Href } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { loadMyProfile, type Profile } from '@/lib/friends';
+import { refreshMe, useMe } from '@/lib/me';
 import { useSession } from '@/lib/session';
 import { usePalette } from '@/theme/use-palette';
 
@@ -19,7 +19,6 @@ export const DRAWER_ITEMS: Item[] = [
   { label: 'Circles', icon: 'radio-button-on-outline', href: '/circles' },
   { label: 'Devices', icon: 'phone-portrait-outline', href: '/devices' },
   { label: 'Settings', icon: 'settings-outline', href: '/settings' },
-  { label: 'Account recovery', icon: 'key-outline', href: '/recovery' },
 ];
 
 /** Side drawer opened from the Home avatar (PLAN.md 2A app shell). */
@@ -29,27 +28,25 @@ export function AppDrawer({ navigation, state }: DrawerContentComponentProps) {
   const account = session.status === 'signedIn' ? session.account : null;
   const handle = account?.handle ?? '';
   const open = !!state.history?.some((h) => h.type === 'drawer');
-  const [profile, setProfile] = useState<Profile | null>(null);
+  const me = useMe();
   useEffect(() => {
-    if (!account || !open) return;
-    void loadMyProfile(account).then(setProfile, () => setProfile(null));
+    if (account && open) refreshMe().catch(() => {});
   }, [account, open]);
-  const displayName = profile?.displayName || handle;
+  const displayName = me?.name || handle;
   const go = (href: Href) => {
     navigation.closeDrawer();
     router.push(href);
   };
-  const items = __DEV__ ? [...DRAWER_ITEMS, { label: 'Crypto self-test', icon: 'flask-outline', href: '/dev' } as Item] : DRAWER_ITEMS;
 
   return (
     <SafeAreaView edges={['top', 'bottom']} className="flex-1 bg-surface dark:bg-surface-dark">
     <ScrollView className="flex-1" contentContainerClassName="px-5 pt-4">
       <View className="pb-2">
-        <Avatar size="lg" name={displayName} />
+        <Avatar size="lg" name={displayName} uri={me?.avatarUrl} />
         <Text className="mt-3 text-xl font-extrabold text-ink dark:text-ink-dark">{displayName}</Text>
         <Text className="text-base text-muted dark:text-muted-dark">@{handle}</Text>
       </View>
-      {items.map((item) => (
+      {DRAWER_ITEMS.map((item) => (
         <Pressable
           key={item.label}
           accessibilityRole="button"

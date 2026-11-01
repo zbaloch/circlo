@@ -7,42 +7,34 @@ import { Button, ErrorText, TextField, Title } from '@/components/form';
 import { PasswordStrength } from '@/components/password-strength';
 import { Icon } from '@/components/ui/icon';
 import { Text } from '@/components/ui/text';
-import { describeError, normalizeHandle, Signup } from '@/lib/account';
-import { checkPassword } from '@/lib/password-strength';
+import { describeError, looksLikeEmail, normalizeUsername, startSignup } from '@/lib/account';
 import { LINKS, openLink } from '@/lib/links';
-import { setPendingSignup } from '@/lib/signup-store';
+import { checkPassword } from '@/lib/password-strength';
 import { usePalette } from '@/theme/use-palette';
 
+/** Sign up: name, username, email and password. A code is emailed next to confirm the address. */
 export default function SignupScreen() {
-  const [handle, setHandle] = useState('');
+  const [name, setName] = useState('');
+  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [confirm, setConfirm] = useState('');
   const [error, setError] = useState<string>();
   const [busy, setBusy] = useState(false);
   const [agreed, setAgreed] = useState(false);
   const palette = usePalette();
-  const strength = checkPassword(password, handle);
+  const strength = checkPassword(password, username || name);
 
   const submit = async () => {
     setError(undefined);
-    try {
-      normalizeHandle(handle);
-    } catch {
-      setError('Handles are 3–30 characters: letters, numbers and _.');
-      return;
-    }
-    if (!strength.ok) {
-      setError(strength.problem ?? 'Choose a stronger password.');
-      return;
-    }
-    if (password !== confirm) {
-      setError('The passwords don’t match.');
-      return;
-    }
+    const handle = normalizeUsername(username);
+    if (!name.trim()) return setError('Enter your name.');
+    if (!handle) return setError('Usernames are 3–30 characters: letters, numbers and _.');
+    if (!looksLikeEmail(email)) return setError('That doesn’t look like an email address.');
+    if (!strength.ok) return setError(strength.problem ?? 'Choose a stronger password.');
     setBusy(true);
     try {
-      setPendingSignup(await Signup.start(handle, password));
-      router.push('/protect-account');
+      const sentTo = await startSignup({ name: name.trim(), username: handle, email, password });
+      router.push({ pathname: '/verify-email', params: { email: sentTo } });
     } catch (e) {
       setError(describeError(e));
     } finally {
@@ -52,13 +44,12 @@ export default function SignupScreen() {
 
   return (
     <AuthScreen>
-      <Title subtitle="Your handle is what your people see. No one can search you with it though. There’s no email or phone number, and your password never leaves this phone.">
-        Create your account
-      </Title>
-      <TextField label="Handle" placeholder="e.g. sam_k" value={handle} onChangeText={setHandle} maxLength={30} />
-      <TextField label="Password" secureTextEntry value={password} onChangeText={setPassword} textContentType="newPassword" />
+      <Title subtitle="Your name and @username are what your people see. Nobody can look you up: you connect by invite.">Create your account</Title>
+      <TextField label="Name" placeholder="e.g. Sam Khan" value={name} onChangeText={setName} maxLength={50} autoCapitalize="words" textContentType="name" autoComplete="name" />
+      <TextField label="Username" placeholder="e.g. sam_k" value={username} onChangeText={setUsername} maxLength={31} textContentType="username" autoComplete="username-new" />
+      <TextField label="Email" placeholder="you@example.com" value={email} onChangeText={setEmail} keyboardType="email-address" textContentType="emailAddress" autoComplete="email" hint="Only for signing in and resetting your password. It’s never shown to anyone." />
+      <TextField label="Password" secureTextEntry value={password} onChangeText={setPassword} textContentType="newPassword" autoComplete="new-password" />
       <PasswordStrength check={strength} empty={!password} />
-      <TextField label="Confirm password" secureTextEntry value={confirm} onChangeText={setConfirm} textContentType="newPassword" />
       <View className="flex-row items-start gap-3">
         <Pressable
           accessibilityRole="checkbox"

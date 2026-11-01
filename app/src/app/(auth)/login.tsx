@@ -4,14 +4,15 @@ import { Pressable } from 'react-native';
 
 import { AuthScreen } from '@/components/auth-screen';
 import { Button, ErrorText, TextField, Title } from '@/components/form';
+import { Text } from '@/components/ui/text';
+import { ApiError } from '@/api/client';
 import { describeError, login } from '@/lib/account';
 import { useSession } from '@/lib/session';
-import { Text } from '@/components/ui/text';
 
-/** Log in on this device: the encrypted key backup is downloaded and decrypted here. */
+/** Log in with a username or email and password. */
 export default function LoginScreen() {
   const { signIn } = useSession();
-  const [handle, setHandle] = useState('');
+  const [name, setName] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string>();
   const [busy, setBusy] = useState(false);
@@ -20,9 +21,14 @@ export default function LoginScreen() {
     setError(undefined);
     setBusy(true);
     try {
-      signIn(await login(handle, password));
+      signIn(await login(name, password));
     } catch (e) {
-      setError(describeError(e));
+      if (e instanceof ApiError && e.code === 'email_not_verified' && e.details.email) {
+        // A signup that was never finished: a fresh code is on its way.
+        router.push({ pathname: '/verify-email', params: { email: e.details.email } });
+      } else {
+        setError(describeError(e));
+      }
     } finally {
       setBusy(false);
     }
@@ -30,16 +36,13 @@ export default function LoginScreen() {
 
   return (
     <AuthScreen>
-      <Title subtitle="Your keys are restored from your encrypted backup. Only your password can unlock it.">Log in</Title>
-      <TextField label="Handle" value={handle} onChangeText={setHandle} textContentType="username" />
-      <TextField label="Password" secureTextEntry value={password} onChangeText={setPassword} textContentType="password" />
+      <Title>Log in</Title>
+      <TextField label="Username or email" value={name} onChangeText={setName} textContentType="username" autoComplete="username" keyboardType="email-address" />
+      <TextField label="Password" secureTextEntry value={password} onChangeText={setPassword} textContentType="password" autoComplete="current-password" onSubmitEditing={submit} />
       <ErrorText>{error}</ErrorText>
-      <Button size="lg" label="Log in" onPress={submit} loading={busy} disabled={!handle || !password} />
-      <Pressable accessibilityRole="link" onPress={() => router.push('/recover')} className="items-center py-2">
+      <Button size="lg" label="Log in" onPress={submit} loading={busy} disabled={!name || !password} />
+      <Pressable accessibilityRole="link" onPress={() => router.push('/forgot-password')} className="items-center py-2">
         <Text className="font-semibold text-primary dark:text-primary-dark">Forgot your password?</Text>
-      </Pressable>
-      <Pressable accessibilityRole="link" onPress={() => router.push('/link')} className="items-center py-2">
-        <Text className="font-semibold text-primary dark:text-primary-dark">Link from another device</Text>
       </Pressable>
     </AuthScreen>
   );

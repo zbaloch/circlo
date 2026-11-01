@@ -1,53 +1,103 @@
+import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
+import { Pressable, View } from 'react-native';
 
+import { api, ok } from '@/api/client';
 import { AuthScreen } from '@/components/auth-screen';
+import { Avatar } from '@/components/avatar';
 import { Button, ErrorText, TextField, Title } from '@/components/form';
+import { Spinner } from '@/components/ui/spinner';
+import { Text } from '@/components/ui/text';
 import { describeError } from '@/lib/account';
-import { ensureEpoch, loadMyProfile, saveMyProfile } from '@/lib/friends';
+import { refreshMe, saveProfile, setMe, useMe } from '@/lib/me';
+import { discardPicked, uploadAvatar } from '@/lib/media';
 import { useSession } from '@/lib/session';
 
-/** Edit my profile; it's encrypted on this phone with a key only my friends hold. */
+/** Edit my name, bio and photo. They're shown to the people I'm connected with, never to strangers. */
 export default function EditProfileScreen() {
   const session = useSession();
   const account = session.status === 'signedIn' ? session.account : null;
-  const [displayName, setDisplayName] = useState('');
-  const [bio, setBio] = useState('');
+  const me = useMe();
+  const [name, setName] = useState(me?.name ?? '');
+  const [bio, setBio] = useState(me?.bio ?? '');
   const [error, setError] = useState<string>();
   const [busy, setBusy] = useState(false);
+  const [photoBusy, setPhotoBusy] = useState(false);
 
   useEffect(() => {
-    if (!account) return;
-    ensureEpoch(account)
-      .then(() => loadMyProfile(account))
-      .then(
-        (p) => {
-          if (p) {
-            setDisplayName(p.displayName);
-            setBio(p.bio);
-          }
-        },
-        (e) => setError(describeError(e)),
-      );
-  }, [account]);
+    refreshMe().then(
+      (m) => {
+        setName((n) => n || m.name);
+        setBio((b) => b || m.bio);
+      },
+      (e) => setError(describeError(e)),
+    );
+  }, []);
 
   if (!account) return null;
 
+  const changePhoto = async () => {
+    const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsEditing: true, aspect: [1, 1], exif: false, quality: 1 });
+    if (res.canceled || !res.assets[0]) return;
+    const a = res.assets[0];
+    const picked = { uri: a.uri, type: 'image' as const, width: a.width, height: a.height, mimeType: a.mimeType ?? undefined };
+    setPhotoBusy(true);
+    setError(undefined);
+    try {
+      const objectKey = await uploadAvatar(picked);
+      setMe(ok(await api.PUT('/v1/me/avatar', { body: { objectKey } })));
+    } catch (e) {
+      setError(describeError(e));
+    } finally {
+      discardPicked([picked]);
+      setPhotoBusy(false);
+    }
+  };
+
+  const removePhoto = async () => {
+    setPhotoBusy(true);
+    try {
+      setMe(ok(await api.DELETE('/v1/me/avatar')));
+    } catch (e) {
+      setError(describeError(e));
+    } finally {
+      setPhotoBusy(false);
+    }
+  };
+
   return (
     <AuthScreen>
-      <Title subtitle="Encrypted on this phone. Only your people can read it; Circlo can’t.">Edit profile</Title>
-      <TextField label="Display name" value={displayName} onChangeText={setDisplayName} maxLength={50} autoCapitalize="words" />
+      <Title subtitle="Your people see your name, photo and bio. Nobody else can.">Edit profile</Title>
+      <View className="flex-row items-center gap-4">
+        <Avatar size="lg" name={name || account.handle} uri={me?.avatarUrl} />
+        {photoBusy ? (
+          <Spinner />
+        ) : (
+          <View className="gap-1">
+            <Pressable accessibilityRole="button" onPress={changePhoto} className="py-1 active:opacity-60">
+              <Text className="font-semibold text-primary dark:text-primary-dark">{me?.avatarUrl ? 'Change photo' : 'Add a photo'}</Text>
+            </Pressable>
+            {me?.avatarUrl ? (
+              <Pressable accessibilityRole="button" onPress={removePhoto} className="py-1 active:opacity-60">
+                <Text className="font-semibold text-danger dark:text-danger-dark">Remove photo</Text>
+              </Pressable>
+            ) : null}
+          </View>
+        )}
+      </View>
+      <TextField label="Name" value={name} onChangeText={setName} maxLength={50} autoCapitalize="words" />
       <TextField label="Bio" value={bio} onChangeText={setBio} maxLength={160} multiline />
       <ErrorText>{error}</ErrorText>
       <Button
         label="Save"
         loading={busy}
-        disabled={!displayName.trim()}
+        disabled={!name.trim()}
         onPress={async () => {
           setBusy(true);
           setError(undefined);
           try {
-            await saveMyProfile(account, { displayName: displayName.trim(), bio: bio.trim(), handle: account.handle });
+            await saveProfile(name, bio);
             router.back();
           } catch (e) {
             setError(describeError(e));

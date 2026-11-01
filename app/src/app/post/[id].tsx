@@ -1,16 +1,17 @@
 import { useFocusEffect, useLocalSearchParams } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { FlatList, Pressable, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Avatar } from '@/components/avatar';
 import { EmptyState } from '@/components/empty-state';
-import { authorName, openProfile, usePostActions } from '@/components/post-actions';
+import { openProfile, usePostActions } from '@/components/post-actions';
 import { PostDetail } from '@/components/post-card';
 import { loadAddressBook, type AddressBook } from '@/lib/addressbook';
 import { putPost, usePost } from '@/lib/feed-store';
+import { fetchPost } from '@/lib/posts';
 import { useSession } from '@/lib/session';
-import { deleteReply, fetchLikers, fetchReplies, type Reply } from '@/lib/thread';
+import { deleteReply, fetchLikers, fetchReplies, type Liker, type Reply } from '@/lib/thread';
 import { relativeTime } from '@/lib/time';
 import { useNow } from '@/lib/use-now';
 import { likersLine } from '@/lib/view-logic';
@@ -30,8 +31,14 @@ export default function ThreadScreen() {
   const post = usePost(id);
   const [book, setBook] = useState<AddressBook | null>(null);
   const [replies, setReplies] = useState<Reply[] | null>(null);
-  const [likers, setLikers] = useState<string[]>([]);
+  const [likers, setLikers] = useState<Liker[]>([]);
+  const [missing, setMissing] = useState(false);
   const actions = usePostActions(account, book, { inThread: true });
+
+  // Opened from a notification or a link: the post may not be in the timeline yet.
+  useEffect(() => {
+    if (account && !post) fetchPost(account, id).then(putPost, () => setMissing(true));
+  }, [account, post, id]);
 
   const load = useCallback(() => {
     if (!account || !post) return;
@@ -50,6 +57,7 @@ export default function ThreadScreen() {
 
   if (!account) return null;
   if (!post) {
+    if (!missing) return <Spinner className="py-10" />;
     return (
       <View className="flex-1 bg-surface dark:bg-surface-dark">
         <EmptyState icon="eye-off-outline" title="Post not available" body="It may have been deleted, or it isn’t shared with you." />
@@ -58,12 +66,8 @@ export default function ThreadScreen() {
   }
 
   // Keep my own entry in sync with the like button (the list is fetched once per visit).
-  const shownLikers = post.likedByMe ? [...new Set([account.userId, ...likers])] : likers.filter((u) => u !== account.userId);
-  const known = shownLikers.filter((u) => u === account.userId || book?.contacts[u]);
-  const line = likersLine(
-    known.map((u) => (u === account.userId ? 'you' : authorName(account, book, u).name)),
-    shownLikers.length - known.length,
-  );
+  const others = likers.filter((l) => l.userId !== account.userId);
+  const line = likersLine([...(post.likedByMe ? ['you'] : []), ...others.map((l) => l.name)], 0);
 
   const removeReply = (r: Reply) =>
     showAlert('Delete reply?', undefined, [
@@ -94,18 +98,23 @@ export default function ThreadScreen() {
           }
           ListEmptyComponent={replies ? <Text className="px-4 py-6 text-center text-muted dark:text-muted-dark">No replies yet.</Text> : undefined}
           renderItem={({ item }) => {
-            const who = authorName(account, book, item.authorId);
-            const name = item.mine || book?.contacts[item.authorId] ? who.name : 'Someone the author knows';
+            const name = item.authorName;
+            const known = item.mine || !!book?.contacts[item.authorId];
             return (
               <Pressable
                 onLongPress={item.mine || post.mine ? () => removeReply(item) : undefined}
                 className="flex-row gap-3 border-b border-border px-4 py-3 dark:border-border-dark">
-                <Pressable accessibilityRole="button" accessibilityLabel={`${name}'s profile`} onPress={() => openProfile(account, item.authorId)} className="self-start active:opacity-70">
-                  <Avatar size="sm" name={name} />
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={`${name}'s profile`}
+                  disabled={!known}
+                  onPress={() => openProfile(account, item.authorId)}
+                  className="self-start active:opacity-70">
+                  <Avatar size="sm" name={name} uri={item.authorAvatar} />
                 </Pressable>
                 <View className="flex-1 gap-1">
                   <Text className="text-sm text-muted dark:text-muted-dark">
-                    <Text className="font-bold text-ink dark:text-ink-dark">{name}</Text> · {relativeTime(item.createdAtMs, now)}
+                    <Text className="font-bold text-ink dark:text-ink-dark">{name}</Text> @{item.authorHandle} · {relativeTime(item.createdAtMs, now)}
                   </Text>
                   <Text className="text-base text-ink dark:text-ink-dark">{item.text}</Text>
                 </View>

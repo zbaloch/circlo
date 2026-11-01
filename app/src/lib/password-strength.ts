@@ -5,10 +5,10 @@ import * as en from '@zxcvbn-ts/language-en';
 import leaked from './leaked-passwords.json';
 
 /**
- * Password rules, checked on the phone only: with OPAQUE the server never sees the password, so it can't check it.
+ * Password rules, checked in the app as you type (the server checks the length again and keeps only a hash).
  * Following NIST SP 800-63B: a minimum length, no composition rules (symbols and capitals are not required), and a
  * blocklist of passwords from breaches. On top, zxcvbn estimates how guessable it is and must score at least 3 of 4,
- * which refuses keyboard patterns, repeats, dates, dictionary words and anything built from the handle.
+ * which refuses keyboard patterns, repeats, dates, dictionary words and anything built from your name or username.
  *
  * The blocklist is zxcvbn's own (~49k) plus the UK NCSC's top 100,000 passwords from Have I Been Pwned, minus the ones
  * already in zxcvbn's (leaked-passwords.json, lowercased; via SecLists, MIT). Nothing is sent anywhere.
@@ -33,7 +33,7 @@ function setup() {
     factory = new ZxcvbnFactory({
       dictionary: { ...common.dictionary, ...en.dictionary, 'passwords-leaked': leaked as string[] },
       graphs: common.adjacencyGraphs,
-      translations: { ...en.translations, warnings: { ...en.translations.warnings, userInputs: 'Don’t use your handle in your password.' } },
+      translations: { ...en.translations, warnings: { ...en.translations.warnings, userInputs: 'Don’t use your name or username in your password.' } },
     });
     blocklist = new Set([...(common.dictionary['passwords-common'] as string[]), ...(leaked as string[])]);
   }

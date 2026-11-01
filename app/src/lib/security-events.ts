@@ -1,13 +1,12 @@
-import * as SecureStore from 'expo-secure-store';
-
 import { api, ok } from '@/api/client';
 
 import type { StoredAccount } from './keystore';
+import { deleteItem, getItem, setItem } from './storage';
 
 /**
- * "New sign-in to your account" (the server records each password login; only its time, nothing about the device).
- * Each phone remembers the newest sign-in it has dealt with, so it only alerts about the ones after it. A phone that
- * has no marker yet (just signed in, or just updated the app) starts from the newest one, which is usually its own.
+ * "New sign-in to your account" (the server records each login; only its time, nothing about the device). Each device
+ * remembers the newest sign-in it has dealt with, so it only alerts about the ones after it. A device with no marker
+ * yet (just signed in) starts from the newest one, which is usually its own.
  */
 export type SignIn = { id: string; createdAt: string };
 
@@ -26,26 +25,25 @@ export function unseenSignIns(events: SignIn[], seenAt: string | null): { unseen
 /** Every sign-in of the last 30 days, newest first, for the Notifications tab. */
 export async function listSignIns(): Promise<SignIn[]> {
   const res = ok(await api.GET('/v1/security-events'));
-  return (res.events ?? []).filter((e) => e.kind === 'sign_in').map((e) => ({ id: e.id, createdAt: e.createdAt }));
+  return res.events.filter((e) => e.kind === 'sign_in').map((e) => ({ id: e.id, createdAt: e.createdAt }));
 }
 
-/** Sign-ins this phone hasn't shown yet. */
+/** Sign-ins this device hasn't shown yet. */
 export async function newSignIns(account: StoredAccount): Promise<SignIn[]> {
-  const res = ok(await api.GET('/v1/security-events'));
-  const events = (res.events ?? []).filter((e) => e.kind === 'sign_in').map((e) => ({ id: e.id, createdAt: e.createdAt }));
-  const seenAt = await SecureStore.getItemAsync(seenKey(account.userId)).catch(() => null);
+  const events = await listSignIns();
+  const seenAt = await getItem(seenKey(account.userId));
   const { unseen, marker } = unseenSignIns(events, seenAt);
-  if (seenAt === null) await SecureStore.setItemAsync(seenKey(account.userId), marker).catch(() => undefined);
+  if (seenAt === null) await setItem(seenKey(account.userId), marker).catch(() => undefined);
   return unseen;
 }
 
 /** "It was me" (or the password was changed): don't show these again. */
 export async function markSignInsSeen(account: StoredAccount, signIns: SignIn[]): Promise<void> {
   const newest = unseenSignIns(signIns, null).marker;
-  if (signIns.length) await SecureStore.setItemAsync(seenKey(account.userId), newest).catch(() => undefined);
+  if (signIns.length) await setItem(seenKey(account.userId), newest).catch(() => undefined);
 }
 
-/** Sign-out: nothing of the account stays on the phone. */
+/** Sign-out: nothing of the account stays on the device. */
 export async function forgetSignIns(userId: string): Promise<void> {
-  await SecureStore.deleteItemAsync(seenKey(userId)).catch(() => undefined);
+  await deleteItem(seenKey(userId));
 }

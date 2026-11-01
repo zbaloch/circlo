@@ -5,13 +5,10 @@ import { Pressable, RefreshControl, ScrollView, View } from 'react-native';
 import { Avatar } from '@/components/avatar';
 import { EmptyState } from '@/components/empty-state';
 import { ErrorText } from '@/components/form';
-import { authorName } from '@/components/post-actions';
 import { Screen } from '@/components/screen';
 import { Icon } from '@/components/ui/icon';
 import { Text } from '@/components/ui/text';
-import { loadMyRecentPosts, markActivitySeen, refreshActivity, useActivity, type ActivityItem } from '@/lib/activity';
-import { loadAddressBook, type AddressBook } from '@/lib/addressbook';
-import { getPost } from '@/lib/feed-store';
+import { markActivitySeen, refreshActivity, useActivity, type ActivityItem } from '@/lib/activity';
 import { listSignIns, type SignIn } from '@/lib/security-events';
 import { relativeTime } from '@/lib/time';
 import { useNow } from '@/lib/use-now';
@@ -39,7 +36,6 @@ export default function NotificationsScreen() {
   const activity = useActivity();
   const palette = usePalette();
   const now = useNow();
-  const [book, setBook] = useState<AddressBook | null>(null);
   const [signIns, setSignIns] = useState<SignIn[]>([]);
   const [fresh, setFresh] = useState<ReadonlySet<string>>(new Set());
   const [refreshing, setRefreshing] = useState(false);
@@ -49,9 +45,7 @@ export default function NotificationsScreen() {
     await Promise.all([
       refresh(),
       refreshActivity(account).catch(() => {}),
-      loadMyRecentPosts(account).catch(() => {}),
       listSignIns().then(setSignIns, () => {}),
-      loadAddressBook(account).then(setBook, () => {}),
     ]);
   }, [account, refresh]);
   useFocusEffect(
@@ -103,9 +97,9 @@ export default function NotificationsScreen() {
           isNew={fresh.has(c.userId)}
           hint="Opens your requests"
           onPress={() => router.navigate({ pathname: '/search', params: { section: 'friends' } })}
-          avatar={<Avatar name={displayName(c)} />}
+          avatar={<Avatar name={displayName(c)} uri={c.profile.avatarUrl} />}
           title={<><Text className="font-bold text-ink dark:text-ink-dark">{displayName(c)}</Text> wants to connect</>}
-          line={c.identityChanged ? 'Their security keys changed. Review before accepting.' : 'Tap to review the request'}
+          line={`@${c.profile.handle} · Tap to review the request`}
         />
       ))}
       {rows.map((row) => {
@@ -126,16 +120,16 @@ export default function NotificationsScreen() {
         }
         const { item } = row;
         const key = `${item.kind}:${item.replyId ?? item.actorId}:${item.postId}`;
-        const name = authorName(account, book, item.actorId).name;
-        const post = getPost(item.postId);
-        const quote = post?.text ? ` · “${post.text.length > 60 ? `${post.text.slice(0, 60)}…` : post.text}”` : '';
+        const name = item.actorName;
+        const said = item.kind === 'reply' && item.replyText ? item.replyText : item.postText;
+        const quote = said ? ` · “${said.length > 60 ? `${said.slice(0, 60)}…` : said}”` : '';
         return (
           <Row
             key={key}
             isNew={fresh.has(key)}
-            hint={post ? 'Opens the post' : undefined}
-            onPress={post ? () => router.push(`/post/${item.postId}`) : undefined}
-            avatar={<Avatar name={name} />}
+            hint="Opens the post"
+            onPress={() => router.push({ pathname: '/post/[id]', params: { id: item.postId } })}
+            avatar={<Avatar name={name} uri={item.actorAvatar} />}
             title={
               <>
                 <Text className="font-bold text-ink dark:text-ink-dark">{name}</Text>

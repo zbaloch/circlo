@@ -6,31 +6,23 @@ import {
   circleName,
   circlesOf,
   membersOf,
-  migratedCircles,
   nextCircleId,
   validAudience,
 } from '@/lib/circles';
 
-const friend = (circles: number[] = [], legacy: Partial<Contact> = {}): Contact => ({
-  ed25519: 'e',
-  x25519: 'x',
-  identityVersion: 1,
-  verified: false,
-  circle: 2,
-  circles,
-  keys: [],
-  ...legacy,
-});
+jest.mock('@/api/client', () => ({}));
 
-describe('circles (independent, v1.3)', () => {
+const friend = (circles: number[] = [], status: Contact['status'] = 'accepted'): Contact => ({ status, displayName: 'F', handle: 'f', circles });
+
+describe('circles', () => {
   // Starter circles: 1 Close Friends, 2 Family, 3 Kids, 4 Work; 6 is one I added.
   const book = {
     circleDefs: [...STARTER_CIRCLES, { id: 6, name: 'Book club' }],
-    contacts: { a: friend([1, 2]), b: friend([2]), c: friend([3]), d: friend(), e: friend([6, 7]) },
+    contacts: { a: friend([1, 2]), b: friend([2]), c: friend([3]), d: friend(), e: friend([6, 7]), p: friend([3], 'outgoing') },
   };
 
   it('starts with Close Friends, Family, Kids and Work', () => {
-    expect(circleDefs({}).map((c) => c.name)).toEqual(['Close Friends', 'Family', 'Kids', 'Work']);
+    expect(circleDefs({} as never).map((c) => c.name)).toEqual(['Close Friends', 'Family', 'Kids', 'Work']);
     expect(circleName(book, 6)).toBe('Book club');
   });
 
@@ -49,6 +41,8 @@ describe('circles (independent, v1.3)', () => {
     expect(audienceSize(book, { kind: 'circles', ids: [2] })).toBe(2);
     expect(audienceSize(book, { kind: 'circles', ids: [1, 2] })).toBe(2);
     expect(audienceSize(book, { kind: 'circles', ids: [1, 2, 3, 6] })).toBe(4);
+    // Someone I've asked but who hasn't accepted yet sees nothing.
+    expect(membersOf(book, 3).sort()).toEqual(['c', 'p']);
   });
 
   it('labels audiences for the author', () => {
@@ -73,18 +67,4 @@ describe('circles (independent, v1.3)', () => {
     expect(nextCircleId(full)).toBeNull();
   });
 
-  it('moves nested circles into independent ones (owner decision 2026-10-29)', () => {
-    const v2 = (circle: number, closeFriend = false) => migratedCircles({ circle, closeFriend }, 2);
-    expect(v2(20)).toEqual([1, 2]); // My person → Close Friends + Family
-    expect(v2(40)).toEqual([3]); // Kids
-    expect(v2(60)).toEqual([2]); // Parents & siblings → Family
-    expect(v2(80)).toEqual([]); // Friends → Everyone only
-    expect(v2(100)).toEqual([]);
-    expect(v2(90)).toEqual([]); // a custom circle between Friends and Everyone
-    expect(v2(80, true)).toEqual([1]); // Close Friends members stay
-    expect(v2(40, true)).toEqual([1, 3]);
-    // The first layout (1–10): Spouse, Kids, Kids, Parents & siblings, Extended family, Closest friends…
-    const v1 = (circle: number) => migratedCircles({ circle }, undefined);
-    expect([2, 3, 4, 5, 6, 7, 10].map(v1)).toEqual([[1, 2], [3], [3], [2], [2], [], []]);
-  });
 });

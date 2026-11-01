@@ -25,12 +25,13 @@ type Props = {
   name: string;
   handle?: string;
   bio?: string;
+  avatarUrl?: string | null;
   friendCount?: number;
   /** Buttons under the bio (Edit profile, Preview as…, Move, Unfriend…). */
   actions?: ReactElement;
   /** Buttons on the right of the avatar, X / Bluesky style. */
   headerRight?: ReactElement;
-  /** Extra content above the tabs (e.g. the fingerprint box). */
+  /** Extra content above the tabs. */
   extra?: ReactElement;
 };
 
@@ -41,6 +42,7 @@ export function ProfileFeed({
   name,
   handle,
   bio,
+  avatarUrl,
   friendCount,
   actions,
   headerRight,
@@ -104,7 +106,7 @@ export function ProfileFeed({
             <View className="-mt-10 gap-2 px-4">
               <View className="flex-row items-end justify-between">
                 <View className="rounded-full border-4 border-surface dark:border-surface-dark">
-                  <Avatar size="lg" name={name} />
+                  <Avatar size="lg" name={name} uri={avatarUrl} />
                 </View>
                 {headerRight ? <View className="mb-1 flex-row items-center gap-2">{headerRight}</View> : null}
               </View>

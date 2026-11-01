@@ -12,8 +12,8 @@ import { Text } from '@/components/ui/text';
 import { Spinner } from '@/components/ui/spinner';
 
 /**
- * "Preview as…" (PLAN.md Phase 8): my posts exactly as this friend can open them. Built from the same circle key
- * they were given in each epoch, not from my labels, and shown the way they see it: no audience badge, no actions.
+ * "Preview as…" (PLAN.md Phase 8): my posts exactly as this friend sees them, decided by the server the same way it
+ * decides for them, and shown the way they see it: no audience badge, no actions.
  */
 export default function PreviewScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
