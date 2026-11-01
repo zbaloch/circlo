@@ -29,7 +29,7 @@ lose) and makes the web app possible.
 | Email codes | A hash of the latest 6-digit code, its purpose and expiry (15 minutes) | Confirm your email, reset your password |
 | Unfinished signups | As above, deleted after a day if the email is never confirmed | Finish signing up |
 | Devices | Random id, signed-in and signed-out times, which kind of app it is (iPhone app, Android app or web browser: no model, OS version or browser name); if notifications are on, the push token sealed with a server key, or a hash of the background-check token | List and sign out your devices; tell you about activity on your phone when you have the app, by email when you don't |
-| Notification emails | Whether you want them, and until the next email goes out, how many new replies, messages and requests it will mention (counts only) | One short email about activity while you're not signed in to the phone app |
+| Daily notification | Whether you want the email, the hour (UTC) your app chose for "around 6pm" (a setting: no time zone or location), when the last one went out, and until the next one how many new replies, messages, requests and friends are waiting (counts only, never sent) | One calm note a day, only on days something happened: a push on your phone if you have the app, otherwise an email |
 | Sessions | Hashes of refresh tokens, per device, until they expire (30 days) | Stay signed in |
 | Sign-ins | The time of each login (no device, place or address), kept 30 days | Warn your other devices: "New sign-in to your account" |
 | Login lock | Per account (or per typed name, if no account matches): failed-attempt count and lock time, deleted a week after the last failure | Lock login after 3 wrong passwords (15 min, 1 h, then 24 h) |
@@ -45,9 +45,11 @@ a link to your account) and your reports lose their link to you.
 
 ## Who else sees something
 
-- **Apple / Google: nothing.** There is no remote push (owner decision 2026-10-30). A phone that opts in checks Circlo
-  itself in the background and shows a local notification with counts.
-- **The email provider** sees your email address and the codes Circlo sends you (nothing else).
+- **Apple / Google** deliver at most one push a day to a phone that turned notifications on. It says only "You have a
+  few new things waiting. Catch up when you're ready.": no names, words, ids or counts (owner decision 2026-11-01).
+- **The email provider** sees your email address and what Circlo emails you: codes, the daily note if you don't have
+  the app (the kinds of things waiting, never who, what or how many), and security emails straight away (a new
+  sign-in, a password change, a device signed out, naming only the kind of device: never where from).
 - **The hosting provider and the storage (S3) provider** see IP addresses of connections at the network level, and
   hold the stored data. Our code doesn't record IPs, but their logs might (see the deployment rules below).
 

@@ -10,6 +10,8 @@ import com.circlo.server.storage.MediaUrlSigner;
 import com.circlo.server.web.ApiException;
 import com.circlo.server.web.Ids;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
@@ -85,16 +87,21 @@ public class AccountController {
         return load(me);
     }
 
-    public record NotificationSettings(@NotNull Boolean email) {}
+    /**
+     * `email`: the daily email about activity on or off (it's only sent while I'm not signed in to the phone app).
+     * `digestHour`: when the daily note comes, as an hour in UTC (the app sends 6pm on the phone's clock).
+     */
+    public record NotificationSettings(Boolean email, @Min(0) @Max(23) Integer digestHour) {}
 
-    /** Turns emails about activity on or off (they're only sent while I'm not signed in to the phone app). */
     @PutMapping("/v1/me/notifications")
     @Transactional
     public Me notificationSettings(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody NotificationSettings r) {
         byte[] me = userId(jwt);
-        jdbc.update("UPDATE users SET email_notifications = ? WHERE id = ?", r.email(), me);
-        if (!r.email()) {
-            jdbc.update("DELETE FROM email_digests WHERE user_id = ?", (Object) me);
+        if (r.email() != null) {
+            jdbc.update("UPDATE users SET email_notifications = ? WHERE id = ?", r.email(), me);
+        }
+        if (r.digestHour() != null) {
+            jdbc.update("UPDATE users SET digest_hour = ? WHERE id = ?", r.digestHour(), me);
         }
         return load(me);
     }

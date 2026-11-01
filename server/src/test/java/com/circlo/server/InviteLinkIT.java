@@ -2,7 +2,6 @@ package com.circlo.server;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.circlo.server.notify.EmailDigests;
 import com.circlo.server.web.Ids;
 import java.sql.Timestamp;
 import java.time.Duration;
@@ -22,9 +21,6 @@ class InviteLinkIT extends IntegrationTest {
 
     @Autowired
     private JdbcTemplate jdbc;
-
-    @Autowired
-    private EmailDigests digests;
 
     private static String token(TestUser u) {
         return (String) u.call("GET", "/v1/invites/link", null).getBody().get("token");
@@ -97,11 +93,11 @@ class InviteLinkIT extends IntegrationTest {
         assertThat(items.get(0)).containsEntry("kind", "joined").containsEntry("actorId", b.userId.toString()).containsEntry("postId", null);
         assertThat(activity(b)).isEmpty(); // the joiner knows already
 
-        // No app on a phone: an email, saying nothing about who.
-        digests.sendDue(Instant.now().plus(Duration.ofHours(1)));
+        // No app on a phone: that day's email, saying nothing about who.
+        sendDaily();
         List<TestMail.Sent> emails = mail.to(a.email);
         assertThat(emails).hasSize(before + 1);
-        assertThat(emails.get(emails.size() - 1).subject()).isEqualTo("New on Circlo: a new friend");
+        assertThat(emails.get(emails.size() - 1).body()).contains("You have a new friend waiting on Circlo.");
         assertThat(emails.get(emails.size() - 1).toString()).doesNotContain("il_told_joiner");
 
         // Removed: the notification goes too.

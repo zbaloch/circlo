@@ -88,45 +88,42 @@ class EngagementFlowIT extends IntegrationTest {
     }
 
     @Test
-    void pushesAreContentFreeAndOnlyReachTheRecipient() throws Exception {
+    void theDailyPushIsCalmAndOnlyReachesTheRecipient() {
         TestUser a = user("push_author");
         TestUser b = user("push_friend");
         a.befriend(b);
+        sendDaily(); // the friend request's day
         assertThat(a.status("PUT", "/v1/devices/current/push-token", Map.of("token", "tok-a", "service", "apns"))).isEqualTo(200);
         assertThat(b.status("PUT", "/v1/devices/current/push-token", Map.of("token", "tok-b", "service", "apns_sandbox"))).isEqualTo(200);
         assertThat(a.status("PUT", "/v1/devices/current/push-token", Map.of("token", "x", "service", "carrier-pigeon"))).isEqualTo(400);
-        // An Android phone of A's: same pushes, through FCM.
+        // An Android phone of A's: the same push, through FCM.
         Map<String, Object> phone = a.loginAgain();
         assertThat(call("PUT", "/v1/devices/current/push-token", Map.of("token", "fcm-tok-a", "service", "fcm"), (String) phone.get("accessToken"))
                 .getStatusCode().value()).isEqualTo(200);
 
         String post = a.post("tell me", "everyone", List.of());
-        String reply = (String) b.call("POST", "/v1/posts/" + post + "/replies", Map.of("text", "secret words")).getBody().get("replyId");
-        List<TestPush.Sent> toA = push.await("tok-a", 1);
+        b.call("POST", "/v1/posts/" + post + "/replies", Map.of("text", "secret words"));
+        // Likes update the app live but are never told.
+        b.call("PUT", "/v1/posts/" + post + "/like", null);
+        sendDaily();
+        List<TestPush.Sent> toA = push.to("tok-a");
         assertThat(toA).hasSize(1);
-        assertThat(toA.get(0).alert()).isEqualTo("New reply");
+        assertThat(toA.get(0).alert()).isEqualTo(NotifyChannelsIT.CALM_PUSH);
         assertThat(toA.get(0).service()).isEqualTo("apns");
-        assertThat(toA.get(0).data()).isEqualTo(Map.of("type", "reply", "postId", post, "replyId", reply));
-        List<TestPush.Sent> toAndroid = push.await("fcm-tok-a", 1);
+        assertThat(toA.get(0).data()).isEqualTo(Map.of("type", "digest"));
+        List<TestPush.Sent> toAndroid = push.to("fcm-tok-a");
         assertThat(toAndroid).hasSize(1);
         assertThat(toAndroid.get(0).service()).isEqualTo("fcm");
-        assertThat(toAndroid.get(0).alert()).isEqualTo("New reply");
         assertThat(toAndroid.get(0).data()).isEqualTo(toA.get(0).data());
         assertThat(push.to("tok-b")).isEmpty(); // never my own activity
 
-        // Likes update the app live but don't buzz the phone.
-        b.call("PUT", "/v1/posts/" + post + "/like", null);
-
         String chat = (String) a.call("POST", "/v1/chats", Map.of("userIds", List.of(b.userId.toString()))).getBody().get("chatId");
         a.call("POST", "/v1/chats/" + chat + "/messages", Map.of("text", "meet at 7"));
-        List<TestPush.Sent> toB = push.await("tok-b", 1);
+        sendDaily();
+        List<TestPush.Sent> toB = push.to("tok-b");
         assertThat(toB).hasSize(1);
-        assertThat(toB.get(0).alert()).isEqualTo("New message");
         assertThat(toB.get(0).service()).isEqualTo("apns_sandbox");
-        assertThat(toB.get(0).data()).isEqualTo(Map.of("type", "message", "chatId", chat));
-        Thread.sleep(300);
-        assertThat(push.to("tok-a")).hasSize(1);
-        assertThat(push.to("fcm-tok-a")).hasSize(1);
+        assertThat(push.to("tok-a")).hasSize(1); // a quiet day for A
 
         // Nothing a push says names anyone or quotes anything.
         for (TestPush.Sent s : List.of(toA.get(0), toB.get(0))) {
@@ -136,7 +133,7 @@ class EngagementFlowIT extends IntegrationTest {
         // Someone I blocked can't make my phone buzz; signing out forgets the device's token.
         b.call("POST", "/v1/blocks/" + a.userId, null);
         a.call("POST", "/v1/chats/" + chat + "/messages", Map.of("text", "hello?"));
-        Thread.sleep(300);
+        sendDaily();
         assertThat(push.to("tok-b")).hasSize(1);
         assertThat(a.status("POST", "/v1/auth/logout", null)).isEqualTo(200);
         // Only the device that signed out; A's Android phone is still signed in and keeps its token.
@@ -147,22 +144,22 @@ class EngagementFlowIT extends IntegrationTest {
     }
 
     @Test
-    void friendRequestsPushAndUnregisteredTokensAreForgotten() throws Exception {
+    void friendRequestsAreToldAndUnregisteredTokensAreForgotten() {
         TestUser a = user("pushreq_a");
         TestUser b = user("pushreq_b");
         a.call("PUT", "/v1/devices/current/push-token", Map.of("token", "bad-token", "service", "apns"));
         String token = (String) a.call("POST", "/v1/invites", null).getBody().get("token");
         b.call("POST", "/v1/invites/redeem", Map.of("token", token));
         b.call("POST", "/v1/friends/requests", Map.of("toUserId", a.userId.toString(), "circles", List.of()));
-        List<TestPush.Sent> sent = push.await("bad-token", 1);
+        sendDaily();
+        List<TestPush.Sent> sent = push.to("bad-token");
         assertThat(sent).hasSize(1);
-        assertThat(sent.get(0).alert()).isEqualTo("New friend request");
-        assertThat(sent.get(0).data()).isEqualTo(Map.of("type", "request"));
+        assertThat(sent.get(0).data()).isEqualTo(Map.of("type", "digest"));
 
         // Apple said the token is gone: it isn't used again.
         b.call("DELETE", "/v1/friends/" + a.userId, null);
         b.call("POST", "/v1/friends/requests", Map.of("toUserId", a.userId.toString(), "circles", List.of()));
-        Thread.sleep(300);
+        sendDaily();
         assertThat(push.to("bad-token")).hasSize(1);
     }
 

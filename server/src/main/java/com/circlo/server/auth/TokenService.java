@@ -1,6 +1,7 @@
 package com.circlo.server.auth;
 
 import com.circlo.server.config.AuthProperties;
+import com.circlo.server.notify.SecurityEmails;
 import com.circlo.server.web.ApiException;
 import com.circlo.server.web.Ids;
 import java.security.MessageDigest;
@@ -37,10 +38,12 @@ public class TokenService {
     private final JwtEncoder encoder;
     private final JdbcTemplate jdbc;
     private final AuthProperties props;
+    private final SecurityEmails security;
     private final Clock clock = Clock.systemUTC();
 
-    public TokenService(JwtEncoder encoder, JdbcTemplate jdbc, AuthProperties props) {
+    public TokenService(JwtEncoder encoder, JdbcTemplate jdbc, AuthProperties props, SecurityEmails security) {
         this.encoder = encoder;
+        this.security = security;
         this.jdbc = jdbc;
         this.props = props;
     }
@@ -127,14 +130,17 @@ public class TokenService {
                 now, Ids.bytes(userId), kept);
     }
 
-    /** Signs out one device. Returns false if it isn't one of this user's signed-in devices. */
+    /** Signs out one device (and emails me which kind). Returns false if it isn't one of this user's signed-in devices. */
     @Transactional
     public boolean revokeDevice(UUID userId, UUID deviceId) {
         Timestamp now = Timestamp.from(clock.instant());
+        List<String> kind = jdbc.query("SELECT kind FROM devices WHERE id = ? AND user_id = ? AND revoked_at IS NULL",
+                (rs, i) -> rs.getString(1), Ids.bytes(deviceId), Ids.bytes(userId));
         int n = jdbc.update("UPDATE devices SET revoked_at = ?, check_token_hash = NULL, push_token_enc = NULL, push_service = NULL WHERE id = ? AND user_id = ? AND revoked_at IS NULL",
                 now, Ids.bytes(deviceId), Ids.bytes(userId));
         if (n == 1) {
             jdbc.update("UPDATE refresh_tokens SET revoked_at = ? WHERE device_id = ? AND revoked_at IS NULL", now, Ids.bytes(deviceId));
+            security.signedOut(Ids.bytes(userId), kind.isEmpty() ? null : kind.get(0));
         }
         return n == 1;
     }

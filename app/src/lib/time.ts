@@ -17,3 +17,11 @@ export function fullTime(ms: number): string {
   const time = d.toLocaleTimeString('en', { hour: 'numeric', minute: '2-digit' });
   return `${time} · ${d.getDate()} ${d.toLocaleString('en', { month: 'short' })} ${d.getFullYear()}`;
 }
+
+/**
+ * Pure: the hour (UTC, 0-23) for the daily notification so it comes at `localHour` on this phone's clock.
+ * `offsetMinutes` is Date.getTimezoneOffset() (minutes from local time to UTC); half-hour zones round to the nearer hour.
+ */
+export function digestHourUtc(offsetMinutes: number, localHour = 18): number {
+  return ((Math.round((localHour * 60 + offsetMinutes) / 60) % 24) + 24) % 24;
+}

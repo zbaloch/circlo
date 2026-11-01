@@ -9,8 +9,9 @@ export function pushServiceFor(os: string, extra: { pushService?: string } | und
 }
 
 /**
- * Pure: where tapping a notification goes. Pushes carry only a type and random ids: a reply opens the thread at that
- * reply, a message its chat, a request the friend requests. Anything else (background-check counts) opens Notifications.
+ * Pure: where tapping a notification goes. The daily push ("digest") and background-check notes open Notifications.
+ * Older pushes carried a type and random ids: a reply opened the thread at that reply, a message its chat, a request
+ * the friend requests.
  */
 export function pushRoute(data: Record<string, unknown> | null | undefined, chat = CHAT_ENABLED): Href {
   const str = (k: string) => (typeof data?.[k] === 'string' && /^[0-9a-f-]{36}$/i.test(data[k] as string) ? (data[k] as string) : null);

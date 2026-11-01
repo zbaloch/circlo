@@ -1,9 +1,13 @@
 package com.circlo.server;
 
+import com.circlo.server.notify.DailyDigests;
 import com.circlo.server.web.Ids;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.Base64;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.TestInstance;
@@ -44,6 +48,24 @@ public abstract class IntegrationTest {
 
     @Autowired
     protected TestPush push;
+
+    @Autowired
+    protected DailyDigests daily;
+
+    private static final AtomicInteger DAYS = new AtomicInteger();
+
+    /**
+     * Sends the daily notifications as if it were `hour`:30 UTC on a day after any earlier call (each person gets at
+     * most one a day, so every call is a new day). Returns how many people were told.
+     */
+    protected int sendDaily(int hour) {
+        return daily.sendDue(Instant.parse("2100-01-01T00:30:00Z").plus(Duration.ofDays(DAYS.incrementAndGet())).plus(Duration.ofHours(hour)));
+    }
+
+    /** The default hour: 18:00 UTC. */
+    protected int sendDaily() {
+        return sendDaily(18);
+    }
 
     @LocalServerPort
     protected int port;

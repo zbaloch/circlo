@@ -1,5 +1,7 @@
 import { checkNow, permissionFrom, shouldOffer, summary } from '@/lib/background-check';
 
+const CALM = 'You have a few new things waiting. Catch up when you’re ready.';
+
 const mockStore = new Map<string, string>();
 jest.mock('expo-secure-store', () => ({
   AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY: 1,
@@ -31,18 +33,18 @@ beforeEach(() => {
 });
 
 describe('summary', () => {
-  it('says how many of each, never who or what', () => {
+  it('says calmly that something is waiting: never who, what or how many', () => {
     expect(summary(counts({}))).toBeNull();
-    expect(summary(counts({ replies: 2, likes: 1 }), true)).toBe('2 replies, 1 like.');
-    // Likes hidden (LIKES_ENABLED off): never mentioned.
-    expect(summary(counts({ replies: 2, likes: 1 }), false)).toBe('2 replies.');
+    expect(summary(counts({ replies: 2, requests: 1 }))).toBe(CALM);
+    expect(summary(counts({ messages: 1 }))).toBe(CALM);
+    // Likes hidden (LIKES_ENABLED off): never mentioned, never a reason to notify.
     expect(summary(counts({ likes: 3 }), false)).toBeNull();
-    expect(summary(counts({ messages: 1, requests: 3 }))).toBe('1 new message, 3 friend requests.');
+    expect(summary(counts({ likes: 3 }), true)).toBe(CALM);
   });
 
   it('leads with a new sign-in', () => {
-    expect(summary(counts({ signIns: 1 }))).toBe('New sign-in to your account.');
-    expect(summary(counts({ signIns: 1, replies: 1 }))).toBe('New sign-in to your account. Also 1 reply.');
+    expect(summary(counts({ signIns: 1 }))).toBe('New sign-in to your account. If it wasn’t you, change your password in Settings.');
+    expect(summary(counts({ signIns: 1, replies: 1 }))).toBe('New sign-in to your account. If it wasn’t you, change your password in Settings.');
   });
 });
 
@@ -65,8 +67,22 @@ describe('checkNow', () => {
     const [url, init] = fetchMock.mock.calls[0];
     expect(url).toBe('https://api.example/v1/activity/pending?since=2026-10-30T10%3A00%3A00.000Z');
     expect(init.headers).toEqual({ 'X-Circlo-Check-Token': 'tok' });
-    expect(Notifications.scheduleNotificationAsync).toHaveBeenCalledWith(expect.objectContaining({ content: { title: 'Circlo', body: '1 reply.' } }));
+    expect(Notifications.scheduleNotificationAsync).toHaveBeenCalledWith(expect.objectContaining({ content: { title: 'Circlo', body: CALM } }));
     expect(Date.parse(mockStore.get('circlo.check-since')!)).toBeGreaterThan(Date.parse('2026-10-30T10:00:00.000Z'));
+  });
+
+  it('tells about activity at most once a day, but a sign-in at once', async () => {
+    const Notifications = jest.requireMock('expo-notifications');
+    mockStore.set('circlo.check-token', 'tok').set('circlo.check-since', '2026-10-30T10:00:00.000Z').set('circlo.check-told', new Date().toISOString());
+    fetchMock.mockResolvedValueOnce({ ok: true, status: 200, json: async () => counts({ replies: 1 }) });
+    await checkNow();
+    expect(Notifications.scheduleNotificationAsync).not.toHaveBeenCalled();
+    // Not counted as told: it waits for tomorrow's note.
+    expect(mockStore.get('circlo.check-since')).toBe('2026-10-30T10:00:00.000Z');
+
+    fetchMock.mockResolvedValueOnce({ ok: true, status: 200, json: async () => counts({ signIns: 1 }) });
+    await checkNow();
+    expect(Notifications.scheduleNotificationAsync).toHaveBeenCalledTimes(1);
   });
 
   it('stays quiet when nothing is new', async () => {

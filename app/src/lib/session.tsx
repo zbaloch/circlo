@@ -14,6 +14,7 @@ import { clearMessaging } from './messaging';
 import { clearOutbox } from './outbox';
 import { forgetSignIns } from './security-events';
 import { forgetConnections } from './use-connections';
+import { digestHourUtc } from './time';
 
 type State = { status: 'loading' } | { status: 'signedOut' } | { status: 'signedIn'; account: StoredAccount };
 
@@ -117,6 +118,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     // Which kind of app this sign-in is (only that): the server tells me about activity by push while I have the phone
     // app, and by email while I only use the web. Sent on every launch, so sign-ins from before this was asked catch up.
     api.PUT('/v1/devices/current', { body: { kind: deviceKind(Platform.OS) } }).catch(() => undefined);
+    // The daily notification comes around 6pm here; sent on every launch so travel and clock changes catch up.
+    api.PUT('/v1/me/notifications', { body: { digestHour: digestHourUtc(new Date().getTimezoneOffset()) } }).catch(() => undefined);
     return () => setRefresher(null);
   }, [signedIn]);
 

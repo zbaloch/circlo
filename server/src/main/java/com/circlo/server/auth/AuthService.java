@@ -1,6 +1,7 @@
 package com.circlo.server.auth;
 
 import com.circlo.server.social.CircleController;
+import com.circlo.server.notify.SecurityEmails;
 import com.circlo.server.web.ApiException;
 import com.circlo.server.web.Ids;
 import com.circlo.server.web.LockedException;
@@ -35,11 +36,13 @@ public class AuthService {
     private final EmailCodes codes;
     private final LoginThrottle throttle;
     private final RateLimiter limiter;
+    private final SecurityEmails security;
     private final Clock clock = Clock.systemUTC();
 
     public AuthService(JdbcTemplate jdbc, TokenService tokens, PasswordHasher passwords, EmailCodes codes, LoginThrottle throttle,
-            RateLimiter limiter) {
+            RateLimiter limiter, SecurityEmails security) {
         this.jdbc = jdbc;
+        this.security = security;
         this.tokens = tokens;
         this.passwords = passwords;
         this.codes = codes;
@@ -191,9 +194,10 @@ public class AuthService {
             }
             throw new ApiException(HttpStatus.FORBIDDEN, "email_not_verified", Map.of("email", u.email()));
         }
-        // Shown on the account's other devices ("New sign-in"), with no detail about this one.
+        // Shown on the account's other devices ("New sign-in") and emailed, with no detail about this one.
         jdbc.update("INSERT INTO security_events (id, user_id, kind, created_at) VALUES (?, ?, 'sign_in', ?)",
                 Ids.bytes(Ids.newId()), u.id(), now());
+        security.signIn(u.id());
         return tokens.signIn(u.uuid());
     }
 
@@ -219,6 +223,7 @@ public class AuthService {
                 .orElseThrow(() -> ApiException.badRequest("invalid_code"));
         codes.consume(u.id(), EmailCodes.Purpose.reset, code);
         jdbc.update("UPDATE users SET password_hash = ? WHERE id = ?", passwords.hash(password), u.id());
+        security.passwordChanged(u.id());
         throttle.clear(throttleKey(u, null));
         tokens.revokeAll(u.uuid());
         return tokens.signIn(u.uuid());
@@ -245,6 +250,7 @@ public class AuthService {
         }
         throttle.clear(key);
         jdbc.update("UPDATE users SET password_hash = ? WHERE id = ?", passwords.hash(next), u.id());
+        security.passwordChanged(u.id());
         tokens.revokeAllExcept(userId, deviceId);
         return tokens.issue(userId, deviceId);
     }

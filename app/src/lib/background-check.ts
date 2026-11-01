@@ -1,10 +1,11 @@
 /**
- * Notifications (owner decision 2026-11-01): real-time, content-free remote push on iPhone (APNs) and Android (FCM).
- * The server tells Apple or Google only "New reply", "New message" or "New friend request" plus random ids, so a tap
- * opens the right screen (lib/push-route); names and words stay in Circlo. An Android build without FCM
- * (no google-services.json) falls back to background checks: now and then (about every 15 minutes at best) the phone
- * asks for counts with this device's check token, which can read nothing else, and shows a local notification. The
- * web app uses background-check.web.ts (nothing in browsers).
+ * Notifications (owner decisions 2026-11-01): one calm, content-free push a day on iPhone (APNs) and Android (FCM),
+ * around 6pm on the phone's clock and only on days something happened: "You have a few new things waiting". A tap
+ * opens Notifications (lib/push-route); names and words stay in Circlo. Account alerts (new sign-in and so on) come by
+ * email straight away. An Android build without FCM (no google-services.json) falls back to background checks: now and
+ * then (about every 15 minutes at best) the phone asks for counts with this device's check token, which can read
+ * nothing else, and shows the same calm note at most once a day (a new sign-in at once). The web app uses
+ * background-check.web.ts (nothing in browsers).
  */
 import * as BackgroundTask from 'expo-background-task';
 import Constants from 'expo-constants';
@@ -23,6 +24,10 @@ export const CHECK_TASK = 'circlo.activity-check';
 const CHANNEL = 'activity';
 const TOKEN_KEY = 'circlo.check-token';
 const SINCE_KEY = 'circlo.check-since';
+const TOLD_KEY = 'circlo.check-told';
+/** Background checks tell about activity at most this often. */
+const DAILY_MS = 20 * 60 * 60 * 1000;
+const CALM = 'You have a few new things waiting. Catch up when you’re ready.';
 const PROMPT_DISMISSED = 'circlo.notifications-prompt-dismissed';
 const PUSH_ON = 'circlo.push-on';
 
@@ -47,18 +52,10 @@ export async function refreshPushToken(): Promise<void> {
 
 export type Pending = { requests: number; replies: number; likes: number; messages: number; signIns: number };
 
-const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
-
-/** Pure: the notification text, or null when there's nothing new. Counts only: no names, no content. */
+/** Pure: the notification text, or null when there's nothing new. Calm: never who, what or how many. */
 export function summary(p: Pending, likes = LIKES_ENABLED): string | null {
-  const parts = [
-    p.messages ? plural(p.messages, 'new message', 'new messages') : '',
-    p.replies ? plural(p.replies, 'reply', 'replies') : '',
-    likes && p.likes ? plural(p.likes, 'like', 'likes') : '',
-    p.requests ? plural(p.requests, 'friend request', 'friend requests') : '',
-  ].filter(Boolean);
-  if (p.signIns) return `New sign-in to your account.${parts.length ? ` Also ${parts.join(', ')}.` : ''}`;
-  return parts.length ? `${parts.join(', ')}.`.replace(/^./, (c) => c.toUpperCase()) : null;
+  if (p.signIns) return 'New sign-in to your account. If it wasn’t you, change your password in Settings.';
+  return p.messages || p.replies || p.requests || (likes && p.likes) ? CALM : null;
 }
 
 // While Circlo is open there's nothing to tell: the screens are up to date.
@@ -85,12 +82,19 @@ export async function checkNow(): Promise<void> {
   const res = await fetch(`${API_URL}/v1/activity/pending?since=${encodeURIComponent(since)}`, { headers: { 'X-Circlo-Check-Token': token } });
   if (res.status === 401) return stopLocally(); // the device was revoked or checks were turned off elsewhere
   if (!res.ok) throw new Error(`check failed: ${res.status}`);
-  const text = summary((await res.json()) as Pending);
+  const pending = (await res.json()) as Pending;
+  const text = summary(pending);
+  if (text && !pending.signIns) {
+    // Activity at most once a day: until then it keeps waiting (the time isn't moved on).
+    const told = await getItem(TOLD_KEY, 'background');
+    if (told && Date.now() - Date.parse(told) < DAILY_MS) return;
+  }
   if (text) {
     await Notifications.scheduleNotificationAsync({
       content: { title: 'Circlo', body: text },
       trigger: Platform.OS === 'android' ? { channelId: CHANNEL } : null,
     });
+    await setItem(TOLD_KEY, now, 'background');
   }
   await setItem(SINCE_KEY, now, 'background');
 }

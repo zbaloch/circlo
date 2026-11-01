@@ -19,5 +19,8 @@ circlo:
     mode: log
   cors:
     origins: https://app.example.test
+  notify:
+    # Tests send the daily notifications themselves (IntegrationTest.sendDaily).
+    daily-scheduled: false
   s3:
     bucket: circlo-media-test
