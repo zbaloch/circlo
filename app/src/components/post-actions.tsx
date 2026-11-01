@@ -50,18 +50,24 @@ export function usePostActions(account: StoredAccount | null, book: AddressBook 
       ]);
       return;
     }
-    showAlert('Delete post?', 'It will be removed for everyone who could see it, with its replies and likes.', [
+    // My post: the options first, then a confirmation before anything is deleted.
+    const confirmDelete = () =>
+      showAlert('Delete post?', 'It will be removed for everyone who could see it, with its replies and likes. This can’t be undone.', [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () =>
+            deletePost(post.postId).then(() => {
+              removePost(post.postId);
+              opts.onChange?.();
+              if (opts.inThread) router.back();
+            }, () => showAlert('Couldn’t delete', 'Check your connection and try again.')),
+        },
+      ]);
+    showAlert('Your post', undefined, [
+      { text: 'Delete post', style: 'destructive', onPress: confirmDelete },
       { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: () =>
-          deletePost(post.postId).then(() => {
-            removePost(post.postId);
-            opts.onChange?.();
-            if (opts.inThread) router.back();
-          }, () => showAlert('Couldn’t delete', 'Check your connection and try again.')),
-      },
     ]);
   };
 
