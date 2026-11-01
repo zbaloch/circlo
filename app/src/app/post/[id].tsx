@@ -20,6 +20,7 @@ import { likersLine } from '@/lib/view-logic';
 import { Text } from '@/components/ui/text';
 import { showAlert } from '@/lib/dialog';
 import { Spinner } from '@/components/ui/spinner';
+import { LIKES_ENABLED } from '@/lib/features';
 import { onLiveChange } from '@/lib/live';
 import { usePalette } from '@/theme/use-palette';
 
@@ -62,7 +63,7 @@ export default function ThreadScreen() {
       },
       () => setReplies([]),
     );
-    fetchLikers(post).then(setLikers, () => setLikers([]));
+    if (LIKES_ENABLED) fetchLikers(post).then(setLikers, () => setLikers([]));
     // eslint-disable-next-line react-hooks/exhaustive-deps -- reload when the post changes identity, not on like toggles
   }, [account, post?.postId]);
   useFocusEffect(load);
@@ -99,7 +100,7 @@ export default function ThreadScreen() {
 
   // Keep my own entry in sync with the like button (the list is fetched once per visit).
   const others = likers.filter((l) => l.userId !== account.userId);
-  const line = likersLine([...(post.likedByMe ? ['you'] : []), ...others.map((l) => l.name)], 0);
+  const line = LIKES_ENABLED && likersLine([...(post.likedByMe ? ['you'] : []), ...others.map((l) => l.name)], 0);
 
   const removeReply = (r: Reply) =>
     showAlert('Delete reply?', undefined, [
@@ -191,6 +192,7 @@ export default function ThreadScreen() {
                     </Pressable>
                   </View>
                   <Text className="text-base text-ink dark:text-ink-dark">{item.text}</Text>
+                  {LIKES_ENABLED ? (
                   <Pressable
                     accessibilityRole="button"
                     accessibilityLabel={item.likedByMe ? 'Unlike reply' : 'Like reply'}
@@ -203,6 +205,7 @@ export default function ThreadScreen() {
                       <Text className={`text-sm ${item.likedByMe ? 'text-danger dark:text-danger-dark' : 'text-muted dark:text-muted-dark'}`}>{item.likeCount}</Text>
                     ) : null}
                   </Pressable>
+                  ) : null}
                 </View>
               </Pressable>
             );

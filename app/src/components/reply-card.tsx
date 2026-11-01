@@ -8,6 +8,7 @@ import { putPost } from '@/lib/feed-store';
 import type { UserReply } from '@/lib/thread';
 import { relativeTime } from '@/lib/time';
 import { usePalette } from '@/theme/use-palette';
+import { LIKES_ENABLED } from '@/lib/features';
 
 /**
  * One of someone's replies on their profile (X style): the reply, "Replying to @them", and a preview of the post it
@@ -39,7 +40,7 @@ export function ReplyCard({ item, now }: { item: UserReply; now: number }) {
             {post.text || (post.media.length ? (post.media[0].type === 'video' ? 'Video' : 'Photo') : '')}
           </Text>
         </View>
-        {reply.likeCount ? (
+        {LIKES_ENABLED && reply.likeCount ? (
           <View className="mt-1 flex-row items-center gap-1">
             <Icon name={reply.likedByMe ? 'heart' : 'heart-outline'} size={14} color={reply.likedByMe ? palette.danger : palette.muted} />
             <Text className="text-xs text-muted dark:text-muted-dark">{reply.likeCount}</Text>

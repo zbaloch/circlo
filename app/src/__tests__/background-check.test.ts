@@ -33,7 +33,10 @@ beforeEach(() => {
 describe('summary', () => {
   it('says how many of each, never who or what', () => {
     expect(summary(counts({}))).toBeNull();
-    expect(summary(counts({ replies: 2, likes: 1 }))).toBe('2 replies, 1 like.');
+    expect(summary(counts({ replies: 2, likes: 1 }), true)).toBe('2 replies, 1 like.');
+    // Likes hidden (LIKES_ENABLED off): never mentioned.
+    expect(summary(counts({ replies: 2, likes: 1 }), false)).toBe('2 replies.');
+    expect(summary(counts({ likes: 3 }), false)).toBeNull();
     expect(summary(counts({ messages: 1, requests: 3 }))).toBe('1 new message, 3 friend requests.');
   });
 

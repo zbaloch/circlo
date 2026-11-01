@@ -5,6 +5,7 @@ import { api, ok } from '@/api/client';
 import type { StoredAccount } from './keystore';
 import { useSession } from './session';
 import { deleteItem, getItem, setItem } from './storage';
+import { shownActivity } from './view-logic';
 
 /**
  * Replies and likes on my posts and likes on my replies, for the Notifications tab (no remote push: the app fetches them itself). Which items
@@ -70,7 +71,7 @@ function fromRow(r: Row): ActivityItem {
 export async function refreshActivity(account: StoredAccount): Promise<void> {
   if (state.owner !== account.userId) set({ owner: account.userId, items: null, seenAt: null });
   const [rows, seenAt] = await Promise.all([fetchRows(), getItem(seenKey(account.userId))]);
-  const items = rows.map(fromRow);
+  const items = shownActivity(rows.map(fromRow));
   if (state.owner !== account.userId) return;
   // First time on this device: start from now rather than lighting the dot for everything that happened before.
   const start = seenAt ?? items[0]?.createdAt ?? new Date(0).toISOString();

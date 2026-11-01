@@ -1,5 +1,7 @@
 /** Pure display helpers for posts, threads and profiles (no React, no native modules; unit-tested). */
 import type { FeedPost } from './posts';
+import type { ActivityItem } from './activity';
+import { LIKES_ENABLED } from './features';
 
 const URL = /(https?:\/\/[^\s]+)/g;
 
@@ -23,9 +25,9 @@ export function likersLine(names: string[], others: number): string | null {
 
 export type ProfileTab = 'posts' | 'replies' | 'media' | 'likes';
 
-/** Tabs for a profile, as on X: Posts, Replies, Media, and Likes only on my own (PLAN.md 2A). */
-export function profileTabs(own: boolean): ProfileTab[] {
-  return own ? ['posts', 'replies', 'media', 'likes'] : ['posts', 'replies', 'media'];
+/** Tabs for a profile, as on X: Posts, Replies, Media, and Likes only on my own (PLAN.md 2A) while likes are shown. */
+export function profileTabs(own: boolean, likes = LIKES_ENABLED): ProfileTab[] {
+  return own && likes ? ['posts', 'replies', 'media', 'likes'] : ['posts', 'replies', 'media'];
 }
 
 /** Posts shown under each tab. Likes come from the timeline I've loaded (posts I can read and liked). */
@@ -58,4 +60,9 @@ export function deviceLabel(d: { kind: 'ios' | 'android' | 'web' | null; current
   const kind = d.kind === 'ios' ? 'iPhone app' : d.kind === 'android' ? 'Android app' : d.kind === 'web' ? 'Web browser' : null;
   if (d.current) return kind ? `This device · ${kind}` : 'This device';
   return kind ?? 'Other device';
+}
+
+/** Pure: the items the Notifications tab shows (and its dot counts); likes only while they're shown. */
+export function shownActivity<T extends Pick<ActivityItem, 'kind'>>(items: T[], likes = LIKES_ENABLED): T[] {
+  return likes ? items : items.filter((i) => i.kind === 'reply');
 }

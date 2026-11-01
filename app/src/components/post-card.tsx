@@ -12,6 +12,7 @@ import { useNow } from '@/lib/use-now';
 import { linkParts } from '@/lib/view-logic';
 import { usePalette } from '@/theme/use-palette';
 import { Text } from '@/components/ui/text';
+import { LIKES_ENABLED } from '@/lib/features';
 
 type Props = {
   post: FeedPost;
@@ -90,7 +91,9 @@ export function PostDetail({ post, name, handle, avatarUrl, audience, onReply, o
       </View>
       <View className="flex-row items-center gap-10 border-t border-border py-3 dark:border-border-dark">
         <Action icon="chatbubble-outline" label={`Reply, ${post.replyCount} replies`} count={post.replyCount} onPress={onReply} />
-        <Action icon={post.likedByMe ? 'heart' : 'heart-outline'} label={post.likedByMe ? 'Unlike' : 'Like'} count={post.likeCount} active={post.likedByMe} onPress={onLike} />
+        {LIKES_ENABLED ? (
+          <Action icon={post.likedByMe ? 'heart' : 'heart-outline'} label={post.likedByMe ? 'Unlike' : 'Like'} count={post.likeCount} active={post.likedByMe} onPress={onLike} />
+        ) : null}
       </View>
     </View>
   );
@@ -130,10 +133,12 @@ export function PostCard({ post, name, handle, avatarUrl, audience, onOpen, onRe
         ) : null}
         {post.text ? <PostText text={post.text} className="text-[15px] leading-5 text-ink dark:text-ink-dark" /> : null}
         {post.media.length ? <MediaGrid media={post.media} onPress={onMediaPress} /> : null}
-        {onReply || onLike ? (
+        {onReply || (LIKES_ENABLED && onLike) ? (
           <View className="flex-row items-center gap-10 pt-1">
             <Action icon="chatbubble-outline" label={`Reply, ${post.replyCount} replies`} count={post.replyCount} onPress={onReply} />
-            <Action icon={post.likedByMe ? 'heart' : 'heart-outline'} label={post.likedByMe ? 'Unlike' : 'Like'} count={post.likeCount} active={post.likedByMe} onPress={onLike} />
+            {LIKES_ENABLED ? (
+              <Action icon={post.likedByMe ? 'heart' : 'heart-outline'} label={post.likedByMe ? 'Unlike' : 'Like'} count={post.likeCount} active={post.likedByMe} onPress={onLike} />
+            ) : null}
           </View>
         ) : null}
       </View>

@@ -17,6 +17,7 @@ import { api, API_URL, ok } from '@/api/client';
 
 import { pushServiceFor } from './push-route';
 import { deleteItem, getItem, setItem } from './storage';
+import { LIKES_ENABLED } from './features';
 
 export const CHECK_TASK = 'circlo.activity-check';
 const CHANNEL = 'activity';
@@ -49,11 +50,11 @@ export type Pending = { requests: number; replies: number; likes: number; messag
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 
 /** Pure: the notification text, or null when there's nothing new. Counts only: no names, no content. */
-export function summary(p: Pending): string | null {
+export function summary(p: Pending, likes = LIKES_ENABLED): string | null {
   const parts = [
     p.messages ? plural(p.messages, 'new message', 'new messages') : '',
     p.replies ? plural(p.replies, 'reply', 'replies') : '',
-    p.likes ? plural(p.likes, 'like', 'likes') : '',
+    likes && p.likes ? plural(p.likes, 'like', 'likes') : '',
     p.requests ? plural(p.requests, 'friend request', 'friend requests') : '',
   ].filter(Boolean);
   if (p.signIns) return `New sign-in to your account.${parts.length ? ` Also ${parts.join(', ')}.` : ''}`;

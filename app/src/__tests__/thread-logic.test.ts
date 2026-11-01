@@ -1,9 +1,10 @@
 import { audienceBadge, authorName } from '@/components/post-actions';
+import type { ActivityItem } from '@/lib/activity';
 import { mergeIds } from '@/lib/feed-store';
 import { setMe } from '@/lib/me';
 import type { FeedPost } from '@/lib/posts';
 import { noteSentReply, takeSentReply, toggledLike, validateReply, type Reply } from '@/lib/thread';
-import { likersLine, linkParts, postsForTab, profileTabs } from '@/lib/view-logic';
+import { likersLine, linkParts, postsForTab, profileTabs, shownActivity } from '@/lib/view-logic';
 
 // Native modules and navigation don't load under jest; these tests cover the pure logic only.
 jest.mock('expo-file-system', () => ({}));
@@ -92,8 +93,16 @@ describe('timeline and profile tabs', () => {
     expect(mergeIds(['a', 'c'], ['b', 'a', 'd'], (id) => t[id])).toEqual(['d', 'a', 'b', 'c']);
   });
   it('shows Replies on every profile and Likes only on my own', () => {
-    expect(profileTabs(true)).toEqual(['posts', 'replies', 'media', 'likes']);
-    expect(profileTabs(false)).toEqual(['posts', 'replies', 'media']);
+    expect(profileTabs(true, true)).toEqual(['posts', 'replies', 'media', 'likes']);
+    expect(profileTabs(false, true)).toEqual(['posts', 'replies', 'media']);
+    // Likes hidden: no Likes tab anywhere.
+    expect(profileTabs(true, false)).toEqual(['posts', 'replies', 'media']);
+  });
+  it('drops like notifications while likes are hidden', () => {
+    const item = (kind: ActivityItem['kind']) => ({ kind, postId: 'p', postText: '', actorId: 'a', actorName: 'A', actorHandle: 'a', createdAt: '' }) as ActivityItem;
+    const all = [item('reply'), item('like'), item('reply_like')];
+    expect(shownActivity(all, false).map((i) => i.kind)).toEqual(['reply']);
+    expect(shownActivity(all, true)).toHaveLength(3);
   });
   it('filters posts per tab', () => {
     const withMedia = post({ postId: 'm', media: [{} as never] });
