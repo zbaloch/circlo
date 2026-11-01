@@ -75,15 +75,17 @@ export default function ViewerScreen() {
         onMomentumScrollEnd={(e) => setIndex(Math.round(e.nativeEvent.contentOffset.x / width))}
         renderItem={({ item }) => <ZoomableImage media={item} width={width} height={height} onDismiss={() => router.back()} />}
       />
-      <SafeAreaView edges={['top']} className="absolute left-0 right-0 top-0 flex-row items-center justify-between px-3">
-        <Pressable accessibilityRole="button" accessibilityLabel="Close" onPress={() => router.back()} className="h-11 w-11 items-center justify-center rounded-full bg-black/50">
-          <Icon name="close" size={26} color="#FFFFFF" />
-        </Pressable>
-        {state.media.length > 1 ? (
-          <Text className="rounded-full bg-black/50 px-3 py-1 text-white">
-            {index + 1} / {state.media.length}
-          </Text>
-        ) : null}
+      <SafeAreaView edges={['top']} className="absolute left-0 right-0 top-0">
+        <View className="flex-row items-center justify-between px-3">
+          <Pressable accessibilityRole="button" accessibilityLabel="Close" onPress={() => router.back()} className="h-11 w-11 items-center justify-center rounded-full bg-black/50">
+            <Icon name="close" size={26} color="#FFFFFF" />
+          </Pressable>
+          {state.media.length > 1 ? (
+            <Text className="rounded-full bg-black/50 px-3 py-1 text-white">
+              {index + 1} / {state.media.length}
+            </Text>
+          ) : null}
+        </View>
       </SafeAreaView>
     </View>
   );
