@@ -1,5 +1,6 @@
 import '../global.css';
 import '@/lib/interop';
+import '@/theme/color-scheme';
 // Defines the background check task at start-up, as the OS may launch the app just to run it.
 import '@/lib/background-check';
 

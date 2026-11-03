@@ -8,7 +8,9 @@ const { colors } = require('./src/theme/tokens');
 module.exports = {
   content: ['./src/**/*.{ts,tsx}'],
   presets: [require('nativewind/preset')],
-  darkMode: 'media',
+  // 'class', not 'media': NativeWind's web runtime throws on 'media'. Phones still follow the OS theme;
+  // on web src/theme/color-scheme.web.ts sets the class from the OS setting.
+  darkMode: 'class',
   theme: {
     extend: {
       colors,
