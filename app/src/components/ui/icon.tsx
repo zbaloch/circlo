@@ -52,6 +52,8 @@ import {
   type LucideIcon,
 } from 'lucide-react-native';
 
+import { svgA11y } from './svg-a11y';
+
 /**
  * The app's icons: Lucide (https://lucide.dev), drawn with react-native-svg. Names are kept from the earlier icon set
  * so screens read the same. Lucide is outline-only, so "filled" variants are shown either filled in (a liked heart,
@@ -134,8 +136,7 @@ export function Icon({ name, size = 24, color, accessibilityLabel }: Props) {
       color={color}
       fill={spec.fill ? color : 'none'}
       strokeWidth={spec.bold ? 2.5 : 1.75}
-      accessible={!!accessibilityLabel}
-      accessibilityLabel={accessibilityLabel}
+      {...svgA11y(accessibilityLabel)}
     />
   );
 }

@@ -1,5 +1,6 @@
 import Svg, { Circle, Path } from 'react-native-svg';
 
+import { svgA11y } from '@/components/ui/svg-a11y';
 import { colors } from '@/theme/tokens';
 import { usePalette } from '@/theme/use-palette';
 
@@ -30,7 +31,7 @@ export function CircloSymbol({ size = 'sm' }: { size?: 'sm' | 'lg' }) {
   const { ink, dot } = useBrand();
   const px = PIXELS[size];
   return (
-    <Svg width={px} height={px} viewBox="0 0 200 200" accessible accessibilityRole="image" accessibilityLabel="Circlo">
+    <Svg width={px} height={px} viewBox="0 0 200 200" {...svgA11y('Circlo')}>
       <Path d={SYMBOL_RING} fill={ink} fillRule="evenodd" />
       <Circle {...SYMBOL_DOT} fill={dot} />
     </Svg>
@@ -45,9 +46,7 @@ export function CircloWordmark({ height = 24 }: { height?: number }) {
       width={(height * WORDMARK_SIZE.w) / WORDMARK_SIZE.h}
       height={height}
       viewBox={`0 0 ${WORDMARK_SIZE.w} ${WORDMARK_SIZE.h}`}
-      accessible
-      accessibilityRole="image"
-      accessibilityLabel="Circlo">
+      {...svgA11y('Circlo')}>
       <Path d={WORDMARK_LETTERS} fill={ink} fillRule="evenodd" />
       <Path d={WORDMARK_RING} fill={ink} fillRule="evenodd" />
       <Circle {...WORDMARK_DOT} fill={dot} />
