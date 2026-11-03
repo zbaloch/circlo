@@ -2,8 +2,9 @@ import { Icon } from '@/components/ui/icon';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { router, useFocusEffect } from 'expo-router';
-import { useCallback, useState } from 'react';
-import { BackHandler, Platform, Pressable, ScrollView, View } from 'react-native';
+import { useCallback, useRef, useState } from 'react';
+import { BackHandler, Platform, Pressable, ScrollView, View, type ScrollViewInstance } from 'react-native';
+import { useFollowCaret } from '@/components/follow-caret';
 import { KeyboardSpacer } from '@/components/keyboard-spacer';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -44,6 +45,8 @@ export default function ComposeScreen() {
   const [step, setStep] = useState<'write' | 'audience'>('write');
   const [audience, setAudience] = useState<Audience | null>(null);
   const [text, setText] = useState('');
+  const scroll = useRef<ScrollViewInstance>(null);
+  const follow = useFollowCaret(scroll, text);
   const [media, setMedia] = useState<PickedMedia[]>([]);
   const [error, setError] = useState<string>();
 
@@ -185,7 +188,7 @@ export default function ComposeScreen() {
           </Pressable>
         </View>
 
-        <ScrollView testID="compose-body" className="flex-1" contentContainerClassName="gap-3 px-4 pb-4" keyboardShouldPersistTaps="handled">
+        <ScrollView ref={scroll} testID="compose-body" className="flex-1" contentContainerClassName="gap-3 px-4 pb-4" keyboardShouldPersistTaps="handled">
           <View className="flex-row gap-3">
             <Avatar id={account?.userId} name={account?.handle} />
             <View className="flex-1 gap-2">
@@ -197,6 +200,7 @@ export default function ComposeScreen() {
                 placeholderTextColor={palette.muted}
                 value={text}
                 onChangeText={setText}
+                {...follow}
                 // Android centres multiline text and pads it by default: start at the top, with no line height
                 // (Android adds it above the text). 4 pt puts the first line's centre on the 40 pt avatar's, as
                 // measured on screen; Android snaps the text, so 5 pt already lands about 5 pt too low.

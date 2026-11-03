@@ -1,7 +1,7 @@
 import { Icon } from '@/components/ui/icon';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
-import { useCallback, useState } from 'react';
-import { Pressable, ScrollView, View } from 'react-native';
+import { useCallback, useRef, useState } from 'react';
+import { Pressable, ScrollView, View, type ScrollViewInstance } from 'react-native';
 import { KeyboardSpacer } from '@/components/keyboard-spacer';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -20,6 +20,7 @@ import { showToast } from '@/lib/toast';
 import { useNow } from '@/lib/use-now';
 import { usePalette } from '@/theme/use-palette';
 import { Spinner } from '@/components/ui/spinner';
+import { useFollowCaret } from '@/components/follow-caret';
 import { Text, TextInput } from '@/components/ui/text';
 
 /**
@@ -42,6 +43,8 @@ export default function ReplyScreen() {
   const text = draft.id === id ? draft.text : '';
   const setText = (t: string) => setDraft({ id, text: t });
   const sending = sendingId === id;
+  const scroll = useRef<ScrollViewInstance>(null);
+  const follow = useFollowCaret(scroll, text);
 
   useFocusEffect(
     useCallback(() => {
@@ -92,7 +95,7 @@ export default function ReplyScreen() {
           </Pressable>
         </View>
 
-        <ScrollView className="flex-1" contentContainerClassName="px-4 pt-2" keyboardShouldPersistTaps="handled">
+        <ScrollView ref={scroll} className="flex-1" contentContainerClassName="px-4 pt-2" keyboardShouldPersistTaps="handled">
           {/* The post being answered, joined to my reply by a thread line. */}
           <View className="flex-row gap-3">
             <View className="items-center">
@@ -137,6 +140,7 @@ export default function ReplyScreen() {
               placeholderTextColor={palette.muted}
               value={text}
               onChangeText={setText}
+              {...follow}
               className="flex-1 pt-2 text-lg text-ink dark:text-ink-dark"
             />
           </View>
