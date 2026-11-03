@@ -44,16 +44,16 @@ export default function EnableNotificationsScreen() {
           <Text className="text-center text-3xl font-extrabold text-ink dark:text-ink-dark">Know when something’s new</Text>
           <Text className="text-center text-base text-muted dark:text-muted-dark">
             {usesPush
-              ? `Get a notification as soon as someone replies to you${CHAT_ENABLED ? ', sends you a message' : ''} or asks to connect.`
-              : 'Circlo can check for new replies, likes, messages and requests now and then, and let you know.'}
+              ? `Once a day, around 6pm, and only on days something happened, Circlo lets you know there are new replies${CHAT_ENABLED ? ', messages' : ''} or requests waiting.`
+              : `Now and then Circlo checks for new replies${CHAT_ENABLED ? ', messages' : ''} and requests, and lets you know at most once a day.`}
           </Text>
         </View>
         <View className="flex-row gap-3 rounded-2xl bg-surface-raised p-4 dark:bg-surface-raised-dark">
           <Icon name="lock-closed-outline" size={20} color={palette.primary} />
           <Text className="flex-1 text-sm text-muted dark:text-muted-dark">
             {usesPush
-              ? 'Notifications only say “New reply” or “New friend request”. Names and words never leave Circlo; you see them when you open it.'
-              : 'Nothing goes through Apple or Google: your phone checks Circlo itself, and the notification only says how many new things there are. Your phone decides when to check, so it can take a while; Circlo is always up to date when you open it.'}
+              ? 'The notification only says “You have a few new things waiting”. Never who, what or how many: you see that when you open Circlo.'
+              : 'Nothing goes through Apple or Google: your phone checks Circlo itself, and the notification never says who, what or how many. Your phone decides when to check, so it can take a while; Circlo is always up to date when you open it.'}
           </Text>
         </View>
       </ScrollView>
@@ -67,15 +67,15 @@ export default function EnableNotificationsScreen() {
   );
 }
 
-/** The top of a phone's lock screen with Circlo's notifications as they really look: counts only, no names or content. */
+/** The top of a phone's lock screen with Circlo's notification as it really looks: no names, content or counts. */
 function PhonePreview() {
   return (
     <View accessible={false} importantForAccessibility="no-hide-descendants" className="items-center">
       <View className="w-64 gap-2 overflow-hidden rounded-t-[44px] border-4 border-b-0 border-border bg-surface-raised px-3 pb-6 pt-8 dark:border-border-dark dark:bg-surface-raised-dark">
-        <Text className="pb-2 text-center text-5xl font-bold text-ink dark:text-ink-dark">9:41</Text>
-        <NotificationCard when="now" text="2 replies, 1 new message." />
+        <Text className="pb-2 text-center text-5xl font-bold text-ink dark:text-ink-dark">6:00</Text>
+        <NotificationCard when="now" text="You have a few new things waiting. Catch up when you’re ready." />
         <View className="opacity-60">
-          <NotificationCard when="1h ago" text="1 friend request." />
+          <NotificationCard when="Yesterday" text="You have a few new things waiting. Catch up when you’re ready." />
         </View>
       </View>
       <View className="h-px w-72 bg-border dark:bg-border-dark" />

@@ -9,6 +9,7 @@
  */
 import * as BackgroundTask from 'expo-background-task';
 import Constants from 'expo-constants';
+import { File, Paths } from 'expo-file-system';
 import * as Notifications from 'expo-notifications';
 import { AndroidImportance } from 'expo-notifications';
 import * as TaskManager from 'expo-task-manager';
@@ -182,21 +183,34 @@ export function shouldOffer(state: NotificationPermission, dismissed: boolean): 
 
 let offered = false;
 
+/**
+ * "Not now" is remembered in a file in the app's own folder, not in the Keychain: iOS keeps Keychain items after the
+ * app is deleted but resets the notification permission, so a Keychain flag would hide the screen after a reinstall
+ * although the system popup could be shown again. The file goes away with the app.
+ */
+function promptDismissedFile(): File {
+  return new File(Paths.document, PROMPT_DISMISSED);
+}
+
 /** Whether to open Circlo's notifications screen now (at most once per launch; never again after "Not now"). */
 export async function offerBackgroundChecksNow(): Promise<boolean> {
   if (offered) return false;
   offered = true;
   try {
-    const dismissed = (await getItem(PROMPT_DISMISSED)) === '1';
-    return shouldOffer(await notificationPermission(), dismissed);
+    return shouldOffer(await notificationPermission(), promptDismissedFile().exists);
   } catch {
     return false;
   }
 }
 
-/** "Not now" (or done): don't open the screen again; Settings still has the switch. */
+/** "Not now" (or done): don't open the screen again on this install; Settings still has the switch. */
 export function dismissNotificationsPrompt() {
-  setItem(PROMPT_DISMISSED, '1').catch(() => undefined);
+  try {
+    const file = promptDismissedFile();
+    if (!file.exists) file.create();
+  } catch {
+    // Worst case the screen is offered once more.
+  }
 }
 
 /** A tapped notification, with its routing data (see lib/push-route), also when it launched the app. */

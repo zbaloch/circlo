@@ -1,4 +1,4 @@
-import { checkNow, permissionFrom, shouldOffer, summary } from '@/lib/background-check';
+import { checkNow, dismissNotificationsPrompt, offerBackgroundChecksNow, permissionFrom, shouldOffer, summary } from '@/lib/background-check';
 
 const CALM = 'You have a few new things waiting. Catch up when you’re ready.';
 
@@ -9,7 +9,19 @@ jest.mock('expo-secure-store', () => ({
   setItemAsync: jest.fn(async (k: string, v: string) => void mockStore.set(k, v)),
   deleteItemAsync: jest.fn(async (k: string) => void mockStore.delete(k)),
 }));
+// Files in the app's own folder (deleted with the app, unlike Keychain items).
+const mockFiles = new Set<string>();
+jest.mock('expo-file-system', () => ({
+  Paths: { document: 'doc:' },
+  File: jest.fn((dir: string, name: string) => ({
+    get exists() {
+      return mockFiles.has(dir + name);
+    },
+    create: () => void mockFiles.add(dir + name),
+  })),
+}));
 jest.mock('expo-notifications', () => ({
+  getPermissionsAsync: jest.fn(async () => ({ granted: false, canAskAgain: true })),
   setNotificationHandler: jest.fn(),
   scheduleNotificationAsync: jest.fn(async () => 'id'),
   AndroidImportance: { DEFAULT: 3 },
@@ -29,6 +41,7 @@ const counts = (p: Partial<Record<'requests' | 'replies' | 'likes' | 'messages' 
 
 beforeEach(() => {
   mockStore.clear();
+  mockFiles.clear();
   jest.clearAllMocks();
 });
 
@@ -115,5 +128,13 @@ describe('permission and offer', () => {
     expect(shouldOffer('ask', true)).toBe(false);
     expect(shouldOffer('on', false)).toBe(false);
     expect(shouldOffer('blocked', false)).toBe(false);
+  });
+
+  it('after “Not now” the screen stays away; a flag left in the Keychain by an earlier install doesn’t hide it', async () => {
+    // An old install's Keychain marker survives deleting the app on iOS, but the system permission is reset.
+    mockStore.set('circlo.notifications-prompt-dismissed', '1');
+    expect(await offerBackgroundChecksNow()).toBe(true);
+    dismissNotificationsPrompt();
+    expect(mockFiles.has('doc:circlo.notifications-prompt-dismissed')).toBe(true);
   });
 });
