@@ -19,7 +19,7 @@ const POINTS: Point[] = [
   {
     icon: 'eye-off-outline',
     title: 'Only the people you choose',
-    body: 'You connect by invite only, nobody can look you up, and nobody is ever told which circle they’re in. No ads and no tracking.',
+    body: 'You connect by invite only, nobody can look you up, and nobody is ever told which circle they’re in. No tracking and no personalised ads.',
   },
 ];
 
