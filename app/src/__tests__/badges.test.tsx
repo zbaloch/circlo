@@ -66,7 +66,7 @@ describe('drawer', () => {
     const props = { navigation: { closeDrawer: jest.fn() }, state: { history: [] } } as unknown as Parameters<typeof AppDrawer>[0];
     await render(<AppDrawer {...props} />);
     const menu = screen.getByTestId('drawer-menu');
-    expect(within(menu).getByText('Settings')).toBeTruthy();
+    expect(within(menu).getByText('Settings and privacy')).toBeTruthy();
     expect(within(menu).queryByText('Log out')).toBeNull();
     expect(screen.getByRole('button', { name: 'Log out' })).toBeTruthy();
   });

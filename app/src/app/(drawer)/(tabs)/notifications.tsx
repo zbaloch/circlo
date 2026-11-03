@@ -129,7 +129,7 @@ export default function NotificationsScreen() {
                 </View>
               }
               title="New sign-in to your account"
-              line={`${relativeTime(Date.parse(row.signIn.createdAt), now)} · If it wasn’t you, change your password in Settings.`}
+              line={`${relativeTime(Date.parse(row.signIn.createdAt), now)} · If it wasn’t you, change your password in Settings and privacy.`}
             />
           );
         }

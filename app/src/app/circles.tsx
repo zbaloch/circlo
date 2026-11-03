@@ -8,7 +8,7 @@ import { ErrorText } from '@/components/form';
 import { Screen } from '@/components/screen';
 import { describeError } from '@/lib/account';
 import { MAX_CIRCLES, refreshAddressBook, type AddressBook } from '@/lib/addressbook';
-import { circleDefs, membersOf, nextCircleId, ONLY_ME, TO_EVERYONE } from '@/lib/circles';
+import { circleDefs, membersOf, nextCircleId, ONLY_ME, ONLY_ME_NOTE, ONLY_ME_TITLE, TO_EVERYONE } from '@/lib/circles';
 import { useSession } from '@/lib/session';
 import { usePalette } from '@/theme/use-palette';
 import { Text } from '@/components/ui/text';
@@ -50,8 +50,8 @@ export default function CirclesScreen() {
         <View className={row}>
           <AudienceBadge book={book} audience={ONLY_ME} />
           <View className="flex-1">
-            <Text className="text-base font-bold text-ink dark:text-ink-dark">Only me</Text>
-            <Text className="text-muted dark:text-muted-dark">Only you</Text>
+            <Text className="text-base font-bold text-ink dark:text-ink-dark">{ONLY_ME_TITLE}</Text>
+            <Text className="text-muted dark:text-muted-dark">{ONLY_ME_NOTE}</Text>
           </View>
         </View>
         <View className={row}>

@@ -14,7 +14,7 @@ import { usePalette } from '@/theme/use-palette';
 
 /**
  * Asks about notifications before the system popup, which iOS and Android show only once: the popup follows only a
- * "yes" here, and "Not now" leaves it unused so the user can still turn them on later from Settings. A "yes" turns on
+ * "yes" here, and "Not now" leaves it unused so the user can still turn them on later from Settings and privacy › Notifications. A "yes" turns on
  * content-free push (iPhone and Android; background checks on an Android build without FCM; lib/background-check).
  */
 export default function EnableNotificationsScreen() {

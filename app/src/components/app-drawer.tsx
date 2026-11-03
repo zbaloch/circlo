@@ -16,9 +16,9 @@ type Item = { label: string; icon: IconName; href: Href };
 
 export const DRAWER_ITEMS: Item[] = [
   { label: 'Profile', icon: 'person-outline', href: '/profile' },
-  { label: 'Circles', icon: 'radio-button-on-outline', href: '/circles' },
-  { label: 'Devices', icon: 'phone-portrait-outline', href: '/devices' },
-  { label: 'Settings', icon: 'settings-outline', href: '/settings' },
+  { label: 'My Circles', icon: 'radio-button-on-outline', href: '/circles' },
+  // Devices is the first link inside Settings and privacy.
+  { label: 'Settings and privacy', icon: 'settings-outline', href: '/settings' },
 ];
 
 /** Side drawer opened from the Home avatar (PLAN.md 2A app shell). Log out sits apart at the bottom, away from the menu. */

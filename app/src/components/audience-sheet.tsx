@@ -3,14 +3,14 @@ import { Modal, Pressable, View } from 'react-native';
 
 import { AudienceBadge, CircleBadge } from './circle-badge';
 import type { AddressBook, Audience } from '@/lib/addressbook';
-import { audienceSize, circleDefs, membersOf, ONLY_ME, TO_EVERYONE } from '@/lib/circles';
+import { audienceSize, circleDefs, membersOf, ONLY_ME, ONLY_ME_NOTE, ONLY_ME_TITLE, TO_EVERYONE } from '@/lib/circles';
 import { usePalette } from '@/theme/use-palette';
 import { Text } from '@/components/ui/text';
 
 const people = (n: number) => `${n} ${n === 1 ? 'person' : 'people'}`;
 
 export function audienceLine(book: AddressBook, audience: Audience): string {
-  if (audience.kind === 'onlyMe') return 'Only you';
+  if (audience.kind === 'onlyMe') return ONLY_ME_NOTE;
   if (audience.kind === 'everyone') return `All your people · ${people(audienceSize(book, audience))}`;
   return `Only people in ${audience.ids.length === 1 ? 'this circle' : 'these circles'} · ${people(audienceSize(book, audience))}`;
 }
@@ -81,8 +81,8 @@ export function AudiencePicker({ book, selected, onChange }: {
     <>
       <ChoiceRow
         badge={<AudienceBadge book={book} audience={ONLY_ME} />}
-        title="Only me"
-        line="Only you"
+        title={ONLY_ME_TITLE}
+        line={ONLY_ME_NOTE}
         checked={selected?.kind === 'onlyMe'}
         onPress={() => onChange(ONLY_ME)}
       />

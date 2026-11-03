@@ -27,6 +27,10 @@ export function circleDefs(book: Pick<AddressBook, 'circleDefs'>): CircleDef[] {
   return [...(book.circleDefs ?? STARTER_CIRCLES)].sort((a, b) => a.id - b.id);
 }
 
+/** How Only me is named and explained wherever it's chosen (My Circles, the composer's audience sheet). */
+export const ONLY_ME_TITLE = 'Only me (my mind)';
+export const ONLY_ME_NOTE = 'Posts in this circle are private to you. Nobody else can see them.';
+
 /** Circle 1 wears a star while it keeps its starter name: Family, or Close Friends on accounts made before 2026-11-03. */
 export function hasStar(id: number, name: string): boolean {
   return id === 1 && (name === 'Family' || name === 'Close Friends');

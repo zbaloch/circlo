@@ -65,9 +65,13 @@ function Navigator() {
       <Stack.Protected guard={signedIn} redirectTo="/welcome">
         <Stack.Screen name="(drawer)" options={{ headerShown: false }} />
         <Stack.Screen name="profile" options={{ title: 'Profile' }} />
-        <Stack.Screen name="circles" options={{ title: 'Circles' }} />
+        <Stack.Screen name="circles" options={{ title: 'My Circles' }} />
         <Stack.Screen name="devices" options={{ title: 'Devices' }} />
-        <Stack.Screen name="settings" options={{ title: 'Settings' }} />
+        <Stack.Screen name="settings/index" options={{ title: 'Settings and privacy' }} />
+        <Stack.Screen name="settings/account" options={{ title: 'Your account' }} />
+        <Stack.Screen name="settings/notifications" options={{ title: 'Notifications' }} />
+        <Stack.Screen name="settings/privacy" options={{ title: 'Privacy and safety' }} />
+        <Stack.Screen name="settings/about" options={{ title: 'About Circlo' }} />
         <Stack.Screen name="edit-profile" options={{ title: 'Edit profile' }} />
         <Stack.Screen name="friend/[id]" options={{ title: 'Profile' }} />
         <Stack.Screen name="scan" options={{ title: 'Scan code' }} />

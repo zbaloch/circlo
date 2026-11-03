@@ -5,7 +5,7 @@ import { useIntegrityWarning } from '@/lib/device-integrity';
 import { usePalette } from '@/theme/use-palette';
 import { Text } from '@/components/ui/text';
 
-/** Home banner on a rooted/jailbroken phone; warns only and can be dismissed (Settings keeps showing it). */
+/** Home banner on a rooted/jailbroken phone; warns only and can be dismissed (Settings and privacy › Privacy and safety keeps showing it). */
 export function IntegrityBanner() {
   const { message, dismissed, dismiss } = useIntegrityWarning();
   const palette = usePalette();
