@@ -27,6 +27,11 @@ export function circleDefs(book: Pick<AddressBook, 'circleDefs'>): CircleDef[] {
   return [...(book.circleDefs ?? STARTER_CIRCLES)].sort((a, b) => a.id - b.id);
 }
 
+/** Circle 1 wears a star while it keeps its starter name: Family, or Close Friends on accounts made before 2026-11-03. */
+export function hasStar(id: number, name: string): boolean {
+  return id === 1 && (name === 'Family' || name === 'Close Friends');
+}
+
 export function circleName(book: Pick<AddressBook, 'circleDefs'>, id: number): string {
   return circleDefs(book).find((c) => c.id === id)?.name ?? 'Circle';
 }

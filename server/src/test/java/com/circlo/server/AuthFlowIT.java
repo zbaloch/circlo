@@ -38,7 +38,7 @@ class AuthFlowIT extends IntegrationTest {
         assertThat(me).containsEntry("username", "ana_signup").containsEntry("email", a.email);
         // Sign-up asks for no name: it stays empty until set in Edit profile.
         assertThat(me.get("name")).isNull();
-        assertThat(a.get("/v1/circles")).extracting(c -> c.get("name")).containsExactly("Close Friends", "Family", "Kids", "Work");
+        assertThat(a.get("/v1/circles")).extracting(c -> c.get("name")).containsExactly("Family", "Close Friends", "School", "Work", "Acquaintances");
 
         assertThat(a.login("ANA_signup", TestUser.PASSWORD).getStatusCode().value()).isEqualTo(200);
         assertThat(a.login("@ana_signup", TestUser.PASSWORD).getStatusCode().value()).isEqualTo(200);

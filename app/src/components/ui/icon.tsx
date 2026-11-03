@@ -55,7 +55,7 @@ import {
 /**
  * The app's icons: Lucide (https://lucide.dev), drawn with react-native-svg. Names are kept from the earlier icon set
  * so screens read the same. Lucide is outline-only, so "filled" variants are shown either filled in (a liked heart,
- * the Close Friends star, play) or with a bolder stroke (the selected tab, a checked item).
+ * the Family star, play) or with a bolder stroke (the selected tab, a checked item).
  */
 type Spec = { icon: LucideIcon; fill?: boolean; bold?: boolean };
 

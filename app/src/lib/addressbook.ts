@@ -27,12 +27,13 @@ export type AddressBook = {
   circleDefs: CircleDef[];
 };
 
-/** Starter circles of a new account (the server creates them; owner decision 2026-10-29). */
+/** Starter circles of a new account (the server creates them; owner decision 2026-11-03). */
 export const STARTER_CIRCLES: CircleDef[] = [
-  { id: 1, name: 'Close Friends' },
-  { id: 2, name: 'Family' },
-  { id: 3, name: 'Kids' },
+  { id: 1, name: 'Family' },
+  { id: 2, name: 'Close Friends' },
+  { id: 3, name: 'School' },
   { id: 4, name: 'Work' },
+  { id: 5, name: 'Acquaintances' },
 ];
 export const MAX_CIRCLES = 8;
 

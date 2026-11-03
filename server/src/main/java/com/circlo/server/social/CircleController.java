@@ -30,15 +30,15 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * My circles (owner decision 2026-10-29): up to 8, ids 1–8, starting with Close Friends, Family, Kids and Work. A friend
- * can be in any number of them. Circle names and memberships are returned only to their owner and nobody is told
+ * My circles (owner decision 2026-10-29): up to 8, ids 1–8. New accounts start with Family, Close Friends, School, Work
+ * and Acquaintances (owner decision 2026-11-03), each renamable by its owner only. A friend can be in any number of them. Circle names and memberships are returned only to their owner and nobody is told
  * when they're added, moved or removed.
  */
 @RestController
 public class CircleController {
 
     public static final int MAX_CIRCLES = 8;
-    static final List<String> STARTERS = List.of("Close Friends", "Family", "Kids", "Work");
+    static final List<String> STARTERS = List.of("Family", "Close Friends", "School", "Work", "Acquaintances");
 
     private final JdbcTemplate jdbc;
     private final People people;

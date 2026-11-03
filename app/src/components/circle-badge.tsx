@@ -3,7 +3,7 @@ import { View } from 'react-native';
 
 import { Text } from '@/components/ui/text';
 import type { AddressBook, Audience } from '@/lib/addressbook';
-import { circleName } from '@/lib/circles';
+import { circleName, hasStar } from '@/lib/circles';
 import { usePalette } from '@/theme/use-palette';
 
 function Badge({ small, children }: { small: boolean; children: React.ReactNode }) {
@@ -11,13 +11,13 @@ function Badge({ small, children }: { small: boolean; children: React.ReactNode 
   return <View className={`${box} items-center justify-center rounded-full bg-primary-soft dark:bg-primary-soft-dark`}>{children}</View>;
 }
 
-/** A circle's badge: its first letter (a star for Close Friends, id 1). */
+/** A circle's badge: its first letter (a star for Family, circle 1). */
 export function CircleBadge({ book, id, small = false }: { book: Pick<AddressBook, 'circleDefs'>; id: number; small?: boolean }) {
   const palette = usePalette();
   const name = circleName(book, id);
   return (
     <Badge small={small}>
-      {id === 1 && name === 'Close Friends' ? (
+      {hasStar(id, name) ? (
         <Icon name="star" size={small ? 15 : 17} color={palette.primary} />
       ) : (
         <Text className={`font-bold text-primary dark:text-primary-dark ${small ? 'text-sm' : ''}`}>{[...name][0]?.toUpperCase()}</Text>

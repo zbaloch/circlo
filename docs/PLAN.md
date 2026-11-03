@@ -11,7 +11,7 @@ and there is a web app.
 | Accounts | Name, @username, email and password. The email is confirmed with a 6-digit code before the account exists; a forgotten password is reset with an emailed code. The photo can be added or changed later in Edit profile |
 | Passwords | Stored only as Argon2id hashes (server). Strength checked in the app (zxcvbn, 12+ characters) |
 | Data | Sent over HTTPS (TLS), stored as sent. The **server enforces who sees what** (THREAT_MODEL.md v2.0) |
-| Circles | Kept on the server: up to 8 per person (starters Close Friends, Family, Kids, Work). Names, memberships and a post's audience are returned only to the owner |
+| Circles | Kept on the server: up to 8 per person (starters Family, Close Friends, School, Work, Acquaintances since 2026-11-03). Names, memberships and a post's audience are returned only to the owner |
 | Post audience | Only me; Everyone (all current friends); or circles: the people in them **now** (owner decision 2026-11-01: taking someone out of a circle closes its posts to them, earlier ones too; putting them back reopens them; deleting a circle leaves posts shared only with it to the author). Unfriend/block removes access to everything |
 | Chats | Server-stored 1:1 and group chats between friends; read state per person, so it's the same on every device |
 | Media | Metadata removed on the device, then presigned upload to a private bucket; presigned downloads (1 hour) |
@@ -580,7 +580,7 @@ Rate limiting. **Do not log request bodies or IPs.**
 **Done when:** two test users become friends and see each other's decrypted profiles. The server DB contains no names.
 
 ### Phase 6: Circles
-> Superseded in part by CRYPTO.md v1.3 (owner decision 2026-10-29): circles are now independent, not nested. Only me and Everyone are built in; each author has up to 8 circles (starters Close Friends, Family, Kids, Work), a friend can be in any number, and a post can go to several circles at once. See PROGRESS.md decisions log.
+> Superseded in part by CRYPTO.md v1.3 (owner decision 2026-10-29): circles are now independent, not nested. Only me and Everyone are built in; each author has up to 8 circles (starters Family, Close Friends, School, Work, Acquaintances since 2026-11-03), a friend can be in any number, and a post can go to several circles at once. See PROGRESS.md decisions log.
 
 - Address-book blob holding circles 1–100, editable labels (defaults: 1 Me, 2 Spouse, 3–4 Kids, 5 Parents & siblings, 6 Extended family, 7 Closest friends, 8 Neighbourhood, 9 Work, 10 Faded contacts, 11–100 unnamed).
 - Assigning a friend to circle *k* sends them `Ck`.

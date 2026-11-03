@@ -5,6 +5,7 @@ import {
   circleDefs,
   circleName,
   circlesOf,
+  hasStar,
   membersOf,
   nextCircleId,
   validAudience,
@@ -15,14 +16,14 @@ jest.mock('@/api/client', () => ({}));
 const friend = (circles: number[] = [], status: Contact['status'] = 'accepted'): Contact => ({ status, displayName: 'F', handle: 'f', circles });
 
 describe('circles', () => {
-  // Starter circles: 1 Close Friends, 2 Family, 3 Kids, 4 Work; 6 is one I added.
+  // Starter circles: 1 Family, 2 Close Friends, 3 School, 4 Work, 5 Acquaintances; 6 is one I added.
   const book = {
     circleDefs: [...STARTER_CIRCLES, { id: 6, name: 'Book club' }],
     contacts: { a: friend([1, 2]), b: friend([2]), c: friend([3]), d: friend(), e: friend([6, 7]), p: friend([3], 'outgoing') },
   };
 
-  it('starts with Close Friends, Family, Kids and Work', () => {
-    expect(circleDefs({} as never).map((c) => c.name)).toEqual(['Close Friends', 'Family', 'Kids', 'Work']);
+  it('starts with Family, Close Friends, School, Work and Acquaintances', () => {
+    expect(circleDefs({} as never).map((c) => c.name)).toEqual(['Family', 'Close Friends', 'School', 'Work', 'Acquaintances']);
     expect(circleName(book, 6)).toBe('Book club');
   });
 
@@ -37,7 +38,7 @@ describe('circles', () => {
     expect(audienceSize(book, { kind: 'onlyMe' })).toBe(0);
     expect(audienceSize(book, { kind: 'everyone' })).toBe(5);
     expect(audienceSize(book, { kind: 'circles', ids: [3] })).toBe(1);
-    // Family is not "closer than" Kids: nesting is gone.
+    // Close Friends is not "closer than" School: nesting is gone.
     expect(audienceSize(book, { kind: 'circles', ids: [2] })).toBe(2);
     expect(audienceSize(book, { kind: 'circles', ids: [1, 2] })).toBe(2);
     expect(audienceSize(book, { kind: 'circles', ids: [1, 2, 3, 6] })).toBe(4);
@@ -48,8 +49,15 @@ describe('circles', () => {
   it('labels audiences for the author', () => {
     expect(audienceLabel(book, { kind: 'onlyMe' })).toBe('Only me');
     expect(audienceLabel(book, { kind: 'everyone' })).toBe('Everyone');
-    expect(audienceLabel(book, { kind: 'circles', ids: [3, 2] })).toBe('Family, Kids');
-    expect(audienceLabel(book, { kind: 'circles', ids: [6, 1, 2] })).toBe('Close Friends +2');
+    expect(audienceLabel(book, { kind: 'circles', ids: [3, 2] })).toBe('Close Friends, School');
+    expect(audienceLabel(book, { kind: 'circles', ids: [6, 1, 2] })).toBe('Family +2');
+  });
+
+  it('stars circle 1 while it keeps its starter name', () => {
+    expect(hasStar(1, 'Family')).toBe(true);
+    expect(hasStar(1, 'Close Friends')).toBe(true); // accounts created before the 2026-11-03 starters
+    expect(hasStar(1, 'Cousins')).toBe(false); // renamed: its letter instead
+    expect(hasStar(2, 'Close Friends')).toBe(false);
   });
 
   it('only accepts audiences of existing circles, at least one, no repeats', () => {
@@ -57,12 +65,12 @@ describe('circles', () => {
     expect(validAudience(book, { kind: 'everyone' })).toBe(true);
     expect(validAudience(book, { kind: 'circles', ids: [1, 6] })).toBe(true);
     expect(validAudience(book, { kind: 'circles', ids: [] })).toBe(false);
-    expect(validAudience(book, { kind: 'circles', ids: [5] })).toBe(false);
+    expect(validAudience(book, { kind: 'circles', ids: [7] })).toBe(false);
     expect(validAudience(book, { kind: 'circles', ids: [2, 2] })).toBe(false);
   });
 
   it('new circles take the lowest free id, up to 8', () => {
-    expect(nextCircleId(book)).toBe(5);
+    expect(nextCircleId(book)).toBe(7);
     const full = { circleDefs: Array.from({ length: MAX_CIRCLES }, (_, i) => ({ id: i + 1, name: `c${i}` })) };
     expect(nextCircleId(full)).toBeNull();
   });

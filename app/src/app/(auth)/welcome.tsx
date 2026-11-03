@@ -14,7 +14,7 @@ const POINTS: Point[] = [
   {
     icon: 'people-outline',
     title: 'Share with your circles',
-    body: 'Put people in circles like Family, Kids or Close Friends. Post to one or more circles and only the people in them can see it, or share with Everyone, or keep it for yourself.',
+    body: 'Put people in circles like Family, Close Friends or Work. Post to one or more circles and only the people in them can see it, or share with Everyone, or keep it for yourself.',
   },
   {
     icon: 'eye-off-outline',

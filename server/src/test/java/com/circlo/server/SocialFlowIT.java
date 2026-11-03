@@ -60,14 +60,18 @@ class SocialFlowIT extends IntegrationTest {
         TestUser b = user("soc_member");
         a.befriend(b);
         var created = a.call("POST", "/v1/circles", Map.of("name", "  Neighbours "));
-        assertThat(created.getBody()).containsEntry("id", 5).containsEntry("name", "Neighbours");
-        assertThat(a.status("PUT", "/v1/circles/5", Map.of("name", "Street"))).isEqualTo(200);
-        assertThat(a.call("PUT", "/v1/friends/" + b.userId + "/circles", Map.of("circles", List.of(5, 2, 99))).getBody())
-                .containsEntry("circles", List.of(2, 5));
-        assertThat(a.get("/v1/friends").get(0)).containsEntry("circles", List.of(2, 5));
-        assertThat(a.status("DELETE", "/v1/circles/5", null)).isEqualTo(200);
+        assertThat(created.getBody()).containsEntry("id", 6).containsEntry("name", "Neighbours");
+        assertThat(a.status("PUT", "/v1/circles/6", Map.of("name", "Street"))).isEqualTo(200);
+        // Renaming is mine alone: my friend still has their own Family.
+        assertThat(a.status("PUT", "/v1/circles/1", Map.of("name", "Cousins"))).isEqualTo(200);
+        assertThat(a.get("/v1/circles").get(0)).containsEntry("name", "Cousins");
+        assertThat(b.get("/v1/circles").get(0)).containsEntry("name", "Family");
+        assertThat(a.call("PUT", "/v1/friends/" + b.userId + "/circles", Map.of("circles", List.of(6, 2, 99))).getBody())
+                .containsEntry("circles", List.of(2, 6));
+        assertThat(a.get("/v1/friends").get(0)).containsEntry("circles", List.of(2, 6));
+        assertThat(a.status("DELETE", "/v1/circles/6", null)).isEqualTo(200);
         assertThat(a.get("/v1/friends").get(0)).containsEntry("circles", List.of(2));
-        for (int i = 0; i < 4; i++) {
+        for (int i = 0; i < 3; i++) {
             a.call("POST", "/v1/circles", Map.of("name", "Extra " + i));
         }
         assertThat(a.call("POST", "/v1/circles", Map.of("name", "One too many")).getBody()).containsEntry("error", "too_many_circles");
