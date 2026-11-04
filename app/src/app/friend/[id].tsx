@@ -5,7 +5,7 @@ import { Modal, Pressable, ScrollView, View } from 'react-native';
 
 import { Avatar } from '@/components/avatar';
 import { CircleBadge } from '@/components/circle-badge';
-import { memberLine } from '@/components/circle-choice';
+import { circlesLine, EveryoneRow, memberLine } from '@/components/circle-choice';
 import { ErrorText } from '@/components/form';
 import { ProfileFeed } from '@/components/profile-feed';
 import { Spinner } from '@/components/ui/spinner';
@@ -13,7 +13,7 @@ import { Text } from '@/components/ui/text';
 import { describeError } from '@/lib/account';
 import { loadAddressBook, type AddressBook, type Contact } from '@/lib/addressbook';
 import { blockUser } from '@/lib/blocks';
-import { audienceLabel, circleDefs, circlesOf, setCircles, unfriend } from '@/lib/circles';
+import { circleDefs, circlesOf, setCircles, unfriend } from '@/lib/circles';
 import { showAlert } from '@/lib/dialog';
 import { loadProfile, type Profile } from '@/lib/friends';
 import { displayName, useConnections } from '@/lib/use-connections';
@@ -84,9 +84,9 @@ export default function FriendScreen() {
     router.push({ pathname: '/report/[id]', params: { id: c.userId, kind: 'user' } });
   };
 
-  // The button beside the avatar: their circles ("Everyone" if none: they see my Everyone posts).
+  // The button beside the avatar: Everyone, plus their circles.
   const theirCircles = contact && book ? circlesOf(book, contact) : [];
-  const circlesText = book ? audienceLabel(book, theirCircles.length ? { kind: 'circles', ids: theirCircles } : { kind: 'everyone' }) : '';
+  const circlesText = book ? circlesLine(book, theirCircles) : '';
   const circleButton =
     contact && book ? (
       <Pressable
@@ -203,8 +203,9 @@ function FriendSheet({ visible, name, book, contact, busy, onClose, onToggle, on
         <ScrollView>
           <Text className="px-5 pb-1 pt-2 text-sm font-bold uppercase text-muted dark:text-muted-dark">Circles</Text>
           <Text className="px-5 pb-1 text-sm text-muted dark:text-muted-dark">
-            {name} sees your Everyone posts, plus posts to the circles you put them in.
+            {name} is in Everyone, like everyone you’re connected with, and also sees posts to the circles you put them in.
           </Text>
+          <EveryoneRow book={book} />
           {circleDefs(book).map((c) => {
             const on = circlesOf(book, contact).includes(c.id);
             return (

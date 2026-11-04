@@ -123,7 +123,7 @@ export default function SearchScreen() {
     run(`accept:${c.userId}`, async () => {
       await acceptRequest(account, c.userId, circles);
       await refresh();
-      if (book) setNotice(`You and ${displayName(c)} are now connected${circles.length ? `, in ${circlesLine(book, circles)}` : ''}.`);
+      if (book) setNotice(`You and ${displayName(c)} are now connected. They’re in ${circlesLine(book, circles)}.`);
       else setNotice(`You and ${displayName(c)} are now connected.`);
     });
 
@@ -180,7 +180,7 @@ export default function SearchScreen() {
       void run(`circles:${c.userId}`, async () => {
         await setCircles(account, c.userId, ids);
         setBook(await loadAddressBook(account));
-        setNotice(ids.length && book ? `${displayName(c)} is in ${circlesLine(book, ids)}.` : `${displayName(c)} sees your Everyone posts.`);
+        setNotice(book ? `${displayName(c)} is in ${circlesLine(book, ids)}.` : `${displayName(c)} is in Everyone.`);
       }),
     );
 
@@ -290,14 +290,14 @@ export default function SearchScreen() {
           <Avatar id={c.userId} name={displayName(c)} uri={c.profile.avatarUrl} />
           <View className="flex-1">
             <Text className="font-bold text-ink dark:text-ink-dark">{displayName(c)} joined</Text>
-            <Text className="text-muted dark:text-muted-dark">You’re connected. They see your Everyone posts.</Text>
+            <Text className="text-muted dark:text-muted-dark">You’re connected and they’re in Everyone. Add them to more circles if you like.</Text>
           </View>
           <Button label="Circles" variant="outline" loading={busy === `circles:${c.userId}`} disabled={!!busy} onPress={() => chooseFor(c)} />
         </View>
       ))}
       <Text className="self-start text-muted dark:text-muted-dark">
-        Show this code to someone, or send them your link. Anyone who opens it is connected with you and sees your Everyone
-        posts; you’ll be told, and can choose their circles. It stays the same until you reset it.
+        Show this code to someone, or send them your link. Anyone who opens it is connected with you and added to Everyone,
+        so they see your Everyone posts. You’ll be told, and can add them to more circles. It stays the same until you reset it.
       </Text>
       {link ? (
         <>

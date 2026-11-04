@@ -7,12 +7,29 @@ import { AudienceBadge, CircleBadge } from './circle-badge';
 import { Button } from '@/components/form';
 import { Text } from '@/components/ui/text';
 import type { AddressBook } from '@/lib/addressbook';
-import { audienceLabel, circleDefs, membersOf } from '@/lib/circles';
+import { audienceLabel, circleDefs, membersOf, TO_EVERYONE } from '@/lib/circles';
 import { usePalette } from '@/theme/use-palette';
 
-/** "Close Friends, Family" or "No circles" for a friend's circles. */
+/**
+ * Where a friend is: always Everyone (everyone I'm connected with is in it), plus the circles I picked:
+ * "Everyone" or "Everyone, Family +1".
+ */
 export function circlesLine(book: Pick<AddressBook, 'circleDefs'>, ids: number[]): string {
-  return ids.length ? audienceLabel(book, { kind: 'circles', ids }) : 'No circles';
+  return ids.length ? `Everyone, ${audienceLabel(book, { kind: 'circles', ids })}` : 'Everyone';
+}
+
+/** The first row of every circle picker for a person: Everyone, ticked and locked. */
+export function EveryoneRow({ book }: { book: Pick<AddressBook, 'circleDefs'> }) {
+  return (
+    <ChoiceRow
+      multi
+      locked
+      checked
+      badge={<AudienceBadge book={book} audience={TO_EVERYONE} />}
+      title="Everyone"
+      line="Always · everyone you’re connected with"
+    />
+  );
 }
 
 /** How many are in a circle, for the picker. */
@@ -51,9 +68,11 @@ function CirclePicker({ book, selected, onDone, onClose, confirmLabel = 'Done' }
   return (
     <>
       <Text className="px-5 pb-2 text-sm text-muted dark:text-muted-dark">
-        They always see your Everyone posts, plus posts to any circles you pick here. Pick none to keep them in Everyone only. Only you see this.
+        Everyone you connect with is added to Everyone and sees your Everyone posts. Add them to more circles if you like. Only you see this.
       </Text>
       <ScrollView>
+        <EveryoneRow book={book} />
+        <Text className="px-5 pb-1 pt-3 text-sm font-bold uppercase text-muted dark:text-muted-dark">Also add to</Text>
         {circleDefs(book).map((c) => (
           <ChoiceRow
             key={c.id}
@@ -79,7 +98,7 @@ function CirclePicker({ book, selected, onDone, onClose, confirmLabel = 'Done' }
   );
 }
 
-/** A tappable "Circles" row that opens the picker sheet. Choosing none is fine: they see Everyone posts. */
+/** A tappable "Circles" row that opens the picker sheet. Everyone is always included; more circles are optional. */
 export function CircleChoice({ book, value, onChange, label = 'Add to circles' }: {
   book: AddressBook;
   value: number[];
@@ -99,7 +118,7 @@ export function CircleChoice({ book, value, onChange, label = 'Add to circles' }
         <AudienceBadge book={book} audience={value.length ? { kind: 'circles', ids: value } : { kind: 'everyone' }} small />
         <View className="flex-1">
           <Text className="text-xs text-muted dark:text-muted-dark">{label} · only you see this</Text>
-          <Text className="font-semibold text-ink dark:text-ink-dark">{value.length ? line : 'None · sees Everyone posts'}</Text>
+          <Text className="font-semibold text-ink dark:text-ink-dark">{line}</Text>
         </View>
         <Icon name="chevron-down" size={18} color={palette.muted} />
       </Pressable>

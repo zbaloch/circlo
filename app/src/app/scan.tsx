@@ -48,10 +48,10 @@ export default function ScanScreen() {
 
   const connect = async ({ data, book, from }: { data: string; book: AddressBook; from: Inviter }, circles: number[]) => {
     const name = from.name || `@${from.handle}`;
-    const where = circles.length ? `, in ${circlesLine(book, circles)}` : '';
+    const where = circlesLine(book, circles);
     try {
       const status = await joinInvite(account, data, circles);
-      setStatus(status === 'accepted' ? `You and ${name} are now connected${where}.` : `Request sent${where}. You’ll see their profile once they accept.`);
+      setStatus(status === 'accepted' ? `You and ${name} are now connected. They’re in ${where}.` : `Request sent. Once they accept, they’re in ${where}.`);
     } catch (e) {
       setError(e instanceof InviteError ? e.message : describeError(e));
     }

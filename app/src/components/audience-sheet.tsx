@@ -32,19 +32,22 @@ export function Sheet({ visible, onClose, title, children }: { visible: boolean;
 }
 
 /** One tappable row: a badge, a title, a line under it, and a radio or checkbox mark. */
-export function ChoiceRow({ badge, title, line, checked, multi = false, onPress }: {
+export function ChoiceRow({ badge, title, line, checked, multi = false, locked = false, onPress }: {
   badge: React.ReactNode;
   title: string;
   line?: string;
   checked: boolean;
   multi?: boolean;
-  onPress: () => void;
+  /** Always on and can't be changed (Everyone, for a friend). */
+  locked?: boolean;
+  onPress?: () => void;
 }) {
   const palette = usePalette();
   return (
     <Pressable
       accessibilityRole={multi ? 'checkbox' : 'radio'}
-      accessibilityState={multi ? { checked } : { selected: checked }}
+      accessibilityState={multi ? { checked, disabled: locked } : { selected: checked, disabled: locked }}
+      disabled={locked}
       onPress={onPress}
       className="flex-row items-center gap-3 px-5 py-3 active:bg-surface-raised dark:active:bg-surface-raised-dark">
       {badge}
@@ -52,7 +55,9 @@ export function ChoiceRow({ badge, title, line, checked, multi = false, onPress 
         <Text className="text-base font-semibold text-ink dark:text-ink-dark">{title}</Text>
         {line ? <Text className="text-sm text-muted dark:text-muted-dark">{line}</Text> : null}
       </View>
-      {multi ? (
+      {locked ? (
+        <Icon name="lock-closed" size={18} color={palette.muted} />
+      ) : multi ? (
         <Icon name={checked ? 'checkbox' : 'square-outline'} size={22} color={checked ? palette.primary : palette.muted} />
       ) : checked ? (
         <Icon name="checkmark-circle" size={22} color={palette.primary} />
