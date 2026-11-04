@@ -106,7 +106,8 @@ class EngagementFlowIT extends IntegrationTest {
         // Likes update the app live but are never told.
         b.call("PUT", "/v1/posts/" + post + "/like", null);
         sendDaily();
-        List<TestPush.Sent> toA = push.to("tok-a");
+        // tok-a also heard about the Android phone's sign-in straight away (SecurityAlertsIT); here only the day counts.
+        List<TestPush.Sent> toA = push.to("tok-a").stream().filter(s -> "digest".equals(s.data().get("type"))).toList();
         assertThat(toA).hasSize(1);
         assertThat(toA.get(0).alert()).isEqualTo(NotifyChannelsIT.CALM_PUSH);
         assertThat(toA.get(0).service()).isEqualTo("apns");
@@ -123,7 +124,7 @@ class EngagementFlowIT extends IntegrationTest {
         List<TestPush.Sent> toB = push.to("tok-b");
         assertThat(toB).hasSize(1);
         assertThat(toB.get(0).service()).isEqualTo("apns_sandbox");
-        assertThat(push.to("tok-a")).hasSize(1); // a quiet day for A
+        assertThat(push.to("tok-a").stream().filter(s -> "digest".equals(s.data().get("type")))).hasSize(1); // a quiet day for A
 
         // Nothing a push says names anyone or quotes anything.
         for (TestPush.Sent s : List.of(toA.get(0), toB.get(0))) {

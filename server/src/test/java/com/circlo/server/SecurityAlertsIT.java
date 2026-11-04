@@ -8,12 +8,12 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
 /**
- * Account events are emailed straight away, whatever the notification settings (owner decision 2026-11-01): a new
- * sign-in, a password changed or reset, and another device signed out from the Devices list (signing myself out sends
- * nothing). They say what happened and to which kind of device
- * (iPhone, Android, browser), never where from.
+ * Account events are emailed and pushed straight away, whatever the notification settings (owner decisions 2026-11-01
+ * and 2026-11-04): a new sign-in, a password changed or reset, and another device signed out from the Devices list
+ * (signing myself out sends nothing). They say what happened and to which kind of device (iPhone, Android, browser),
+ * never where from. The device that did it isn't pushed.
  */
-class SecurityEmailsIT extends IntegrationTest {
+class SecurityAlertsIT extends IntegrationTest {
 
     /** Waits up to 3 s for an email to this person with this subject (they're sent after the change commits). */
     private List<TestMail.Sent> await(TestUser u, String subject, int n) throws InterruptedException {
@@ -77,5 +77,45 @@ class SecurityEmailsIT extends IntegrationTest {
         assertThat(a.status("POST", "/v1/auth/logout", null)).isEqualTo(200);
         Thread.sleep(300);
         assertThat(mail.to(a.email).stream().filter(s -> s.subject().endsWith("was signed out of your Circlo account"))).hasSize(1);
+    }
+
+    /** Signs in as an iPhone with notifications on; returns its tokens. */
+    private Map<String, Object> phone(TestUser u, String pushToken) {
+        Map<String, Object> tokens = u.loginAgain();
+        String access = (String) tokens.get("accessToken");
+        assertThat(call("PUT", "/v1/devices/current", Map.of("kind", "ios"), access).getStatusCode().value()).isEqualTo(200);
+        assertThat(call("PUT", "/v1/devices/current/push-token", Map.of("token", pushToken, "service", "apns"), access)
+                .getStatusCode().value()).isEqualTo(200);
+        return tokens;
+    }
+
+    @Test
+    void securityEventsArePushedAtOnceToMyPhonesButNotTheOneThatDidIt() throws Exception {
+        TestUser a = user("sec_push");
+        Map<String, Object> phoneA = phone(a, "sec-tok-a");
+        // A new sign-in: the phone already signed in hears about it, with no detail about the new device.
+        String phoneB = (String) phone(a, "sec-tok-b").get("accessToken");
+        List<TestPush.Sent> signIn = push.await("sec-tok-a", 1);
+        assertThat(signIn).hasSize(1);
+        assertThat(signIn.get(0).alert()).isEqualTo("New sign-in to your Circlo account. If it wasn’t you, change your password in Settings.");
+        assertThat(signIn.get(0).data()).isEqualTo(Map.of("type", "security"));
+        assertThat(push.to("sec-tok-b")).isEmpty(); // it was the new one
+
+        // Phone B signs phone A out: A is told (before it loses its token), B isn't.
+        assertThat(call("DELETE", "/v1/devices/" + phoneA.get("deviceId"), null, phoneB).getStatusCode().value()).isEqualTo(200);
+        List<TestPush.Sent> out = push.await("sec-tok-a", 2);
+        assertThat(out).hasSize(2);
+        assertThat(out.get(1).alert()).startsWith("An iPhone was signed out of your Circlo account");
+
+        // Changing the password on B: the other phones are told, B isn't.
+        phone(a, "sec-tok-c");
+        assertThat(push.await("sec-tok-b", 1)).hasSize(1); // C's sign-in
+        var changed = call("POST", "/v1/auth/password/change", Map.of("currentPassword", TestUser.PASSWORD, "newPassword", "another long password"), phoneB);
+        assertThat(changed.getStatusCode().value()).isEqualTo(200);
+        List<TestPush.Sent> pw = push.await("sec-tok-c", 1);
+        assertThat(pw).hasSize(1);
+        assertThat(pw.get(0).alert()).isEqualTo("Your Circlo password was changed. If it wasn’t you, reset it with “Forgot password?”.");
+        Thread.sleep(300);
+        assertThat(push.to("sec-tok-b")).hasSize(1);
     }
 }

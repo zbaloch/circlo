@@ -19,5 +19,7 @@ export function pushRoute(data: Record<string, unknown> | null | undefined, chat
   if (type === 'reply' && str('postId') && str('replyId')) return { pathname: '/post/[id]', params: { id: str('postId')!, reply: str('replyId')! } };
   if (type === 'message' && chat && str('chatId')) return { pathname: '/chat/[id]', params: { id: str('chatId')! } };
   if (type === 'request') return { pathname: '/search', params: { section: 'friends' } };
+  // Security alerts (new sign-in, password changed, a device signed out): the timeline, which shows a new sign-in in full.
+  if (type === 'security') return '/';
   return '/notifications';
 }

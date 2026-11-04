@@ -5,7 +5,7 @@ import com.circlo.server.auth.AuthService;
 import com.circlo.server.auth.TokenService;
 import com.circlo.server.media.Attachments;
 import com.circlo.server.media.MediaSweeper;
-import com.circlo.server.notify.SecurityEmails;
+import com.circlo.server.notify.SecurityAlerts;
 import com.circlo.server.storage.MediaStore;
 import com.circlo.server.storage.MediaUrlSigner;
 import com.circlo.server.web.ApiException;
@@ -45,10 +45,10 @@ public class AccountController {
     private final Attachments attachments;
     private final TokenService tokens;
     private final AuthService auth;
-    private final SecurityEmails security;
+    private final SecurityAlerts security;
 
     public AccountController(JdbcTemplate jdbc, MediaUrlSigner signer, MediaStore store, Attachments attachments, TokenService tokens,
-            AuthService auth, SecurityEmails security) {
+            AuthService auth, SecurityAlerts security) {
         this.security = security;
         this.jdbc = jdbc;
         this.signer = signer;
@@ -159,11 +159,16 @@ public class AccountController {
         byte[] me = userId(jwt);
         List<String> kind = jdbc.query("SELECT kind FROM devices WHERE id = ? AND user_id = ? AND revoked_at IS NULL",
                 (rs, i) -> rs.getString(1), Ids.bytes(deviceId), me);
-        if (!tokens.revokeDevice(TokenService.userOf(jwt), deviceId)) {
+        if (kind.isEmpty()) {
             throw ApiException.notFound();
         }
-        if (!deviceId.equals(TokenService.deviceOf(jwt))) {
-            security.signedOut(me, kind.isEmpty() ? null : kind.get(0));
+        // Before signing it out, so that phone is told too (only after the commit).
+        UUID current = TokenService.deviceOf(jwt);
+        if (!deviceId.equals(current)) {
+            security.signedOut(me, kind.get(0), current);
+        }
+        if (!tokens.revokeDevice(TokenService.userOf(jwt), deviceId)) {
+            throw ApiException.notFound();
         }
         return Map.of("status", "revoked");
     }

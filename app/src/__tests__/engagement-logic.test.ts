@@ -21,6 +21,7 @@ describe('tapping a push', () => {
     expect(pushRoute({ type: 'reply', postId: P, replyId: R })).toEqual({ pathname: '/post/[id]', params: { id: P, reply: R } });
     expect(pushRoute({ type: 'message', chatId: C }, true)).toEqual({ pathname: '/chat/[id]', params: { id: C } });
     expect(pushRoute({ type: 'request' })).toEqual({ pathname: '/search', params: { section: 'friends' } });
+    expect(pushRoute({ type: 'security' })).toBe('/');
   });
 
   it('falls back to Notifications for counts-only or malformed data', () => {

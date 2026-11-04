@@ -1,7 +1,7 @@
 package com.circlo.server.auth;
 
 import com.circlo.server.social.CircleController;
-import com.circlo.server.notify.SecurityEmails;
+import com.circlo.server.notify.SecurityAlerts;
 import com.circlo.server.web.ApiException;
 import com.circlo.server.web.Ids;
 import com.circlo.server.web.LockedException;
@@ -36,11 +36,11 @@ public class AuthService {
     private final EmailCodes codes;
     private final LoginThrottle throttle;
     private final RateLimiter limiter;
-    private final SecurityEmails security;
+    private final SecurityAlerts security;
     private final Clock clock = Clock.systemUTC();
 
     public AuthService(JdbcTemplate jdbc, TokenService tokens, PasswordHasher passwords, EmailCodes codes, LoginThrottle throttle,
-            RateLimiter limiter, SecurityEmails security) {
+            RateLimiter limiter, SecurityAlerts security) {
         this.jdbc = jdbc;
         this.security = security;
         this.tokens = tokens;
@@ -223,7 +223,7 @@ public class AuthService {
                 .orElseThrow(() -> ApiException.badRequest("invalid_code"));
         codes.consume(u.id(), EmailCodes.Purpose.reset, code);
         jdbc.update("UPDATE users SET password_hash = ? WHERE id = ?", passwords.hash(password), u.id());
-        security.passwordChanged(u.id());
+        security.passwordChanged(u.id(), null);
         throttle.clear(throttleKey(u, null));
         tokens.revokeAll(u.uuid());
         return tokens.signIn(u.uuid());
@@ -250,7 +250,7 @@ public class AuthService {
         }
         throttle.clear(key);
         jdbc.update("UPDATE users SET password_hash = ? WHERE id = ?", passwords.hash(next), u.id());
-        security.passwordChanged(u.id());
+        security.passwordChanged(u.id(), deviceId);
         tokens.revokeAllExcept(userId, deviceId);
         return tokens.issue(userId, deviceId);
     }

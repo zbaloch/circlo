@@ -10,7 +10,7 @@ import { backgroundChecksOn, disableBackgroundChecks, enableBackgroundChecks, no
 import { CHAT_ENABLED } from '@/lib/features';
 import { refreshMe, setEmailNotifications, useMe } from '@/lib/me';
 
-/** Notifications: the daily phone notification, the daily email, and the security emails that always go out. */
+/** Notifications: the daily phone notification, the daily email, and the security alerts that always go out. */
 export default function NotificationSettingsScreen() {
   const [error, setError] = useState<string>();
   const me = useMe();
@@ -70,7 +70,7 @@ export default function NotificationSettingsScreen() {
             />
           ) : null}
         </Row>
-        <Row title="Security emails" subtitle={SECURITY_NOTE} />
+        <Row title="Security alerts" subtitle={SECURITY_NOTE} />
       </Section>
       <View className="px-4">
         <ErrorText>{error}</ErrorText>
@@ -87,5 +87,7 @@ const CHECKS_NOTE = usesPush
 const EMAIL_TITLE = 'A daily email when I’m not using the app';
 const EMAIL_WHAT = CHAT_ENABLED ? 'new replies, messages, friends or requests' : 'new replies, friends or requests';
 const EMAIL_NOTE_WEB = `Without the Circlo app on a phone, we email you once a day, around 6pm, on days with ${EMAIL_WHAT}. With the app, you’re told on your phone instead and get no emails.`;
-const SECURITY_NOTE = 'A new sign-in, a password change, or another device signed out from Devices is always emailed straight away, whatever you choose here.';
+const SECURITY_NOTE = usesPush
+  ? 'A new sign-in, a password change, or another device signed out from Devices is always emailed straight away, and your phones with notifications on are told too, whatever you choose here.'
+  : 'A new sign-in, a password change, or another device signed out from Devices is always emailed straight away, whatever you choose here.';
 const EMAIL_NOTE_APP = `Only while you’re not signed in to the Circlo app on a phone. While you are, you’re told here instead and get no emails.`;
