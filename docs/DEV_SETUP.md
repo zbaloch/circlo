@@ -166,7 +166,7 @@ Both platforms get the same pushes and taps open the same screens.
 ### Android (FCM)
 
 1. **Firebase project (once):** console.firebase.google.com → **Add project** (Analytics off) → **Add app** → Android,
-   package `com.circlo.app` → download **google-services.json** (identifies the app to FCM; keep it out of the repo,
+   package `com.hellocirclo.app` → download **google-services.json** (identifies the app to FCM; keep it out of the repo,
    it's git-ignored).
 2. **Build secret:** GitHub → Settings → Environments → `release` → add secret **GOOGLE_SERVICES_JSON_BASE64** with the
    output of `base64 -w0 google-services.json`. The release workflow writes it to a temp file and passes its path to

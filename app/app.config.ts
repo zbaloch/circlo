@@ -26,7 +26,8 @@ const config: ExpoConfig = {
   icon: './assets/images/icon.png',
   userInterfaceStyle: 'automatic',
   ios: {
-    // com.circlo.app was already taken on Apple's side, so iOS uses com.hellocirclo.app (owner decision 2026-10-31).
+    // com.circlo.app was already taken on Apple's side, so iOS uses com.hellocirclo.app (owner decision 2026-10-31), and
+    // Android uses the same ID so both stores and Firebase match (owner decision 2026-11-04).
     bundleIdentifier: 'com.hellocirclo.app',
     ...(buildNumber ? { buildNumber } : {}),
     // Brand pack (ios/AppIcon.appiconset): the dotted "o" on white, plus dark and tinted (iOS 18) variants.
@@ -43,7 +44,7 @@ const config: ExpoConfig = {
     config: { usesNonExemptEncryption: false },
   },
   android: {
-    package: 'com.circlo.app',
+    package: 'com.hellocirclo.app',
     ...(buildNumber ? { versionCode: Number(buildNumber) } : {}),
     adaptiveIcon: {
       backgroundColor: colors.brand.background,

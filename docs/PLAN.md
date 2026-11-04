@@ -75,12 +75,12 @@ The product is **Circlo** (domain `circlo.com`). Every project, package, databas
 | **Expo / React Native app** | `name: "Circlo"`, `slug: "circlo"`, `scheme: "circlo"` (deep links `circlo://…`) |
 | npm package names | root workspace `circlo`, app package `@circlo/app` |
 | iOS bundle identifier | `com.hellocirclo.app` (`com.circlo.app` was taken on Apple's side; owner decision 2026-10-31) |
-| Android application ID | `com.circlo.app` |
+| Android application ID | `com.hellocirclo.app` (the same as iOS; owner decision 2026-11-04) |
 | Universal / app links | `https://circlo.com/i/<token>` (friend invites), `https://circlo.com/.well-known/…` |
 | Keychain / Keystore service name | `com.circlo.app.keys` |
 | Crypto domain-separation strings | all HKDF `info` and AAD labels start with `circlo/v1/` (e.g. `circlo/v1/circle-step`, `circlo/v1/reply`, `circlo/v1/post-ref`) |
 | JWT issuer / audience | `circlo-server` / `circlo-app` |
-| Push notification topic | `com.circlo.app` |
+| Push notification topic | `com.hellocirclo.app` (APNs topic = the iOS bundle ID) |
 | Log and metric prefix | `circlo.` |
 
 **Never** use the old working names "circles" or "orbits" for any identifier. "Circle" is still the in-app term for the 1–100 audience levels (e.g. the Circles screen, `circle` in code that handles audience levels), but never as a project, package, database or bucket name.
@@ -660,7 +660,7 @@ On the device:
 ## 5. Instructions to paste into Claude Code's CLAUDE.md
 
 ```
-- The product is Circlo. Name every project, package, database, bucket, container, bundle ID and config key per docs/PLAN.md section 0A (circlo-core, @circlo/core, com.circlo.server / circlo-server, DBs circlo + circlo_test, buckets circlo-media + circlo-media-test, app com.circlo.app, scheme circlo://, env prefix CIRCLO_, crypto labels circlo/v1/...). Never use "circles" or "orbits" as an identifier.
+- The product is Circlo. Name every project, package, database, bucket, container, bundle ID and config key per docs/PLAN.md section 0A (circlo-core, @circlo/core, com.circlo.server / circlo-server, DBs circlo + circlo_test, buckets circlo-media + circlo-media-test, app com.hellocirclo.app, scheme circlo://, env prefix CIRCLO_, crypto labels circlo/v1/...). Never use "circles" or "orbits" as an identifier.
 - Never send plaintext user content, names, emails, circle numbers or private keys to the server.
 - All crypto lives in /core (Rust). The app and server never implement crypto primitives themselves.
 - Every ciphertext uses AEAD with AAD binding (object type, id, version).

@@ -1,6 +1,6 @@
 # app/ — @circlo/app (Expo SDK 58, React Native 0.88, TypeScript)
 
-- Expo dev builds (not Expo Go). `name: "Circlo"`, `slug: "circlo"`, `scheme: "circlo"`, iOS bundle ID `com.hellocirclo.app` (`com.circlo.app` was taken at Apple), Android package `com.circlo.app`
+- Expo dev builds (not Expo Go). `name: "Circlo"`, `slug: "circlo"`, `scheme: "circlo"`, iOS bundle ID and Android package `com.hellocirclo.app` (`com.circlo.app` was taken at Apple; Android matches it)
   (see `app.config.ts`).
 - One codebase, three targets: iOS, Android and the **web app** (app.hellocirclo.com, `npm run build:web`, static
   single-page export deployed with `vercel.json`). Native-only modules get a `.web.ts` sibling with the same exports

@@ -3,7 +3,7 @@
 Full spec: `docs/PLAN.md` (read its "Current design" section first). Progress and decisions log: `docs/PROGRESS.md`
 (read it first when resuming). Each of `server/`, `app/` has its own `CLAUDE.md` with part-specific conventions.
 
-- The product is Circlo. Name every project, package, database, bucket, container, bundle ID and config key per docs/PLAN.md section 0A (com.circlo.server / circlo-server, @circlo/app, DBs circlo + circlo_test, buckets circlo-media + circlo-media-test, app com.circlo.app, scheme circlo://, env prefix CIRCLO_). Never use "circles" or "orbits" as an identifier.
+- The product is Circlo. Name every project, package, database, bucket, container, bundle ID and config key per docs/PLAN.md section 0A (com.circlo.server / circlo-server, @circlo/app, DBs circlo + circlo_test, buckets circlo-media + circlo-media-test, app com.hellocirclo.app (iOS and Android), scheme circlo://, env prefix CIRCLO_). Never use "circles" or "orbits" as an identifier.
 - Owner decision 2026-11-01: no end-to-end encryption. Content travels over HTTPS and is stored as sent; the server decides who may see what. Don't reintroduce device-level encryption without asking.
 - Every read of a post, reply, like, photo, chat, profile or circle goes through a server-side access check. Circle names, memberships and a post's audience are returned only to their owner. Other people's emails are never returned.
 - Passwords are stored only as Argon2id hashes; email codes, refresh tokens, invite and check tokens only as SHA-256 hashes.
