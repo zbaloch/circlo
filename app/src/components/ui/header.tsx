@@ -4,6 +4,7 @@ import type { ReactNode } from 'react';
 import { Pressable, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { useMe } from '@/lib/me';
 import { useSession } from '@/lib/session';
 import { usePalette } from '@/theme/use-palette';
 
@@ -49,9 +50,11 @@ export function DrawerAvatarButton() {
   const session = useSession();
   const handle = session.status === 'signedIn' ? session.account.handle : undefined;
   const userId = session.status === 'signedIn' ? session.account.userId : undefined;
+  // My profile photo once it's loaded (the drawer and Edit profile keep it fresh); my initial until then.
+  const me = useMe();
   return (
     <Pressable accessibilityRole="button" accessibilityLabel="Open menu" hitSlop={8} onPress={() => navigation.dispatch({ type: 'OPEN_DRAWER' })} className="active:opacity-70">
-      <Avatar size="sm" id={userId} name={handle} />
+      <Avatar size="sm" id={userId} name={me?.name || handle} uri={me?.avatarUrl} />
     </Pressable>
   );
 }

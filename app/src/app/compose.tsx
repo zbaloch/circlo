@@ -16,6 +16,7 @@ import { describeError } from '@/lib/account';
 import { loadAddressBook, type AddressBook, type Audience } from '@/lib/addressbook';
 import { audienceLabel, ONLY_ME } from '@/lib/circles';
 import { discardPicked, MAX_IMAGES, type PickedMedia } from '@/lib/media';
+import { useMe } from '@/lib/me';
 import { enqueuePost } from '@/lib/outbox';
 import { MAX_POST_CHARS, validateDraft } from '@/lib/posts';
 import { useSession } from '@/lib/session';
@@ -39,6 +40,7 @@ function toPicked(a: ImagePicker.ImagePickerAsset): PickedMedia {
  */
 export default function ComposeScreen() {
   const session = useSession();
+  const me = useMe();
   const account = session.status === 'signedIn' ? session.account : null;
   const palette = usePalette();
   const [book, setBook] = useState<AddressBook | null>(null);
@@ -190,7 +192,7 @@ export default function ComposeScreen() {
 
         <ScrollView ref={scroll} testID="compose-body" className="flex-1" contentContainerClassName="gap-3 px-4 pb-4" keyboardShouldPersistTaps="handled">
           <View className="flex-row gap-3">
-            <Avatar id={account?.userId} name={account?.handle} />
+            <Avatar id={account?.userId} name={me?.name || account?.handle} uri={me?.avatarUrl} />
             <View className="flex-1 gap-2">
               <TextInput
                 accessibilityLabel="Post text"

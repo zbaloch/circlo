@@ -13,6 +13,7 @@ import { PostText } from '@/components/post-card';
 import { loadAddressBook, type AddressBook } from '@/lib/addressbook';
 import { showAlert } from '@/lib/dialog';
 import { putPost, usePost } from '@/lib/feed-store';
+import { useMe } from '@/lib/me';
 import { useSession } from '@/lib/session';
 import { MAX_REPLY_CHARS, noteSentReply, sendReply, validateReply } from '@/lib/thread';
 import { relativeTime } from '@/lib/time';
@@ -35,6 +36,7 @@ export default function ReplyScreen() {
   const account = session.status === 'signedIn' ? session.account : null;
   const palette = usePalette();
   const post = usePost(id);
+  const myProfile = useMe();
   const [book, setBook] = useState<AddressBook | null>(null);
   // Drawer screens stay mounted between visits, so the draft and the sending state belong to one post: a reply to
   // another post starts empty.
@@ -131,7 +133,7 @@ export default function ReplyScreen() {
 
           {/* My reply. */}
           <View className="flex-row gap-3">
-            <Avatar id={account.userId} name={me.name} />
+            <Avatar id={account.userId} name={me.name} uri={myProfile?.avatarUrl} />
             <TextInput
               accessibilityLabel="Reply"
               autoFocus
