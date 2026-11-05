@@ -14,6 +14,7 @@ describe('no tracking', () => {
     // The photo picker needs no permission; broad photo access would need a Play declaration.
     expect(BLOCKED_PERMISSIONS).toContain('android.permission.READ_MEDIA_IMAGES');
     expect(BLOCKED_PERMISSIONS).toContain('android.permission.READ_MEDIA_VIDEO');
+    expect(BLOCKED_PERMISSIONS).toContain('android.permission.SYSTEM_ALERT_WINDOW');
     expect(manifest.$['xmlns:tools']).toBe('http://schemas.android.com/tools');
   });
 

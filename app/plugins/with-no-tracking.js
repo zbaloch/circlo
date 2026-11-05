@@ -15,6 +15,8 @@ const BLOCKED_PERMISSIONS = [
   'android.permission.READ_MEDIA_IMAGES',
   'android.permission.READ_MEDIA_VIDEO',
   'android.permission.READ_MEDIA_VISUAL_USER_SELECTED',
+  // Drawing over other apps: Expo's template adds it for React Native's developer menu; Circlo never needs it.
+  'android.permission.SYSTEM_ALERT_WINDOW',
 ];
 // Not blocked: com.google.android.c2dm.permission.RECEIVE, which Firebase needs to deliver Circlo's content-free pushes.
 
