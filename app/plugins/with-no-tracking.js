@@ -10,9 +10,13 @@ const BLOCKED_PERMISSIONS = [
   'android.permission.ACCESS_ADSERVICES_AD_ID',
   'android.permission.ACCESS_ADSERVICES_ATTRIBUTION',
   'android.permission.ACCESS_ADSERVICES_TOPICS',
-  // There is no remote push (notifications are local, from background checks), so Google's push receiver isn't needed.
-  'com.google.android.c2dm.permission.RECEIVE',
+  // Photos are picked with Android's photo picker, which needs no permission. Broad access to the photo library would
+  // need a Google Play declaration Circlo can't justify (a library may still declare it, e.g. for screenshot detection).
+  'android.permission.READ_MEDIA_IMAGES',
+  'android.permission.READ_MEDIA_VIDEO',
+  'android.permission.READ_MEDIA_VISUAL_USER_SELECTED',
 ];
+// Not blocked: com.google.android.c2dm.permission.RECEIVE, which Firebase needs to deliver Circlo's content-free pushes.
 
 /** Adds tools:node="remove" entries so the merged manifest drops these permissions. Pure; exported for tests. */
 function blockPermissions(manifest) {
