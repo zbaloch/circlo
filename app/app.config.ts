@@ -101,6 +101,21 @@ const config: ExpoConfig = {
     ],
     // Background checks for new activity (iOS BGTaskScheduler, Android WorkManager).
     'expo-background-task',
+    // Release builds shrink code with R8, which removed WorkManager's Room database (created by reflection), so the
+    // app crashed at start: "Failed to create an instance of class androidx.work.impl.WorkDatabase". Keep Room's
+    // generated databases.
+    [
+      'expo-build-properties',
+      {
+        android: {
+          extraProguardRules: [
+            '-keep class * extends androidx.room.RoomDatabase { <init>(); }',
+            '-keep class androidx.work.impl.WorkDatabase_Impl { *; }',
+            '-keep class androidx.work.impl.** extends androidx.room.RoomDatabase { *; }',
+          ].join('\n'),
+        },
+      },
+    ],
     // The wordmark: gray-900 with a sky-500 dot on white; white with a sky-400 dot on gray-950 in dark mode.
     [
       'expo-splash-screen',
