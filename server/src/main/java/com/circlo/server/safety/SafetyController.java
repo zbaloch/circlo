@@ -83,13 +83,11 @@ public class SafetyController {
                         .orElseThrow(ApiException::notFound);
             }
             case "reply" -> {
-                Object[] row = jdbc.query("SELECT post_id, author_id, CONCAT('reply: ', body) FROM post_replies WHERE id = ?",
-                        (rs, i) -> new Object[] {rs.getBytes(1), rs.getBytes(2), rs.getString(3)}, (Object) target).stream().findFirst()
+                // Only a reply I can see (its post, and its circle).
+                access.visibleReplyPost(me, target).orElseThrow(ApiException::notFound);
+                yield jdbc.query("SELECT author_id, CONCAT('reply: ', body) FROM post_replies WHERE id = ?",
+                        (rs, i) -> new Object[] {rs.getBytes(1), rs.getString(2)}, (Object) target).stream().findFirst()
                         .orElseThrow(ApiException::notFound);
-                if (!access.canSee(me, (byte[]) row[0])) {
-                    throw ApiException.notFound();
-                }
-                yield new Object[] {row[1], row[2]};
             }
             default -> jdbc.query("""
                     SELECT m.sender_id, CONCAT('message: ', m.body) FROM chat_messages m

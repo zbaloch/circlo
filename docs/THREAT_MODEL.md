@@ -42,6 +42,7 @@
 | Moving someone into a circle doesn't open old posts | The snapshot is taken at post time | `PostsFlowIT` |
 | Unfriend/block removes access everywhere | `People.disconnect` deletes the friendship, circle memberships and snapshot rows | `PostsFlowIT`, `SocialFlowIT` |
 | Replies, likes and media follow their post | Every thread endpoint checks the post first; media URLs are only handed out inside views of visible posts | `PostsFlowIT`, `MediaFlowIT` |
+| Replies don't reveal other circles | On a post shared with several circles, a reply reaches only people who share one of those circles with its writer (plus the post's author); reply counts, profile Replies tabs, likes and reports follow the same rule. The post author's own replies reach the whole audience | `ReplyCirclesIT` |
 | Circle labels stay private | Audience fields are only set on the author's own posts; `/v1/circles` and circle ids in `/v1/friends` are the caller's own | `PostsFlowIT`, `SocialFlowIT` |
 | Chats are members-only | Membership check on every chat call; only friends can be added | `ChatFlowIT` |
 | No discovery | No search endpoint; requests need a redeemed invite from the target; profiles 404 for strangers | `SocialFlowIT` |

@@ -73,7 +73,8 @@ public class ActivityController {
                   UNION ALL
                   SELECT 'reply_like', r.post_id, p.body, rl.liker_id, r.id, r.body, rl.created_at
                     FROM reply_likes rl JOIN post_replies r ON r.id = rl.reply_id JOIN posts p ON p.id = r.post_id
-                   WHERE r.author_id = ? AND rl.liker_id <> ? AND rl.created_at < ? AND """ + PostAccess.VISIBLE + """
+                   WHERE r.author_id = ? AND rl.liker_id <> ? AND rl.created_at < ? AND """ + PostAccess.VISIBLE + " AND "
+                + PostAccess.replyVisibleTo("rl.liker_id") + """
                   UNION ALL
                   SELECT 'joined', NULL, NULL, f.user_a, NULL, NULL, f.created_at
                     FROM friendships f WHERE f.user_b = ? AND f.via_link = TRUE AND f.status = 'accepted' AND f.created_at < ?

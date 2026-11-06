@@ -35,8 +35,9 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Replies and likes, on posts and on replies. Anyone who can see a post can see and add its replies and likes, and
- * nobody else; replies from people I blocked are left out for me. A person's replies are listed only on posts I can see.
+ * Replies and likes, on posts and on replies. Anyone who can see a post can add replies and likes, and nobody else.
+ * Replies stay in the circle they came from (PostAccess.replyVisibleTo), and replies from people I blocked are left out
+ * for me. A person's replies are listed only where I could see them on the post.
  */
 @RestController
 public class ThreadController {
@@ -132,10 +133,11 @@ public class ThreadController {
             @RequestParam(value = "limit", defaultValue = "100") int limit) {
         byte[] me = me(jwt);
         visibleAuthor(me, postId);
-        List<ReplyRow> rows = jdbc.query("SELECT " + REPLY_COLUMNS + " FROM post_replies r "
+        List<ReplyRow> rows = jdbc.query("SELECT " + REPLY_COLUMNS + " FROM post_replies r JOIN posts p ON p.id = r.post_id "
                 + "WHERE r.post_id = ? AND r.created_at > ? AND r.author_id NOT IN (SELECT blocked_id FROM user_blocks WHERE blocker_id = ?) "
-                + "ORDER BY r.created_at, r.id LIMIT ?",
-                (rs, i) -> replyRow(rs), Ids.bytes(postId), Timestamp.from(after == null ? Instant.EPOCH : after), me, Math.max(1, Math.min(limit, 200)));
+                + "AND " + PostAccess.REPLY_VISIBLE + " ORDER BY r.created_at, r.id LIMIT ?",
+                (rs, i) -> replyRow(rs), Ids.bytes(postId), Timestamp.from(after == null ? Instant.EPOCH : after), me, me, me, me,
+                Math.max(1, Math.min(limit, 200)));
         return replyViews(me, rows);
     }
 
@@ -149,15 +151,17 @@ public class ThreadController {
             @RequestParam(value = "limit", defaultValue = "30") int limit) {
         byte[] me = me(jwt);
         String notBlocked = " NOT IN (SELECT blocked_id FROM user_blocks WHERE blocker_id = ?)";
-        Object[] args = new Object[9];
+        Object[] args = new Object[12];
         args[0] = Ids.bytes(userId);
         System.arraycopy(PostAccess.visibleArgs(me), 0, args, 1, 4);
-        args[5] = Timestamp.from(before == null ? Instant.now().plusSeconds(60) : before);
-        args[6] = me;
-        args[7] = me;
-        args[8] = Math.max(1, Math.min(limit, 100));
+        System.arraycopy(PostAccess.replyVisibleArgs(me), 0, args, 5, 3);
+        args[8] = Timestamp.from(before == null ? Instant.now().plusSeconds(60) : before);
+        args[9] = me;
+        args[10] = me;
+        args[11] = Math.max(1, Math.min(limit, 100));
         List<ReplyRow> rows = jdbc.query("SELECT " + REPLY_COLUMNS + " FROM post_replies r JOIN posts p ON p.id = r.post_id "
-                + "WHERE r.author_id = ? AND " + PostAccess.VISIBLE + " AND r.created_at < ? AND r.author_id" + notBlocked
+                + "WHERE r.author_id = ? AND " + PostAccess.VISIBLE + " AND " + PostAccess.REPLY_VISIBLE
+                + " AND r.created_at < ? AND r.author_id" + notBlocked
                 + " AND p.author_id" + notBlocked + " ORDER BY r.created_at DESC LIMIT ?", (rs, i) -> replyRow(rs), args);
         if (rows.isEmpty()) {
             return List.of();
@@ -193,11 +197,12 @@ public class ThreadController {
 
     // ---------- likes on replies ----------
 
-    /** The reply's author, if the reply is on this post and I may see the post; otherwise 404. */
+    /** The reply's author, if the reply is on this post and I may see the post and the reply; otherwise 404. */
     private byte[] visibleReplyAuthor(byte[] me, UUID postId, UUID replyId) {
         visibleAuthor(me, postId);
-        return jdbc.query("SELECT author_id FROM post_replies WHERE id = ? AND post_id = ?", (rs, i) -> rs.getBytes(1),
-                Ids.bytes(replyId), Ids.bytes(postId)).stream().findFirst().orElseThrow(ApiException::notFound);
+        return jdbc.query("SELECT r.author_id FROM post_replies r JOIN posts p ON p.id = r.post_id WHERE r.id = ? AND r.post_id = ? AND "
+                + PostAccess.REPLY_VISIBLE, (rs, i) -> rs.getBytes(1), Ids.bytes(replyId), Ids.bytes(postId), me, me, me)
+                .stream().findFirst().orElseThrow(ApiException::notFound);
     }
 
     @PutMapping("/v1/posts/{postId}/replies/{replyId}/like")

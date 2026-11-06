@@ -155,7 +155,9 @@ public class PostController {
         Object[] idArgs = ids.stream().map(Ids::bytes).toArray();
         Map<UUID, People.Person> authors = people.persons(rows.stream().map(Row::author).toList());
         Map<UUID, List<Attachments.AttachmentView>> media = attachments.of("post_id", ids);
-        Map<UUID, Integer> replies = counts("SELECT post_id, COUNT(*) FROM post_replies WHERE post_id IN (" + marks + ") GROUP BY post_id", idArgs);
+        // Only the replies this viewer may see, so the count doesn't tell them about other circles' replies.
+        Map<UUID, Integer> replies = counts("SELECT r.post_id, COUNT(*) FROM post_replies r JOIN posts p ON p.id = r.post_id WHERE r.post_id IN ("
+                + marks + ") AND " + PostAccess.REPLY_VISIBLE + " GROUP BY r.post_id", concat(idArgs, PostAccess.replyVisibleArgs(viewer)));
         Map<UUID, Integer> likes = counts("SELECT post_id, COUNT(*) FROM post_likes WHERE post_id IN (" + marks + ") GROUP BY post_id", idArgs);
         Set<UUID> liked = new HashSet<>(jdbc.query("SELECT post_id FROM post_likes WHERE liker_id = ? AND post_id IN (" + marks + ")",
                 (rs, i) -> Ids.uuid(rs.getBytes(1)), concat(new Object[] {viewer}, idArgs)));
