@@ -173,7 +173,8 @@ export default function ThreadScreen() {
                 <View className="flex-1 gap-1">
                   <View className="flex-row items-start gap-2">
                     <Text numberOfLines={1} className="flex-1 text-sm text-muted dark:text-muted-dark">
-                      <Text className="font-bold text-ink dark:text-ink-dark">{name}</Text> @{item.authorHandle} · {relativeTime(item.createdAtMs, now)}
+                      <Text className="font-bold text-ink dark:text-ink-dark">{name}</Text>
+                      {item.mine ? <Text accessibilityLabel="Your reply"> · You</Text> : null} @{item.authorHandle} · {relativeTime(item.createdAtMs, now)}
                     </Text>
                     <Pressable accessibilityRole="button" accessibilityLabel="Reply options" hitSlop={10} onPress={() => replyMenu(item)} className="-mt-0.5 active:opacity-60">
                       <Icon name="ellipsis-horizontal" size={18} color={palette.muted} />

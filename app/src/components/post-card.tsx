@@ -29,7 +29,18 @@ type Props = {
   onMediaPress?: (index: number) => void;
   /** Opens the author's profile (avatar or name). */
   onAuthor?: () => void;
+  /** Leaves out "You" on my own posts where every post is mine (my profile). */
+  hideYou?: boolean;
 };
+
+/** "· You" after my name on my own posts and replies, so I can tell them apart at a glance. */
+export function YouTag({ className = 'text-[15px]' }: { className?: string }) {
+  return (
+    <Text accessibilityLabel="Your post" className={`shrink-0 text-muted dark:text-muted-dark ${className}`}>
+      · You
+    </Text>
+  );
+}
 
 function Action({ icon, label, count, active, onPress }: { icon: IconName; label: string; count?: number; active?: boolean; onPress?: () => void }) {
   const palette = usePalette();
@@ -68,7 +79,10 @@ export function PostDetail({ post, name, handle, avatarUrl, audience, onReply, o
         <Pressable accessibilityRole="button" accessibilityLabel={`${name}'s profile`} onPress={onAuthor} disabled={!onAuthor} className="flex-1 flex-row items-center gap-3 active:opacity-70">
           <Avatar id={post.authorId} name={name} uri={avatarUrl} />
           <View className="flex-1">
-            <Text numberOfLines={1} className="text-base font-bold text-ink dark:text-ink-dark">{name}</Text>
+            <View className="flex-row items-center gap-1">
+              <Text numberOfLines={1} className="shrink text-base font-bold text-ink dark:text-ink-dark">{name}</Text>
+              {post.mine ? <YouTag className="text-base" /> : null}
+            </View>
             {handle ? <Text numberOfLines={1} className="text-[15px] text-muted dark:text-muted-dark">@{handle}</Text> : null}
           </View>
         </Pressable>
@@ -99,7 +113,7 @@ export function PostDetail({ post, name, handle, avatarUrl, audience, onReply, o
   );
 }
 
-export function PostCard({ post, name, handle, avatarUrl, audience, onOpen, onReply, onLike, onMore, onMediaPress, onAuthor }: Props) {
+export function PostCard({ post, name, handle, avatarUrl, audience, onOpen, onReply, onLike, onMore, onMediaPress, onAuthor, hideYou }: Props) {
   const now = useNow();
   const palette = usePalette();
   return (
@@ -112,6 +126,7 @@ export function PostCard({ post, name, handle, avatarUrl, audience, onOpen, onRe
           <Text numberOfLines={1} onPress={onAuthor} className="shrink text-[15px] font-bold text-ink dark:text-ink-dark">
             {name}
           </Text>
+          {post.mine && !hideYou ? <YouTag /> : null}
           {handle ? (
             <Text numberOfLines={1} className="shrink text-[15px] text-muted dark:text-muted-dark">
               @{handle}

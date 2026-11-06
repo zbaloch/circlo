@@ -230,7 +230,7 @@ export function ProfileFeed({
           item.reply ? (
             <ReplyCard item={item.reply} now={now} />
           ) : item.post ? (
-            <PostCard post={item.post} {...actionsFor.cardProps(item.post)} />
+            <PostCard post={item.post} {...actionsFor.cardProps(item.post)} hideYou={own} />
           ) : null
         }
       />
