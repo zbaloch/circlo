@@ -743,6 +743,24 @@ paths:
       responses:
         "200": { $ref: "#/components/responses/Status" }
         "404": { $ref: "#/components/responses/Error" }
+  /v1/posts/{postId}/audience:
+    put:
+      summary: Change who can see my post (at once; nobody is told). 404 for anyone but the author
+      parameters:
+        - { $ref: "#/components/parameters/PostId" }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/Audience" }
+      responses:
+        "200":
+          description: The post, with its new audience
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Post" }
+        "400": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
   /v1/posts/{postId}/replies:
     get:
       summary: Replies, oldest first

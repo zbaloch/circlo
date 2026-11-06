@@ -1986,6 +1986,50 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/posts/{postId}/audience": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Change who can see my post (at once; nobody is told). 404 for anyone but the author */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    postId: components["parameters"]["PostId"];
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["Audience"];
+                };
+            };
+            responses: {
+                /** @description The post, with its new audience */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Post"];
+                    };
+                };
+                400: components["responses"]["Error"];
+                404: components["responses"]["Error"];
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/posts/{postId}/replies": {
         parameters: {
             query?: never;

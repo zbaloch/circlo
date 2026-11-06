@@ -31,6 +31,7 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
@@ -94,34 +95,75 @@ public class PostController {
         }
         List<Attachments.NewAttachment> media = p.media() == null ? List.of() : p.media();
         String text = cleanText(p.text(), MAX_CHARS, !media.isEmpty());
-        String audience = switch (p.audience().kind()) {
-            case "onlyMe" -> "only_me";
-            case "everyone" -> "everyone";
-            default -> "circles";
-        };
-        List<Integer> circles = List.of();
-        if (audience.equals("circles")) {
-            Set<Integer> mine = new HashSet<>(jdbc.queryForList("SELECT id FROM circles WHERE owner_id = ?", Integer.class, (Object) me));
-            circles = p.audience().circles() == null ? List.of() : p.audience().circles().stream().distinct().sorted().toList();
-            if (circles.isEmpty() || !mine.containsAll(circles)) {
-                throw ApiException.badRequest("invalid_audience");
-            }
-        }
+        Chosen chosen = chosen(me, p.audience());
         UUID postId = Ids.newId();
         byte[] id = Ids.bytes(postId);
-        jdbc.update("INSERT INTO posts (id, author_id, body, audience, created_at) VALUES (?, ?, ?, ?, ?)", id, me, text, audience,
+        jdbc.update("INSERT INTO posts (id, author_id, body, audience, created_at) VALUES (?, ?, ?, ?, ?)", id, me, text, chosen.kind(),
                 Timestamp.from(Instant.now()));
-        for (int c : circles) {
+        for (int c : chosen.circles()) {
             jdbc.update("INSERT INTO post_circles (post_id, circle_id) VALUES (?, ?)", id, c);
         }
         attachments.attach(me, id, null, media);
         // Open timelines of everyone who may see it show "New posts" right away.
-        List<UUID> readers = audience.equals("only_me") ? List.of()
-                : audience.equals("everyone")
-                        ? jdbc.query(PostAccess.FRIENDS.substring(1, PostAccess.FRIENDS.length() - 1), (rs, i) -> Ids.uuid(rs.getBytes(1)), me, me)
-                        : jdbc.query("SELECT DISTINCT cm.member_id FROM post_circles pc JOIN circle_members cm ON cm.owner_id = ? "
-                                + "AND cm.circle_id = pc.circle_id WHERE pc.post_id = ?", (rs, i) -> Ids.uuid(rs.getBytes(1)), me, id);
-        notifier.changed(readers);
+        notifier.changed(readers(me, id));
+        return views(me, "WHERE p.id = ?", id).get(0);
+    }
+
+    /** An audience as stored: `kind` only_me, everyone or circles, and the circle ids (sorted, for circles only). */
+    private record Chosen(String kind, List<Integer> circles) {}
+
+    /** Checks an audience against my circles; a circle choice needs one or more circles that are mine. */
+    private Chosen chosen(byte[] me, Audience a) {
+        String kind = switch (a.kind()) {
+            case "onlyMe" -> "only_me";
+            case "everyone" -> "everyone";
+            default -> "circles";
+        };
+        if (!kind.equals("circles")) {
+            return new Chosen(kind, List.of());
+        }
+        Set<Integer> mine = new HashSet<>(jdbc.queryForList("SELECT id FROM circles WHERE owner_id = ?", Integer.class, (Object) me));
+        List<Integer> circles = a.circles() == null ? List.of() : a.circles().stream().distinct().sorted().toList();
+        if (circles.isEmpty() || !mine.containsAll(circles)) {
+            throw ApiException.badRequest("invalid_audience");
+        }
+        return new Chosen(kind, circles);
+    }
+
+    /** Everyone other than me who may see my post now. */
+    private List<UUID> readers(byte[] me, byte[] postId) {
+        String kind = jdbc.queryForObject("SELECT audience FROM posts WHERE id = ?", String.class, (Object) postId);
+        return switch (kind) {
+            case "only_me" -> List.of();
+            case "everyone" -> jdbc.query(PostAccess.FRIENDS.substring(1, PostAccess.FRIENDS.length() - 1), (rs, i) -> Ids.uuid(rs.getBytes(1)), me, me);
+            default -> jdbc.query("SELECT DISTINCT cm.member_id FROM post_circles pc JOIN circle_members cm ON cm.owner_id = ? "
+                    + "AND cm.circle_id = pc.circle_id WHERE pc.post_id = ?", (rs, i) -> Ids.uuid(rs.getBytes(1)), me, postId);
+        };
+    }
+
+    /**
+     * Changes who may see my post (owner decision 2026-11-06), at once and everywhere, like moving people between
+     * circles: added people see it with its replies, removed people lose it. Nobody is told. Only the author can do
+     * this; for anyone else the post is "not found", so it gives nothing away.
+     */
+    @PutMapping("/v1/posts/{postId}/audience")
+    @Transactional
+    public PostView changeAudience(@AuthenticationPrincipal Jwt jwt, @PathVariable("postId") UUID postId, @Valid @RequestBody Audience a) {
+        byte[] me = me(jwt);
+        byte[] id = Ids.bytes(postId);
+        if (jdbc.queryForList("SELECT 1 FROM posts WHERE id = ? AND author_id = ? FOR UPDATE", id, me).isEmpty()) {
+            throw ApiException.notFound();
+        }
+        Chosen chosen = chosen(me, a);
+        Set<UUID> affected = new HashSet<>(readers(me, id));
+        jdbc.update("UPDATE posts SET audience = ? WHERE id = ?", chosen.kind(), id);
+        jdbc.update("DELETE FROM post_circles WHERE post_id = ?", (Object) id);
+        for (int c : chosen.circles()) {
+            jdbc.update("INSERT INTO post_circles (post_id, circle_id) VALUES (?, ?)", id, c);
+        }
+        // Open apps of those who gained or lost it refresh, without being told why.
+        affected.addAll(readers(me, id));
+        notifier.changed(List.copyOf(affected));
         return views(me, "WHERE p.id = ?", id).get(0);
     }
 

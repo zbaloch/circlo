@@ -1,4 +1,8 @@
 import { router } from 'expo-router';
+import { useState } from 'react';
+
+import { ChangeAudienceSheet } from '@/components/change-audience-sheet';
+import { showToast } from '@/lib/toast';
 
 import { type AddressBook } from '@/lib/addressbook';
 import { audienceLabel } from '@/lib/circles';
@@ -30,6 +34,8 @@ export function audienceBadge(book: Pick<AddressBook, 'circleDefs'> | null, post
 
 /** Everything a post card needs, shared by Home, the thread view and profiles. */
 export function usePostActions(account: StoredAccount | null, book: AddressBook | null, opts: { inThread?: boolean; onChange?: () => void } = {}) {
+  // My post whose audience I'm changing, if any.
+  const [editing, setEditing] = useState<FeedPost | null>(null);
   const like = async (post: FeedPost) => {
     const next = toggledLike(post);
     putPost(next);
@@ -66,10 +72,27 @@ export function usePostActions(account: StoredAccount | null, book: AddressBook 
         },
       ]);
     showAlert('Your post', undefined, [
-      { text: 'Delete post', style: 'destructive', onPress: confirmDelete },
-      { text: 'Cancel', style: 'cancel' },
+      ...(book ? [{ text: 'Change who can see this', onPress: () => setEditing(post) }] : []),
+      { text: 'Delete post', style: 'destructive' as const, onPress: confirmDelete },
+      { text: 'Cancel', style: 'cancel' as const },
     ]);
   };
+
+  const sheet =
+    editing && book ? (
+      <ChangeAudienceSheet
+        visible
+        book={book}
+        post={editing}
+        onClose={() => setEditing(null)}
+        onSaved={(updated) => {
+          putPost(updated);
+          setEditing(null);
+          opts.onChange?.();
+          showToast('Updated who can see this');
+        }}
+      />
+    ) : null;
 
   const cardProps = (post: FeedPost) => {
     const open = () => router.push({ pathname: '/post/[id]', params: { id: post.postId } });
@@ -92,5 +115,5 @@ export function usePostActions(account: StoredAccount | null, book: AddressBook 
     };
   };
 
-  return { cardProps, sheet: null };
+  return { cardProps, sheet };
 }

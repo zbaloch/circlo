@@ -87,6 +87,21 @@ export async function deletePost(postId: string): Promise<void> {
   ok(await api.DELETE('/v1/posts/{postId}', { params: { path: { postId } } }));
 }
 
+/** Changes who can see my post, at once; nobody is told. Returns the post with its new audience. */
+export async function changeAudience(post: FeedPost, audience: Audience): Promise<FeedPost> {
+  const row = ok(await api.PUT('/v1/posts/{postId}/audience', { params: { path: { postId: post.postId } }, body: apiAudience(audience) }));
+  return fromRow(row, post.authorId);
+}
+
+/** True when two audiences are the same choice (circles in any order). Pure. */
+export function sameAudience(a: Audience | null | undefined, b: Audience | null | undefined): boolean {
+  if (!a || !b || a.kind !== b.kind) return false;
+  if (a.kind !== 'circles' || b.kind !== 'circles') return true;
+  const x = [...a.ids].sort((m, n) => m - n);
+  const y = [...b.ids].sort((m, n) => m - n);
+  return x.length === y.length && x.every((id, i) => id === y[i]);
+}
+
 export type Page = { posts: FeedPost[]; cursor?: string; hasMore: boolean };
 
 function page(rows: PostRow[], myId: string, limit: number): Page {
