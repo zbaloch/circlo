@@ -1,6 +1,6 @@
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { Pressable, ScrollView, View } from 'react-native';
+import { ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Button } from '@/components/form';
@@ -64,11 +64,10 @@ export default function SecurityAlertScreen() {
           </Text>
         </View>
       </ScrollView>
-      <View className="gap-1 px-6 pb-6 pt-3">
-        <Button size="lg" label="No, change my password" onPress={secure} />
-        <Pressable accessibilityRole="button" onPress={itWasMe} className="items-center rounded-full py-3 active:bg-surface-raised dark:active:bg-surface-raised-dark">
-          <Text className="text-[15px] font-bold text-ink dark:text-ink-dark">Yes, it was me</Text>
-        </Pressable>
+      {/* It almost always was me, so that's the main button; changing the password stays a full button right below. */}
+      <View className="gap-3 px-6 pb-6 pt-3">
+        <Button size="lg" label="Yes, it was me" onPress={itWasMe} />
+        <Button size="lg" variant="outline" label="No, change my password" onPress={secure} />
       </View>
     </SafeAreaView>
   );
