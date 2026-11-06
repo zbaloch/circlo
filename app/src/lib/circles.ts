@@ -68,7 +68,8 @@ export function audienceLabel(book: Pick<AddressBook, 'circleDefs'>, audience: A
   if (audience.kind === 'everyone') return 'Everyone';
   const names = [...audience.ids].sort((a, b) => a - b).map((id) => circleName(book, id));
   if (names.length === 0) return 'Circles';
-  return names.length <= 2 ? names.join(', ') : `${names[0]} +${names.length - 1}`;
+  // Every circle by name: "Family +2" left me guessing who a post went to.
+  return names.join(', ');
 }
 
 /** A usable audience: circles must exist, without repeats; an empty circle choice isn't one. */

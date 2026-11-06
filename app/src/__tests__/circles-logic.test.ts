@@ -50,7 +50,7 @@ describe('circles', () => {
     expect(audienceLabel(book, { kind: 'onlyMe' })).toBe('Only me');
     expect(audienceLabel(book, { kind: 'everyone' })).toBe('Everyone');
     expect(audienceLabel(book, { kind: 'circles', ids: [3, 2] })).toBe('Close Friends, School');
-    expect(audienceLabel(book, { kind: 'circles', ids: [6, 1, 2] })).toBe('Family +2');
+    expect(audienceLabel(book, { kind: 'circles', ids: [6, 1, 2] })).toBe('Family, Close Friends, Book club'); // every circle, so it's never unclear
   });
 
   it('stars circle 1 while it keeps its starter name', () => {

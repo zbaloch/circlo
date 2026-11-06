@@ -99,7 +99,7 @@ export function PostDetail({ post, name, handle, avatarUrl, audience, onReply, o
         {audience ? (
           <View className="flex-row items-center gap-1">
             <Icon name="lock-closed" size={12} color={palette.muted} />
-            <Text className="text-[15px] text-muted dark:text-muted-dark">{audience}</Text>
+            <Text className="shrink text-[15px] text-muted dark:text-muted-dark">{audience}</Text>
           </View>
         ) : null}
       </View>
@@ -143,7 +143,7 @@ export function PostCard({ post, name, handle, avatarUrl, audience, onOpen, onRe
         {audience ? (
           <View className="flex-row items-center gap-1">
             <Icon name="lock-closed" size={12} color={palette.muted} />
-            <Text className="text-xs text-muted dark:text-muted-dark">{audience}</Text>
+            <Text className="shrink text-xs text-muted dark:text-muted-dark">{audience}</Text>
           </View>
         ) : null}
         {post.text ? <PostText text={post.text} className="text-[15px] leading-5 text-ink dark:text-ink-dark" /> : null}
