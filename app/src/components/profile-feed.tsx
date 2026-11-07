@@ -15,6 +15,7 @@ import { fetchAuthorPosts, type FeedPost } from "@/lib/posts";
 import { fetchUserReplies, type UserReply } from "@/lib/thread";
 import { useNow } from "@/lib/use-now";
 import { postsForTab, profileTabs, type ProfileTab } from "@/lib/view-logic";
+import { ContentText } from "@/components/content-text";
 
 const TAB_LABEL: Record<ProfileTab, string> = {
   posts: "Posts",
@@ -162,9 +163,7 @@ export function ProfileFeed({
                 </Text>
               ) : null}
               {bio ? (
-                <Text className="text-base text-ink dark:text-ink-dark">
-                  {bio}
-                </Text>
+                <ContentText text={bio} className="text-base text-ink dark:text-ink-dark" />
               ) : null}
               {friendCount !== undefined ? (
                 <Text className="text-muted dark:text-muted-dark">

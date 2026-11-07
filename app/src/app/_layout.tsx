@@ -9,6 +9,18 @@ import { Inter_500Medium } from '@expo-google-fonts/inter/500Medium';
 import { Inter_600SemiBold } from '@expo-google-fonts/inter/600SemiBold';
 import { Inter_700Bold } from '@expo-google-fonts/inter/700Bold';
 import { Inter_800ExtraBold } from '@expo-google-fonts/inter/800ExtraBold';
+import {
+  NotoNaskhArabic_400Regular,
+  NotoNaskhArabic_500Medium,
+  NotoNaskhArabic_600SemiBold,
+  NotoNaskhArabic_700Bold,
+} from '@expo-google-fonts/noto-naskh-arabic';
+import {
+  NotoNastaliqUrdu_400Regular,
+  NotoNastaliqUrdu_500Medium,
+  NotoNastaliqUrdu_600SemiBold,
+  NotoNastaliqUrdu_700Bold,
+} from '@expo-google-fonts/noto-nastaliq-urdu';
 import { useFonts } from 'expo-font';
 import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
@@ -101,7 +113,12 @@ function Navigator() {
 
 export default function RootLayout() {
   const palette = usePalette();
-  const [fontsLoaded, fontError] = useFonts({ Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold, Inter_800ExtraBold });
+  const [fontsLoaded, fontError] = useFonts({
+    Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold, Inter_800ExtraBold,
+    // Arabic-script posts (lib/script): Naskh for Sindhi and Arabic, Nastaliq for Urdu and Persian.
+    NotoNaskhArabic_400Regular, NotoNaskhArabic_500Medium, NotoNaskhArabic_600SemiBold, NotoNaskhArabic_700Bold,
+    NotoNastaliqUrdu_400Regular, NotoNastaliqUrdu_500Medium, NotoNastaliqUrdu_600SemiBold, NotoNastaliqUrdu_700Bold,
+  });
   const ready = fontsLoaded || !!fontError;
   useEffect(() => {
     if (ready) SplashScreen.hideAsync().catch(() => undefined);

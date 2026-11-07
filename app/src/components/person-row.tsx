@@ -3,6 +3,7 @@ import { Pressable, View } from 'react-native';
 
 import { Avatar } from '@/components/avatar';
 import { Icon } from '@/components/ui/icon';
+import { ContentText } from '@/components/content-text';
 import { Text } from '@/components/ui/text';
 import { usePalette } from '@/theme/use-palette';
 
@@ -44,7 +45,7 @@ export function PersonRow({ id, name, handle, bio, note, avatarUrl, onPress, act
             <Text numberOfLines={2} className="flex-1 text-sm text-muted dark:text-muted-dark">{note}</Text>
           </View>
         ) : null}
-        {bio ? <Text numberOfLines={3} className="text-ink dark:text-ink-dark">{bio}</Text> : null}
+        {bio ? <ContentText text={bio} links={false} numberOfLines={3} className="text-ink dark:text-ink-dark" /> : null}
       </View>
     </Pressable>
   );

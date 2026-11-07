@@ -1,6 +1,7 @@
 import { router } from 'expo-router';
 import { Pressable, View } from 'react-native';
 
+import { ContentText } from '@/components/content-text';
 import { Avatar } from '@/components/avatar';
 import { Icon } from '@/components/ui/icon';
 import { Text } from '@/components/ui/text';
@@ -31,7 +32,7 @@ export function ReplyCard({ item, now }: { item: UserReply; now: number }) {
         <Text className="text-sm text-muted dark:text-muted-dark">
           Replying to <Text className="text-primary dark:text-primary-dark">@{post.authorHandle}</Text>
         </Text>
-        <Text className="text-base text-ink dark:text-ink-dark">{reply.text}</Text>
+        <ContentText text={reply.text} className="text-base text-ink dark:text-ink-dark" />
         <View className="mt-1 gap-0.5 rounded-xl border border-border px-3 py-2 dark:border-border-dark">
           <Text numberOfLines={1} className="text-sm text-muted dark:text-muted-dark">
             <Text className="font-bold text-ink dark:text-ink-dark">{post.authorName}</Text> · {relativeTime(post.createdAtMs, now)}

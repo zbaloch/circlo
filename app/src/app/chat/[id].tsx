@@ -1,3 +1,5 @@
+import { ContentText } from '@/components/content-text';
+import { scriptOf, textDirection } from '@/lib/script';
 import { Icon } from '@/components/ui/icon';
 import * as ImagePicker from 'expo-image-picker';
 import { Redirect, router, useFocusEffect, useLocalSearchParams, useNavigation } from 'expo-router';
@@ -206,7 +208,7 @@ export function ChatScreen() {
                   ) : null}
                   {item.msg.text ? (
                     <View className={`rounded-2xl px-4 py-2 ${item.msg.mine ? 'rounded-br-md bg-primary dark:bg-primary-dark' : 'rounded-bl-md bg-surface-raised dark:bg-surface-raised-dark'}`}>
-                      <Text className={item.msg.mine ? 'text-base text-on-primary dark:text-on-primary-dark' : 'text-base text-ink dark:text-ink-dark'}>{item.msg.text}</Text>
+                      <ContentText text={item.msg.text} className={item.msg.mine ? 'text-base text-on-primary dark:text-on-primary-dark' : 'text-base text-ink dark:text-ink-dark'} />
                     </View>
                   ) : null}
                 </Pressable>
@@ -228,7 +230,8 @@ export function ChatScreen() {
             value={text}
             onChangeText={setText}
             maxLength={4000}
-            className="max-h-28 flex-1 rounded-2xl bg-surface-raised px-4 py-2 text-base text-ink dark:bg-surface-raised-dark dark:text-ink-dark"
+            script={scriptOf(text)}
+            className={`max-h-28 flex-1 rounded-2xl bg-surface-raised px-4 py-2 text-base text-ink dark:bg-surface-raised-dark dark:text-ink-dark ${textDirection(text) === 'rtl' ? 'text-right' : ''}`}
           />
           <Pressable
             accessibilityRole="button"

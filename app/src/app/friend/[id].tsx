@@ -18,6 +18,7 @@ import { showAlert } from '@/lib/dialog';
 import { loadProfile, type Profile } from '@/lib/friends';
 import { showToast } from '@/lib/toast';
 import { displayName, useConnections } from '@/lib/use-connections';
+import { ContentText } from '@/components/content-text';
 import { usePalette } from '@/theme/use-palette';
 
 /**
@@ -151,7 +152,7 @@ export default function FriendScreen() {
       <Avatar size="lg" id={c.userId} name={name} uri={profile?.avatarUrl ?? c.profile.avatarUrl} />
       <Text className="text-2xl font-bold text-ink dark:text-ink-dark">{name}</Text>
       <Text className="text-muted dark:text-muted-dark">@{c.profile.handle}</Text>
-      {profile?.bio ? <Text className="text-center text-base text-ink dark:text-ink-dark">{profile.bio}</Text> : null}
+      {profile?.bio ? <ContentText text={profile.bio} className="text-center text-base text-ink dark:text-ink-dark" /> : null}
       <Text className="text-muted dark:text-muted-dark">Request pending</Text>
       {circleButton}
       <View className="w-full">{below}</View>

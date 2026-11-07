@@ -11,6 +11,7 @@ import { fullTime, relativeTime } from '@/lib/time';
 import { useNow } from '@/lib/use-now';
 import { linkParts } from '@/lib/view-logic';
 import { usePalette } from '@/theme/use-palette';
+import { ContentText } from '@/components/content-text';
 import { Text } from '@/components/ui/text';
 import { LIKES_ENABLED } from '@/lib/features';
 
@@ -53,21 +54,9 @@ function Action({ icon, label, count, active, onPress }: { icon: IconName; label
 }
 
 /** Post card (PLAN.md 2A). No repost action, deliberately: resharing would leak a post beyond its circle. */
-/** Post text with tappable links. */
+/** Post text: each paragraph in its own direction and its script's font (ContentText), with tappable links. */
 export function PostText({ text, className }: { text: string; className: string }) {
-  return (
-    <Text className={className}>
-      {linkParts(text).map((part, i) =>
-        part.url ? (
-          <Text key={i} accessibilityRole="link" onPress={() => Linking.openURL(part.url!)} className="text-primary dark:text-primary-dark">
-            {part.text}
-          </Text>
-        ) : (
-          part.text
-        ),
-      )}
-    </Text>
-  );
+  return <ContentText text={text} className={className} />;
 }
 
 /** The thread's main post, X style: author row, full-width text and media, the full time, then actions. */

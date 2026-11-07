@@ -22,6 +22,7 @@ import { MAX_POST_CHARS, validateDraft } from '@/lib/posts';
 import { useSession } from '@/lib/session';
 import { usePalette } from '@/theme/use-palette';
 import { Text, TextInput } from '@/components/ui/text';
+import { scriptOf, textDirection } from '@/lib/script';
 
 function toPicked(a: ImagePicker.ImagePickerAsset): PickedMedia {
   return {
@@ -209,7 +210,9 @@ export default function ComposeScreen() {
                 textAlignVertical="top"
                 // Room to tap while empty; with photos the field fits its text, so they sit right under it and move
                 // down as it grows (as on X).
-                className={`${media.length ? 'min-h-8' : 'min-h-24'} p-0 pt-1 text-lg text-ink dark:text-ink-dark`}
+                // Typing in Sindhi, Urdu, Persian or Arabic: right-aligned, in that script's font.
+                script={scriptOf(text)}
+                className={`${media.length ? 'min-h-8' : 'min-h-24'} p-0 pt-1 text-lg text-ink dark:text-ink-dark ${textDirection(text) === 'rtl' ? 'text-right' : ''}`}
               />
             </View>
           </View>

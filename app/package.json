@@ -17,6 +17,8 @@
   },
   "dependencies": {
     "@expo-google-fonts/inter": "0.4.2",
+    "@expo-google-fonts/noto-naskh-arabic": "0.4.5",
+    "@expo-google-fonts/noto-nastaliq-urdu": "0.4.2",
     "@shopify/flash-list": "2.3.2",
     "@zxcvbn-ts/core": "4.2.0",
     "@zxcvbn-ts/language-common": "4.1.3",

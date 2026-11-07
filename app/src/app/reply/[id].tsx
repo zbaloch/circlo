@@ -1,3 +1,5 @@
+import { ContentText } from '@/components/content-text';
+import { scriptOf, textDirection } from '@/lib/script';
 import { Icon } from '@/components/ui/icon';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useRef, useState } from 'react';
@@ -119,7 +121,7 @@ export default function ReplyScreen() {
                 {author.handle ? <Text numberOfLines={1} className="shrink text-[15px] text-muted dark:text-muted-dark">@{author.handle}</Text> : null}
                 <Text className="text-[15px] text-muted dark:text-muted-dark">· {relativeTime(shown.at, now)}</Text>
               </View>
-              {answering ? <Text className="text-[15px] leading-5 text-ink dark:text-ink-dark">{answering.text}</Text> : null}
+              {answering ? <ContentText text={answering.text} className="text-[15px] leading-5 text-ink dark:text-ink-dark" /> : null}
               {!answering && post.text ? <PostText text={post.text} className="text-[15px] leading-5 text-ink dark:text-ink-dark" /> : null}
               <Text className="pt-3 text-[15px] text-muted dark:text-muted-dark">
                 Replying to <Text className="text-primary dark:text-primary-dark">{author.handle ? `@${author.handle}` : author.name}</Text>
@@ -152,7 +154,9 @@ export default function ReplyScreen() {
               value={text}
               onChangeText={setText}
               {...follow}
-              className="flex-1 pt-2 text-lg text-ink dark:text-ink-dark"
+              // Typing in Sindhi, Urdu, Persian or Arabic: right-aligned, in that script's font.
+              script={scriptOf(text)}
+              className={`flex-1 pt-2 text-lg text-ink dark:text-ink-dark ${textDirection(text) === 'rtl' ? 'text-right' : ''}`}
             />
           </View>
         </ScrollView>

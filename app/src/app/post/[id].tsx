@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { FlatList, Pressable, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { ContentText } from '@/components/content-text';
 import { Avatar } from '@/components/avatar';
 import { EmptyState } from '@/components/empty-state';
 import { openProfile, usePostActions } from '@/components/post-actions';
@@ -185,7 +186,7 @@ export default function ThreadScreen() {
                       Replying to <Text className="text-primary dark:text-primary-dark">@{item.replyingTo.handle}</Text>
                     </Text>
                   ) : null}
-                  <Text className="text-base text-ink dark:text-ink-dark">{item.text}</Text>
+                  <ContentText text={item.text} className="text-base text-ink dark:text-ink-dark" />
                   <View className="mt-1 flex-row items-center gap-6">
                     {/* Answer this reply: the answer stays in this reply's circle (the server decides). */}
                     <Pressable
