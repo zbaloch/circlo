@@ -91,7 +91,7 @@ describe('Get started on an empty Home', () => {
     await render(<GetStarted connections={[]} />);
     expect(screen.getByText('Get started')).toBeTruthy();
     await fireEvent.press(screen.getByRole('button', { name: 'Invite' }));
-    expect(mockPush).toHaveBeenCalledWith({ pathname: '/add-people', params: { section: 'invite' } });
+    expect(mockNavigate).toHaveBeenCalledWith({ pathname: '/search', params: { section: 'invite' } });
     await fireEvent.press(screen.getByRole('button', { name: 'Write' }));
     expect(mockPush).toHaveBeenCalledWith('/compose');
   });

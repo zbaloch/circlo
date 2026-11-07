@@ -24,39 +24,40 @@ import { Text } from '@/components/ui/text';
 /** While my QR code is on screen, check this often for people who scan it. */
 const INVITE_POLL_MS = 3_000;
 
-type Section = 'friends' | 'circles' | 'invite' | 'join';
-export type HubMode = 'people' | 'add';
-/** The People tab: who (your people) and how they're grouped (your circles). Add people: the two ways to connect. */
-const SECTIONS: Record<HubMode, { key: Section; label: string }[]> = {
-  people: [
-    { key: 'friends', label: 'People' },
-    { key: 'circles', label: 'Circles' },
-  ],
-  add: [
-    { key: 'invite', label: 'Invite someone' },
-    { key: 'join', label: 'Got an invite?' },
-  ],
-};
+type Section = 'friends' | 'circles' | 'invite';
+/** Who (your people), how they're grouped (your circles), and how to add more (Invite, with Got an invite? below). */
+const SECTIONS: { key: Section; label: string }[] = [
+  { key: 'friends', label: 'People' },
+  { key: 'circles', label: 'Circles' },
+  { key: 'invite', label: 'Invite' },
+];
 
 function message(e: unknown) {
   return e instanceof InviteError ? e.message : describeError(e);
 }
 
 /**
- * Your people and your circles in one place (owner decision 2026-11-07). `people` (the People tab): People (requests
- * to answer, requests I sent, my people with their circles) and Circles (Only me, Everyone, my circles, New circle).
- * `add` (Add people, from the tab's button): Invite someone (my QR code and link, the same until I reset it) and Got an
- * invite? (scan or paste someone's). Invites are the only way to connect; there is no search. Whoever scans my code
- * while it's on screen shows up above it, to choose their circles.
+ * The People tab: your people, your circles and inviting, in one place (owner decisions 2026-11-07). People (requests
+ * to answer, requests I sent, my people with their circles), Circles (Only me, Everyone, my circles, New circle) and
+ * Invite (my QR code and link, the same until I reset it, then "Got an invite?" to scan or paste someone's). It opens
+ * on Invite while I have nobody yet, since that's the first thing to do. Invites are the only way to connect; there
+ * is no search. Whoever scans my code while it's on screen shows up above it, to choose their circles.
  */
-export function PeopleHub({ mode }: { mode: HubMode }) {
+export function PeopleHub() {
   const palette = usePalette();
   const { account, connections, unseenRequests, refresh } = useConnections();
   // Links can open a given section (a request in Notifications, Get started's "Invite someone", an invite link).
   const { section: requested, invite } = useLocalSearchParams<{ section?: string; invite?: string }>();
-  const sections = SECTIONS[mode];
-  const asSection = (s?: string) => sections.find((x) => x.key === s)?.key;
-  const [section, setSection] = useState<Section>(asSection(requested) ?? sections[0].key);
+  // "join" is the old name for Got an invite?, which now sits under Invite.
+  const asSection = (s?: string) => (s === 'join' ? 'invite' : SECTIONS.find((x) => x.key === s)?.key);
+  const [section, setSection] = useState<Section>(asSection(requested) ?? 'friends');
+  // With nobody yet (no people, no requests), open on Invite: it's the first thing to do. Decided once, when the
+  // connections first arrive, and only when no link asked for a section.
+  const [opened, setOpened] = useState(!!asSection(requested));
+  if (!opened && connections) {
+    setOpened(true);
+    if (connections.length === 0) setSection('invite');
+  }
   const [lastRequested, setLastRequested] = useState(requested);
   if (requested !== lastRequested) {
     setLastRequested(requested);
@@ -73,8 +74,8 @@ export function PeopleHub({ mode }: { mode: HubMode }) {
   const [link, setLink] = useState<string>();
   // Who I was connected with when my code went on screen: anyone new since then just joined.
   const [known, setKnown] = useState<ReadonlySet<string> | null>(null);
-  // An invite link that opened the app waits on Got an invite?, ready to send (only Add people takes it).
-  const [pasted, setPasted] = useState(() => (mode === 'add' ? (takePendingInvite() ?? '') : ''));
+  // An invite link that opened the app (before signing in) waits under Invite, in Got an invite?, ready to send.
+  const [pasted, setPasted] = useState(() => takePendingInvite() ?? '');
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string>();
   const [notice, setNotice] = useState<string>();
@@ -216,7 +217,6 @@ export function PeopleHub({ mode }: { mode: HubMode }) {
   const dots: Record<Section, boolean> = {
     friends: incoming.length > 0,
     circles: false,
-    join: false,
     invite: false,
   };
 
@@ -274,7 +274,7 @@ export function PeopleHub({ mode }: { mode: HubMode }) {
         {friends.length === 0 ? (
           <View className="items-start gap-3">
             <Text className="text-muted dark:text-muted-dark">No one here yet. Invite someone, or use an invite you were sent.</Text>
-            <Button label="Invite someone" onPress={() => router.push({ pathname: '/add-people', params: { section: 'invite' } })} />
+            <Button label="Invite someone" onPress={() => pick('invite')} />
           </View>
         ) : null}
         {friends.map((f) => (
@@ -302,7 +302,6 @@ export function PeopleHub({ mode }: { mode: HubMode }) {
       {Platform.OS !== 'web' ? <Button label="Scan QR code" onPress={() => router.push('/scan')} /> : null}
       <TextField label={Platform.OS === 'web' ? 'Paste the invite link' : 'Or paste an invite link'} placeholder="https://www.hellocirclo.com/i/…" value={pasted} onChangeText={setPasted} />
       <Button label="Connect" variant="outline" disabled={!pasted} loading={busy === 'paste'} onPress={() => void connectWith(pasted)} />
-      {feedback}
     </>
   );
 
@@ -348,7 +347,7 @@ export function PeopleHub({ mode }: { mode: HubMode }) {
   return (
     <View className="flex-1 bg-surface dark:bg-surface-dark">
       <View accessibilityRole="tablist" className="flex-row border-b border-border dark:border-border-dark">
-        {sections.map((t) => (
+        {SECTIONS.map((t) => (
           <Pressable
             key={t.key}
             accessibilityRole="tab"
@@ -371,7 +370,19 @@ export function PeopleHub({ mode }: { mode: HubMode }) {
         contentContainerClassName="gap-5 p-5"
         keyboardShouldPersistTaps="handled"
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={async () => { setRefreshing(true); await refresh(); setRefreshing(false); }} />}>
-        {section === 'friends' ? friendsSection : section === 'circles' ? (book ? <CirclesList book={book} /> : null) : section === 'join' ? joinSection : inviteSection}
+        {section === 'friends' ? (
+          friendsSection
+        ) : section === 'circles' ? (
+          book ? <CirclesList book={book} /> : null
+        ) : (
+          <>
+            {inviteSection}
+            <View className="gap-3 border-t border-border pt-5 dark:border-border-dark">
+              <Text accessibilityRole="header" className="text-lg font-bold text-ink dark:text-ink-dark">Got an invite?</Text>
+              {joinSection}
+            </View>
+          </>
+        )}
       </ScrollView>
       {ask && book ? (
         <CirclePickerSheet

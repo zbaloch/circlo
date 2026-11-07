@@ -84,7 +84,6 @@ function Navigator() {
         <Stack.Screen name="(drawer)" options={{ headerShown: false }} />
         <Stack.Screen name="profile" options={page('Profile')} />
         <Stack.Screen name="circles" options={page('My Circles')} />
-        <Stack.Screen name="add-people" options={page('Add people')} />
         <Stack.Screen name="devices" options={page('Devices')} />
         <Stack.Screen name="settings/index" options={page('Settings and privacy')} />
         <Stack.Screen name="settings/account" options={page('Your account')} />

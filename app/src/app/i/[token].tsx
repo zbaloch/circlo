@@ -15,5 +15,5 @@ export default function InviteLink() {
   if (session.status === 'loading') return null;
   if (session.status === 'signedIn' && token) return <Redirect href={{ pathname: '/search', params: { invite: token } }} />;
   if (token) setPendingInvite(`${INVITE_HOST}${token}`);
-  return session.status === 'signedIn' ? <Redirect href={{ pathname: '/add-people', params: { section: 'join' } }} /> : <Redirect href="/welcome" />;
+  return session.status === 'signedIn' ? <Redirect href={{ pathname: '/search', params: { section: 'invite' } }} /> : <Redirect href="/welcome" />;
 }

@@ -1,8 +1,4 @@
-import { router, Tabs } from 'expo-router';
-
-import { IconButton } from '@/components/icon-button';
-import { Icon } from '@/components/ui/icon';
-import { usePalette } from '@/theme/use-palette';
+import { Tabs } from 'expo-router';
 
 import { DrawerAvatarButton, HeaderBar } from '@/components/ui/header';
 import { TabBar, type TabSpec } from '@/components/ui/tab-bar';
@@ -26,15 +22,6 @@ export function visibleTabs(chat: boolean): TabSpec[] {
 
 export const TABS = visibleTabs(CHAT_ENABLED);
 
-function AddPeopleButton() {
-  const palette = usePalette();
-  return (
-    <IconButton accessibilityLabel="Add people" onPress={() => router.push('/add-people')}>
-      <Icon name="person-add-outline" size={24} color={palette.ink} />
-    </IconButton>
-  );
-}
-
 /** Bottom tab bar with icons only (PLAN.md 2A). Labels exist for screen readers. Same on iOS and Android. */
 export default function TabLayout() {
   useConnectionsSync();
@@ -57,8 +44,6 @@ export default function TabLayout() {
             title: t.label,
             // Home draws its own header so it can hide on scroll (PLAN.md 2A).
             ...(t.name === 'index' ? { headerShown: false } : {}),
-            // People: invite someone or use an invite, from one button (Add people).
-            ...(t.name === 'search' ? { headerRight: () => <AddPeopleButton /> } : {}),
           }}
         />
       ))}

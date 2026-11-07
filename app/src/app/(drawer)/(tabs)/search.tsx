@@ -1,6 +1,6 @@
 import { PeopleHub } from '@/components/people-hub';
 
-/** The People tab: your people and your circles (PeopleHub). Add people is a button in its header. */
+/** The People tab: your people, your circles and inviting (PeopleHub). */
 export default function PeopleScreen() {
-  return <PeopleHub mode="people" />;
+  return <PeopleHub />;
 }
