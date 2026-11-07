@@ -51,14 +51,15 @@ export default function SignupScreen() {
         <Pressable
           accessibilityRole="checkbox"
           accessibilityState={{ checked: agreed }}
-          accessibilityLabel="I agree to the Terms of Use and Privacy Policy"
+          accessibilityLabel="I’m 16 or older and agree to the Terms of Use and Privacy Policy"
           onPress={() => setAgreed(!agreed)}
           hitSlop={8}
           className="pt-0.5">
           <Icon name={agreed ? 'checkbox' : 'square-outline'} size={22} color={agreed ? palette.primary : palette.muted} />
         </Pressable>
         <Text className="flex-1 text-sm text-muted dark:text-muted-dark">
-          I agree to the{' '}
+          {/* Circlo is for people 16 and over (Terms of Use, the stores' age ratings). */}
+          I’m 16 or older and agree to the{' '}
           <Text accessibilityRole="link" onPress={() => openLink(LINKS.terms)} className="text-sm font-semibold text-primary dark:text-primary-dark">
             Terms of Use
           </Text>{' '}

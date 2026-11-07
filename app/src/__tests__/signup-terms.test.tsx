@@ -8,13 +8,15 @@ jest.mock('expo-linking', () => ({ openURL: jest.fn() }));
 jest.mock('@/lib/account', () => ({ normalizeUsername: (h: string) => h, looksLikeEmail: () => true, describeError: String, startSignup: jest.fn(async () => 'sam@example.com') }));
 
 describe('signup terms', () => {
-  it('can’t continue until the terms are agreed to, and links to the terms and privacy policy', async () => {
+  it('can’t continue until they confirm they’re 16 or older and agree to the terms, and links to the terms and privacy policy', async () => {
     const Linking = jest.requireMock('expo-linking');
     await render(<SignupScreen />);
     const cont = screen.getByRole('button', { name: 'Continue' });
     expect(cont).toBeDisabled();
+    // The app is for people 16 and over (Terms of Use, store age ratings).
+    expect(screen.getByText(/I’m 16 or older and agree to the/)).toBeTruthy();
 
-    await fireEvent.press(screen.getByRole('checkbox', { name: 'I agree to the Terms of Use and Privacy Policy' }));
+    await fireEvent.press(screen.getByRole('checkbox', { name: 'I’m 16 or older and agree to the Terms of Use and Privacy Policy' }));
     expect(screen.getByRole('button', { name: 'Continue' })).toBeEnabled();
 
     await fireEvent.press(screen.getByText('Terms of Use'));
@@ -29,7 +31,7 @@ describe('signup terms', () => {
     await fireEvent.changeText(screen.getByLabelText('Username'), 'sam_k');
     await fireEvent.changeText(screen.getByLabelText('Email'), 'sam@example.com');
     await fireEvent.changeText(screen.getByLabelText('Password'), 'violet tractor sings at dawn 47');
-    await fireEvent.press(screen.getByRole('checkbox', { name: 'I agree to the Terms of Use and Privacy Policy' }));
+    await fireEvent.press(screen.getByRole('checkbox', { name: 'I’m 16 or older and agree to the Terms of Use and Privacy Policy' }));
     await fireEvent.press(screen.getByRole('button', { name: 'Continue' }));
     await waitFor(() => expect(startSignup).toHaveBeenCalledWith({ username: 'sam_k', email: 'sam@example.com', password: 'violet tractor sings at dawn 47' }));
   });
