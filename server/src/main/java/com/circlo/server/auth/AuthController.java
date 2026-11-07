@@ -81,7 +81,8 @@ public class AuthController {
     @PostMapping("/login")
     public ResponseEntity<Object> login(@Valid @RequestBody LoginRequest r) {
         if (Boolean.TRUE.equals(r.emailCode())) {
-            return ResponseEntity.status(HttpStatus.ACCEPTED).body(auth.startLogin(r.login(), r.password()));
+            AuthService.LoginStart start = auth.beginLogin(r.login(), r.password());
+            return start.tokens() != null ? ResponseEntity.ok(start.tokens()) : ResponseEntity.status(HttpStatus.ACCEPTED).body(start.codeSent());
         }
         return ResponseEntity.ok(auth.login(r.login(), r.password()));
     }

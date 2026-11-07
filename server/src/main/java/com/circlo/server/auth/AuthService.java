@@ -188,19 +188,35 @@ public class AuthService {
     /** "Code sent" after the right password: where it went (partly hidden), and the attempt's one-time challenge. */
     public record CodeSent(String status, String email, String challenge) {}
 
-    /**
-     * Step 1 of signing in, for apps that ask for the code (owner decision 2026-11-07): the password, then a 6-digit
-     * code by email, tied to this attempt by its challenge. Nothing is signed in yet.
-     */
-    @Transactional(noRollbackFor = ApiException.class)
-    public CodeSent startLogin(String typed, String password) {
-        User u = checkPassword(typed, password);
+    /** Emails a 6-digit login code, tied to this attempt by a one-time challenge. */
+    private CodeSent sendLoginCode(User u) {
         if (!mayEmail(u.email())) {
             throw new ApiException(HttpStatus.TOO_MANY_REQUESTS, "rate_limited");
         }
         String challenge = Base64.getUrlEncoder().withoutPadding().encodeToString(Ids.random(32));
         codes.send(u.id(), u.email(), u.displayName(), EmailCodes.Purpose.login, challengeHash(challenge));
         return new CodeSent("code_sent", Accounts.maskEmail(u.email()), challenge);
+    }
+
+    /** Signed in with the password alone, or a code on its way: what step 1 of a login gives. */
+    public record LoginStart(TokenService.Tokens tokens, CodeSent codeSent) {}
+
+    /**
+     * Step 1 of signing in, for apps that ask for the code (owner decision 2026-11-07): the password, then a 6-digit
+     * code by email. Nothing is signed in yet, except for an app review account (CIRCLO_LOGIN_CODE_EXEMPT, owner
+     * decision 2026-11-08), which signs in with the password alone.
+     */
+    @Transactional(noRollbackFor = ApiException.class)
+    public LoginStart beginLogin(String typed, String password) {
+        User u = checkPassword(typed, password);
+        if (exempt(u)) {
+            return new LoginStart(signedIn(u), null);
+        }
+        return new LoginStart(null, sendLoginCode(u));
+    }
+
+    private boolean exempt(User u) {
+        return u.username() != null && props.exemptUsernames().contains(u.username().toLowerCase(java.util.Locale.ROOT));
     }
 
     /** Step 2: the code from the email, with the attempt's challenge, signs this device in. */
@@ -250,7 +266,7 @@ public class AuthService {
     @Transactional(noRollbackFor = ApiException.class)
     public TokenService.Tokens login(String typed, String password) {
         User u = checkPassword(typed, password);
-        if (props.loginCodeForOldApps()) {
+        if (props.loginCodeForOldApps() && !exempt(u)) {
             if (!mayEmail(u.email())) {
                 throw new ApiException(HttpStatus.TOO_MANY_REQUESTS, "rate_limited");
             }

@@ -53,6 +53,9 @@ circlo:
     # Apps already in the stores don't ask for the emailed sign-in code; true makes them use it anyway (through their
     # "Check your email" screen). Turn on once the apps that ask for it (1.1.0) are out.
     login-code-for-old-apps: ${CIRCLO_LOGIN_CODE_FOR_OLD_APPS:false}
+    # App review accounts (comma-separated usernames) that sign in with the password alone: Apple's and Google's
+    # reviewers can't read their email for the code. Keep them to the review accounts, with long random passwords.
+    login-code-exempt: ${CIRCLO_LOGIN_CODE_EXEMPT:}
   # Push to iPhones (content-free). Off unless the key, key id and team id are set; see docs/DEV_SETUP.md "Push".
   apns:
     key: ${CIRCLO_APNS_KEY:}
