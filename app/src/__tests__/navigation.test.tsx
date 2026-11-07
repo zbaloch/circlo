@@ -45,8 +45,9 @@ jest.mock('@/lib/feed-store', () => ({
 // it is checked on the emulator (docs/PROGRESS.md "Needs manual check").
 describe('app shell', () => {
   it('has the icon-only tabs from PLAN.md 2A, each with a screen-reader label; Messages only while chat is on', () => {
-    // Chat is hidden for now (owner decision 2026-11-01): Circlo is about posts in circles.
-    expect(TABS.map((t) => t.label)).toEqual(['Home', 'People', 'Notifications']);
+    // Chat is on again (owner decision 2026-11-07).
+    expect(TABS.map((t) => t.label)).toEqual(['Home', 'People', 'Notifications', 'Messages']);
+    expect(visibleTabs(false).map((t) => t.label)).toEqual(['Home', 'People', 'Notifications']);
     expect(visibleTabs(true).map((t) => t.label)).toEqual(['Home', 'People', 'Notifications', 'Messages']);
     for (const t of visibleTabs(true)) {
       expect(t.icon).toBeTruthy();

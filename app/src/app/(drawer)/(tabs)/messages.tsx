@@ -17,7 +17,7 @@ import { chatTitle } from '@/lib/view-logic';
 import { Text } from '@/components/ui/text';
 
 /** Messages inbox (PLAN.md 2A): conversations newest first, with unread counts. */
-/** Chat is hidden for now (lib/features): a direct link lands on Home. */
+/** Behind lib/features' CHAT_ENABLED: when chat is switched off, a direct link lands on Home. */
 export default function MessagesScreenRoute() {
   return CHAT_ENABLED ? <MessagesScreen /> : <Redirect href="/" />;
 }

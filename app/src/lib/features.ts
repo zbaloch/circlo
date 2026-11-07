@@ -1,9 +1,9 @@
 /**
- * Product switches. Chat is hidden (owner decision 2026-11-01): Circlo is about posts in circles, and people already
- * chat elsewhere. Everything behind it (screens, lib/messaging, the server's /v1/chats) is kept intact; set this to
- * true to bring the Messages tab back.
+ * Product switches. Chat is on again (owner decision 2026-11-07, reversing 2026-11-01's "people chat elsewhere"):
+ * the Messages tab, chats with one person or a group, with report and block on every message. Set this to false to
+ * hide it again; the screens, lib/messaging and the server's /v1/chats stay intact either way.
  */
-export const CHAT_ENABLED = false;
+export const CHAT_ENABLED = true;
 
 /**
  * Likes are hidden (owner decision 2026-11-01): counting approval is vanity; if something matters, people reply. The

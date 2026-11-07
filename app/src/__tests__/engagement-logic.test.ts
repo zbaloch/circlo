@@ -31,9 +31,9 @@ describe('tapping a push', () => {
     expect(pushRoute({ type: 'message', chatId: 42 }, true)).toBe('/notifications');
   });
 
-  it('never opens a chat while chat is hidden', () => {
+  it('a message push opens its chat; never a chat if chat is switched off', () => {
+    expect(pushRoute({ type: 'message', chatId: C })).toEqual({ pathname: '/chat/[id]', params: { id: C } });
     expect(pushRoute({ type: 'message', chatId: C }, false)).toBe('/notifications');
-    expect(pushRoute({ type: 'message', chatId: C })).toBe('/notifications');
   });
 });
 
