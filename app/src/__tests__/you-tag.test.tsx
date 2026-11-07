@@ -26,28 +26,35 @@ const post = (mine: boolean): FeedPost => ({
   likedByMe: false,
 });
 
-describe('my own posts and replies say "You"', () => {
-  it('marks my post in the timeline and in the thread', async () => {
+describe('my own posts and replies say "(you)"', () => {
+  it('marks my post in the timeline in place of my own handle', async () => {
     await render(<PostCard post={post(true)} name="Zaheer" handle="zaheer" />);
-    expect(screen.getByText('· You')).toBeTruthy();
+    expect(screen.getByText('(you)')).toBeTruthy();
+    expect(screen.queryByText('@zaheer')).toBeNull();
+  });
+
+  it('marks my post in the thread, with my handle on its own line below', async () => {
     await render(<PostDetail post={post(true)} name="Zaheer" handle="zaheer" />);
-    expect(screen.getByText('· You')).toBeTruthy();
+    expect(screen.getByText('(you)')).toBeTruthy();
+    expect(screen.getByText('@zaheer')).toBeTruthy();
   });
 
   it("doesn't mark other people's posts", async () => {
     await render(<PostCard post={post(false)} name="Maira" handle="maira" />);
-    expect(screen.queryByText('· You')).toBeNull();
+    expect(screen.queryByText('(you)')).toBeNull();
+    expect(screen.getByText('@maira')).toBeTruthy();
     await render(<PostDetail post={post(false)} name="Maira" handle="maira" />);
-    expect(screen.queryByText('· You')).toBeNull();
+    expect(screen.queryByText('(you)')).toBeNull();
   });
 
   it('can leave it out where every post is mine (my own profile)', async () => {
     await render(<PostCard post={post(true)} name="Zaheer" handle="zaheer" hideYou />);
-    expect(screen.queryByText('· You')).toBeNull();
+    expect(screen.queryByText('(you)')).toBeNull();
+    expect(screen.getByText('@zaheer')).toBeTruthy();
   });
 
   it('the tag on its own, for reply rows', async () => {
     await render(<YouTag />);
-    expect(screen.getByText('· You')).toBeTruthy();
+    expect(screen.getByText('(you)')).toBeTruthy();
   });
 });

@@ -34,11 +34,15 @@ type Props = {
   hideYou?: boolean;
 };
 
-/** "· You" after my name on my own posts and replies, so I can tell them apart at a glance. */
+/**
+ * "(you)" after my name on my own posts and replies, so I can tell them apart at a glance. In one-line rows it takes
+ * the place of my handle (owner feedback 2026-11-07: "Zaheer · You @zaheer" read oddly, and my own handle tells me
+ * nothing).
+ */
 export function YouTag({ className = 'text-[15px]' }: { className?: string }) {
   return (
     <Text accessibilityLabel="Your post" className={`shrink-0 text-muted dark:text-muted-dark ${className}`}>
-      · You
+      (you)
     </Text>
   );
 }
@@ -115,8 +119,9 @@ export function PostCard({ post, name, handle, avatarUrl, audience, onOpen, onRe
           <Text numberOfLines={1} onPress={onAuthor} className="shrink text-[15px] font-bold text-ink dark:text-ink-dark">
             {name}
           </Text>
-          {post.mine && !hideYou ? <YouTag /> : null}
-          {handle ? (
+          {post.mine && !hideYou ? (
+            <YouTag />
+          ) : handle ? (
             <Text numberOfLines={1} className="shrink text-[15px] text-muted dark:text-muted-dark">
               @{handle}
             </Text>
