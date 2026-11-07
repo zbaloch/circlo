@@ -25,11 +25,11 @@ import { Text } from '@/components/ui/text';
 const INVITE_POLL_MS = 3_000;
 
 type Section = 'friends' | 'circles' | 'invite';
-/** Who (your people), how they're grouped (your circles), and how to add more (Invite, with Got an invite? below). */
+/** Who (your people), how they're grouped (your circles), and how to add more (Invites: Invite someone and Got an invite?). */
 const SECTIONS: { key: Section; label: string }[] = [
   { key: 'friends', label: 'People' },
   { key: 'circles', label: 'Circles' },
-  { key: 'invite', label: 'Invite' },
+  { key: 'invite', label: 'Invites' },
 ];
 
 function message(e: unknown) {
@@ -43,7 +43,7 @@ function message(e: unknown) {
  * on Invite while I have nobody yet, since that's the first thing to do. Invites are the only way to connect; there
  * is no search. Whoever scans my code while it's on screen shows up above it, to choose their circles.
  */
-export function PeopleHub() {
+export function PeopleHub({ only }: { only?: 'invite' | 'join' } = {}) {
   const palette = usePalette();
   const { account, connections, unseenRequests, refresh } = useConnections();
   // Links can open a given section (a request in Notifications, Get started's "Invite someone", an invite link).
@@ -75,7 +75,8 @@ export function PeopleHub() {
   // Who I was connected with when my code went on screen: anyone new since then just joined.
   const [known, setKnown] = useState<ReadonlySet<string> | null>(null);
   // An invite link that opened the app (before signing in) waits under Invite, in Got an invite?, ready to send.
-  const [pasted, setPasted] = useState(() => takePendingInvite() ?? '');
+  // An invite link that opened the app (before signing in) waits on Got an invite?, ready to send.
+  const [pasted, setPasted] = useState(() => (only === 'join' ? (takePendingInvite() ?? '') : ''));
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string>();
   const [notice, setNotice] = useState<string>();
@@ -99,7 +100,9 @@ export function PeopleHub() {
   const incoming = all.filter((c) => c.status === 'incoming');
   const outgoing = all.filter((c) => c.status === 'outgoing');
   const friends = all.filter((c) => c.status === 'accepted');
-  const joiners = section === 'invite' ? justJoined(all, known) : [];
+  // My code is on screen only on Invite someone.
+  const onInviteScreen = only === 'invite';
+  const joiners = onInviteScreen ? justJoined(all, known) : [];
 
   // Requests are visible here, so they count as seen (clears the bell's dot).
   const unseenKey = unseenRequests.join(',');
@@ -110,7 +113,7 @@ export function PeopleHub() {
   );
 
   // My link, fetched when its tab opens; who I'm connected with then is noted so new joiners stand out.
-  const showingInvite = section === 'invite' && !!connections;
+  const showingInvite = onInviteScreen && !!connections;
   useEffect(() => {
     if (!showingInvite || link) return;
     getInviteLink().then(setLink, (e) => setError(message(e)));
@@ -274,7 +277,7 @@ export function PeopleHub() {
         {friends.length === 0 ? (
           <View className="items-start gap-3">
             <Text className="text-muted dark:text-muted-dark">No one here yet. Invite someone, or use an invite you were sent.</Text>
-            <Button label="Invite someone" onPress={() => pick('invite')} />
+            <Button label="Invite someone" onPress={() => router.push('/invite')} />
           </View>
         ) : null}
         {friends.map((f) => (
@@ -302,6 +305,7 @@ export function PeopleHub() {
       {Platform.OS !== 'web' ? <Button label="Scan QR code" onPress={() => router.push('/scan')} /> : null}
       <TextField label={Platform.OS === 'web' ? 'Paste the invite link' : 'Or paste an invite link'} placeholder="https://www.hellocirclo.com/i/…" value={pasted} onChangeText={setPasted} />
       <Button label="Connect" variant="outline" disabled={!pasted} loading={busy === 'paste'} onPress={() => void connectWith(pasted)} />
+      {feedback}
     </>
   );
 
@@ -344,6 +348,60 @@ export function PeopleHub() {
     </View>
   );
 
+  // The Invite section: two clear choices, each on its own screen (owner request 2026-11-07: both on one page was too
+  // much).
+  const choice = (title: string, line: string, icon: 'qr-code-outline' | 'scan-outline', href: '/invite' | '/join') => (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`${title}. ${line}`}
+      onPress={() => router.push(href)}
+      className="flex-row items-center gap-4 rounded-2xl border border-border p-5 active:opacity-60 dark:border-border-dark">
+      <View className="h-12 w-12 items-center justify-center rounded-full bg-primary-soft dark:bg-primary-soft-dark">
+        <Icon name={icon} size={24} color={palette.primary} />
+      </View>
+      <View className="flex-1 gap-1">
+        <Text className="text-lg font-bold text-ink dark:text-ink-dark">{title}</Text>
+        <Text className="text-muted dark:text-muted-dark">{line}</Text>
+      </View>
+      <Icon name="chevron-forward" size={20} color={palette.muted} />
+    </Pressable>
+  );
+  const choices = (
+    <View className="gap-3">
+      {choice('Invite someone', 'Share your link or let them scan your QR code. You choose their circles when they join.', 'qr-code-outline', '/invite')}
+      {choice('Got an invite?', 'Scan their QR code or paste the link they sent you.', 'scan-outline', '/join')}
+    </View>
+  );
+
+  const sheets = (
+    <>
+      {ask && book ? (
+        <CirclePickerSheet
+          visible
+          book={book}
+          selected={[]}
+          title={ask.title}
+          person={ask.person}
+          confirmLabel={ask.confirmLabel}
+          onDone={ask.done}
+          onClose={() => setAsk(undefined)}
+        />
+      ) : null}
+    </>
+  );
+
+  // Invite someone or Got an invite? on its own screen.
+  if (only) {
+    return (
+      <View className="flex-1 bg-surface dark:bg-surface-dark">
+        <ScrollView className="flex-1" contentContainerClassName="gap-5 p-5" keyboardShouldPersistTaps="handled">
+          {only === 'invite' ? inviteSection : joinSection}
+        </ScrollView>
+        {sheets}
+      </View>
+    );
+  }
+
   return (
     <View className="flex-1 bg-surface dark:bg-surface-dark">
       <View accessibilityRole="tablist" className="flex-row border-b border-border dark:border-border-dark">
@@ -375,13 +433,7 @@ export function PeopleHub() {
         ) : section === 'circles' ? (
           book ? <CirclesList book={book} /> : null
         ) : (
-          <>
-            {inviteSection}
-            <View className="gap-3 border-t border-border pt-5 dark:border-border-dark">
-              <Text accessibilityRole="header" className="text-lg font-bold text-ink dark:text-ink-dark">Got an invite?</Text>
-              {joinSection}
-            </View>
-          </>
+          choices
         )}
       </ScrollView>
       {ask && book ? (

@@ -46,7 +46,7 @@ describe('People: your people, your circles and inviting, in one tab', () => {
 
   it('has three sections, and opens on People once you have people', async () => {
     await render(<PeopleHub />);
-    expect(tabs()).toEqual(['People (1)', 'Circles', 'Invite']);
+    expect(tabs()).toEqual(['People (1)', 'Circles', 'Invites']);
     expect(selected('People (1)')).toBe(true);
     expect(await screen.findByText('Everyone, Family')).toBeTruthy();
     // No separate Add people button any more.
@@ -56,17 +56,34 @@ describe('People: your people, your circles and inviting, in one tab', () => {
   it('opens on Invite while you have no people yet', async () => {
     mockConnections = [];
     await render(<PeopleHub />);
-    expect(selected('Invite')).toBe(true);
+    expect(selected('Invites')).toBe(true);
   });
 
-  it('Invite has your code and link, and "Got an invite?" below it, with a waiting link filled in', async () => {
+  it('Invite offers two clear choices, each opening its own screen', async () => {
     mockParams = { section: 'invite' };
-    mockTake.mockReturnValueOnce('https://www.hellocirclo.com/i/xyz' as never);
     await render(<PeopleHub />);
-    expect(selected('Invite')).toBe(true);
+    expect(selected('Invites')).toBe(true);
+    await fireEvent.press(screen.getByRole('button', { name: /^Invite someone/ }));
+    expect(mockPush).toHaveBeenCalledWith('/invite');
+    await fireEvent.press(screen.getByRole('button', { name: /^Got an invite\?/ }));
+    expect(mockPush).toHaveBeenCalledWith('/join');
+    // The code and the paste box live on those screens, not here.
+    expect(screen.queryByLabelText('Invite link')).toBeNull();
+    expect(screen.queryByText('Connect')).toBeNull();
+  });
+
+  it('the Invite someone screen shows your code and link', async () => {
+    await render(<PeopleHub only="invite" />);
+    expect(screen.queryAllByRole('tab')).toHaveLength(0);
     expect(await screen.findByLabelText('Invite link')).toBeTruthy();
-    expect(screen.getByText('Got an invite?')).toBeTruthy();
+  });
+
+  it('the Got an invite? screen has scan and paste, with a waiting link filled in', async () => {
+    mockTake.mockReturnValueOnce('https://www.hellocirclo.com/i/xyz' as never);
+    await render(<PeopleHub only="join" />);
+    expect(screen.queryAllByRole('tab')).toHaveLength(0);
     expect(screen.getByDisplayValue('https://www.hellocirclo.com/i/xyz')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Connect' })).toBeTruthy();
   });
 
   it('Circles lists Only me, Everyone and your circles, each opening its screen, and New circle', async () => {

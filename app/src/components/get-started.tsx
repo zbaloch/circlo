@@ -18,10 +18,10 @@ export function getStartedSteps(connections: Connection[] | null): Step[] {
   const requests = all.filter((c) => c.status === 'incoming').length;
   const invite: Step =
     friends > 0
-      ? { key: 'invite', title: 'Invite someone', body: `You’re connected with ${friends} ${friends === 1 ? 'person' : 'people'}. Invite more whenever you like.`, done: true, actionLabel: 'Invite', open: () => router.navigate({ pathname: '/search', params: { section: 'invite' } }) }
+      ? { key: 'invite', title: 'Invite someone', body: `You’re connected with ${friends} ${friends === 1 ? 'person' : 'people'}. Invite more whenever you like.`, done: true, actionLabel: 'Invite', open: () => router.push('/invite') }
       : requests > 0
         ? { key: 'invite', title: 'Invite someone', body: 'Someone wants to connect. Accept, and choose which of your circles they’re in.', done: false, actionLabel: 'Review request', open: () => router.navigate({ pathname: '/search', params: { section: 'friends' } }) }
-        : { key: 'invite', title: 'Invite someone', body: 'Share your invite link or QR code. When they join, you choose which of your circles they’re in.', done: false, actionLabel: 'Invite', open: () => router.navigate({ pathname: '/search', params: { section: 'invite' } }) };
+        : { key: 'invite', title: 'Invite someone', body: 'Share your invite link or QR code. When they join, you choose which of your circles they’re in.', done: false, actionLabel: 'Invite', open: () => router.push('/invite') };
   return [
     invite,
     { key: 'post', title: 'Write your first post', body: 'Choose who sees it: Everyone, or just the circles you pick.', done: false, actionLabel: 'Write', open: () => router.push('/compose') },
