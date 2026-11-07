@@ -18,9 +18,9 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
- * Replies, messages, requests and new friends are told once a day, calmly, on one channel per person (owner decisions
- * 2026-11-01): a push when they're signed in to the phone app, an email when they aren't (web only, or nowhere), never
- * both, and only on days something happened. Neither says who, what or how many.
+ * Replies, messages, requests and new friends are told once a day, calmly, and only on days something happened
+ * (owner decision 2026-11-01), on two channels that don't replace each other (owner decision 2026-11-07): a push to
+ * phones with notifications on, and an email unless daily emails are off. Neither says who, what or how many.
  */
 class NotifyChannelsIT extends IntegrationTest {
 
@@ -100,7 +100,7 @@ class NotifyChannelsIT extends IntegrationTest {
     }
 
     @Test
-    void withTheAppOnAPhoneOneCalmPushAndNoEmailEvenWithTheWebSignedIn() {
+    void withTheAppOnAPhoneTheDayComesAsAPushAndAnEmail() {
         TestUser a = user("ch_app");
         TestUser b = user("ch_app_friend");
         a.befriend(b);
@@ -118,25 +118,33 @@ class NotifyChannelsIT extends IntegrationTest {
         assertThat(sent).hasSize(pushes + 1);
         assertThat(sent.get(sent.size() - 1).alert()).isEqualTo(CALM_PUSH);
         assertThat(sent.get(sent.size() - 1).data()).isEqualTo(Map.of("type", "digest"));
-        assertThat(daily(a)).hasSize(emails);
+        // Push and email are two channels, not one instead of the other (owner decision 2026-11-07).
+        List<TestMail.Sent> mails = daily(a);
+        assertThat(mails).hasSize(emails + 1);
+        assertThat(mails.get(mails.size() - 1).body()).contains("You have new replies waiting on Circlo.");
 
-        // Notifications turned off on the phone: still the app's choice, so no email either.
+        // Notifications turned off on the phone: no push, but the email still comes.
         assertThat(call("DELETE", "/v1/devices/current/push-token", null, phone).getStatusCode().value()).isEqualTo(200);
         reply(b, post, "three");
-        sendDaily();
+        assertThat(emailsTo(a)).hasSize(emails + 2);
         assertThat(push.to("ch-tok")).hasSize(pushes + 1);
-        assertThat(daily(a)).hasSize(emails);
 
-        // Signed out of the app: only the web is left, so email again.
-        assertThat(call("POST", "/v1/auth/logout", null, phone).getStatusCode().value()).isEqualTo(200);
+        // Daily emails turned off, notifications on again: only the push.
+        assertThat(a.call("PUT", "/v1/me/notifications", Map.of("email", false)).getStatusCode().value()).isEqualTo(200);
+        call("PUT", "/v1/devices/current/push-token", Map.of("token", "ch-tok", "service", "apns"), phone);
         reply(b, post, "four");
-        List<TestMail.Sent> all = emailsTo(a);
-        assertThat(all).hasSize(emails + 1);
-        assertThat(all.get(all.size() - 1).body()).contains("You have a new reply waiting on Circlo.");
+        assertThat(emailsTo(a)).hasSize(emails + 2);
+        assertThat(push.to("ch-tok")).hasSize(pushes + 2);
+
+        // Both off: nothing at all.
+        assertThat(call("DELETE", "/v1/devices/current/push-token", null, phone).getStatusCode().value()).isEqualTo(200);
+        reply(b, post, "five");
+        assertThat(emailsTo(a)).hasSize(emails + 2);
+        assertThat(push.to("ch-tok")).hasSize(pushes + 2);
     }
 
     @Test
-    void aDeletedAppFallsBackToEmailUntilItRegistersAgain() {
+    void aDeletedAppStopsGettingPushesButTheEmailCarriesOn() {
         TestUser a = user("ch_gone");
         TestUser b = user("ch_gone_friend");
         a.befriend(b);
@@ -145,7 +153,7 @@ class NotifyChannelsIT extends IntegrationTest {
         String post = a.post("hello", "everyone", List.of());
         int emails = daily(a).size();
 
-        // Google says the token is dead: that day comes by email, and the phone stops counting as an app.
+        // Google says the token is dead: the phone stops getting pushes; the email comes as every day.
         reply(b, post, "one");
         assertThat(emailsTo(a)).hasSize(emails + 1);
         assertThat(push.to("bad-gone")).hasSize(1);
@@ -155,10 +163,10 @@ class NotifyChannelsIT extends IntegrationTest {
         assertThat(emailsTo(a)).hasSize(emails + 2);
         assertThat(push.to("bad-gone")).hasSize(1);
 
-        // The app opened again with a fresh token: back to push.
+        // The app opened again with a fresh token: pushes again, and the email too.
         call("PUT", "/v1/devices/current/push-token", Map.of("token", "ch-gone-new", "service", "fcm"), phone);
         reply(b, post, "three");
-        assertThat(emailsTo(a)).hasSize(emails + 2);
+        assertThat(emailsTo(a)).hasSize(emails + 3);
         assertThat(push.to("ch-gone-new")).hasSize(1);
     }
 

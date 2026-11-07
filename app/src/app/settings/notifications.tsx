@@ -54,7 +54,7 @@ export default function NotificationSettingsScreen() {
             )}
           </Row>
         ) : null}
-        <Row title={EMAIL_TITLE} subtitle={Platform.OS === 'web' ? EMAIL_NOTE_WEB : EMAIL_NOTE_APP}>
+        <Row title={EMAIL_TITLE} subtitle={EMAIL_NOTE}>
           {me ? (
             <Toggle
               accessibilityLabel={EMAIL_TITLE}
@@ -81,13 +81,12 @@ export default function NotificationSettingsScreen() {
 
 const CHECKS_TITLE = 'A daily notification';
 const CHECKS_NOTE = usesPush
-  ? 'Once a day, around 6pm, and only on days something happened: “You have a few new things waiting.” It never says who, what or how many. Turn it off and nothing is sent, not even an email.'
-  : 'Your phone asks Circlo now and then, and at most once a day says there are new things waiting. Nothing goes through Apple or Google. Turn it off and nothing is sent, not even an email.';
+  ? 'Once a day, around 6pm, and only on days something happened: “You have a few new things waiting.” It never says who, what or how many. Turn it off and your phone isn’t told; the daily email below is separate.'
+  : 'Your phone asks Circlo now and then, and at most once a day says there are new things waiting. Nothing goes through Apple or Google. Turn it off and your phone isn’t told; the daily email below is separate.';
 
-const EMAIL_TITLE = 'A daily email when I’m not using the app';
+const EMAIL_TITLE = 'A daily email';
 const EMAIL_WHAT = CHAT_ENABLED ? 'new replies, messages, friends or requests' : 'new replies, friends or requests';
-const EMAIL_NOTE_WEB = `Without the Circlo app on a phone, we email you once a day, around 6pm, on days with ${EMAIL_WHAT}. With the app, you’re told on your phone instead and get no emails.`;
+const EMAIL_NOTE = `Once a day, around 6pm, on days with ${EMAIL_WHAT}: what kind of things are waiting, never who or what. It’s separate from notifications on your phone.`;
 const SECURITY_NOTE = usesPush
   ? 'A new sign-in, a password change, or another device signed out from Devices is always emailed straight away, and your phones with notifications on are told too, whatever you choose here.'
   : 'A new sign-in, a password change, or another device signed out from Devices is always emailed straight away, whatever you choose here.';
-const EMAIL_NOTE_APP = `Only while you’re not signed in to the Circlo app on a phone. While you are, you’re told here instead and get no emails.`;

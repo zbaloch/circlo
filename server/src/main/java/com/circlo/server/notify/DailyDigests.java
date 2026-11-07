@@ -27,16 +27,16 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * Activity is told once a day, calmly (owner decision 2026-11-01). Replies, messages, requests and new friends are
- * counted per person and, at the hour their app chose (default 18:00 UTC), they're told on one channel, and only on
- * days something happened:
+ * counted per person and, at the hour their app chose (default 18:00 UTC), they're told only on days something
+ * happened, on two channels that don't replace each other (owner decision 2026-11-07); each is off only when they
+ * turned it off:
  * <ul>
- *   <li>signed in to the app on a phone: one push, "You have a few new things waiting", never an email, even if they
- *       also use the web app. A phone with notifications turned off still counts: they chose silence.</li>
- *   <li>no app (only the web app, or nothing): one email naming the kinds of things waiting, with a link to the web
- *       app and a one-click unsubscribe link (signed, so it needs no stored token).</li>
+ *   <li>a push, "You have a few new things waiting", to each of their phones with notifications on (signed in, and
+ *       Apple or Google haven't said its token is dead);</li>
+ *   <li>an email naming the kinds of things waiting, with a link to the web app and a one-click unsubscribe link
+ *       (signed, so it needs no stored token), unless they turned daily emails off.</li>
  * </ul>
- * Neither says who, what or how many. An app counts while its session is alive (not signed out, not lapsed) and Apple
- * or Google haven't said its push token is dead; if they say so now, that day's note comes by email instead.
+ * Neither says who, what or how many.
  */
 @Component
 public class DailyDigests {
@@ -132,11 +132,10 @@ public class DailyDigests {
         if (summary.isEmpty()) {
             return false;
         }
-        if (toldOnPhones(user)) {
-            return true;
-        }
+        // Two channels, neither replacing the other (owner decision 2026-11-07): each is off only if they turned it off.
+        boolean pushed = pushToPhones(user);
         if (!d.emailOn()) {
-            return false;
+            return pushed;
         }
         String unsubscribe = unsubscribeUrl(Ids.uuid(user));
         mail.send(d.email(), SUBJECT, """
@@ -144,8 +143,8 @@ public class DailyDigests {
 
                 Catch up whenever you like: %s/notifications
 
-                This note comes at most once a day, and only on days something happens. It comes by email because \
-                you're not signed in to the Circlo app on a phone; with the app, it comes there instead.
+                This note comes at most once a day, and only on days something happens. Notifications on your phone \
+                are separate: turn them on or off in the app, under Settings and privacy, Notifications.
 
                 Turn these emails off: %s
                 """.formatted(summary, props.webBase(), unsubscribe),
@@ -154,10 +153,10 @@ public class DailyDigests {
     }
 
     /**
-     * Pushes the day's note to my phone apps. True if I have one that still counts (even with notifications off), so
-     * no email; false if I have none, or Apple and Google just said every one of them is gone.
+     * Pushes the day's note to my phones that have notifications on. True if at least one was sent; a phone Apple or
+     * Google say is gone stops getting them until the app registers again.
      */
-    private boolean toldOnPhones(byte[] user) {
+    private boolean pushToPhones(byte[] user) {
         record Device(byte[] id, byte[] sealed, String service) {}
         // Devices from before the kind was recorded count when they have a push token.
         List<Device> apps = jdbc.query("""
@@ -166,7 +165,7 @@ public class DailyDigests {
                   AND (d.kind IN ('ios', 'android') OR d.push_token_enc IS NOT NULL)
                   AND EXISTS (SELECT 1 FROM refresh_tokens t WHERE t.device_id = d.id AND t.revoked_at IS NULL AND t.expires_at > ?)""",
                 (rs, i) -> new Device(rs.getBytes(1), rs.getBytes(2), rs.getString(3)), user, Timestamp.from(Instant.now()));
-        int reachable = apps.size();
+        int sent = 0;
         PushSender.Message message = new PushSender.Message(PUSH, Map.of("type", "digest"));
         for (Device d : apps) {
             if (d.sealed() == null) {
@@ -176,10 +175,11 @@ public class DailyDigests {
             PushSender.Result result = token == null ? PushSender.Result.UNREGISTERED : sender.send(d.service(), token, message);
             if (result == PushSender.Result.UNREGISTERED) {
                 jdbc.update("UPDATE devices SET push_token_enc = NULL, push_service = NULL, push_lost = TRUE WHERE id = ?", (Object) d.id());
-                reachable--;
+            } else {
+                sent++;
             }
         }
-        return reachable > 0;
+        return sent > 0;
     }
 
     /** "new replies, a new message and a friend request": the kinds waiting, never how many (empty if none). */
