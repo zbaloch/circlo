@@ -777,14 +777,19 @@ paths:
               schema: { type: array, items: { $ref: "#/components/schemas/Reply" } }
         "404": { $ref: "#/components/responses/Error" }
     post:
-      summary: Reply
+      summary: Reply, to the post or (with parentId) to one of its replies I can see; an answer stays in that reply's circle
       parameters:
         - { $ref: "#/components/parameters/PostId" }
       requestBody:
         required: true
         content:
           application/json:
-            schema: { type: object, required: [text], properties: { text: { type: string } } }
+            schema:
+              type: object
+              required: [text]
+              properties:
+                text: { type: string }
+                parentId: { $ref: "#/components/schemas/Id" }
       responses:
         "201":
           description: The new reply
@@ -854,6 +859,10 @@ paths:
       parameters:
         - { $ref: "#/components/parameters/Before" }
         - { $ref: "#/components/parameters/Limit" }
+        - name: replies
+          in: query
+          description: "all: also answers to my replies on other people's posts (kind reply_reply)"
+          schema: { type: string, enum: [all] }
       responses:
         "200":
           description: Activity
@@ -869,7 +878,7 @@ paths:
                       type: object
                       required: [kind, postId, postText, actorId, actor, createdAt]
                       properties:
-                        kind: { type: string, enum: [reply, like, reply_like, joined] }
+                        kind: { type: string, enum: [reply, like, reply_like, reply_reply, joined] }
                         postId: { type: [string, "null"], format: uuid }
                         postText: { type: [string, "null"] }
                         actorId: { $ref: "#/components/schemas/Id" }
@@ -1186,6 +1195,13 @@ components:
         createdAt: { type: string, format: date-time }
         likeCount: { type: integer }
         likedByMe: { type: boolean }
+        parentId:
+          type: [string, "null"]
+          format: uuid
+          description: The reply this answers; null for a reply to the post, or when I can't see that reply
+        replyingTo:
+          description: Who wrote the reply this answers (null in the same cases as parentId)
+          oneOf: [{ $ref: "#/components/schemas/Person" }, { type: "null" }]
     Message:
       type: object
       required: [seq, messageId, senderId, text, media, createdAt]

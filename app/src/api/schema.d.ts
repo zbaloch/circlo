@@ -2067,7 +2067,7 @@ export interface paths {
             };
         };
         put?: never;
-        /** Reply */
+        /** Reply, to the post or (with parentId) to one of its replies I can see; an answer stays in that reply's circle */
         post: {
             parameters: {
                 query?: never;
@@ -2081,6 +2081,7 @@ export interface paths {
                 content: {
                     "application/json": {
                         text: string;
+                        parentId?: components["schemas"]["Id"];
                     };
                 };
             };
@@ -2282,6 +2283,8 @@ export interface paths {
                 query?: {
                     before?: components["parameters"]["Before"];
                     limit?: components["parameters"]["Limit"];
+                    /** @description all: also answers to my replies on other people's posts (kind reply_reply) */
+                    replies?: "all";
                 };
                 header?: never;
                 path?: never;
@@ -2298,7 +2301,7 @@ export interface paths {
                         "application/json": {
                             items: {
                                 /** @enum {string} */
-                                kind: "reply" | "like" | "reply_like" | "joined";
+                                kind: "reply" | "like" | "reply_like" | "reply_reply" | "joined";
                                 /** Format: uuid */
                                 postId: string | null;
                                 postText: string | null;
@@ -2781,6 +2784,13 @@ export interface components {
             createdAt: string;
             likeCount: number;
             likedByMe: boolean;
+            /**
+             * Format: uuid
+             * @description The reply this answers; null for a reply to the post, or when I can't see that reply
+             */
+            parentId?: string | null;
+            /** @description Who wrote the reply this answers (null in the same cases as parentId) */
+            replyingTo?: components["schemas"]["Person"] | null;
         };
         Message: {
             /** Format: int64 */

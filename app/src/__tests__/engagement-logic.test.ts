@@ -81,6 +81,18 @@ describe('reply likes', () => {
     expect(activityVerb('joined')).toBe(' joined with your invite link');
   });
 
+  it('an answer to my reply opens the thread at the answer', () => {
+    const item = { kind: 'reply_reply', postId: P, replyId: R, postText: '', actorId: 'b', actorName: 'Bo', actorHandle: 'bo', createdAt: '' } as ActivityItem;
+    expect(activityHref(item)).toEqual({ pathname: '/post/[id]', params: { id: P, reply: R } });
+    expect(activityVerb('reply_reply')).toBe(' replied to your reply');
+  });
+
+  it('knows which reply a reply answers, and who wrote it', () => {
+    expect(fromReplyRow(row as never, 'me')).toMatchObject({ parentId: null, replyingTo: null });
+    const answer = { ...row, parentId: C, replyingTo: { userId: 'b', name: 'Bo', username: 'bo', avatarUrl: null } };
+    expect(fromReplyRow(answer as never, 'me')).toMatchObject({ parentId: C, replyingTo: { name: 'Bo', handle: 'bo' } });
+  });
+
   it('replies can be reported', () => {
     expect(reportBody('reply', R, 'harassment', '')).toEqual({ kind: 'reply', targetId: R, reason: 'harassment' });
   });

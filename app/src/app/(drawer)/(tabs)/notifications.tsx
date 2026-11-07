@@ -37,6 +37,7 @@ export function activityHref(item: ActivityItem) {
 /** Pure: what the row says after the person's name. Exported for tests. */
 export function activityVerb(kind: ActivityItem['kind']): string {
   if (kind === 'joined') return ' joined with your invite link';
+  if (kind === 'reply_reply') return ' replied to your reply';
   return kind === 'reply' ? ' replied to your post' : kind === 'reply_like' ? ' liked your reply' : ' liked your post';
 }
 

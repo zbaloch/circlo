@@ -15,7 +15,7 @@ import { showAlert } from '@/lib/dialog';
 import { putPost, usePost } from '@/lib/feed-store';
 import { useMe } from '@/lib/me';
 import { useSession } from '@/lib/session';
-import { MAX_REPLY_CHARS, noteSentReply, sendReply, validateReply } from '@/lib/thread';
+import { MAX_REPLY_CHARS, noteSentReply, replyTarget, sendReply, validateReply } from '@/lib/thread';
 import { relativeTime } from '@/lib/time';
 import { showToast } from '@/lib/toast';
 import { useNow } from '@/lib/use-now';
@@ -26,12 +26,14 @@ import { Text, TextInput } from '@/components/ui/text';
 
 /**
  * Reply composer, X style: Cancel and Reply on top, the post being answered with a thread line, "Replying to
- * @handle", then my avatar and the text box. Opened from the reply icon on any post. After sending it goes back: to
- * the thread with the new reply highlighted, or elsewhere (the timeline, a profile) with a "Reply sent · View" toast.
+ * @handle", then my avatar and the text box. Opened from the reply icon on any post, or on a reply in a thread
+ * (`parent`): then that reply is shown and answered, and the server keeps the answer in that reply's circle. After
+ * sending it goes back: to the thread with the new reply highlighted, or elsewhere (the timeline, a profile) with a
+ * "Reply sent · View" toast.
  */
 export default function ReplyScreen() {
   const now = useNow();
-  const { id, from } = useLocalSearchParams<{ id: string; from?: string }>();
+  const { id, from, parent } = useLocalSearchParams<{ id: string; from?: string; parent?: string }>();
   const session = useSession();
   const account = session.status === 'signedIn' ? session.account : null;
   const palette = usePalette();
@@ -39,12 +41,13 @@ export default function ReplyScreen() {
   const myProfile = useMe();
   const [book, setBook] = useState<AddressBook | null>(null);
   // Drawer screens stay mounted between visits, so the draft and the sending state belong to one post: a reply to
-  // another post starts empty.
-  const [draft, setDraft] = useState({ id, text: '' });
+  // another post (or another reply) starts empty.
+  const key = `${id}:${parent ?? ''}`;
+  const [draft, setDraft] = useState({ key, text: '' });
   const [sendingId, setSendingId] = useState<string | null>(null);
-  const text = draft.id === id ? draft.text : '';
-  const setText = (t: string) => setDraft({ id, text: t });
-  const sending = sendingId === id;
+  const text = draft.key === key ? draft.text : '';
+  const setText = (t: string) => setDraft({ key, text: t });
+  const sending = sendingId === key;
   const scroll = useRef<ScrollViewInstance>(null);
   const follow = useFollowCaret(scroll, text);
 
@@ -55,18 +58,23 @@ export default function ReplyScreen() {
   );
 
   if (!account || !post) return null;
-  const author = { name: post.authorName, handle: post.authorHandle };
+  // What's being answered: the reply opened from, or the post.
+  const answering = replyTarget(parent);
+  const shown = answering
+    ? { authorId: answering.authorId, name: answering.authorName, handle: answering.authorHandle, avatar: answering.authorAvatar, at: answering.createdAtMs, text: answering.text }
+    : { authorId: post.authorId, name: post.authorName, handle: post.authorHandle, avatar: undefined, at: post.createdAtMs, text: post.text };
+  const author = { name: shown.name, handle: shown.handle };
   const me = authorName(account, book, account.userId);
   const blocked = !!validateReply(text) || sending;
   // X shows a small preview of the media on the right: a photo's thumbnail or a video's poster.
-  const preview = post.media[0];
+  const preview = answering ? undefined : post.media[0];
   const isVideo = preview?.type === 'video';
 
   const send = async () => {
     if (blocked) return;
-    setSendingId(id);
+    setSendingId(key);
     try {
-      const reply = await sendReply(account, post, text);
+      const reply = await sendReply(account, post, text, parent);
       putPost({ ...post, replyCount: post.replyCount + 1 });
       setText('');
       setSendingId(null);
@@ -98,10 +106,10 @@ export default function ReplyScreen() {
         </View>
 
         <ScrollView ref={scroll} className="flex-1" contentContainerClassName="px-4 pt-2" keyboardShouldPersistTaps="handled">
-          {/* The post being answered, joined to my reply by a thread line. */}
+          {/* The post (or reply) being answered, joined to my reply by a thread line. */}
           <View className="flex-row gap-3">
             <View className="items-center">
-              <Avatar id={post.authorId} name={author.name} />
+              <Avatar id={shown.authorId} name={author.name} uri={shown.avatar} />
               <View className="mt-1 w-0.5 flex-1 rounded-full bg-border dark:bg-border-dark" />
             </View>
             <View className="flex-1 flex-row gap-3 pb-4">
@@ -109,9 +117,10 @@ export default function ReplyScreen() {
               <View className="flex-row items-center gap-1">
                 <Text numberOfLines={1} className="shrink text-[15px] font-bold text-ink dark:text-ink-dark">{author.name}</Text>
                 {author.handle ? <Text numberOfLines={1} className="shrink text-[15px] text-muted dark:text-muted-dark">@{author.handle}</Text> : null}
-                <Text className="text-[15px] text-muted dark:text-muted-dark">· {relativeTime(post.createdAtMs, now)}</Text>
+                <Text className="text-[15px] text-muted dark:text-muted-dark">· {relativeTime(shown.at, now)}</Text>
               </View>
-              {post.text ? <PostText text={post.text} className="text-[15px] leading-5 text-ink dark:text-ink-dark" /> : null}
+              {answering ? <Text className="text-[15px] leading-5 text-ink dark:text-ink-dark">{answering.text}</Text> : null}
+              {!answering && post.text ? <PostText text={post.text} className="text-[15px] leading-5 text-ink dark:text-ink-dark" /> : null}
               <Text className="pt-3 text-[15px] text-muted dark:text-muted-dark">
                 Replying to <Text className="text-primary dark:text-primary-dark">{author.handle ? `@${author.handle}` : author.name}</Text>
               </Text>

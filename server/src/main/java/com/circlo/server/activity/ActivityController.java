@@ -8,6 +8,7 @@ import com.circlo.server.web.Ids;
 import com.circlo.server.web.RateLimiter;
 import java.sql.Timestamp;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
 import java.util.Map;
@@ -53,14 +54,25 @@ public class ActivityController {
     /**
      * Replies and likes by other people on my posts, likes on my replies (on posts I can still see), and people who
      * joined with my invite link (while we're still connected; no post), newest first; people I blocked are left out.
+     * With `replies=all` (apps that know the kind), also answers to my replies on other people's posts ('reply_reply').
      */
     @GetMapping("/v1/activity")
     public Activity activity(@AuthenticationPrincipal Jwt jwt, @RequestParam(value = "before", required = false) Instant before,
-            @RequestParam(value = "limit", defaultValue = "50") int limit) {
+            @RequestParam(value = "limit", defaultValue = "50") int limit,
+            @RequestParam(value = "replies", required = false) String replies) {
         byte[] me = Ids.bytes(TokenService.userOf(jwt));
         Timestamp cursor = Timestamp.from(before == null ? Instant.now().plusSeconds(60) : before);
         int n = Math.max(1, Math.min(limit, 100));
         record Row(String kind, UUID post, String postText, UUID actor, UUID reply, String replyText, Instant at) {}
+        boolean answers = "all".equals(replies);
+        List<Object> args = new ArrayList<>(List.of(me, me, cursor, me, me, cursor, me, me, cursor));
+        args.addAll(List.of(PostAccess.visibleArgs(me)));
+        if (answers) {
+            args.addAll(List.of(me, me, me, cursor));
+            args.addAll(List.of(PostAccess.visibleArgs(me)));
+            args.addAll(List.of(PostAccess.replyVisibleArgs(me)));
+        }
+        args.addAll(List.of(me, cursor, me, n));
         List<Row> rows = jdbc.query("""
                 SELECT * FROM (
                   SELECT 'reply' AS kind, r.post_id, p.body AS post_body, r.author_id AS actor, r.id AS reply_id, r.body AS reply_body, r.created_at
@@ -74,7 +86,12 @@ public class ActivityController {
                   SELECT 'reply_like', r.post_id, p.body, rl.liker_id, r.id, r.body, rl.created_at
                     FROM reply_likes rl JOIN post_replies r ON r.id = rl.reply_id JOIN posts p ON p.id = r.post_id
                    WHERE r.author_id = ? AND rl.liker_id <> ? AND rl.created_at < ? AND """ + PostAccess.VISIBLE + " AND "
-                + PostAccess.replyVisibleTo("rl.liker_id") + """
+                + PostAccess.replyVisibleTo("rl.liker_id") + (answers ? """
+                  UNION ALL
+                  SELECT 'reply_reply', r.post_id, p.body, r.author_id, r.id, r.body, r.created_at
+                    FROM post_replies r JOIN post_replies pr ON pr.id = r.parent_id JOIN posts p ON p.id = r.post_id
+                   WHERE pr.author_id = ? AND r.author_id <> ? AND p.author_id <> ? AND r.created_at < ? AND """
+                        + PostAccess.VISIBLE + " AND " + PostAccess.REPLY_VISIBLE : "") + """
                   UNION ALL
                   SELECT 'joined', NULL, NULL, f.user_a, NULL, NULL, f.created_at
                     FROM friendships f WHERE f.user_b = ? AND f.via_link = TRUE AND f.status = 'accepted' AND f.created_at < ?
@@ -83,7 +100,7 @@ public class ActivityController {
                 ORDER BY a.created_at DESC LIMIT ?""",
                 (rs, i) -> new Row(rs.getString(1), rs.getBytes(2) == null ? null : Ids.uuid(rs.getBytes(2)), rs.getString(3), Ids.uuid(rs.getBytes(4)),
                         rs.getBytes(5) == null ? null : Ids.uuid(rs.getBytes(5)), rs.getString(6), rs.getTimestamp(7).toInstant()),
-                me, me, cursor, me, me, cursor, me, me, cursor, me, me, me, me, me, cursor, me, n);
+                args.toArray());
         Map<UUID, People.Person> actors = people.persons(rows.stream().map(Row::actor).toList());
         return new Activity(rows.stream().filter(r -> actors.containsKey(r.actor()))
                 .map(r -> new Item(r.kind(), r.post(), r.postText(), r.actor(), actors.get(r.actor()), r.reply(), r.replyText(), r.at()))

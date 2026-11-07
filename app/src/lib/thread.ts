@@ -21,6 +21,9 @@ export type Reply = {
   mine: boolean;
   likeCount: number;
   likedByMe: boolean;
+  /** The reply this answers, and who wrote it; null for a reply to the post (or one I can't see). */
+  parentId?: string | null;
+  replyingTo?: { name: string; handle: string } | null;
 };
 
 /** One of someone's replies with the post it answers (their profile's Replies tab). */
@@ -41,6 +44,8 @@ export function fromReplyRow(r: components['schemas']['Reply'], myId: string): R
     mine: r.authorId === myId,
     likeCount: r.likeCount,
     likedByMe: r.likedByMe,
+    parentId: r.parentId ?? null,
+    replyingTo: r.replyingTo ? { name: r.replyingTo.name, handle: r.replyingTo.username } : null,
   };
 }
 
@@ -73,11 +78,25 @@ export function validateReply(text: string): string | null {
   return null;
 }
 
-export async function sendReply(account: StoredAccount, post: Pick<FeedPost, 'postId'>, text: string): Promise<Reply> {
+/** `parentId`: the reply this answers (the server keeps the answer in that reply's circle). */
+export async function sendReply(account: StoredAccount, post: Pick<FeedPost, 'postId'>, text: string, parentId?: string): Promise<Reply> {
   const problem = validateReply(text);
   if (problem) throw new Error(problem);
-  const row = ok(await api.POST('/v1/posts/{postId}/replies', { params: { path: { postId: post.postId } }, body: { text: text.trim() } }));
+  const body = parentId ? { text: text.trim(), parentId } : { text: text.trim() };
+  const row = ok(await api.POST('/v1/posts/{postId}/replies', { params: { path: { postId: post.postId } }, body }));
   return fromReplyRow(row, account.userId);
+}
+
+// The reply being answered, handed from the thread to the composer (which shows it above the text box).
+let target: Reply | null = null;
+
+export function noteReplyTarget(reply: Reply): void {
+  target = reply;
+}
+
+/** The reply noted for answering, if it is this one. */
+export function replyTarget(replyId: string | undefined): Reply | null {
+  return replyId && target?.replyId === replyId ? target : null;
 }
 
 // A reply just sent from the composer opened on a thread, for that thread to show and highlight when it's back on screen.

@@ -12,7 +12,7 @@ import { shownActivity } from './view-logic';
  * I've seen is a time kept on this device, and drives the bell's dot.
  */
 export type ActivityItem = {
-  kind: 'reply' | 'like' | 'reply_like' | 'joined';
+  kind: 'reply' | 'like' | 'reply_like' | 'reply_reply' | 'joined';
   /** None for 'joined'. */
   postId: string | null;
   postText: string | null;
@@ -51,7 +51,7 @@ export function unseenCount(items: ActivityItem[] | null, seenAt: string | null)
 type Row = Awaited<ReturnType<typeof fetchRows>>[number];
 
 async function fetchRows() {
-  return ok(await api.GET('/v1/activity', { params: { query: { limit: 50 } } })).items;
+  return ok(await api.GET('/v1/activity', { params: { query: { limit: 50, replies: 'all' } } })).items;
 }
 
 function fromRow(r: Row): ActivityItem {

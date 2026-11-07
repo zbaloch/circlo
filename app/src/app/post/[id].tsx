@@ -12,7 +12,7 @@ import { loadAddressBook, type AddressBook } from '@/lib/addressbook';
 import { putPost, usePost } from '@/lib/feed-store';
 import { fetchPost } from '@/lib/posts';
 import { useSession } from '@/lib/session';
-import { deleteReply, fetchLikers, fetchReplies, setReplyLiked, takeSentReply, toggledReplyLike, type Liker, type Reply } from '@/lib/thread';
+import { deleteReply, fetchLikers, fetchReplies, noteReplyTarget, setReplyLiked, takeSentReply, toggledReplyLike, type Liker, type Reply } from '@/lib/thread';
 import { relativeTime } from '@/lib/time';
 import { useNow } from '@/lib/use-now';
 import { likersLine } from '@/lib/view-logic';
@@ -180,21 +180,40 @@ export default function ThreadScreen() {
                       <Icon name="ellipsis-horizontal" size={18} color={palette.muted} />
                     </Pressable>
                   </View>
-                  <Text className="text-base text-ink dark:text-ink-dark">{item.text}</Text>
-                  {LIKES_ENABLED ? (
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityLabel={item.likedByMe ? 'Unlike reply' : 'Like reply'}
-                    accessibilityState={{ selected: item.likedByMe }}
-                    hitSlop={8}
-                    onPress={() => likeReply(item)}
-                    className="mt-1 flex-row items-center gap-1 self-start active:opacity-60">
-                    <Icon name={item.likedByMe ? 'heart' : 'heart-outline'} size={16} color={item.likedByMe ? palette.danger : palette.muted} />
-                    {item.likeCount ? (
-                      <Text className={`text-sm ${item.likedByMe ? 'text-danger dark:text-danger-dark' : 'text-muted dark:text-muted-dark'}`}>{item.likeCount}</Text>
-                    ) : null}
-                  </Pressable>
+                  {item.replyingTo ? (
+                    <Text className="text-sm text-muted dark:text-muted-dark">
+                      Replying to <Text className="text-primary dark:text-primary-dark">@{item.replyingTo.handle}</Text>
+                    </Text>
                   ) : null}
+                  <Text className="text-base text-ink dark:text-ink-dark">{item.text}</Text>
+                  <View className="mt-1 flex-row items-center gap-6">
+                    {/* Answer this reply: the answer stays in this reply's circle (the server decides). */}
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel={`Reply to ${name}`}
+                      hitSlop={8}
+                      onPress={() => {
+                        noteReplyTarget(item);
+                        router.push({ pathname: '/reply/[id]', params: { id: post.postId, parent: item.replyId, from: 'thread' } });
+                      }}
+                      className="flex-row items-center gap-1 self-start active:opacity-60">
+                      <Icon name="chatbubble-outline" size={16} color={palette.muted} />
+                    </Pressable>
+                    {LIKES_ENABLED ? (
+                      <Pressable
+                        accessibilityRole="button"
+                        accessibilityLabel={item.likedByMe ? 'Unlike reply' : 'Like reply'}
+                        accessibilityState={{ selected: item.likedByMe }}
+                        hitSlop={8}
+                        onPress={() => likeReply(item)}
+                        className="flex-row items-center gap-1 self-start active:opacity-60">
+                        <Icon name={item.likedByMe ? 'heart' : 'heart-outline'} size={16} color={item.likedByMe ? palette.danger : palette.muted} />
+                        {item.likeCount ? (
+                          <Text className={`text-sm ${item.likedByMe ? 'text-danger dark:text-danger-dark' : 'text-muted dark:text-muted-dark'}`}>{item.likeCount}</Text>
+                        ) : null}
+                      </Pressable>
+                    ) : null}
+                  </View>
                 </View>
               </Pressable>
             );

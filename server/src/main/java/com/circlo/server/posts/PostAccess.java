@@ -36,10 +36,18 @@ public class PostAccess {
      * this, Close Friends would learn who in Family the post also went to.
      */
     public static String replyVisibleTo(String viewer) {
-        return "(p.author_id = " + viewer + " OR r.author_id = " + viewer + " OR r.author_id = p.author_id OR p.audience = 'everyone' "
+        // An answer to a reply (owner request 2026-11-07) must also pass for the writer of the top reply it hangs from,
+        // so it stays in that reply's circle however deep it goes.
+        return "(" + writerVisibleTo(viewer, "r.author_id") + " AND (r.scope_author_id IS NULL OR "
+                + writerVisibleTo(viewer, "r.scope_author_id") + "))";
+    }
+
+    /** True when `viewer` may see what `writer` says under post `p` (the rule above, for one writer). */
+    private static String writerVisibleTo(String viewer, String writer) {
+        return "(p.author_id = " + viewer + " OR " + writer + " = " + viewer + " OR " + writer + " = p.author_id OR p.audience = 'everyone' "
                 + "OR EXISTS (SELECT 1 FROM post_circles pc "
                 + "JOIN circle_members cv ON cv.owner_id = p.author_id AND cv.circle_id = pc.circle_id AND cv.member_id = " + viewer + " "
-                + "JOIN circle_members cr ON cr.owner_id = p.author_id AND cr.circle_id = pc.circle_id AND cr.member_id = r.author_id "
+                + "JOIN circle_members cr ON cr.owner_id = p.author_id AND cr.circle_id = pc.circle_id AND cr.member_id = " + writer + " "
                 + "WHERE pc.post_id = p.id))";
     }
 
@@ -47,13 +55,23 @@ public class PostAccess {
     public static final String REPLY_VISIBLE = replyVisibleTo("?");
 
     public static Object[] replyVisibleArgs(byte[] viewer) {
-        return new Object[] {viewer, viewer, viewer};
+        return new Object[] {viewer, viewer, viewer, viewer, viewer, viewer};
+    }
+
+    /** `first`, then the viewer's {@link #replyVisibleArgs}, then `rest`: for queries with REPLY_VISIBLE in the middle. */
+    public static Object[] withReplyArgs(Object[] first, byte[] viewer, Object... rest) {
+        Object[] reply = replyVisibleArgs(viewer);
+        Object[] out = new Object[first.length + reply.length + rest.length];
+        System.arraycopy(first, 0, out, 0, first.length);
+        System.arraycopy(reply, 0, out, first.length, reply.length);
+        System.arraycopy(rest, 0, out, first.length + reply.length, rest.length);
+        return out;
     }
 
     /** The reply's post, if the viewer may see both the post and the reply; otherwise empty (callers answer 404). */
     public Optional<byte[]> visibleReplyPost(byte[] viewer, byte[] replyId) {
         List<byte[]> post = jdbc.query("SELECT r.post_id FROM post_replies r JOIN posts p ON p.id = r.post_id WHERE r.id = ? AND "
-                + REPLY_VISIBLE, (rs, i) -> rs.getBytes(1), replyId, viewer, viewer, viewer);
+                + REPLY_VISIBLE, (rs, i) -> rs.getBytes(1), withReplyArgs(new Object[] {replyId}, viewer));
         return post.isEmpty() || !canSee(viewer, post.get(0)) ? Optional.empty() : Optional.of(post.get(0));
     }
 

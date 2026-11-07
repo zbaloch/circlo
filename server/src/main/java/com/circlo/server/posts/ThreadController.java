@@ -11,12 +11,14 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import java.sql.Timestamp;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
@@ -70,18 +72,24 @@ public class ThreadController {
 
     // ---------- replies ----------
 
-    public record NewReply(@NotNull @Size(max = 4 * MAX_REPLY_CHARS) String text) {}
+    /** `parentId`: the reply this answers, on the same post (optional). */
+    public record NewReply(@NotNull @Size(max = 4 * MAX_REPLY_CHARS) String text, UUID parentId) {}
 
+    /**
+     * `parentId` and `replyingTo`: the reply this answers and who wrote it, only when I may see that reply (otherwise
+     * both are null, so nobody learns who else is in the conversation).
+     */
     public record ReplyView(UUID replyId, UUID authorId, People.Person author, String text, Instant createdAt, int likeCount,
-            boolean likedByMe) {}
+            boolean likedByMe, UUID parentId, People.Person replyingTo) {}
 
-    private record ReplyRow(UUID id, UUID post, UUID author, String body, Instant at) {}
+    private record ReplyRow(UUID id, UUID post, UUID author, String body, Instant at, UUID parent) {}
 
-    private static final String REPLY_COLUMNS = "r.id, r.post_id, r.author_id, r.body, r.created_at";
+    private static final String REPLY_COLUMNS = "r.id, r.post_id, r.author_id, r.body, r.created_at, r.parent_id";
 
     private static ReplyRow replyRow(java.sql.ResultSet rs) throws java.sql.SQLException {
+        byte[] parent = rs.getBytes(6);
         return new ReplyRow(Ids.uuid(rs.getBytes(1)), Ids.uuid(rs.getBytes(2)), Ids.uuid(rs.getBytes(3)), rs.getString(4),
-                rs.getTimestamp(5).toInstant());
+                rs.getTimestamp(5).toInstant(), parent == null ? null : Ids.uuid(parent));
     }
 
     /** Replies (already limited to what `viewer` may see) with their authors and likes, in the given order. */
@@ -101,10 +109,27 @@ public class ThreadController {
         System.arraycopy(ids, 0, mineArgs, 1, ids.length);
         Set<UUID> liked = new HashSet<>(jdbc.query("SELECT reply_id FROM reply_likes WHERE liker_id = ? AND reply_id IN (" + marks + ")",
                 (rs, i) -> Ids.uuid(rs.getBytes(1)), mineArgs));
-        Map<UUID, People.Person> authors = people.persons(rows.stream().map(ReplyRow::author).toList());
+        // The replies these answer, as far as I may see them, and who wrote them.
+        List<UUID> parentIds = rows.stream().map(ReplyRow::parent).filter(Objects::nonNull).distinct().toList();
+        Map<UUID, UUID> parentAuthor = new HashMap<>();
+        if (!parentIds.isEmpty()) {
+            jdbc.query("SELECT r.id, r.author_id FROM post_replies r JOIN posts p ON p.id = r.post_id WHERE r.id IN ("
+                    + String.join(",", Collections.nCopies(parentIds.size(), "?")) + ") AND " + PostAccess.REPLY_VISIBLE
+                    + " AND r.author_id NOT IN (SELECT blocked_id FROM user_blocks WHERE blocker_id = ?)",
+                    rs -> {
+                        parentAuthor.put(Ids.uuid(rs.getBytes(1)), Ids.uuid(rs.getBytes(2)));
+                    }, PostAccess.withReplyArgs(parentIds.stream().map(Ids::bytes).toArray(), viewer, viewer));
+        }
+        List<UUID> everyone = new ArrayList<>(rows.stream().map(ReplyRow::author).toList());
+        everyone.addAll(parentAuthor.values());
+        Map<UUID, People.Person> authors = people.persons(everyone);
         return rows.stream().filter(r -> authors.containsKey(r.author()))
-                .map(r -> new ReplyView(r.id(), r.author(), authors.get(r.author()), r.body(), r.at(), likes.getOrDefault(r.id(), 0),
-                        liked.contains(r.id())))
+                .map(r -> {
+                    UUID to = r.parent() == null ? null : parentAuthor.get(r.parent());
+                    People.Person toPerson = to == null ? null : authors.get(to);
+                    return new ReplyView(r.id(), r.author(), authors.get(r.author()), r.body(), r.at(), likes.getOrDefault(r.id(), 0),
+                            liked.contains(r.id()), toPerson == null ? null : r.parent(), toPerson);
+                })
                 .toList();
     }
 
@@ -117,14 +142,33 @@ public class ThreadController {
             throw ApiException.rateLimited();
         }
         String text = PostController.cleanText(r.text(), MAX_REPLY_CHARS, false);
+        // Answering a reply: it must be on this post and one I can see. The answer stays in its circle (scope_author_id).
+        byte[] parentAuthor = null;
+        byte[] scope = null;
+        if (r.parentId() != null) {
+            record Parent(byte[] author, byte[] scope) {}
+            Parent parent = jdbc.query("SELECT r.author_id, COALESCE(r.scope_author_id, r.author_id) FROM post_replies r "
+                    + "JOIN posts p ON p.id = r.post_id WHERE r.id = ? AND r.post_id = ? AND " + PostAccess.REPLY_VISIBLE,
+                    (rs, i) -> new Parent(rs.getBytes(1), rs.getBytes(2)),
+                    PostAccess.withReplyArgs(new Object[] {Ids.bytes(r.parentId()), Ids.bytes(postId)}, me))
+                    .stream().findFirst().orElseThrow(ApiException::notFound);
+            parentAuthor = parent.author();
+            scope = parent.scope();
+        }
         UUID replyId = Ids.newId();
         Instant now = Instant.now();
-        jdbc.update("INSERT INTO post_replies (id, post_id, author_id, body, created_at) VALUES (?, ?, ?, ?, ?)",
-                Ids.bytes(replyId), Ids.bytes(postId), me, text, Timestamp.from(now));
+        jdbc.update("INSERT INTO post_replies (id, post_id, author_id, body, created_at, parent_id, scope_author_id) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                Ids.bytes(replyId), Ids.bytes(postId), me, text, Timestamp.from(now),
+                r.parentId() == null ? null : Ids.bytes(r.parentId()), scope);
         notifier.changed(postAuthor);
         notifier.reply(postAuthor, me, postId, replyId);
+        if (parentAuthor != null && !Arrays.equals(parentAuthor, postAuthor)) {
+            notifier.changed(parentAuthor);
+            notifier.reply(parentAuthor, me, postId, replyId);
+        }
         UUID author = Ids.uuid(me);
-        return new ReplyView(replyId, author, people.person(author), text, now, 0, false);
+        People.Person to = parentAuthor == null ? null : people.person(Ids.uuid(parentAuthor));
+        return new ReplyView(replyId, author, people.person(author), text, now, 0, false, to == null ? null : r.parentId(), to);
     }
 
     @GetMapping("/v1/posts/{postId}/replies")
@@ -136,8 +180,9 @@ public class ThreadController {
         List<ReplyRow> rows = jdbc.query("SELECT " + REPLY_COLUMNS + " FROM post_replies r JOIN posts p ON p.id = r.post_id "
                 + "WHERE r.post_id = ? AND r.created_at > ? AND r.author_id NOT IN (SELECT blocked_id FROM user_blocks WHERE blocker_id = ?) "
                 + "AND " + PostAccess.REPLY_VISIBLE + " ORDER BY r.created_at, r.id LIMIT ?",
-                (rs, i) -> replyRow(rs), Ids.bytes(postId), Timestamp.from(after == null ? Instant.EPOCH : after), me, me, me, me,
-                Math.max(1, Math.min(limit, 200)));
+                (rs, i) -> replyRow(rs), PostAccess.withReplyArgs(
+                        new Object[] {Ids.bytes(postId), Timestamp.from(after == null ? Instant.EPOCH : after), me}, me,
+                        Math.max(1, Math.min(limit, 200))));
         return replyViews(me, rows);
     }
 
@@ -151,14 +196,11 @@ public class ThreadController {
             @RequestParam(value = "limit", defaultValue = "30") int limit) {
         byte[] me = me(jwt);
         String notBlocked = " NOT IN (SELECT blocked_id FROM user_blocks WHERE blocker_id = ?)";
-        Object[] args = new Object[12];
-        args[0] = Ids.bytes(userId);
-        System.arraycopy(PostAccess.visibleArgs(me), 0, args, 1, 4);
-        System.arraycopy(PostAccess.replyVisibleArgs(me), 0, args, 5, 3);
-        args[8] = Timestamp.from(before == null ? Instant.now().plusSeconds(60) : before);
-        args[9] = me;
-        args[10] = me;
-        args[11] = Math.max(1, Math.min(limit, 100));
+        Object[] first = new Object[5];
+        first[0] = Ids.bytes(userId);
+        System.arraycopy(PostAccess.visibleArgs(me), 0, first, 1, 4);
+        Object[] args = PostAccess.withReplyArgs(first, me, Timestamp.from(before == null ? Instant.now().plusSeconds(60) : before), me, me,
+                Math.max(1, Math.min(limit, 100)));
         List<ReplyRow> rows = jdbc.query("SELECT " + REPLY_COLUMNS + " FROM post_replies r JOIN posts p ON p.id = r.post_id "
                 + "WHERE r.author_id = ? AND " + PostAccess.VISIBLE + " AND " + PostAccess.REPLY_VISIBLE
                 + " AND r.created_at < ? AND r.author_id" + notBlocked
@@ -201,7 +243,8 @@ public class ThreadController {
     private byte[] visibleReplyAuthor(byte[] me, UUID postId, UUID replyId) {
         visibleAuthor(me, postId);
         return jdbc.query("SELECT r.author_id FROM post_replies r JOIN posts p ON p.id = r.post_id WHERE r.id = ? AND r.post_id = ? AND "
-                + PostAccess.REPLY_VISIBLE, (rs, i) -> rs.getBytes(1), Ids.bytes(replyId), Ids.bytes(postId), me, me, me)
+                + PostAccess.REPLY_VISIBLE, (rs, i) -> rs.getBytes(1),
+                PostAccess.withReplyArgs(new Object[] {Ids.bytes(replyId), Ids.bytes(postId)}, me))
                 .stream().findFirst().orElseThrow(ApiException::notFound);
     }
 
