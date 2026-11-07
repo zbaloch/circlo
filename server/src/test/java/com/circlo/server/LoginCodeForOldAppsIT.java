@@ -16,7 +16,7 @@ import org.springframework.test.context.TestPropertySource;
 class LoginCodeForOldAppsIT extends IntegrationTest {
 
     @Test
-    void oldAppsGoThroughTheirCheckYourEmailScreen() {
+    void oldAppsGoThroughTheirCheckYourEmailScreen() throws InterruptedException {
         TestUser a = user("lco_ana");
         ResponseEntity<Map<String, Object>> r = a.login(a.username, a.password);
         assertThat(r.getStatusCode().value()).isEqualTo(403);
@@ -29,7 +29,11 @@ class LoginCodeForOldAppsIT extends IntegrationTest {
         assertThat(done.getStatusCode().value()).isEqualTo(200);
         assertThat(done.getBody()).containsEntry("userId", a.userId.toString()).containsKey("accessToken");
 
-        // A wrong password still answers 401 and sends nothing.
+        // A wrong password still answers 401 and sends nothing. (The "New sign-in" email from signing in above goes out in
+        // the background; wait for it, so it isn't counted as sent by the wrong password.)
+        for (int i = 0; i < 60 && mail.to(a.email).stream().noneMatch(m -> m.subject().startsWith("New sign-in")); i++) {
+            Thread.sleep(50);
+        }
         int before = mail.to(a.email).size();
         assertThat(a.login(a.username, "wrong password, nope").getStatusCode().value()).isEqualTo(401);
         assertThat(mail.to(a.email)).hasSize(before);
