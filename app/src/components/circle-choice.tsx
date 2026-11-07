@@ -52,6 +52,8 @@ export function CirclePickerSheet({ visible, title = 'Their circles', ...rest }:
   onClose: () => void;
   title?: string;
   confirmLabel?: string;
+  /** Who's being added, to say in plain words what they'll see. */
+  person?: string;
 }) {
   // The body mounts each time the sheet opens, so it starts from the current choice.
   return (
@@ -61,19 +63,22 @@ export function CirclePickerSheet({ visible, title = 'Their circles', ...rest }:
   );
 }
 
-function CirclePicker({ book, selected, onDone, onClose, confirmLabel = 'Done' }: {
+function CirclePicker({ book, selected, onDone, onClose, confirmLabel = 'Done', person }: {
   book: AddressBook;
   selected: number[];
   onDone: (ids: number[]) => void;
   onClose: () => void;
   confirmLabel?: string;
+  person?: string;
 }) {
   const [ids, setIds] = useState<number[]>(selected);
   const toggle = (id: number) => setIds((cur) => (cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id].sort((a, b) => a - b)));
   return (
     <>
       <Text className="px-5 pb-2 text-sm text-muted dark:text-muted-dark">
-        Everyone you connect with is added to Everyone and sees your Everyone posts. Add them to more circles if you like. Only you see this.
+        {person
+          ? `${person} will see your Everyone posts and your posts to the circles you tick, nothing else. They’re never told which circles they’re in.`
+          : 'Everyone you connect with is added to Everyone and sees your Everyone posts. Add them to more circles if you like. Only you see this.'}
       </Text>
       <ScrollView>
         <EveryoneRow book={book} />

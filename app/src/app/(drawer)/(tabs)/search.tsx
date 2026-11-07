@@ -6,6 +6,7 @@ import { Platform, Pressable, RefreshControl, ScrollView, Share, View } from 're
 import QRCode from 'react-native-qrcode-svg';
 
 import { CirclePickerSheet, circlesLine, peopleCircles } from '@/components/circle-choice';
+import { InviteSheet } from '@/components/invite-sheet';
 import { PersonRow } from '@/components/person-row';
 import { Avatar } from '@/components/avatar';
 import { Button, ErrorText, TextField } from '@/components/form';
@@ -13,7 +14,7 @@ import { describeError } from '@/lib/account';
 import { loadAddressBook, type AddressBook } from '@/lib/addressbook';
 import { circlesOf, setCircles } from '@/lib/circles';
 import { showAlert } from '@/lib/dialog';
-import { acceptRequest, declineRequest, getInviteLink, InviteError, joinInvite, justJoined, previewInvite, resetInviteLink, type Connection } from '@/lib/friends';
+import { acceptRequest, declineRequest, getInviteLink, INVITE_HOST, InviteError, joinInvite, justJoined, previewInvite, resetInviteLink, type Connection } from '@/lib/friends';
 import { takePendingInvite } from '@/lib/pending-invite';
 import { displayName, markRequestsSeen, useConnections } from '@/lib/use-connections';
 import { usePalette } from '@/theme/use-palette';
@@ -42,7 +43,7 @@ export default function SearchScreen() {
   const palette = usePalette();
   const { account, connections, unseenRequests, refresh } = useConnections();
   // Links can open a given tab (Home's "Invite your first friend", a request in Notifications).
-  const { section: requested } = useLocalSearchParams<{ section?: string }>();
+  const { section: requested, invite } = useLocalSearchParams<{ section?: string; invite?: string }>();
   const asSection = (s?: string) => SECTIONS.find((x) => x.key === s)?.key;
   const [section, setSection] = useState<Section>(asSection(requested) ?? 'friends');
   const [lastRequested, setLastRequested] = useState(requested);
@@ -50,6 +51,13 @@ export default function SearchScreen() {
     setLastRequested(requested);
     const next = asSection(requested);
     if (next) setSection(next);
+  }
+  // An invite link opened while signed in: "Add them to your circles" opens straight away (InviteSheet).
+  const [inviteLink, setInviteLink] = useState<string | null>(null);
+  const [lastInvite, setLastInvite] = useState<string>();
+  if (invite && invite !== lastInvite) {
+    setLastInvite(invite);
+    setInviteLink(`${INVITE_HOST}${invite}`);
   }
   const [link, setLink] = useState<string>();
   // Who I was connected with when my code went on screen: anyone new since then just joined.
@@ -63,9 +71,9 @@ export default function SearchScreen() {
   // Asked before accepting a request or sending a pasted invite: which circles the person goes into (author-only;
   // none keeps them in Everyone only).
   const [book, setBook] = useState<AddressBook | null>(null);
-  const [ask, setAsk] = useState<{ title: string; confirmLabel: string; done: (ids: number[]) => void }>();
-  const askCircles = (title: string, confirmLabel: string, done: (ids: number[]) => void) => {
-    if (book) setAsk({ title, confirmLabel, done });
+  const [ask, setAsk] = useState<{ title: string; confirmLabel: string; person: string; done: (ids: number[]) => void }>();
+  const askCircles = (person: string, confirmLabel: string, done: (ids: number[]) => void) => {
+    if (book) setAsk({ title: `Add ${person} to your circles`, confirmLabel, person, done });
     else done([]);
   };
 
@@ -136,7 +144,7 @@ export default function SearchScreen() {
             label="Accept"
             loading={busy === `accept:${c.userId}`}
             disabled={!!busy}
-            onPress={() => askCircles(`Add ${displayName(c)} to circles`, 'Accept', (ids) => void accept(c, ids))}
+            onPress={() => askCircles(displayName(c), 'Accept', (ids) => void accept(c, ids))}
           />
         </View>
         <View className="flex-1">
@@ -166,7 +174,7 @@ export default function SearchScreen() {
     run('paste', async () => {
       const from = await previewInvite(text);
       const name = from.name || `@${from.handle}`;
-      askCircles(`Add ${name} to circles`, 'Connect', (ids) =>
+      askCircles(name, 'Connect', (ids) =>
         void run('paste', async () => {
           const status = await joinInvite(account, text, ids);
           setPasted('');
@@ -177,7 +185,7 @@ export default function SearchScreen() {
     });
 
   const chooseFor = (c: Connection) =>
-    askCircles(`Add ${displayName(c)} to circles`, 'Save', (ids) =>
+    askCircles(displayName(c), 'Save', (ids) =>
       void run(`circles:${c.userId}`, async () => {
         await setCircles(account, c.userId, ids);
         setBook(await loadAddressBook(account));
@@ -357,10 +365,14 @@ export default function SearchScreen() {
           book={book}
           selected={[]}
           title={ask.title}
+          person={ask.person}
           confirmLabel={ask.confirmLabel}
           onDone={ask.done}
           onClose={() => setAsk(undefined)}
         />
+      ) : null}
+      {inviteLink && book ? (
+        <InviteSheet account={account} link={inviteLink} book={book} onClose={() => setInviteLink(null)} onJoined={() => void refresh()} />
       ) : null}
     </View>
   );
