@@ -1998,7 +1998,7 @@ export interface paths {
             requestBody: {
                 content: {
                     "application/json": {
-                        /** @description Up to 500 characters; may be empty with media */
+                        /** @description Up to 1,000 characters; may be empty with media */
                         text: string;
                         audience: components["schemas"]["Audience"];
                         media?: components["schemas"]["NewAttachment"][];

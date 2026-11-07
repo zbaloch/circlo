@@ -1,5 +1,5 @@
 /**
- * Posts (PLAN.md Phase 7): text up to 500 characters and up to 4 photos or 1 video, for Only me, Everyone, or one or
+ * Posts (PLAN.md Phase 7): text up to 1,000 characters and up to 4 photos or 1 video, for Only me, Everyone, or one or
  * more of my circles. The server decides who may see each post and returns its audience only to me, its author.
  */
 import { api, ok } from '@/api/client';
@@ -10,7 +10,7 @@ import { apiAudience, fromApiAudience, validAudience } from './circles';
 import type { StoredAccount } from './keystore';
 import { discardPicked, discardPrepared, prepare, upload, type Attachment, type PickedMedia, type PreparedItem } from './media';
 
-export const MAX_POST_CHARS = 500;
+export const MAX_POST_CHARS = 1000;
 
 export type Draft = { text: string; audience: Audience; media: PickedMedia[] };
 
