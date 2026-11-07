@@ -20,11 +20,11 @@ describe('validateDraft', () => {
     expect(check({ text: '', media: [] })).toMatch(/Write something/);
     expect(check({ text: 'hi', media: [] })).toBeNull();
     expect(check({ text: '', media: [img] })).toBeNull();
-    // Up to 1,000 characters (owner decision 2026-11-07; replies stay at 500).
-    expect(check({ text: 'x'.repeat(1000), media: [] })).toBeNull();
-    expect(check({ text: 'x'.repeat(1001), media: [] })).toMatch(/1000/);
-    // Counted in characters, not UTF-16 units: 1,000 emoji are fine.
-    expect(check({ text: '😀'.repeat(1000), media: [] })).toBeNull();
+    // Up to 1,500 characters (owner decision 2026-11-07; replies stay at 500).
+    expect(check({ text: 'x'.repeat(1500), media: [] })).toBeNull();
+    expect(check({ text: 'x'.repeat(1501), media: [] })).toMatch(/1500/);
+    // Counted in characters, not UTF-16 units: 1,500 emoji are fine.
+    expect(check({ text: '😀'.repeat(1500), media: [] })).toBeNull();
   });
 
   it('allows up to 4 photos or exactly 1 video', () => {

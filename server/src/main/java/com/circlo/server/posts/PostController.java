@@ -45,7 +45,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 public class PostController {
 
-    public static final int MAX_CHARS = 1000;
+    public static final int MAX_CHARS = 1500;
 
     private final JdbcTemplate jdbc;
     private final PostAccess access;

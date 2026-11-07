@@ -82,9 +82,9 @@ class PostsFlowIT extends IntegrationTest {
         TestUser a = user("post_rules");
         assertThat(a.call("POST", "/v1/posts", Map.of("text", "  ", "audience", Map.of("kind", "everyone"))).getBody())
                 .containsEntry("error", "invalid_text");
-        // Posts can be up to 1,000 characters (owner decision 2026-11-07; replies stay at 500), emoji counting as one.
-        assertThat(a.status("POST", "/v1/posts", Map.of("text", "😀".repeat(1000), "audience", Map.of("kind", "everyone")))).isEqualTo(201);
-        assertThat(a.call("POST", "/v1/posts", Map.of("text", "x".repeat(1001), "audience", Map.of("kind", "everyone"))).getBody())
+        // Posts can be up to 1,500 characters (owner decision 2026-11-07; replies stay at 500), emoji counting as one.
+        assertThat(a.status("POST", "/v1/posts", Map.of("text", "😀".repeat(1500), "audience", Map.of("kind", "everyone")))).isEqualTo(201);
+        assertThat(a.call("POST", "/v1/posts", Map.of("text", "x".repeat(1501), "audience", Map.of("kind", "everyone"))).getBody())
                 .containsEntry("error", "invalid_text");
         assertThat(a.call("POST", "/v1/posts", Map.of("text", "hi", "audience", Map.of("kind", "circles", "circles", List.of()))).getBody())
                 .containsEntry("error", "invalid_audience");
