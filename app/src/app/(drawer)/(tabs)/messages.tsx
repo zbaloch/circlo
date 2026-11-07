@@ -107,7 +107,7 @@ export function MessagesScreen() {
           );
         }}
       />
-      <Fab accessibilityLabel="New message" icon="mail-outline" onPress={() => router.push('/new-message')} />
+      <Fab accessibilityLabel="New message" icon="mail-add-outline" onPress={() => router.push('/new-message')} />
     </Screen>
   );
 }
