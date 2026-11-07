@@ -88,7 +88,7 @@ export async function syncConnections(account: StoredAccount): Promise<Connectio
   return Object.entries(book.contacts).map(([userId, c]) => ({
     userId,
     status: c.status,
-    profile: { displayName: c.displayName, handle: c.handle, avatarUrl: c.avatarUrl, bio: '' },
+    profile: { displayName: c.displayName, handle: c.handle, avatarUrl: c.avatarUrl, bio: c.bio ?? '' },
   }));
 }
 

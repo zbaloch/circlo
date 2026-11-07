@@ -506,6 +506,7 @@ paths:
                     since: { type: string, format: date-time }
                     name: { type: string }
                     username: { type: string }
+                    bio: { type: string, description: "As on their profile; empty when they haven't written one" }
                     avatarUrl: { type: [string, "null"] }
                     circles: { type: array, items: { type: integer } }
   /v1/friends/requests:

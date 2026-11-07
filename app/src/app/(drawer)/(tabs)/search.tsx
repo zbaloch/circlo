@@ -5,12 +5,13 @@ import { useCallback, useEffect, useState } from 'react';
 import { Platform, Pressable, RefreshControl, ScrollView, Share, View } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
 
-import { CirclePickerSheet, circlesLine } from '@/components/circle-choice';
+import { CirclePickerSheet, circlesLine, peopleCircles } from '@/components/circle-choice';
+import { PersonRow } from '@/components/person-row';
 import { Avatar } from '@/components/avatar';
 import { Button, ErrorText, TextField } from '@/components/form';
 import { describeError } from '@/lib/account';
 import { loadAddressBook, type AddressBook } from '@/lib/addressbook';
-import { setCircles } from '@/lib/circles';
+import { circlesOf, setCircles } from '@/lib/circles';
 import { showAlert } from '@/lib/dialog';
 import { acceptRequest, declineRequest, getInviteLink, InviteError, joinInvite, justJoined, previewInvite, resetInviteLink, type Connection } from '@/lib/friends';
 import { takePendingInvite } from '@/lib/pending-invite';
@@ -255,17 +256,17 @@ export default function SearchScreen() {
           </View>
         ) : null}
         {friends.map((f) => (
-          <Pressable
+          // Under each person: the circles I put them in (only I see this; they're never told).
+          <PersonRow
             key={f.userId}
-            accessibilityRole="button"
+            id={f.userId}
+            name={displayName(f)}
+            handle={f.profile.handle}
+            bio={f.profile.bio}
+            note={book ? peopleCircles(book, circlesOf(book, book.contacts[f.userId])) : undefined}
+            avatarUrl={f.profile.avatarUrl}
             onPress={() => router.push({ pathname: '/friend/[id]', params: { id: f.userId } })}
-            className="flex-row items-center gap-3 py-2 active:opacity-60">
-            <Avatar id={f.userId} name={displayName(f)} uri={f.profile.avatarUrl} />
-            <View className="flex-1">
-              <Text className="font-bold text-ink dark:text-ink-dark">{displayName(f)}</Text>
-              <Text className="text-muted dark:text-muted-dark">@{f.profile.handle}</Text>
-            </View>
-          </Pressable>
+          />
         ))}
       </View>
     </>

@@ -17,6 +17,8 @@ export type Contact = {
   status: 'accepted' | 'incoming' | 'outgoing';
   displayName: string;
   handle: string;
+  /** As on their profile; empty when they haven't written one (or an older server didn't send it). */
+  bio?: string;
   avatarUrl?: string | null;
   /** Mine to know: the circles (ids) I put them in. Never shown to them. */
   circles: number[];
@@ -47,12 +49,12 @@ export function resetAddressBookCache() {
 
 /** Pure: the book from the server's lists. Exported for tests. */
 export function bookFrom(
-  friends: { userId: string; status: Contact['status']; name: string; username: string; avatarUrl?: string | null; circles: number[] }[],
+  friends: { userId: string; status: Contact['status']; name: string; username: string; bio?: string; avatarUrl?: string | null; circles: number[] }[],
   circles: { id: number; name: string }[],
 ): AddressBook {
   const contacts: Record<string, Contact> = {};
   for (const f of friends) {
-    contacts[f.userId] = { status: f.status, displayName: f.name, handle: f.username, avatarUrl: f.avatarUrl, circles: f.circles };
+    contacts[f.userId] = { status: f.status, displayName: f.name, handle: f.username, bio: f.bio ?? '', avatarUrl: f.avatarUrl, circles: f.circles };
   }
   return { contacts, circleDefs: circles.map((c) => ({ id: c.id, name: c.name })) };
 }

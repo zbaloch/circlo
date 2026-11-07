@@ -17,6 +17,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Base64;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -364,7 +365,7 @@ public class SocialController {
     }
 
     /** `circles`: which of my circles they're in (mine to know; never shown to them). */
-    public record Friend(UUID userId, String status, Instant since, String name, String username, String avatarUrl,
+    public record Friend(UUID userId, String status, Instant since, String name, String username, String bio, String avatarUrl,
             List<Integer> circles) {}
 
     @GetMapping("/v1/friends")
@@ -385,9 +386,18 @@ public class SocialController {
                 rs -> {
                     circles.computeIfAbsent(Ids.uuid(rs.getBytes(1)), k -> new ArrayList<>()).add(rs.getInt(2));
                 }, (Object) me);
+        // Their bios, as on their profile (which I can already open): for the person rows on a circle's screen.
+        Map<UUID, String> bios = new HashMap<>();
+        if (!rows.isEmpty()) {
+            jdbc.query("SELECT id, bio FROM users WHERE id IN (" + String.join(",", Collections.nCopies(rows.size(), "?")) + ")",
+                    rs -> {
+                        bios.put(Ids.uuid(rs.getBytes(1)), rs.getString(2));
+                    }, rows.stream().map(r -> Ids.bytes(r.id())).toArray());
+        }
         return rows.stream().filter(r -> persons.containsKey(r.id())).map(r -> {
             People.Person p = persons.get(r.id());
-            return new Friend(r.id(), r.status(), r.since(), p.name(), p.username(), p.avatarUrl(), circles.getOrDefault(r.id(), List.of()));
+            return new Friend(r.id(), r.status(), r.since(), p.name(), p.username(), bios.getOrDefault(r.id(), ""), p.avatarUrl(),
+                    circles.getOrDefault(r.id(), List.of()));
         }).toList();
     }
 

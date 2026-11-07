@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react-native';
 
-import { CirclePickerSheet, circlesLine } from '@/components/circle-choice';
+import { CirclePickerSheet, circlesLine, peopleCircles } from '@/components/circle-choice';
+import { PersonRow } from '@/components/person-row';
 import { STARTER_CIRCLES } from '@/lib/addressbook';
 
 jest.mock('@/api/client', () => ({}));
@@ -23,5 +24,21 @@ describe('adding someone: Everyone always, more circles if I like', () => {
     await fireEvent.press(screen.getByRole('checkbox', { name: /Family/ }));
     await fireEvent.press(screen.getByRole('button', { name: 'Connect' }));
     expect(done).toHaveBeenCalledWith([1]);
+  });
+});
+
+describe('My People: which circles each person is in (only I see this)', () => {
+  it('names their circles, or says they’re only in Everyone', () => {
+    expect(peopleCircles(book, [1, 2])).toBe('Family, Close Friends');
+    expect(peopleCircles(book, [])).toBe('Everyone only');
+  });
+
+  it('shows it on the person’s row, with their bio', async () => {
+    const open = jest.fn();
+    await render(<PersonRow id="m" name="Ana" handle="ana" bio="Baker" note="Family, Close Friends" onPress={open} />);
+    expect(screen.getByText('Family, Close Friends')).toBeTruthy();
+    expect(screen.getByText('Baker')).toBeTruthy();
+    await fireEvent.press(screen.getByRole('button', { name: /Ana, @ana/ }));
+    expect(open).toHaveBeenCalled();
   });
 });

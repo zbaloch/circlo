@@ -53,6 +53,26 @@ export function membersOf(book: Pick<AddressBook, 'contacts' | 'circleDefs'>, id
     .map(([userId]) => userId);
 }
 
+/**
+ * What adding someone to a circle (or taking them out) means, for the confirmation and the toast after it. A circle
+ * post is seen by whoever is in its circles now (V25), so it works both ways for earlier posts too. Pure.
+ */
+export function membershipChange(person: string, circle: string, join: boolean) {
+  return join
+    ? {
+        title: `Add ${person} to ${circle}?`,
+        message: `${person} will see the posts you share with ${circle} from now on, and the ones you shared with it earlier. They aren’t told, and they never see the circle’s name.`,
+        confirm: 'Add',
+        done: `${person} added to ${circle}`,
+      }
+    : {
+        title: `Remove ${person} from ${circle}?`,
+        message: `${person} will no longer see the posts you shared with ${circle}, unless they were also shared with Everyone or another circle ${person} is in. They aren’t told.`,
+        confirm: 'Remove',
+        done: `${person} removed from ${circle}`,
+      };
+}
+
 const isFriend = (c: Pick<Contact, 'status'>) => c.status === 'accepted';
 
 /** How many friends can see a post to this audience right now. */

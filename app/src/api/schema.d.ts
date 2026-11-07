@@ -1373,6 +1373,8 @@ export interface paths {
                             since: string;
                             name: string;
                             username: string;
+                            /** @description As on their profile; empty when they haven't written one */
+                            bio?: string;
                             avatarUrl?: string | null;
                             circles: number[];
                         }[];

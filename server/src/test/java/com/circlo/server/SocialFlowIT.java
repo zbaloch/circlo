@@ -33,7 +33,10 @@ class SocialFlowIT extends IntegrationTest {
 
         Map<String, Object> benSeenByAna = a.get("/v1/friends").get(0);
         assertThat(benSeenByAna).containsEntry("status", "accepted").containsEntry("username", "soc_ben").containsEntry("circles", List.of(1));
-        assertThat(b.get("/v1/friends").get(0)).containsEntry("circles", List.of(2, 3));
+        assertThat(b.get("/v1/friends").get(0)).containsEntry("circles", List.of(2, 3)).containsEntry("bio", "").doesNotContainKey("email");
+        // The friends list carries each friend's bio, for the circle screen's person rows.
+        assertThat(b.status("PUT", "/v1/me/profile", Map.of("name", "Ben", "bio", "Gardener"))).isEqualTo(200);
+        assertThat(a.get("/v1/friends").get(0)).containsEntry("name", "Ben").containsEntry("bio", "Gardener");
         assertThat(a.get("/v1/circles").get(0)).containsEntry("members", List.of(b.userId.toString()));
         assertThat(a.call("GET", "/v1/users/" + b.userId, null).getBody()).containsEntry("friendCount", 1).doesNotContainKey("email");
     }

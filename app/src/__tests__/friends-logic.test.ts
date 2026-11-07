@@ -52,7 +52,7 @@ describe('address book', () => {
         { id: 2, name: 'Family' },
       ],
     );
-    expect(book.contacts.u1).toEqual({ status: 'accepted', displayName: 'Ana', handle: 'ana', avatarUrl: null, circles: [1, 2] });
+    expect(book.contacts.u1).toEqual({ status: 'accepted', displayName: 'Ana', handle: 'ana', bio: '', avatarUrl: null, circles: [1, 2] });
     expect(book.contacts.u2.status).toBe('incoming');
     expect(book.circleDefs.map((c) => c.name)).toEqual(['Close Friends', 'Family']);
   });

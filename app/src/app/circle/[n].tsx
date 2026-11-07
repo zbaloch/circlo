@@ -2,13 +2,14 @@ import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
 
-import { Avatar } from '@/components/avatar';
 import { Button, ErrorText, TextField } from '@/components/form';
+import { PersonRow, RowButton } from '@/components/person-row';
 import { describeError } from '@/lib/account';
 import { loadAddressBook, type AddressBook, type Contact } from '@/lib/addressbook';
-import { circleDefs, circleName, circlesOf, createCircle, deleteCircle, membersOf, renameCircle, setCircles } from '@/lib/circles';
+import { circleDefs, circleName, circlesOf, createCircle, deleteCircle, membersOf, membershipChange, renameCircle, setCircles } from '@/lib/circles';
 import { showAlert } from '@/lib/dialog';
 import { useSession } from '@/lib/session';
+import { showToast } from '@/lib/toast';
 import { Text } from '@/components/ui/text';
 
 function name(c: Contact) {
@@ -16,8 +17,9 @@ function name(c: Contact) {
 }
 
 /**
- * One circle: name it, see who's in it, add or remove friends, or delete it. `n` is the circle's id, or "new" to make
- * one. Every membership change is silent: nobody is told.
+ * One circle: name it, see who's in it (X followers-list rows that open each profile), add or remove friends after a
+ * confirmation, or delete it. `n` is the circle's id, or "new" to make one. Every membership change is silent: nobody
+ * is told.
  */
 export default function CircleScreen() {
   const { n } = useLocalSearchParams<{ n: string }>();
@@ -76,7 +78,10 @@ export default function CircleScreen() {
           onPress={() =>
             run('create', async () => {
               const created = await createCircle(account, label);
-              router.replace({ pathname: '/circle/[n]', params: { n: String(created) } });
+              router.replace({
+                pathname: '/circle/[n]',
+                params: { n: String(created) },
+              });
             })
           }
         />
@@ -86,76 +91,115 @@ export default function CircleScreen() {
 
   const members = membersOf(book, id);
   const others = Object.keys(book.contacts).filter((userId) => !members.includes(userId));
-  const change = (userId: string, join: boolean) =>
-    run(userId, async () => {
-      const current = circlesOf(book, book.contacts[userId]);
-      await setCircles(account, userId, join ? [...current, id] : current.filter((x) => x !== id));
-      reload();
-    });
-
-  return (
-    <ScrollView className="flex-1 bg-surface dark:bg-surface-dark" contentContainerClassName="gap-4 p-5" keyboardShouldPersistTaps="handled">
-      <Text className="text-muted dark:text-muted-dark">
-        Posts to {circleName(book, id)} are seen only by the {members.length === 1 ? 'person' : `${members.length} people`} in it.
-      </Text>
-      <TextField label="Name (only you see this)" value={label} onChangeText={setLabel} maxLength={40} />
-      <Button
-        label="Save name"
-        variant="outline"
-        disabled={!label.trim() || label.trim() === circleName(book, id)}
-        loading={busy === 'label'}
-        onPress={() =>
-          run('label', async () => {
-            await renameCircle(account, id, label);
+  const circle = circleName(book, id);
+  // Adding or removing someone changes what they can see (earlier posts too), so it's confirmed first and a toast says
+  // it's done. Nobody is told.
+  const change = (userId: string, join: boolean) => {
+    const what = membershipChange(name(book.contacts[userId]), circle, join);
+    showAlert(what.title, what.message, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: what.confirm,
+        style: join ? 'default' : 'destructive',
+        onPress: () =>
+          void run(userId, async () => {
+            const current = circlesOf(book, book.contacts[userId]);
+            await setCircles(account, userId, join ? [...current, id] : current.filter((x) => x !== id));
+            showToast(what.done);
             reload();
-          })
+          }),
+      },
+    ]);
+  };
+  const row = (userId: string, join: boolean) => {
+    const c = book.contacts[userId];
+    return (
+      <PersonRow
+        key={userId}
+        id={userId}
+        name={name(c)}
+        handle={c.handle}
+        bio={c.bio}
+        avatarUrl={c.avatarUrl}
+        onPress={() => router.push({ pathname: '/friend/[id]', params: { id: userId } })}
+        action={
+          <RowButton
+            label={join ? 'Add' : 'Remove'}
+            accessibilityLabel={join ? `Add ${name(c)} to ${circle}` : `Remove ${name(c)} from ${circle}`}
+            filled={join}
+            busy={busy === userId}
+            disabled={!!busy}
+            onPress={() => change(userId, join)}
+          />
         }
       />
-      <ErrorText>{error}</ErrorText>
+    );
+  };
 
-      <Text className="text-lg font-bold text-ink dark:text-ink-dark">In this circle ({members.length})</Text>
-      {members.length === 0 ? <Text className="text-muted dark:text-muted-dark">Nobody yet.</Text> : null}
-      {members.map((userId) => (
-        <View key={userId} className="flex-row items-center gap-3">
-          <Avatar id={userId} name={name(book.contacts[userId])} />
-          <Text className="flex-1 font-semibold text-ink dark:text-ink-dark">{name(book.contacts[userId])}</Text>
-          <Pressable accessibilityRole="button" disabled={!!busy} onPress={() => change(userId, false)} className="px-2 py-1 active:opacity-60">
-            <Text className="font-semibold text-danger dark:text-danger-dark">{busy === userId ? 'Updating…' : 'Remove'}</Text>
-          </Pressable>
-        </View>
-      ))}
-      {others.length > 0 ? <Text className="pt-2 text-lg font-bold text-ink dark:text-ink-dark">Add to this circle</Text> : null}
-      {others.map((userId) => (
-        <View key={userId} className="flex-row items-center gap-3">
-          <Avatar id={userId} name={name(book.contacts[userId])} />
-          <Text className="flex-1 font-semibold text-ink dark:text-ink-dark">{name(book.contacts[userId])}</Text>
-          <Pressable accessibilityRole="button" disabled={!!busy} onPress={() => change(userId, true)} className="px-2 py-1 active:opacity-60">
-            <Text className="font-semibold text-primary dark:text-primary-dark">{busy === userId ? 'Updating…' : 'Add'}</Text>
-          </Pressable>
-        </View>
-      ))}
-
-      <View className="pt-6">
+  return (
+    <View className="flex-1 bg-surface dark:bg-surface-dark">
+      <ScrollView className="flex-1" contentContainerClassName="gap-4 p-5" keyboardShouldPersistTaps="handled">
+        <Text className="text-muted dark:text-muted-dark">
+          Posts to {circleName(book, id)} are seen only by the {members.length === 1 ? 'person' : `${members.length} people`} in it.
+        </Text>
+        <TextField label="Name (only you see this)" value={label} onChangeText={setLabel} maxLength={40} />
         <Button
-          label="Delete circle"
-          variant="danger"
-          loading={busy === 'delete'}
+          label="Save name"
+          variant="outline"
+          disabled={!label.trim() || label.trim() === circleName(book, id)}
+          loading={busy === 'label'}
           onPress={() =>
-            showAlert(`Delete ${circleName(book, id)}?`, 'Posts you already shared with it stay visible to the people who could see them.', [
-              { text: 'Cancel', style: 'cancel' },
-              {
-                text: 'Delete',
-                style: 'destructive',
-                onPress: () =>
-                  run('delete', async () => {
-                    await deleteCircle(account, id);
-                    router.back();
-                  }),
-              },
-            ])
+            run('label', async () => {
+              await renameCircle(account, id, label);
+              reload();
+            })
           }
         />
+        <ErrorText>{error}</ErrorText>
+
+        <View>
+          <Text className="text-lg font-bold text-ink dark:text-ink-dark">In this circle ({members.length})</Text>
+          {members.length === 0 ? <Text className="pt-1 text-muted dark:text-muted-dark">Nobody yet.</Text> : null}
+          {members.map((userId) => row(userId, false))}
+        </View>
+        {others.length > 0 ? (
+          <View>
+            <Text className="pt-2 text-lg font-bold text-ink dark:text-ink-dark">Add to this circle</Text>
+            {others.map((userId) => row(userId, true))}
+          </View>
+        ) : null}
+
+        {/* Deleting is rare and can't be undone, so it's a quiet link at the very bottom, not a big button. */}
+        <View className="mt-4 border-t border-border pt-4 dark:border-border-dark">
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Delete circle"
+            disabled={!!busy}
+            hitSlop={8}
+            className="self-start py-2 active:opacity-60"
+            onPress={() =>
+              showAlert(`Delete ${circle}?`, 'Posts you already shared with it stay visible to the people who could see them.', [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                  text: 'Delete',
+                  style: 'destructive',
+                  onPress: () =>
+                    void run('delete', async () => {
+                      await deleteCircle(account, id);
+                      showToast(`${circle} deleted`);
+                      router.back();
+                    }),
+                },
+              ])
+            }>
+            <Text className="font-semibold text-danger dark:text-danger-dark">{busy === 'delete' ? 'Deleting…' : 'Delete circle'}</Text>
+          </Pressable>
+        </View>
+      </ScrollView>
+      {/* The main action: finished here, back to My Circles (adding and removing save as you go). */}
+      <View className="border-t border-border bg-surface px-5 pb-6 pt-3 dark:border-border-dark dark:bg-surface-dark">
+        <Button size="lg" label="Done" onPress={() => (router.canGoBack() ? router.back() : router.replace('/circles'))} />
       </View>
-    </ScrollView>
+    </View>
   );
 }
