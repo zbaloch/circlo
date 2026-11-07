@@ -60,8 +60,8 @@ describe('app shell', () => {
 
   it('Home shows the empty state and a labelled compose button', async () => {
     await render(<HomeScreen />);
-    expect(await screen.findByText('Your timeline is quiet')).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Invite your first person' })).toBeTruthy();
+    expect(await screen.findByText('Get started')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Invite' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Compose post' })).toBeTruthy();
   });
 

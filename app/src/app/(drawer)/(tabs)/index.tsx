@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable, RefreshControl, View, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 
-import { EmptyState } from '@/components/empty-state';
+import { GetStarted } from '@/components/get-started';
 import { Fab } from '@/components/fab';
 import { HomeHeader } from '@/components/home-header';
 import { IntegrityBanner } from '@/components/integrity-banner';
@@ -20,7 +20,6 @@ import { offerBackgroundChecksNow, onNotificationOpened } from '@/lib/background
 import type { StoredAccount } from '@/lib/keystore';
 import { newSignIns } from '@/lib/security-events';
 import type { FeedPost } from '@/lib/posts';
-import type { Connection } from '@/lib/friends';
 import { refreshMe } from '@/lib/me';
 import { useSession } from '@/lib/session';
 import { useConnections } from '@/lib/use-connections';
@@ -35,43 +34,6 @@ function checkSignIns(account: StoredAccount) {
 }
 
 /** Home timeline (PLAN.md 2A): FlashList, pull-to-refresh, infinite scroll, "New posts" pill, header hides on scroll. */
-/** The empty timeline nudges the next useful step: invite someone, answer a request, or post first. */
-function HomeEmptyState({ connections }: { connections: Connection[] | null }) {
-  const friends = (connections ?? []).filter((c) => c.status === 'accepted').length;
-  const requests = (connections ?? []).filter((c) => c.status === 'incoming').length;
-  if (friends > 0) {
-    return (
-      <EmptyState
-        icon="pencil-outline"
-        title="No posts yet"
-        body={`You have ${friends} ${friends === 1 ? 'person' : 'people'} here. When they share something with you, it shows up here. Why not start? Only the circles you choose can see it.`}
-        actionLabel="Write a post"
-        onAction={() => router.push('/compose')}
-      />
-    );
-  }
-  if (requests > 0) {
-    return (
-      <EmptyState
-        icon="person-add-outline"
-        title="Someone wants to connect"
-        body="Accept their request to start sharing. You choose which circles they’re in."
-        actionLabel="Review request"
-        onAction={() => router.navigate({ pathname: '/search', params: { section: 'friends' } })}
-      />
-    );
-  }
-  return (
-    <EmptyState
-      icon="people-outline"
-      title="Your timeline is quiet"
-      body="Posts from your people appear here. Only people in the circles you choose can see what you share."
-      actionLabel="Invite your first person"
-      onAction={() => router.navigate({ pathname: '/search', params: { section: 'invite' } })}
-    />
-  );
-}
-
 export default function HomeScreen() {
   const session = useSession();
   const account = session.status === 'signedIn' ? session.account : null;
@@ -174,9 +136,7 @@ export default function HomeScreen() {
         }
         ListEmptyComponent={
           pending.length || !feed.loaded ? undefined : (
-            <View className="h-[560px]">
-              <HomeEmptyState connections={connections} />
-            </View>
+            <GetStarted connections={connections} />
           )
         }
         ListFooterComponent={feed.loading ? <Spinner className="py-6" /> : null}

@@ -86,6 +86,7 @@ function Navigator() {
         <Stack.Screen name="report/[id]" options={{ title: 'Report' }} />
         <Stack.Screen name="enable-notifications" options={own} />
         <Stack.Screen name="security-alert" options={own} />
+        <Stack.Screen name="intro" options={own} />
         <Stack.Screen name="change-password" options={{ title: 'Change password' }} />
       </Stack.Protected>
     </Stack>

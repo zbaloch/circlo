@@ -4,6 +4,7 @@ import * as Linking from 'expo-linking';
 const SITE = 'https://www.hellocirclo.com';
 
 export const LINKS = {
+  why: `${SITE}/why`,
   terms: `${SITE}/terms`,
   privacy: `${SITE}/privacy`,
   support: `${SITE}/support`,
