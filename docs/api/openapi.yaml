@@ -861,7 +861,7 @@ paths:
         - { $ref: "#/components/parameters/Limit" }
         - name: replies
           in: query
-          description: "all: also answers to my replies on other people's posts (kind reply_reply)"
+          description: "all: also the newer kinds, answers to my replies on other people's posts (reply_reply) and my requests that were accepted (accepted)"
           schema: { type: string, enum: [all] }
       responses:
         "200":
@@ -878,7 +878,7 @@ paths:
                       type: object
                       required: [kind, postId, postText, actorId, actor, createdAt]
                       properties:
-                        kind: { type: string, enum: [reply, like, reply_like, reply_reply, joined] }
+                        kind: { type: string, enum: [reply, like, reply_like, reply_reply, joined, accepted] }
                         postId: { type: [string, "null"], format: uuid }
                         postText: { type: [string, "null"] }
                         actorId: { $ref: "#/components/schemas/Id" }

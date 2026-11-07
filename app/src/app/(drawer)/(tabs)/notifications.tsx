@@ -27,9 +27,10 @@ export function mergeRows(items: ActivityItem[], signIns: SignIn[]): ({ type: 'a
 
 /**
  * Pure: where tapping a row goes. A reply, or a like on my reply, opens the thread at that reply; someone who joined
- * with my link opens their profile with their circles ready to choose. Exported for tests.
+ * with my link opens their profile with their circles ready to choose; an accepted request opens their profile. Exported for tests.
  */
 export function activityHref(item: ActivityItem) {
+  if (item.kind === 'accepted') return { pathname: '/friend/[id]' as const, params: { id: item.actorId } };
   if (item.kind === 'joined' || !item.postId) return { pathname: '/friend/[id]' as const, params: { id: item.actorId, circles: '1' } };
   return { pathname: '/post/[id]' as const, params: item.kind !== 'like' && item.replyId ? { id: item.postId, reply: item.replyId } : { id: item.postId } };
 }
@@ -38,6 +39,7 @@ export function activityHref(item: ActivityItem) {
 export function activityVerb(kind: ActivityItem['kind']): string {
   if (kind === 'joined') return ' joined with your invite link';
   if (kind === 'reply_reply') return ' replied to your reply';
+  if (kind === 'accepted') return ' accepted your request';
   return kind === 'reply' ? ' replied to your post' : kind === 'reply_like' ? ' liked your reply' : ' liked your post';
 }
 
@@ -140,12 +142,14 @@ export default function NotificationsScreen() {
         const said = item.kind !== 'like' && item.replyText ? item.replyText : item.postText;
         const quote = item.kind === 'joined'
           ? ' · They see your Everyone posts. Tap to choose their circles.'
-          : said ? ` · “${said.length > 60 ? `${said.slice(0, 60)}…` : said}”` : '';
+          : item.kind === 'accepted'
+            ? ' · You’re connected now.'
+            : said ? ` · “${said.length > 60 ? `${said.slice(0, 60)}…` : said}”` : '';
         return (
           <Row
             key={key}
             isNew={fresh.has(key)}
-            hint={item.kind === 'joined' ? 'Opens their profile to choose circles' : item.kind === 'like' ? 'Opens the post' : 'Opens the reply'}
+            hint={item.kind === 'joined' ? 'Opens their profile to choose circles' : item.kind === 'accepted' ? 'Opens their profile' : item.kind === 'like' ? 'Opens the post' : 'Opens the reply'}
             onPress={() => router.push(activityHref(item))}
             avatar={<Avatar id={item.actorId} name={name} uri={item.actorAvatar} />}
             title={

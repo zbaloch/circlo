@@ -319,10 +319,12 @@ public class SocialController {
         if (!"incoming".equals(people.relation(me, other))) {
             throw ApiException.notFound();
         }
-        jdbc.update("UPDATE friendships SET status = 'accepted' WHERE user_a = ? AND user_b = ?", other, me);
+        jdbc.update("UPDATE friendships SET status = 'accepted', accepted_at = ? WHERE user_a = ? AND user_b = ?",
+                Timestamp.from(Instant.now()), other, me);
         jdbc.update("DELETE FROM invite_link_exclusions WHERE owner_id = ? AND user_id = ?", me, other);
         CircleController.setMemberships(jdbc, me, other, a == null ? List.of() : a.circles());
         notifier.changed(other);
+        notifier.accepted(other, me);
         return Map.of("status", "accepted");
     }
 

@@ -54,7 +54,8 @@ public class ActivityController {
     /**
      * Replies and likes by other people on my posts, likes on my replies (on posts I can still see), and people who
      * joined with my invite link (while we're still connected; no post), newest first; people I blocked are left out.
-     * With `replies=all` (apps that know the kind), also answers to my replies on other people's posts ('reply_reply').
+     * With `replies=all` (apps that know the newer kinds), also answers to my replies on other people's posts
+     * ('reply_reply') and requests of mine that were accepted ('accepted', no post).
      */
     @GetMapping("/v1/activity")
     public Activity activity(@AuthenticationPrincipal Jwt jwt, @RequestParam(value = "before", required = false) Instant before,
@@ -71,6 +72,7 @@ public class ActivityController {
             args.addAll(List.of(me, me, me, cursor));
             args.addAll(List.of(PostAccess.visibleArgs(me)));
             args.addAll(List.of(PostAccess.replyVisibleArgs(me)));
+            args.addAll(List.of(me, cursor));
         }
         args.addAll(List.of(me, cursor, me, n));
         List<Row> rows = jdbc.query("""
@@ -91,7 +93,10 @@ public class ActivityController {
                   SELECT 'reply_reply', r.post_id, p.body, r.author_id, r.id, r.body, r.created_at
                     FROM post_replies r JOIN post_replies pr ON pr.id = r.parent_id JOIN posts p ON p.id = r.post_id
                    WHERE pr.author_id = ? AND r.author_id <> ? AND p.author_id <> ? AND r.created_at < ? AND """
-                        + PostAccess.VISIBLE + " AND " + PostAccess.REPLY_VISIBLE : "") + """
+                        + PostAccess.VISIBLE + " AND " + PostAccess.REPLY_VISIBLE + """
+                  UNION ALL
+                  SELECT 'accepted', NULL, NULL, f.user_b, NULL, NULL, f.accepted_at
+                    FROM friendships f WHERE f.user_a = ? AND f.status = 'accepted' AND f.accepted_at IS NOT NULL AND f.accepted_at < ?""" : "") + """
                   UNION ALL
                   SELECT 'joined', NULL, NULL, f.user_a, NULL, NULL, f.created_at
                     FROM friendships f WHERE f.user_b = ? AND f.via_link = TRUE AND f.status = 'accepted' AND f.created_at < ?
@@ -159,7 +164,8 @@ public class ActivityController {
         Timestamp t = Timestamp.from(since);
         String notBlocked = " NOT IN (SELECT blocked_id FROM user_blocks WHERE blocker_id = ?)";
         return new Pending(
-                count("SELECT COUNT(*) FROM friendships WHERE user_b = ? AND (status = 'pending' OR via_link = TRUE) AND created_at > ? AND user_a" + notBlocked, me, t, me),
+                count("SELECT COUNT(*) FROM friendships WHERE user_b = ? AND (status = 'pending' OR via_link = TRUE) AND created_at > ? AND user_a" + notBlocked, me, t, me)
+                        + count("SELECT COUNT(*) FROM friendships WHERE user_a = ? AND status = 'accepted' AND accepted_at > ? AND user_b" + notBlocked, me, t, me),
                 count("SELECT COUNT(*) FROM post_replies r JOIN posts p ON p.id = r.post_id WHERE p.author_id = ? AND r.author_id <> ? "
                         + "AND r.created_at > ? AND r.author_id" + notBlocked, me, me, t, me),
                 count("SELECT COUNT(*) FROM post_likes l JOIN posts p ON p.id = l.post_id WHERE p.author_id = ? AND l.liker_id <> ? "

@@ -2283,7 +2283,7 @@ export interface paths {
                 query?: {
                     before?: components["parameters"]["Before"];
                     limit?: components["parameters"]["Limit"];
-                    /** @description all: also answers to my replies on other people's posts (kind reply_reply) */
+                    /** @description all: also the newer kinds, answers to my replies on other people's posts (reply_reply) and my requests that were accepted (accepted) */
                     replies?: "all";
                 };
                 header?: never;
@@ -2301,7 +2301,7 @@ export interface paths {
                         "application/json": {
                             items: {
                                 /** @enum {string} */
-                                kind: "reply" | "like" | "reply_like" | "reply_reply" | "joined";
+                                kind: "reply" | "like" | "reply_like" | "reply_reply" | "joined" | "accepted";
                                 /** Format: uuid */
                                 postId: string | null;
                                 postText: string | null;

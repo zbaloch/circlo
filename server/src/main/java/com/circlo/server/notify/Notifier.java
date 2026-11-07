@@ -60,6 +60,11 @@ public class Notifier {
         count(recipient, requester, "request");
     }
 
+    /** Someone accepted my friend request: a new friend, in the daily note. */
+    public void accepted(byte[] requester, byte[] accepter) {
+        count(requester, accepter, "joined");
+    }
+
     /** Someone joined with my invite link (we're connected; I may want to choose their circles). */
     public void joined(byte[] owner, byte[] joiner) {
         count(owner, joiner, "joined");

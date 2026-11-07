@@ -87,6 +87,12 @@ describe('reply likes', () => {
     expect(activityVerb('reply_reply')).toBe(' replied to your reply');
   });
 
+  it('"Ana accepted your request" opens her profile', () => {
+    const item = { kind: 'accepted', postId: null, postText: null, actorId: 'a', actorName: 'Ana', actorHandle: 'ana', createdAt: '' } as ActivityItem;
+    expect(activityHref(item)).toEqual({ pathname: '/friend/[id]', params: { id: 'a' } });
+    expect(activityVerb('accepted')).toBe(' accepted your request');
+  });
+
   it('knows which reply a reply answers, and who wrote it', () => {
     expect(fromReplyRow(row as never, 'me')).toMatchObject({ parentId: null, replyingTo: null });
     const answer = { ...row, parentId: C, replyingTo: { userId: 'b', name: 'Bo', username: 'bo', avatarUrl: null } };

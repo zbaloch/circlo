@@ -12,7 +12,7 @@ import { shownActivity } from './view-logic';
  * I've seen is a time kept on this device, and drives the bell's dot.
  */
 export type ActivityItem = {
-  kind: 'reply' | 'like' | 'reply_like' | 'reply_reply' | 'joined';
+  kind: 'reply' | 'like' | 'reply_like' | 'reply_reply' | 'joined' | 'accepted';
   /** None for 'joined'. */
   postId: string | null;
   postText: string | null;
