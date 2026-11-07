@@ -16,7 +16,6 @@ type Item = { label: string; icon: IconName; href: Href };
 
 export const DRAWER_ITEMS: Item[] = [
   { label: 'Profile', icon: 'person-outline', href: '/profile' },
-  { label: 'My Circles', icon: 'radio-button-on-outline', href: '/circles' },
   // Devices is the first link inside Settings and privacy.
   { label: 'Settings and privacy', icon: 'settings-outline', href: '/settings' },
 ];

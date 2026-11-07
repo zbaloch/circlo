@@ -190,7 +190,7 @@ export default function CircleScreen() {
       </ScrollView>
       {/* The main action: finished here, back to My Circles (adding and removing save as you go). */}
       <View className="border-t border-border bg-surface px-5 pb-6 pt-3 dark:border-border-dark dark:bg-surface-dark">
-        <Button size="lg" label="Done" onPress={() => (router.canGoBack() ? router.back() : router.replace('/circles'))} />
+        <Button size="lg" label="Done" onPress={() => (router.canGoBack() ? router.back() : router.replace({ pathname: '/search', params: { section: 'circles' } }))} />
       </View>
     </View>
   );
