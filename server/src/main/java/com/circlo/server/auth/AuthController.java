@@ -7,6 +7,7 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import java.util.Map;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -38,7 +39,13 @@ public class AuthController {
 
     public record VerifyRequest(@NotNull @Size(max = 254) String email, @NotNull @Size(max = 16) String code) {}
 
-    public record LoginRequest(@NotNull @Size(max = 254) String login, @NotNull @Size(max = 512) String password) {}
+    /** `emailCode`: true from apps that do the emailed-code step (1.1.0 on); apps already in the stores omit it. */
+    public record LoginRequest(@NotNull @Size(max = 254) String login, @NotNull @Size(max = 512) String password, Boolean emailCode) {}
+
+    public record LoginCodeRequest(@NotNull @Size(max = 254) String login, @Size(max = 128) String challenge,
+            @NotNull @Size(max = 16) String code) {}
+
+    public record LoginResendRequest(@NotNull @Size(max = 254) String login, @Size(max = 128) String challenge) {}
 
     public record RefreshRequest(@NotBlank @Size(max = 128) String refreshToken) {}
 
@@ -66,9 +73,31 @@ public class AuthController {
         return auth.verifySignup(r.email(), r.code());
     }
 
+    /**
+     * With `emailCode: true`: the right password emails a 6-digit code and answers 202 with where it went and this
+     * attempt's challenge (nothing is signed in yet). Without it (apps already in the stores): signed in at once, as
+     * before, unless CIRCLO_LOGIN_CODE_FOR_OLD_APPS is on.
+     */
     @PostMapping("/login")
-    public TokenService.Tokens login(@Valid @RequestBody LoginRequest r) {
-        return auth.login(r.login(), r.password());
+    public ResponseEntity<Object> login(@Valid @RequestBody LoginRequest r) {
+        if (Boolean.TRUE.equals(r.emailCode())) {
+            return ResponseEntity.status(HttpStatus.ACCEPTED).body(auth.startLogin(r.login(), r.password()));
+        }
+        return ResponseEntity.ok(auth.login(r.login(), r.password()));
+    }
+
+    /** The emailed code, with the attempt's challenge: signs this device in. */
+    @PostMapping("/login/verify")
+    public TokenService.Tokens loginVerify(@Valid @RequestBody LoginCodeRequest r) {
+        return auth.finishLogin(r.login(), r.challenge(), r.code());
+    }
+
+    /** A new code for the same attempt (says nothing about whether one was sent). */
+    @PostMapping("/login/resend")
+    @ResponseStatus(HttpStatus.ACCEPTED)
+    public Map<String, String> loginResend(@Valid @RequestBody LoginResendRequest r) {
+        auth.resendLoginCode(r.login(), r.challenge());
+        return Map.of("status", "ok");
     }
 
     @PostMapping("/refresh")

@@ -145,14 +145,104 @@ export interface paths {
                     "application/json": {
                         login: string;
                         password: string;
+                        /** @description true from apps that do the emailed-code step (1.1.0 on): the right password emails a 6-digit code and answers 202. Apps already in the stores omit it and are signed in at once (200), unless the server sets CIRCLO_LOGIN_CODE_FOR_OLD_APPS. */
+                        emailCode?: boolean;
                     };
                 };
             };
             responses: {
                 200: components["responses"]["Tokens"];
+                /** @description The right password; a sign-in code was emailed (nothing is signed in yet) */
+                202: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** @enum {string} */
+                            status: "code_sent";
+                            /** @description Where it went, partly hidden: z•••@hey.com */
+                            email: string;
+                            /** @description This attempt's one-time challenge, for /login/verify and /login/resend */
+                            challenge: string;
+                        };
+                    };
+                };
                 401: components["responses"]["Error"];
                 403: components["responses"]["Error"];
                 429: components["responses"]["Error"];
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/auth/login/verify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Finish signing in with the emailed code and the attempt's challenge; signs this device in */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        login: string;
+                        challenge: string;
+                        code: string;
+                    };
+                };
+            };
+            responses: {
+                200: components["responses"]["Tokens"];
+                400: components["responses"]["Error"];
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/auth/login/resend": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** A new sign-in code for the same attempt (says nothing about whether one was sent) */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        login: string;
+                        challenge: string;
+                    };
+                };
+            };
+            responses: {
+                202: components["responses"]["Status"];
             };
         };
         delete?: never;

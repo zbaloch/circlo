@@ -43,7 +43,7 @@ public class SecurityConfig {
      * background check (its own token).
      */
     static final String[] PUBLIC_POSTS = {
-        "/v1/auth/signup", "/v1/auth/signup/resend", "/v1/auth/signup/verify", "/v1/auth/login", "/v1/auth/refresh",
+        "/v1/auth/signup", "/v1/auth/signup/resend", "/v1/auth/signup/verify", "/v1/auth/login", "/v1/auth/login/verify", "/v1/auth/login/resend", "/v1/auth/refresh",
         "/v1/auth/password/forgot", "/v1/auth/password/reset", "/v1/email/unsubscribe",
     };
 

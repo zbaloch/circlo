@@ -21,7 +21,10 @@ export default function LoginScreen() {
     setError(undefined);
     setBusy(true);
     try {
-      signIn(await login(name, password));
+      const next = await login(name, password);
+      // The second step: a code by email, entered on the next screen (owner decision 2026-11-07).
+      if (next.step === 'code') router.push({ pathname: '/login-code', params: { login: name.trim(), email: next.email, challenge: next.challenge } });
+      else signIn(next.account);
     } catch (e) {
       if (e instanceof ApiError && e.code === 'email_not_verified' && e.details.email) {
         // A signup that was never finished: a fresh code is on its way.

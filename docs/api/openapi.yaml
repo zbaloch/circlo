@@ -75,12 +75,60 @@ paths:
             schema:
               type: object
               required: [login, password]
-              properties: { login: { type: string }, password: { type: string } }
+              properties:
+                login: { type: string }
+                password: { type: string }
+                emailCode:
+                  type: boolean
+                  description: >-
+                    true from apps that do the emailed-code step (1.1.0 on): the right password emails a 6-digit code
+                    and answers 202. Apps already in the stores omit it and are signed in at once (200), unless the
+                    server sets CIRCLO_LOGIN_CODE_FOR_OLD_APPS.
       responses:
         "200": { $ref: "#/components/responses/Tokens" }
+        "202":
+          description: The right password; a sign-in code was emailed (nothing is signed in yet)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status, email, challenge]
+                properties:
+                  status: { type: string, enum: [code_sent] }
+                  email: { type: string, description: "Where it went, partly hidden: z•••@hey.com" }
+                  challenge: { type: string, description: "This attempt's one-time challenge, for /login/verify and /login/resend" }
         "401": { $ref: "#/components/responses/Error" }
         "403": { $ref: "#/components/responses/Error" }
         "429": { $ref: "#/components/responses/Error" }
+  /v1/auth/login/verify:
+    post:
+      summary: Finish signing in with the emailed code and the attempt's challenge; signs this device in
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [login, challenge, code]
+              properties: { login: { type: string }, challenge: { type: string }, code: { type: string } }
+      responses:
+        "200": { $ref: "#/components/responses/Tokens" }
+        "400": { $ref: "#/components/responses/Error" }
+  /v1/auth/login/resend:
+    post:
+      summary: A new sign-in code for the same attempt (says nothing about whether one was sent)
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [login, challenge]
+              properties: { login: { type: string }, challenge: { type: string } }
+      responses:
+        "202": { $ref: "#/components/responses/Status" }
   /v1/auth/refresh:
     post:
       summary: Rotate the refresh token (single use; reusing an old one signs out every device)

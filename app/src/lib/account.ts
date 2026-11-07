@@ -106,9 +106,27 @@ export async function resendCode(email: string): Promise<void> {
 
 // ---------------- log in ----------------
 
-/** Logs in with a username or email. An unverified email throws `email_not_verified` (with the address in details). */
-export async function login(loginName: string, password: string): Promise<StoredAccount> {
-  return persist(ok(await api.POST('/v1/auth/login', { body: { login: loginName.trim(), password } })));
+/** After the password: signed in already (older servers), or a code was emailed for this attempt. */
+export type LoginStep = { step: 'signedIn'; account: StoredAccount } | { step: 'code'; email: string; challenge: string };
+
+/**
+ * Step 1 of logging in (owner decision 2026-11-07: password, then a code by email). Asks the server for the code step;
+ * the right password emails a code. An unverified email throws `email_not_verified` (with the address in details).
+ */
+export async function login(loginName: string, password: string): Promise<LoginStep> {
+  const data = ok(await api.POST('/v1/auth/login', { body: { login: loginName.trim(), password, emailCode: true } }));
+  if ('challenge' in data) return { step: 'code', email: data.email, challenge: data.challenge };
+  return { step: 'signedIn', account: await persist(data) };
+}
+
+/** Step 2: the code from the email, for this attempt, signs this device in. */
+export async function verifyLoginCode(loginName: string, challenge: string, code: string): Promise<StoredAccount> {
+  return persist(ok(await api.POST('/v1/auth/login/verify', { body: { login: loginName.trim(), challenge, code: code.trim() } })));
+}
+
+/** A new code for the same attempt. */
+export async function resendLoginCode(loginName: string, challenge: string): Promise<void> {
+  ok(await api.POST('/v1/auth/login/resend', { body: { login: loginName.trim(), challenge } }));
 }
 
 // ---------------- passwords ----------------

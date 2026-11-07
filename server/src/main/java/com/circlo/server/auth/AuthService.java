@@ -1,5 +1,6 @@
 package com.circlo.server.auth;
 
+import com.circlo.server.config.AuthProperties;
 import com.circlo.server.social.CircleController;
 import com.circlo.server.notify.SecurityAlerts;
 import com.circlo.server.web.ApiException;
@@ -11,6 +12,7 @@ import java.sql.Timestamp;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Base64;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -37,11 +39,13 @@ public class AuthService {
     private final LoginThrottle throttle;
     private final RateLimiter limiter;
     private final SecurityAlerts security;
+    private final AuthProperties props;
     private final Clock clock = Clock.systemUTC();
 
     public AuthService(JdbcTemplate jdbc, TokenService tokens, PasswordHasher passwords, EmailCodes codes, LoginThrottle throttle,
-            RateLimiter limiter, SecurityAlerts security) {
+            RateLimiter limiter, SecurityAlerts security, AuthProperties props) {
         this.jdbc = jdbc;
+        this.props = props;
         this.security = security;
         this.tokens = tokens;
         this.passwords = passwords;
@@ -124,14 +128,35 @@ public class AuthService {
                 codes.send(u.id(), u.email(), u.displayName(), EmailCodes.Purpose.verify);
             }
         }
+        // An app already in the stores signing in with CIRCLO_LOGIN_CODE_FOR_OLD_APPS on: its "Send a new code" button,
+        // only while that sign-in (which passed the password) is waiting for its code.
+        if (props.loginCodeForOldApps()) {
+            for (User u : usersWhere("email = ? AND status = 'active'", email)) {
+                if (codes.pending(u.id(), EmailCodes.Purpose.login, null) && mayEmail(email)) {
+                    codes.send(u.id(), u.email(), u.displayName(), EmailCodes.Purpose.login);
+                }
+            }
+        }
     }
 
-    /** Finishes a signup with the emailed code: the account becomes active and this device is signed in. */
+    /**
+     * Finishes a signup with the emailed code: the account becomes active and this device is signed in. With
+     * CIRCLO_LOGIN_CODE_FOR_OLD_APPS on, it also finishes an old app's sign-in (it uses this same screen).
+     */
     @Transactional(noRollbackFor = ApiException.class)
     public TokenService.Tokens verifySignup(String rawEmail, String code) {
         String email = Accounts.email(rawEmail);
-        User u = usersWhere("email = ? AND status = 'pending' FOR UPDATE", email).stream().findFirst()
-                .orElseThrow(() -> ApiException.badRequest("invalid_code"));
+        User u = usersWhere("email = ? AND status = 'pending' FOR UPDATE", email).stream().findFirst().orElse(null);
+        if (u == null) {
+            User active = props.loginCodeForOldApps()
+                    ? usersWhere("email = ? AND status = 'active' FOR UPDATE", email).stream().findFirst().orElse(null)
+                    : null;
+            if (active == null) {
+                throw ApiException.badRequest("invalid_code");
+            }
+            codes.consume(active.id(), EmailCodes.Purpose.login, code, null);
+            return signedIn(active);
+        }
         codes.consume(u.id(), EmailCodes.Purpose.verify, code);
         // Someone else may have verified the same username or email first.
         if (!usersWhere("(username = ? OR email = ?) AND status = 'active'", u.username(), u.email()).isEmpty()) {
@@ -160,14 +185,88 @@ public class AuthService {
         return usersWhere(column + " = ? ORDER BY status = 'active' DESC LIMIT 1", login).stream().findFirst().orElse(null);
     }
 
+    /** "Code sent" after the right password: where it went (partly hidden), and the attempt's one-time challenge. */
+    public record CodeSent(String status, String email, String challenge) {}
+
     /**
-     * Logs in with a username or email and password. A wrong password answers 401 with how many attempts are left
-     * before login locks (and the lock, at 0); unknown accounts answer exactly the same. An account whose email isn't
-     * verified yet gets a fresh code and 403 email_not_verified.
+     * Step 1 of signing in, for apps that ask for the code (owner decision 2026-11-07): the password, then a 6-digit
+     * code by email, tied to this attempt by its challenge. Nothing is signed in yet.
+     */
+    @Transactional(noRollbackFor = ApiException.class)
+    public CodeSent startLogin(String typed, String password) {
+        User u = checkPassword(typed, password);
+        if (!mayEmail(u.email())) {
+            throw new ApiException(HttpStatus.TOO_MANY_REQUESTS, "rate_limited");
+        }
+        String challenge = Base64.getUrlEncoder().withoutPadding().encodeToString(Ids.random(32));
+        codes.send(u.id(), u.email(), u.displayName(), EmailCodes.Purpose.login, challengeHash(challenge));
+        return new CodeSent("code_sent", Accounts.maskEmail(u.email()), challenge);
+    }
+
+    /** Step 2: the code from the email, with the attempt's challenge, signs this device in. */
+    @Transactional(noRollbackFor = ApiException.class)
+    public TokenService.Tokens finishLogin(String typed, String challenge, String code) {
+        User u = findByLogin(normalize(typed));
+        if (u == null || !u.active()) {
+            throw ApiException.badRequest("invalid_code");
+        }
+        codes.consume(u.id(), EmailCodes.Purpose.login, code, challenge == null ? null : challengeHash(challenge));
+        return signedIn(u);
+    }
+
+    /** A new code for the same attempt; says nothing, and sends nothing, without a live attempt. */
+    public void resendLoginCode(String typed, String challenge) {
+        User u = findByLogin(normalize(typed));
+        if (u == null || !u.active() || challenge == null) {
+            return;
+        }
+        byte[] hash = challengeHash(challenge);
+        if (codes.pending(u.id(), EmailCodes.Purpose.login, hash) && mayEmail(u.email())) {
+            codes.send(u.id(), u.email(), u.displayName(), EmailCodes.Purpose.login, hash);
+        }
+    }
+
+    private static byte[] challengeHash(String challenge) {
+        return TokenService.sha256(challenge.getBytes(StandardCharsets.US_ASCII));
+    }
+
+    private static String normalize(String typed) {
+        return typed == null ? "" : typed.trim().toLowerCase(java.util.Locale.ROOT);
+    }
+
+    /** Signed in: shown on the account's other devices ("New sign-in") and emailed, with no detail about this one. */
+    private TokenService.Tokens signedIn(User u) {
+        jdbc.update("INSERT INTO security_events (id, user_id, kind, created_at) VALUES (?, ?, 'sign_in', ?)",
+                Ids.bytes(Ids.newId()), u.id(), now());
+        security.signIn(u.id());
+        return tokens.signIn(u.uuid());
+    }
+
+    /**
+     * Logs in with a username or email and password, for apps that don't ask for the code (those already in the
+     * stores). With CIRCLO_LOGIN_CODE_FOR_OLD_APPS on, they get the code anyway, through the screen they have for an
+     * unconfirmed email: 403 email_not_verified, then /v1/auth/signup/verify with the code.
      */
     @Transactional(noRollbackFor = ApiException.class)
     public TokenService.Tokens login(String typed, String password) {
-        String normalized = typed == null ? "" : typed.trim().toLowerCase(java.util.Locale.ROOT);
+        User u = checkPassword(typed, password);
+        if (props.loginCodeForOldApps()) {
+            if (!mayEmail(u.email())) {
+                throw new ApiException(HttpStatus.TOO_MANY_REQUESTS, "rate_limited");
+            }
+            codes.send(u.id(), u.email(), u.displayName(), EmailCodes.Purpose.login);
+            throw new ApiException(HttpStatus.FORBIDDEN, "email_not_verified", Map.of("email", u.email()));
+        }
+        return signedIn(u);
+    }
+
+    /**
+     * Checks a username or email and password. A wrong password answers 401 with how many attempts are left before
+     * login locks (and the lock, at 0); unknown accounts answer exactly the same. An account whose email isn't verified
+     * yet gets a fresh code and 403 email_not_verified.
+     */
+    private User checkPassword(String typed, String password) {
+        String normalized = normalize(typed);
         User u = findByLogin(normalized);
         byte[] key = throttleKey(u, normalized);
         Instant locked = throttle.lockedUntil(key);
@@ -194,11 +293,7 @@ public class AuthService {
             }
             throw new ApiException(HttpStatus.FORBIDDEN, "email_not_verified", Map.of("email", u.email()));
         }
-        // Shown on the account's other devices ("New sign-in") and emailed, with no detail about this one.
-        jdbc.update("INSERT INTO security_events (id, user_id, kind, created_at) VALUES (?, ?, 'sign_in', ?)",
-                Ids.bytes(Ids.newId()), u.id(), now());
-        security.signIn(u.id());
-        return tokens.signIn(u.uuid());
+        return u;
     }
 
     // ---------- forgotten password ----------

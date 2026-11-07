@@ -50,6 +50,9 @@ circlo:
     refresh-ttl: 30d
     code-ttl: 15m
     pending-signup-ttl: 1d
+    # Apps already in the stores don't ask for the emailed sign-in code; true makes them use it anyway (through their
+    # "Check your email" screen). Turn on once the apps that ask for it (1.1.0) are out.
+    login-code-for-old-apps: ${CIRCLO_LOGIN_CODE_FOR_OLD_APPS:false}
   # Push to iPhones (content-free). Off unless the key, key id and team id are set; see docs/DEV_SETUP.md "Push".
   apns:
     key: ${CIRCLO_APNS_KEY:}

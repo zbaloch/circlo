@@ -36,6 +36,12 @@ public final class Accounts {
         return e;
     }
 
+    /** "z•••@hey.com": enough to recognise the address a code went to, without showing it whole. */
+    public static String maskEmail(String email) {
+        int at = email.indexOf('@');
+        return at < 1 ? "•••" : email.charAt(0) + "•••" + email.substring(at);
+    }
+
     /** Trimmed, 1–50 characters, no control characters. Throws invalid_name. */
     public static String name(String raw) {
         String n = raw == null ? "" : raw.strip();
