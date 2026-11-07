@@ -18,11 +18,6 @@ export function circlesLine(book: Pick<AddressBook, 'circleDefs'>, ids: number[]
   return ids.length ? `Everyone, ${audienceLabel(book, { kind: 'circles', ids })}` : 'Everyone';
 }
 
-/** Under a person on My People: the circles I put them in (mine to know; they never see it). Pure. */
-export function peopleCircles(book: Pick<AddressBook, 'circleDefs'>, ids: number[]): string {
-  return ids.length ? audienceLabel(book, { kind: 'circles', ids }) : 'Everyone only';
-}
-
 /** The first row of every circle picker for a person: Everyone, ticked and locked. */
 export function EveryoneRow({ book }: { book: Pick<AddressBook, 'circleDefs'> }) {
   return (

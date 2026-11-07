@@ -39,8 +39,9 @@ export function PersonRow({ id, name, handle, bio, note, avatarUrl, onPress, act
         </View>
         {note ? (
           <View className="flex-row items-center gap-1">
-            <Icon name="people-outline" size={14} color={palette.primary} />
-            <Text numberOfLines={2} className="flex-1 text-sm font-semibold text-primary dark:text-primary-dark">{note}</Text>
+            {/* Grey, like the audience under a post: information, not a link. */}
+            <Icon name="people-outline" size={14} color={palette.muted} />
+            <Text numberOfLines={2} className="flex-1 text-sm text-muted dark:text-muted-dark">{note}</Text>
           </View>
         ) : null}
         {bio ? <Text numberOfLines={3} className="text-ink dark:text-ink-dark">{bio}</Text> : null}

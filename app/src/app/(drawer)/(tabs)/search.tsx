@@ -5,7 +5,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Platform, Pressable, RefreshControl, ScrollView, Share, View } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
 
-import { CirclePickerSheet, circlesLine, peopleCircles } from '@/components/circle-choice';
+import { CirclePickerSheet, circlesLine } from '@/components/circle-choice';
 import { InviteSheet } from '@/components/invite-sheet';
 import { PersonRow } from '@/components/person-row';
 import { Avatar } from '@/components/avatar';
@@ -271,7 +271,7 @@ export default function SearchScreen() {
             name={displayName(f)}
             handle={f.profile.handle}
             bio={f.profile.bio}
-            note={book ? peopleCircles(book, circlesOf(book, book.contacts[f.userId])) : undefined}
+            note={book ? circlesLine(book, circlesOf(book, book.contacts[f.userId])) : undefined}
             avatarUrl={f.profile.avatarUrl}
             onPress={() => router.push({ pathname: '/friend/[id]', params: { id: f.userId } })}
           />

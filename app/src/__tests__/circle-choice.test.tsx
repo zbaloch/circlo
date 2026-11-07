@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react-native';
 
-import { CirclePickerSheet, circlesLine, peopleCircles } from '@/components/circle-choice';
+import { CirclePickerSheet, circlesLine } from '@/components/circle-choice';
 import { PersonRow } from '@/components/person-row';
 import { STARTER_CIRCLES } from '@/lib/addressbook';
 
@@ -28,9 +28,15 @@ describe('adding someone: Everyone always, more circles if I like', () => {
 });
 
 describe('My People: which circles each person is in (only I see this)', () => {
-  it('names their circles, or says they’re only in Everyone', () => {
-    expect(peopleCircles(book, [1, 2])).toBe('Family, Close Friends');
-    expect(peopleCircles(book, [])).toBe('Everyone only');
+  it('always includes Everyone (everyone you’re connected with is in it), then their circles', () => {
+    expect(circlesLine(book, [1, 2])).toBe('Everyone, Family, Close Friends');
+    expect(circlesLine(book, [])).toBe('Everyone');
+  });
+
+  it('shows it in grey, like the audience under a post: it’s information, not a link', async () => {
+    await render(<PersonRow id="m" name="Ana" handle="ana" note="Everyone, Family" onPress={() => {}} />);
+    expect(screen.getByText('Everyone, Family').props.className).toMatch(/text-muted/);
+    expect(screen.getByText('Everyone, Family').props.className).not.toMatch(/text-primary/);
   });
 
   it('shows it on the person’s row, with their bio', async () => {
