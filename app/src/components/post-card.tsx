@@ -1,6 +1,6 @@
 import { Icon, type IconName } from '@/components/ui/icon';
 import { useEffect } from 'react';
-import { Linking, Pressable, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 
 import { Avatar } from '@/components/avatar';
@@ -9,7 +9,6 @@ import type { OutboxItem } from '@/lib/outbox';
 import type { FeedPost } from '@/lib/posts';
 import { fullTime, relativeTime } from '@/lib/time';
 import { useNow } from '@/lib/use-now';
-import { linkParts } from '@/lib/view-logic';
 import { usePalette } from '@/theme/use-palette';
 import { ContentText } from '@/components/content-text';
 import { Text } from '@/components/ui/text';

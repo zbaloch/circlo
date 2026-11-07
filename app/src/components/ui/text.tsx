@@ -8,8 +8,7 @@ import { useAutoGrow } from './auto-grow';
 // Inter is bundled with the app (never fetched at runtime), so text looks the same on iOS and Android. Custom fonts
 // need one family per weight, so Tailwind's font-weight classes are swapped for the matching family: Inter, or for
 // Arabic-script text (`script`, lib/script) Noto Naskh Arabic or Noto Nastaliq Urdu, also bundled.
-const WEIGHTS = ['normal', 'medium', 'semibold', 'bold', 'extrabold', 'black'] as const;
-type Weight = (typeof WEIGHTS)[number];
+type Weight = 'normal' | 'medium' | 'semibold' | 'bold' | 'extrabold' | 'black';
 // Spelled out in full so Tailwind finds every class (it can't see names put together at runtime). The Arabic-script
 // fonts go up to bold.
 const FAMILIES: Record<'sans' | Script, Record<Weight, string>> = {
@@ -24,10 +23,10 @@ function family(base: 'sans' | Script, weight: Weight): string {
 
 /** Replaces a font-weight class with the matching family class (pure; exported for tests). */
 export function fontClass(className = '', script?: Script | null): string {
-  let weight: (typeof WEIGHTS)[number] = 'normal';
+  let weight: Weight = 'normal';
   const rest = className.split(/\s+/).filter((c) => {
     const m = /^font-(normal|medium|semibold|bold|extrabold|black)$/.exec(c);
-    if (m) weight = m[1] as (typeof WEIGHTS)[number];
+    if (m) weight = m[1] as Weight;
     return c !== '' && !m;
   });
   return [family(script ?? 'sans', weight), ...rest].join(' ');

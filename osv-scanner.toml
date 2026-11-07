@@ -2,6 +2,6 @@
 # is looked at again.
 
 [[IgnoredVulns]]
-id = "GHSA-mrhx-c7xc-m3w5"
+id = "GHSA-gcqx-w48m-w2h4"
 ignoreUntil = 2027-01-31T00:00:00Z
-reason = "zod 3 inside @expo/cli (build-time tool, validates our own config); not in the app bundle. Fixed only in zod 4; revisit with the next Expo SDK."
+reason = "deepmerge 4.3.1 inside @expo/config and jest-config (build/test tools that merge our own config files); never sees untrusted input and is not in the app bundle. No fixed version exists yet."
