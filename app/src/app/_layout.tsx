@@ -17,6 +17,7 @@ import { useEffect } from 'react';
 import { View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppFrame } from '@/components/app-frame';
 import { DialogHost } from '@/components/ui/dialog-host';
@@ -37,6 +38,7 @@ SplashScreen.preventAutoHideAsync().catch(() => undefined);
 function Navigator() {
   const session = useSession();
   const palette = usePalette();
+  const insets = useSafeAreaInsets();
   if (session.status === 'loading') {
     return (
       <View className="flex-1 items-center justify-center bg-surface dark:bg-surface-dark">
@@ -47,6 +49,10 @@ function Navigator() {
   const signedIn = session.status === 'signedIn';
   // Screens with their own Cancel or close button: no swipe, so a half-finished post or reply isn't dismissed by accident.
   const own = { headerShown: false, gestureEnabled: false };
+  // Screens with the standard header keep clear of Android's navigation bar: the app draws under it, and with the
+  // three-button bar the end of a screen was hidden behind it. Its height is 0 where there is none. Screens that keep
+  // clear themselves (tabs, the thread, chat, full-screen ones) don't use this.
+  const page = (title: string) => ({ title, contentStyle: { backgroundColor: palette.surface, paddingBottom: insets.bottom } });
   // Keyed on the auth state: signing in or out drops all navigation history, so finished onboarding screens are
   // unmounted and can never be navigated back to.
   return (
@@ -64,30 +70,30 @@ function Navigator() {
       </Stack.Protected>
       <Stack.Protected guard={signedIn} redirectTo="/welcome">
         <Stack.Screen name="(drawer)" options={{ headerShown: false }} />
-        <Stack.Screen name="profile" options={{ title: 'Profile' }} />
-        <Stack.Screen name="circles" options={{ title: 'My Circles' }} />
-        <Stack.Screen name="devices" options={{ title: 'Devices' }} />
-        <Stack.Screen name="settings/index" options={{ title: 'Settings and privacy' }} />
-        <Stack.Screen name="settings/account" options={{ title: 'Your account' }} />
-        <Stack.Screen name="settings/notifications" options={{ title: 'Notifications' }} />
-        <Stack.Screen name="settings/privacy" options={{ title: 'Privacy and safety' }} />
-        <Stack.Screen name="settings/about" options={{ title: 'About Circlo' }} />
-        <Stack.Screen name="edit-profile" options={{ title: 'Edit profile' }} />
-        <Stack.Screen name="friend/[id]" options={{ title: 'Profile' }} />
-        <Stack.Screen name="scan" options={{ title: 'Scan code' }} />
-        <Stack.Screen name="circle/[n]" options={{ title: 'Circle' }} />
+        <Stack.Screen name="profile" options={page('Profile')} />
+        <Stack.Screen name="circles" options={page('My Circles')} />
+        <Stack.Screen name="devices" options={page('Devices')} />
+        <Stack.Screen name="settings/index" options={page('Settings and privacy')} />
+        <Stack.Screen name="settings/account" options={page('Your account')} />
+        <Stack.Screen name="settings/notifications" options={page('Notifications')} />
+        <Stack.Screen name="settings/privacy" options={page('Privacy and safety')} />
+        <Stack.Screen name="settings/about" options={page('About Circlo')} />
+        <Stack.Screen name="edit-profile" options={page('Edit profile')} />
+        <Stack.Screen name="friend/[id]" options={page('Profile')} />
+        <Stack.Screen name="scan" options={page('Scan code')} />
+        <Stack.Screen name="circle/[n]" options={page('Circle')} />
         <Stack.Screen name="compose" options={own} />
         <Stack.Screen name="post/[id]" options={{ title: 'Post' }} />
         <Stack.Screen name="reply/[id]" options={own} />
         <Stack.Screen name="viewer" options={own} />
-        <Stack.Screen name="preview/[id]" options={{ title: 'What they can see' }} />
+        <Stack.Screen name="preview/[id]" options={page('What they can see')} />
         <Stack.Screen name="chat/[id]" options={{ title: 'Chat' }} />
-        <Stack.Screen name="new-message" options={{ title: 'New message' }} />
-        <Stack.Screen name="report/[id]" options={{ title: 'Report' }} />
+        <Stack.Screen name="new-message" options={page('New message')} />
+        <Stack.Screen name="report/[id]" options={page('Report')} />
         <Stack.Screen name="enable-notifications" options={own} />
         <Stack.Screen name="security-alert" options={own} />
         <Stack.Screen name="intro" options={own} />
-        <Stack.Screen name="change-password" options={{ title: 'Change password' }} />
+        <Stack.Screen name="change-password" options={page('Change password')} />
       </Stack.Protected>
     </Stack>
   );
