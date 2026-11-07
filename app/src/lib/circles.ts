@@ -15,6 +15,7 @@ import {
   type CircleDef,
   type Contact,
 } from './addressbook';
+import { showAlert } from './dialog';
 import type { StoredAccount } from './keystore';
 
 export const ONLY_ME: Audience = { kind: 'onlyMe' };
@@ -71,6 +72,18 @@ export function membershipChange(person: string, circle: string, join: boolean) 
         confirm: 'Remove',
         done: `${person} removed from ${circle}`,
       };
+}
+
+/**
+ * Asks before putting someone in a circle or taking them out, saying what it means; `onConfirm` gets the toast text
+ * to show once it's done. Used wherever a single circle is changed (a circle's screen, a person's profile).
+ */
+export function confirmMembership(person: string, circle: string, join: boolean, onConfirm: (done: string) => void): void {
+  const what = membershipChange(person, circle, join);
+  showAlert(what.title, what.message, [
+    { text: 'Cancel', style: 'cancel' },
+    { text: what.confirm, style: join ? 'default' : 'destructive', onPress: () => onConfirm(what.done) },
+  ]);
 }
 
 const isFriend = (c: Pick<Contact, 'status'>) => c.status === 'accepted';

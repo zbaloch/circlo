@@ -13,9 +13,10 @@ import { Text } from '@/components/ui/text';
 import { describeError } from '@/lib/account';
 import { loadAddressBook, type AddressBook, type Contact } from '@/lib/addressbook';
 import { blockUser } from '@/lib/blocks';
-import { circleDefs, circlesOf, setCircles, unfriend } from '@/lib/circles';
+import { circleDefs, circleName, circlesOf, confirmMembership, setCircles, unfriend } from '@/lib/circles';
 import { showAlert } from '@/lib/dialog';
 import { loadProfile, type Profile } from '@/lib/friends';
+import { showToast } from '@/lib/toast';
 import { displayName, useConnections } from '@/lib/use-connections';
 import { usePalette } from '@/theme/use-palette';
 
@@ -110,12 +111,16 @@ export default function FriendScreen() {
           contact={contact}
           busy={busy}
           onClose={() => setOpen(false)}
+          // Asks first and says what it means, like a circle's screen; a toast confirms it's done.
           onToggle={(id, on) =>
-            run(async () => {
-              const current = circlesOf(book, contact);
-              await setCircles(account, c.userId, on ? [...current, id] : current.filter((x) => x !== id));
-              reloadBook();
-            })
+            confirmMembership(name, circleName(book, id), on, (done) =>
+              void run(async () => {
+                const current = circlesOf(book, contact);
+                await setCircles(account, c.userId, on ? [...current, id] : current.filter((x) => x !== id));
+                reloadBook();
+                showToast(done);
+              }),
+            )
           }
           onPreview={() => { setOpen(false); router.push({ pathname: '/preview/[id]', params: { id: c.userId } }); }}
           onRemove={remove}

@@ -6,7 +6,7 @@ import { Button, ErrorText, TextField } from '@/components/form';
 import { PersonRow, RowButton } from '@/components/person-row';
 import { describeError } from '@/lib/account';
 import { loadAddressBook, type AddressBook, type Contact } from '@/lib/addressbook';
-import { circleDefs, circleName, circlesOf, createCircle, deleteCircle, membersOf, membershipChange, renameCircle, setCircles } from '@/lib/circles';
+import { circleDefs, circleName, circlesOf, createCircle, deleteCircle, confirmMembership, membersOf, renameCircle, setCircles } from '@/lib/circles';
 import { showAlert } from '@/lib/dialog';
 import { useSession } from '@/lib/session';
 import { showToast } from '@/lib/toast';
@@ -94,23 +94,15 @@ export default function CircleScreen() {
   const circle = circleName(book, id);
   // Adding or removing someone changes what they can see (earlier posts too), so it's confirmed first and a toast says
   // it's done. Nobody is told.
-  const change = (userId: string, join: boolean) => {
-    const what = membershipChange(name(book.contacts[userId]), circle, join);
-    showAlert(what.title, what.message, [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: what.confirm,
-        style: join ? 'default' : 'destructive',
-        onPress: () =>
-          void run(userId, async () => {
-            const current = circlesOf(book, book.contacts[userId]);
-            await setCircles(account, userId, join ? [...current, id] : current.filter((x) => x !== id));
-            showToast(what.done);
-            reload();
-          }),
-      },
-    ]);
-  };
+  const change = (userId: string, join: boolean) =>
+    confirmMembership(name(book.contacts[userId]), circle, join, (done) =>
+      void run(userId, async () => {
+        const current = circlesOf(book, book.contacts[userId]);
+        await setCircles(account, userId, join ? [...current, id] : current.filter((x) => x !== id));
+        showToast(done);
+        reload();
+      }),
+    );
   const row = (userId: string, join: boolean) => {
     const c = book.contacts[userId];
     return (
