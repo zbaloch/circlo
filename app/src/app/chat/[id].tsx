@@ -11,6 +11,7 @@ import { KeyboardSpacer } from '@/components/keyboard-spacer';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Avatar } from '@/components/avatar';
+import { ChatTitle } from '@/components/chat-title';
 import { MediaGrid } from '@/components/post-media';
 import { blockUser, refreshBlocked, useBlocked, visibleMessages } from '@/lib/blocks';
 import { openViewer } from '@/lib/feed-store';
@@ -79,13 +80,15 @@ export function ChatScreen() {
   useEffect(() => {
     navigation.setOptions({
       title,
+      // Their photo and name; tapping opens their profile (or, in a group, who's in it).
+      headerTitle: account && conv ? () => <ChatTitle conv={conv} account={account} onGroup={() => setMembers(true)} /> : undefined,
       headerRight: () => (
         <Pressable accessibilityRole="button" accessibilityLabel="People in this chat" onPress={() => setMembers(true)} className="px-4">
           <Icon name="people-outline" size={22} color={palette.ink} />
         </Pressable>
       ),
     });
-  }, [navigation, title, palette.ink]);
+  }, [navigation, title, palette.ink, account, conv]);
   useEffect(() => {
     if (conv) markRead(conv.groupId);
   }, [conv, conv?.messages.length]);
