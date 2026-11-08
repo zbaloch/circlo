@@ -1,36 +1,58 @@
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
 
-import { VideoPlayer } from '@/components/post-media';
-import { claim, nowPlaying, release, resetNowPlaying, setPlaying } from '@/lib/now-playing';
+import VideoScreen from '@/app/video';
+import { MediaGrid } from '@/components/post-media';
+import { formatTime, openedVideo, openVideo, rememberMuted, timeAt } from '@/lib/video';
 import { clampPan, doubleTapScale, MAX_ZOOM } from '@/lib/zoom';
 
-// A stand-in for expo-video's player: records play/pause and the position, and lets a test press its own controls.
-type FakePlayer = { currentTime: number; playing: boolean; play: jest.Mock; pause: jest.Mock; emit: (playing: boolean) => void };
+// A stand-in for expo-video's player: records what the viewer asks of it, and lets a test send its events.
+type Listener = (payload?: unknown) => void;
+type FakePlayer = {
+  currentTime: number;
+  duration: number;
+  playing: boolean;
+  muted: boolean;
+  status: string;
+  timeUpdateEventInterval: number;
+  play: jest.Mock;
+  pause: jest.Mock;
+  replay: jest.Mock;
+  emit: (event: string, payload?: unknown) => void;
+};
 const mockPlayers: FakePlayer[] = [];
 jest.mock('expo-video', () => {
   const React = jest.requireActual('react');
   return {
-    useVideoPlayer: () => {
+    useVideoPlayer: (_source: string, setup?: (p: unknown) => void) => {
       const ref = React.useRef(null);
       if (!ref.current) {
-        const listeners: ((p: { isPlaying: boolean }) => void)[] = [];
-        const p: FakePlayer & { addListener: unknown } = {
+        const listeners: Record<string, Listener[]> = {};
+        const p = {
           currentTime: 0,
+          duration: 0,
           playing: false,
+          muted: false,
+          status: 'loading',
+          timeUpdateEventInterval: 0,
           play: jest.fn(() => {
             p.playing = true;
-            listeners.forEach((l) => l({ isPlaying: true }));
+            p.emit('playingChange', { isPlaying: true });
           }),
           pause: jest.fn(() => {
             p.playing = false;
-            listeners.forEach((l) => l({ isPlaying: false }));
+            p.emit('playingChange', { isPlaying: false });
           }),
-          emit: (playing: boolean) => (playing ? p.play() : p.pause()),
-          addListener: (_: string, l: (x: { isPlaying: boolean }) => void) => {
-            listeners.push(l);
-            return { remove: () => listeners.splice(listeners.indexOf(l), 1) };
+          replay: jest.fn(() => {
+            p.currentTime = 0;
+            p.play();
+          }),
+          emit: (event: string, payload?: unknown) => (listeners[event] ?? []).forEach((l) => l(payload)),
+          addListener: (event: string, l: Listener) => {
+            (listeners[event] ??= []).push(l);
+            return { remove: () => listeners[event].splice(listeners[event].indexOf(l), 1) };
           },
         };
+        setup?.(p);
         mockPlayers.push(p);
         ref.current = p;
       }
@@ -40,132 +62,168 @@ jest.mock('expo-video', () => {
   };
 });
 jest.mock('expo-image', () => ({ Image: () => null }));
-// Each screen's focus is driven by the test: blur(screen) / focus(screen).
-const mockFocus: Record<string, { on: Set<() => (() => void) | void>; offs: Map<() => unknown, () => void>; focused: boolean }> = {};
-let mockScreen = 'home';
-jest.mock('expo-router', () => {
-  const React = jest.requireActual('react');
-  return {
-    useFocusEffect: (fn: () => (() => void) | void) => {
-      const name = React.useRef(mockScreen).current;
-      mockFocus[name] ??= { on: new Set(), offs: new Map(), focused: true };
-      React.useEffect(() => {
-        const s = mockFocus[name];
-        s.on.add(fn);
-        if (s.focused) {
-          const off = fn();
-          if (off) s.offs.set(fn, off);
-        }
-        return () => {
-          s.on.delete(fn);
-          s.offs.get(fn)?.();
-          s.offs.delete(fn);
-        };
-      }, [fn, name]);
-    },
-  };
-});
-const blur = (name: string) =>
-  act(async () => {
-    const s = mockFocus[name];
-    s.focused = false;
-    s.offs.forEach((off) => off());
-    s.offs.clear();
-  });
-const focus = (name: string) =>
-  act(async () => {
-    const s = mockFocus[name];
-    s.focused = true;
-    s.on.forEach((fn) => {
-      const off = fn();
-      if (off) s.offs.set(fn, off);
-    });
-  });
+jest.mock('expo-router', () => ({ router: { push: jest.fn(), back: jest.fn() } }));
+const mockRouter: { push: jest.Mock; back: jest.Mock } = jest.requireMock('expo-router').router;
 
-const video = { type: 'video' as const, mime: 'video/mp4', width: 1280, height: 720, durationMs: 30_000, objectKey: 'v1', url: 'https://m.test/v1', previewKey: 'p1', previewUrl: 'https://m.test/p1' };
-const other = { ...video, objectKey: 'v2', url: 'https://m.test/v2' };
+const video = { type: 'video' as const, mime: 'video/mp4', width: 1280, height: 720, durationMs: 10_000, objectKey: 'v1', url: 'https://m.test/v1', previewKey: 'p1', previewUrl: 'https://m.test/p1' };
+const player = () => mockPlayers[mockPlayers.length - 1];
 
 beforeEach(() => {
-  resetNowPlaying();
   mockPlayers.length = 0;
-  for (const k of Object.keys(mockFocus)) delete mockFocus[k];
-  mockScreen = 'home';
+  mockRouter.push.mockClear();
+  mockRouter.back.mockClear();
+  rememberMuted(false);
+  openVideo(null);
 });
 
-describe('now playing: one video at a time, carried from screen to screen', () => {
-  it('hands a playing video on, with its position', () => {
-    claim('v1', 1);
-    release('v1', 1, 12.5, true);
-    expect(nowPlaying()).toEqual({ key: 'v1', owner: 0, time: 12.5, playing: true });
-    claim('v1', 2);
-    expect(nowPlaying()).toMatchObject({ owner: 2, time: 12.5 });
+describe('video helpers', () => {
+  it('shows times as a clock', () => {
+    expect(formatTime(0)).toBe('0:00');
+    expect(formatTime(7.6)).toBe('0:07');
+    expect(formatTime(62)).toBe('1:02');
+    expect(formatTime(3723)).toBe('1:02:03');
+    expect(formatTime(Number.NaN)).toBe('0:00');
   });
 
-  it('only the one showing it can pause it or hand it on', () => {
-    claim('v1', 1);
-    setPlaying('v1', 2, false);
-    release('v1', 2, 3, false);
-    expect(nowPlaying()).toMatchObject({ owner: 1, playing: true });
+  it('finds the time under a finger on the progress bar', () => {
+    expect(timeAt(50, 200, 10)).toBe(2.5);
+    expect(timeAt(-20, 200, 10)).toBe(0);
+    expect(timeAt(260, 200, 10)).toBe(10);
+    expect(timeAt(50, 0, 10)).toBe(0);
   });
 });
 
-describe('videos in posts', () => {
-  const player = (i: number) => mockPlayers[i];
-
-  it('opening the post: the same video carries on from where it was, in the post', async () => {
-    const home = await render(<VideoPlayer video={video} className="" />);
+describe('a video in a post or chat', () => {
+  it('shows the poster and its length; tapping opens the full-screen viewer', async () => {
+    await render(<MediaGrid media={[video]} />);
+    expect(screen.getByText('0:10')).toBeTruthy();
+    // Nothing plays in the timeline.
+    expect(mockPlayers).toHaveLength(0);
     await fireEvent.press(screen.getByRole('button', { name: 'Play video' }));
-    expect(player(0).play).toHaveBeenCalled();
-    player(0).currentTime = 7;
+    expect(openedVideo()).toBe(video);
+    expect(mockRouter.push).toHaveBeenCalledWith('/video');
+  });
+});
 
-    // The post opens on top; Home loses focus.
-    mockScreen = 'post';
-    const post = await render(<VideoPlayer video={video} className="" />);
-    await blur('home');
-    expect(player(0).playing).toBe(false);
-    expect(player(1).currentTime).toBe(7);
-    expect(player(1).playing).toBe(true);
-    // Just one is playing.
-    expect(mockPlayers.filter((p) => p.playing)).toHaveLength(1);
+describe('the full-screen video viewer', () => {
+  beforeEach(() => jest.useFakeTimers());
+  afterEach(() => jest.useRealTimers());
 
-    // Back to Home: it carries on from where the post got to, not from the start.
-    player(1).currentTime = 15;
-    await act(async () => post.unmount());
-    await focus('home');
-    expect(player(0).currentTime).toBe(15);
-    expect(player(0).playing).toBe(true);
-    await act(async () => home.unmount());
+  const open = async () => {
+    openVideo(video);
+    return render(<VideoScreen />);
+  };
+  const controls = () => screen.getByTestId('video-controls');
+  const ready = () =>
+    act(() => {
+      player().duration = 10;
+      player().status = 'readyToPlay';
+      player().emit('statusChange', { status: 'readyToPlay' });
+    });
+
+  it('plays straight away, with a spinner until it is ready', async () => {
+    await open();
+    expect(player().play).toHaveBeenCalled();
+    expect(screen.getByLabelText('Loading')).toBeTruthy();
+    await ready();
+    expect(screen.queryByLabelText('Loading')).toBeNull();
+    expect(screen.getByText('0:00')).toBeTruthy();
+    expect(screen.getByText('0:10')).toBeTruthy();
   });
 
-  it('paused in the post stays paused back on Home, at the same place', async () => {
-    await render(<VideoPlayer video={video} className="" />);
-    await fireEvent.press(screen.getByRole('button', { name: 'Play video' }));
-    mockScreen = 'post';
-    const post = await render(<VideoPlayer video={video} className="" />);
-    await blur('home');
-    player(1).currentTime = 20;
-    await act(async () => player(1).emit(false));
-    await act(async () => post.unmount());
-    await focus('home');
-    expect(player(0).currentTime).toBe(20);
-    expect(player(0).playing).toBe(false);
+  it('pauses and plays with the big button, and shows the time as it plays', async () => {
+    await open();
+    await ready();
+    await act(() => player().emit('timeUpdate', { currentTime: 4.2 }));
+    expect(screen.getByText('0:04')).toBeTruthy();
+    await fireEvent.press(screen.getByRole('button', { name: 'Pause' }));
+    expect(player().pause).toHaveBeenCalled();
+    await fireEvent.press(screen.getByRole('button', { name: 'Play' }));
+    expect(player().play).toHaveBeenCalledTimes(2);
   });
 
-  it('starting another video pauses the first', async () => {
-    await render(
-      <>
-        <VideoPlayer video={video} className="" />
-        <VideoPlayer video={other} className="" />
-      </>,
-    );
-    const [first, second] = screen.getAllByRole('button', { name: 'Play video' });
-    await fireEvent.press(first);
-    await fireEvent.press(second);
-    expect(player(0).playing).toBe(false);
-    expect(player(1).playing).toBe(true);
-    // And pressing play on the first again pauses the second.
-    await act(async () => player(0).emit(true));
-    expect(player(1).playing).toBe(false);
+  it('fades the controls while playing; a tap brings them back; they stay while paused', async () => {
+    await open();
+    await ready();
+    expect(controls().props.pointerEvents).toBe('box-none');
+    await act(() => jest.advanceTimersByTime(3000));
+    expect(controls().props.pointerEvents).toBe('none');
+    // Tap the video.
+    const area = screen.getByTestId('video-area');
+    await act(() => {
+      fireEvent(area, 'responderGrant', { nativeEvent: { pageX: 100, pageY: 100 } });
+      fireEvent(area, 'responderRelease', { nativeEvent: { pageX: 101, pageY: 101 } });
+    });
+    expect(controls().props.pointerEvents).toBe('box-none');
+    await fireEvent.press(screen.getByRole('button', { name: 'Pause' }));
+    await act(() => jest.advanceTimersByTime(5000));
+    expect(controls().props.pointerEvents).toBe('box-none');
+  });
+
+  it('seeks where the progress bar is touched', async () => {
+    await open();
+    await ready();
+    const bar = screen.getByTestId('video-seek');
+    await act(() => {
+      fireEvent(bar, 'layout', { nativeEvent: { layout: { x: 0, y: 0, width: 200, height: 24 } } });
+      fireEvent(bar, 'responderGrant', { nativeEvent: { locationX: 50, pageX: 66 } });
+      fireEvent(bar, 'responderMove', { nativeEvent: { locationX: 0, pageX: 116 } });
+      fireEvent(bar, 'responderRelease', { nativeEvent: { locationX: 0, pageX: 116 } });
+    });
+    // Touched at 50 of 200, dragged 50 further: halfway.
+    expect(player().currentTime).toBe(5);
+    expect(screen.getByText('0:05')).toBeTruthy();
+  });
+
+  it('mutes, and the next video starts muted too', async () => {
+    const first = await open();
+    expect(player().muted).toBe(false);
+    await fireEvent.press(screen.getByRole('button', { name: 'Mute' }));
+    expect(player().muted).toBe(true);
+    await act(async () => first.unmount());
+    await open();
+    expect(player().muted).toBe(true);
+    await fireEvent.press(screen.getByRole('button', { name: 'Sound on' }));
+    expect(player().muted).toBe(false);
+  });
+
+  it('offers to play again at the end', async () => {
+    await open();
+    await ready();
+    await act(() => {
+      player().playing = false;
+      player().emit('playingChange', { isPlaying: false });
+      player().emit('playToEnd');
+    });
+    await fireEvent.press(screen.getByRole('button', { name: 'Play again' }));
+    expect(player().replay).toHaveBeenCalled();
+  });
+
+  it('closes with the close button, or a swipe down', async () => {
+    await open();
+    await fireEvent.press(screen.getByRole('button', { name: 'Close' }));
+    expect(mockRouter.back).toHaveBeenCalledTimes(1);
+    const area = screen.getByTestId('video-area');
+    await act(() => {
+      fireEvent(area, 'responderGrant', { nativeEvent: { pageX: 100, pageY: 100 } });
+      fireEvent(area, 'responderMove', { nativeEvent: { pageX: 100, pageY: 260 } });
+      fireEvent(area, 'responderRelease', { nativeEvent: { pageX: 100, pageY: 260 } });
+    });
+    expect(mockRouter.back).toHaveBeenCalledTimes(2);
+  });
+
+  it('says so when the video can’t play', async () => {
+    await open();
+    await act(() => {
+      player().status = 'error';
+      player().emit('statusChange', { status: 'error' });
+    });
+    expect(screen.getByText('Couldn’t play this video.')).toBeTruthy();
+  });
+
+  it('goes back if there is no video to show', async () => {
+    await render(<VideoScreen />);
+    expect(mockRouter.back).toHaveBeenCalled();
   });
 });
 

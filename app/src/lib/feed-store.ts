@@ -6,6 +6,7 @@ import { useSyncExternalStore } from 'react';
 import type { StoredAccount } from './keystore';
 import type { Attachment } from './media';
 import { fetchFeedPage, type FeedPost } from './posts';
+import { openVideo } from './video';
 
 type State = {
   ids: string[];
@@ -124,6 +125,7 @@ export function removePost(id: string) {
 export function clearFeed() {
   posts.clear();
   viewer = null;
+  openVideo(null);
   set({ ids: [], cursor: undefined, hasMore: true, pending: [], error: undefined, loaded: false });
 }
 

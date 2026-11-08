@@ -100,6 +100,7 @@ function Navigator() {
         <Stack.Screen name="post/[id]" options={{ title: 'Post' }} />
         <Stack.Screen name="reply/[id]" options={own} />
         <Stack.Screen name="viewer" options={own} />
+        <Stack.Screen name="video" options={{ ...own, animation: 'fade' }} />
         <Stack.Screen name="preview/[id]" options={page('What they can see')} />
         <Stack.Screen name="chat/[id]" options={{ title: 'Chat' }} />
         <Stack.Screen name="new-message" options={page('New message')} />
