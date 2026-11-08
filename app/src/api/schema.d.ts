@@ -687,6 +687,55 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/me/storage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** How much storage my account uses: the photos and videos on my posts and chat messages (with their thumbnails and poster frames, counted as photos) and my profile photo */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Storage used, in bytes, and how many photos and videos */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** Format: int64 */
+                            usedBytes: number;
+                            /** Format: int64 */
+                            photoBytes: number;
+                            /** Format: int64 */
+                            videoBytes: number;
+                            /** Format: int64 */
+                            profilePhotoBytes: number;
+                            /** Format: int64 */
+                            photos: number;
+                            /** Format: int64 */
+                            videos: number;
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/me/preview/{friendId}": {
         parameters: {
             query?: never;

@@ -10,6 +10,7 @@ type Page = { icon: IconName; title: string; subtitle: string; href: Href };
 export const SETTINGS_PAGES: Page[] = [
   { icon: 'phone-portrait-outline', title: 'Devices', subtitle: 'See where you’re signed in and sign out the others.', href: '/devices' },
   { icon: 'person-outline', title: 'Your account', subtitle: 'Change your password, export your data or delete your account.', href: '/settings/account' },
+  { icon: 'images', title: 'Storage', subtitle: 'See how much space your photos and videos use.', href: '/settings/storage' },
   { icon: 'notifications-outline', title: 'Notifications', subtitle: 'Choose how Circlo tells you about new things.', href: '/settings/notifications' },
   { icon: 'shield-checkmark-outline', title: 'Privacy and safety', subtitle: 'Who can add you, and the people you’ve blocked.', href: '/settings/privacy' },
   { icon: 'information-circle-outline', title: 'About Circlo', subtitle: 'Terms, privacy policy, child safety and help.', href: '/settings/about' },

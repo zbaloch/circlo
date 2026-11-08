@@ -262,6 +262,26 @@ paths:
           content:
             application/json:
               schema: { type: object, additionalProperties: true }
+  /v1/me/storage:
+    get:
+      summary: >-
+        How much storage my account uses: the photos and videos on my posts and chat messages (with their thumbnails
+        and poster frames, counted as photos) and my profile photo
+      responses:
+        "200":
+          description: Storage used, in bytes, and how many photos and videos
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [usedBytes, photoBytes, videoBytes, profilePhotoBytes, photos, videos]
+                properties:
+                  usedBytes: { type: integer, format: int64 }
+                  photoBytes: { type: integer, format: int64 }
+                  videoBytes: { type: integer, format: int64 }
+                  profilePhotoBytes: { type: integer, format: int64 }
+                  photos: { type: integer, format: int64 }
+                  videos: { type: integer, format: int64 }
   /v1/me/preview/{friendId}:
     get:
       summary: My posts exactly as this friend sees them
