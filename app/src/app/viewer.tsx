@@ -11,40 +11,86 @@ import { MediaImage } from '@/components/post-media';
 import { viewerState } from '@/lib/feed-store';
 import type { Attachment } from '@/lib/media';
 import { Text } from '@/components/ui/text';
+import { clampPan, doubleTapScale, MAX_ZOOM } from '@/lib/zoom';
 
-function ZoomableImage({ media, width, height, onDismiss }: { media: Attachment; width: number; height: number; onDismiss: () => void }) {
+/**
+ * One photo in the viewer. Pinch or double-tap to zoom; while zoomed, dragging moves around the photo (up to its
+ * edges) and swiping to the next photo waits until it's back to normal size (owner report 2026-11-08: a sideways drag
+ * jumped to the next photo instead of moving the zoomed one). Swipe down to close, at normal size.
+ */
+function ZoomableImage({ media, width, height, onDismiss, onZoom }: { media: Attachment; width: number; height: number; onDismiss: () => void; onZoom: (zoomed: boolean) => void }) {
+  const [zoomed, setZoomed] = useState(false);
   const scale = useSharedValue(1);
   const saved = useSharedValue(1);
+  const x = useSharedValue(0);
+  const y = useSharedValue(0);
+  const savedX = useSharedValue(0);
+  const savedY = useSharedValue(0);
   const dy = useSharedValue(0);
+
+  const changed = (z: boolean) => {
+    setZoomed(z);
+    onZoom(z);
+  };
+  const settle = (to: number) => {
+    'worklet';
+    scale.value = withTiming(to);
+    saved.value = to;
+    if (to === 1) {
+      x.value = withTiming(0);
+      y.value = withTiming(0);
+      savedX.value = 0;
+      savedY.value = 0;
+    }
+    runOnJS(changed)(to > 1);
+  };
 
   const pinch = Gesture.Pinch()
     .onUpdate((e) => {
-      scale.value = Math.max(1, Math.min(5, saved.value * e.scale));
+      scale.value = Math.max(1, Math.min(MAX_ZOOM, saved.value * e.scale));
+      x.value = clampPan(savedX.value, scale.value, width);
+      y.value = clampPan(savedY.value, scale.value, height);
     })
     .onEnd(() => {
-      saved.value = scale.value;
+      savedX.value = x.value;
+      savedY.value = y.value;
+      settle(scale.value <= 1.05 ? 1 : scale.value);
     });
-  // Swipe down to dismiss, only when not zoomed (so horizontal paging and zoomed panning still work).
-  const pan = Gesture.Pan()
+  // Zoomed: move around the photo in any direction.
+  const move = Gesture.Pan()
+    .enabled(zoomed)
+    .onUpdate((e) => {
+      x.value = clampPan(savedX.value + e.translationX, scale.value, width);
+      y.value = clampPan(savedY.value + e.translationY, scale.value, height);
+    })
+    .onEnd(() => {
+      savedX.value = x.value;
+      savedY.value = y.value;
+    });
+  // Normal size: swipe down to close (sideways is left to the list, for the next photo).
+  const dismiss = Gesture.Pan()
+    .enabled(!zoomed)
     .activeOffsetY([-15, 15])
     .failOffsetX([-20, 20])
     .onUpdate((e) => {
-      if (saved.value === 1) dy.value = Math.max(0, e.translationY);
+      dy.value = Math.max(0, e.translationY);
     })
     .onEnd((e) => {
-      if (saved.value === 1 && e.translationY > 120) runOnJS(onDismiss)();
+      if (e.translationY > 120) runOnJS(onDismiss)();
       else dy.value = withTiming(0);
     });
   const doubleTap = Gesture.Tap()
     .numberOfTaps(2)
     .onEnd(() => {
-      scale.value = withTiming(1);
-      saved.value = 1;
+      settle(doubleTapScale(saved.value));
     });
 
-  const style = useAnimatedStyle(() => ({ transform: [{ translateY: dy.value }, { scale: scale.value }], opacity: 1 - Math.min(dy.value / 400, 0.6) }));
+  const style = useAnimatedStyle(() => ({
+    transform: [{ translateX: x.value }, { translateY: y.value + dy.value }, { scale: scale.value }],
+    opacity: 1 - Math.min(dy.value / 400, 0.6),
+  }));
   return (
-    <GestureDetector gesture={Gesture.Simultaneous(pinch, pan, doubleTap)}>
+    <GestureDetector gesture={Gesture.Simultaneous(pinch, move, dismiss, doubleTap)}>
       <Animated.View style={[{ width, height }, style]}>
         <View className="flex-1 items-center justify-center">
           <MediaImage objectKey={media.objectKey} url={media.url} className="h-full w-full" fit="contain" />
@@ -54,13 +100,15 @@ function ZoomableImage({ media, width, height, onDismiss }: { media: Attachment;
   );
 }
 
-/** Full-screen media viewer (PLAN.md 2A): swipe between images, pinch to zoom, swipe down to dismiss. */
+/** Full-screen media viewer (PLAN.md 2A): swipe between images, pinch or double-tap to zoom and drag to look around, swipe down to dismiss. */
 export default function ViewerScreen() {
   const state = viewerState();
   // Sized to the space the viewer really has: on the web that's the app's centred column, not the browser window
   // (window-sized pages put the photo off to the side, out of view).
   const [size, setSize] = useState<{ width: number; height: number } | null>(null);
   const [index, setIndex] = useState(state?.index ?? 0);
+  // While a photo is zoomed, sideways drags move the photo, so the list doesn't page.
+  const [zoomed, setZoomed] = useState(false);
   if (!state || state.media.length === 0) {
     router.back();
     return null;
@@ -73,12 +121,13 @@ export default function ViewerScreen() {
         data={state.media}
         horizontal
         pagingEnabled
+        scrollEnabled={!zoomed}
         initialScrollIndex={state.index}
         getItemLayout={(_, i) => ({ length: size.width, offset: size.width * i, index: i })}
         keyExtractor={(m) => m.objectKey}
         showsHorizontalScrollIndicator={false}
         onMomentumScrollEnd={(e) => setIndex(Math.round(e.nativeEvent.contentOffset.x / size.width))}
-        renderItem={({ item }) => <ZoomableImage media={item} width={size.width} height={size.height} onDismiss={() => router.back()} />}
+        renderItem={({ item }) => <ZoomableImage media={item} width={size.width} height={size.height} onDismiss={() => router.back()} onZoom={setZoomed} />}
       />
       ) : null}
       <SafeAreaView edges={['top']} className="absolute left-0 right-0 top-0">
