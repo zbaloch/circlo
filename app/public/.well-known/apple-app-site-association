@@ -1,0 +1,28 @@
+{
+  "applinks": {
+    "details": [
+      {
+        "appIDs": [
+          "P9273YDUQ9.com.hellocirclo.app"
+        ],
+        "components": [
+          {
+            "/": "/.well-known/*",
+            "exclude": true
+          },
+          {
+            "/": "/_expo/*",
+            "exclude": true
+          },
+          {
+            "/": "/assets/*",
+            "exclude": true
+          },
+          {
+            "/": "/*"
+          }
+        ]
+      }
+    ]
+  }
+}

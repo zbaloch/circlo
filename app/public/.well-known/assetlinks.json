@@ -1,0 +1,15 @@
+[
+  {
+    "relation": [
+      "delegate_permission/common.handle_all_urls"
+    ],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.hellocirclo.app",
+      "sha256_cert_fingerprints": [
+        "7C:8B:F7:BD:F6:B4:82:5E:C5:6A:9B:E8:59:DD:DC:5A:91:02:B0:DB:5D:9E:E2:E7:A9:16:32:73:71:90:F4:57",
+        "98:50:35:19:FD:06:D5:C3:00:C0:FD:CF:65:EE:8D:3C:84:65:AE:39:14:DD:28:EC:60:8A:F8:C0:7D:AF:0E:7B"
+      ]
+    }
+  }
+]

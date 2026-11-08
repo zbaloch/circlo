@@ -22,3 +22,4 @@ Full spec: `docs/PLAN.md` (read its "Current design" section first). Progress an
 - UI follows docs/PLAN.md section 2A: Twitter/X-style timeline, tabs, compose sheet and DMs, branded as Circlo with our own logo and colours. The same screens run in the web app (app.hellocirclo.com).
 - Style only with NativeWind classes and the tokens in tailwind.config.js; no inline style objects except for animations.
 - Never show circle labels or numbers to anyone except the post's author. No reposts/retweets feature.
+- Links Circlo sends people (emails, and anything later) point at the web app, https://app.hellocirclo.com/<screen path>, using a path that is also an app screen. The app claims that whole domain (app.config.ts, app/public/.well-known), so the link opens the app on that screen when it's installed and the web app otherwise (owner decision 2026-11-08). Add new linked screens to app/src/__tests__/app-links.test.ts.

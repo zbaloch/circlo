@@ -38,8 +38,10 @@ const config: ExpoConfig = {
     },
     supportsTablet: false,
     // Invite links (https://www.hellocirclo.com/i/<token>) open the app: www.hellocirclo.com serves the matching
-    // apple-app-site-association (circlo-web), and the App ID has the Associated Domains capability.
-    associatedDomains: ['applinks:www.hellocirclo.com'],
+    // apple-app-site-association (circlo-web), and the App ID has the Associated Domains capability. Every link to the
+    // web app (app.hellocirclo.com, as in Circlo's emails) opens the same screen in the app when it's installed
+    // (public/.well-known; owner decision 2026-11-08).
+    associatedDomains: ['applinks:www.hellocirclo.com', 'applinks:app.hellocirclo.com'],
     // Export compliance: Circlo uses only standard HTTPS (TLS) from the operating system, which is exempt.
     config: { usesNonExemptEncryption: false },
   },
@@ -53,13 +55,20 @@ const config: ExpoConfig = {
     },
     predictiveBackGestureEnabled: false,
     ...(googleServicesFile ? { googleServicesFile } : {}),
-    // Invite links open the app (www.hellocirclo.com serves the matching assetlinks.json).
+    // Invite links open the app (www.hellocirclo.com serves the matching assetlinks.json), and so do links to the web app.
     intentFilters: [
       {
         action: 'VIEW',
         autoVerify: true,
         category: ['BROWSABLE', 'DEFAULT'],
         data: [{ scheme: 'https', host: 'www.hellocirclo.com', pathPrefix: '/i' }],
+      },
+      // Every link to the web app opens the same screen in the app (the web app serves assetlinks.json).
+      {
+        action: 'VIEW',
+        autoVerify: true,
+        category: ['BROWSABLE', 'DEFAULT'],
+        data: [{ scheme: 'https', host: 'app.hellocirclo.com' }],
       },
     ],
   },
