@@ -5,7 +5,8 @@ import { Text } from '@/components/ui/text';
 import { runs, type Run } from '@/lib/script';
 import { linkParts } from '@/lib/view-logic';
 
-/** Pure: the classes for one run: right-aligned when right to left, and Nastaliq's taller lines. Exported for tests. */
+/** Pure: the classes for one run: right-aligned when right to left, and Nastaliq's taller lines (Lateef's size is
+ * set with its font, components/ui/text). Exported for tests. */
 export function runClass(className: string, run: Run): string {
   let cls = className;
   if (run.script === 'nastaliq') {
@@ -18,7 +19,7 @@ export function runClass(className: string, run: Run): string {
 
 /**
  * What people wrote (posts, replies, messages, bios), each paragraph in its own direction and its script's font
- * (lib/script): a Sindhi verse right-aligned in Noto Naskh Arabic, an Urdu line in Noto Nastaliq Urdu, English in
+ * (lib/script): a Sindhi verse right-aligned in Lateef, an Urdu line in Noto Nastaliq Urdu, English in
  * Inter as before. Links are tappable.
  */
 export function ContentText({ text, className, links = true, numberOfLines }: {

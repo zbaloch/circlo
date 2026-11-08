@@ -21,6 +21,7 @@ import {
   NotoNastaliqUrdu_600SemiBold,
   NotoNastaliqUrdu_700Bold,
 } from '@expo-google-fonts/noto-nastaliq-urdu';
+import { Lateef_400Regular, Lateef_500Medium, Lateef_600SemiBold, Lateef_700Bold, Lateef_800ExtraBold } from '@expo-google-fonts/lateef';
 import { useFonts } from 'expo-font';
 import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
@@ -119,7 +120,9 @@ export default function RootLayout() {
   const palette = usePalette();
   const [fontsLoaded, fontError] = useFonts({
     Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold, Inter_800ExtraBold,
-    // Arabic-script posts (lib/script): Naskh for Sindhi and Arabic, Nastaliq for Urdu and Persian.
+    // Arabic-script posts (lib/script): Lateef for Sindhi, Naskh for Arabic, Nastaliq for Urdu and Persian. All bundled:
+    // the files ship in the app, so Google never sees a request.
+    Lateef_400Regular, Lateef_500Medium, Lateef_600SemiBold, Lateef_700Bold, Lateef_800ExtraBold,
     NotoNaskhArabic_400Regular, NotoNaskhArabic_500Medium, NotoNaskhArabic_600SemiBold, NotoNaskhArabic_700Bold,
     NotoNastaliqUrdu_400Regular, NotoNastaliqUrdu_500Medium, NotoNastaliqUrdu_600SemiBold, NotoNastaliqUrdu_700Bold,
   });

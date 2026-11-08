@@ -21,7 +21,12 @@ module.exports = {
         'sans-semibold': ['Inter_600SemiBold'],
         'sans-bold': ['Inter_700Bold'],
         'sans-extrabold': ['Inter_800ExtraBold'],
-        // Arabic-script text (lib/script): Naskh for Sindhi and Arabic, Nastaliq for Urdu and Persian. Bundled.
+        // Arabic-script text (lib/script): Lateef for Sindhi, Naskh for Arabic, Nastaliq for Urdu and Persian. Bundled.
+        lateef: ['Lateef_400Regular'],
+        'lateef-medium': ['Lateef_500Medium'],
+        'lateef-semibold': ['Lateef_600SemiBold'],
+        'lateef-bold': ['Lateef_700Bold'],
+        'lateef-extrabold': ['Lateef_800ExtraBold'],
         naskh: ['NotoNaskhArabic_400Regular'],
         'naskh-medium': ['NotoNaskhArabic_500Medium'],
         'naskh-semibold': ['NotoNaskhArabic_600SemiBold'],
