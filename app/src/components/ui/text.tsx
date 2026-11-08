@@ -22,18 +22,18 @@ function family(base: 'sans' | Script, weight: Weight): string {
   return FAMILIES[base][weight];
 }
 
-// Tailwind's text sizes in px, and Lateef's: its letters are small for their size, so it's drawn a quarter bigger,
+// Tailwind's text sizes in px, and Lateef's: its letters are small for their size, so it's drawn half again as big,
 // with room for its tall letters and dots. Spelled out so Tailwind finds every class.
 const SIZES: Record<string, number> = { 'text-xs': 12, 'text-[13px]': 13, 'text-sm': 14, 'text-[15px]': 15, 'text-base': 16, 'text-[17px]': 17, 'text-lg': 18, 'text-xl': 20 };
 const LATEEF: Record<number, string> = {
-  12: 'text-[15px] leading-[24px]',
-  13: 'text-[16px] leading-[26px]',
-  14: 'text-[18px] leading-[28px]',
-  15: 'text-[19px] leading-[30px]',
-  16: 'text-[20px] leading-[32px]',
-  17: 'text-[21px] leading-[34px]',
-  18: 'text-[23px] leading-[36px]',
-  20: 'text-[25px] leading-[40px]',
+  12: 'text-[18px] leading-[28px]',
+  13: 'text-[20px] leading-[30px]',
+  14: 'text-[21px] leading-[32px]',
+  15: 'text-[23px] leading-[34px]',
+  16: 'text-[24px] leading-[38px]',
+  17: 'text-[26px] leading-[40px]',
+  18: 'text-[27px] leading-[42px]',
+  20: 'text-[30px] leading-[46px]',
 };
 
 /** Pure: Lateef's size and line height for text styled `classes` (16px when no size is given). */

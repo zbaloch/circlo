@@ -37,8 +37,8 @@ describe('which font a script gets', () => {
   it('swaps the Inter family for the script’s, keeping the weight', () => {
     expect(fontClass('text-base font-bold', 'naskh')).toBe('font-naskh-bold text-base');
     expect(fontClass('text-base', 'nastaliq')).toBe('font-nastaliq text-base');
-    expect(fontClass('text-base font-semibold', 'lateef')).toBe('font-lateef-semibold text-[20px] leading-[32px]');
-    expect(fontClass('font-extrabold', 'lateef')).toBe('font-lateef-extrabold text-[20px] leading-[32px]');
+    expect(fontClass('text-base font-semibold', 'lateef')).toBe('font-lateef-semibold text-[24px] leading-[38px]');
+    expect(fontClass('font-extrabold', 'lateef')).toBe('font-lateef-extrabold text-[24px] leading-[38px]');
     expect(fontClass('text-base font-semibold')).toBe('font-sans-semibold text-base');
   });
 });
@@ -60,8 +60,8 @@ describe('paragraphs', () => {
     expect(english.props.className).toMatch(/text-\[15px\] leading-5/);
     expect(sindhi.props.className).toMatch(/text-right/);
     expect(sindhi.props.className).toMatch(/font-lateef/);
-    expect(sindhi.props.className).toMatch(/text-\[19px\]/);
-    expect(sindhi.props.className).toMatch(/leading-\[30px\]/);
+    expect(sindhi.props.className).toMatch(/text-\[23px\]/);
+    expect(sindhi.props.className).toMatch(/leading-\[34px\]/);
     expect(sindhi.props.className).not.toMatch(/text-\[15px\]|leading-5/);
     // The colour stays.
     expect(sindhi.props.className).toMatch(/text-ink/);
@@ -73,10 +73,10 @@ describe('paragraphs', () => {
   });
 
   it('sizes Lateef up from any text size, in posts and while typing', () => {
-    expect(fontClass('text-xs text-muted', 'lateef')).toBe('font-lateef text-muted text-[15px] leading-[24px]');
-    expect(fontClass('text-lg leading-6 text-ink', 'lateef')).toBe('font-lateef text-ink text-[23px] leading-[36px]');
+    expect(fontClass('text-xs text-muted', 'lateef')).toBe('font-lateef text-muted text-[18px] leading-[28px]');
+    expect(fontClass('text-lg leading-6 text-ink', 'lateef')).toBe('font-lateef text-ink text-[27px] leading-[42px]');
     // No size given: the 16px default.
-    expect(fontClass('text-ink', 'lateef')).toBe('font-lateef text-ink text-[20px] leading-[32px]');
+    expect(fontClass('text-ink', 'lateef')).toBe('font-lateef text-ink text-[24px] leading-[38px]');
   });
 
   it('keeps the blank line between paragraphs (a trailing line break alone draws nothing)', async () => {
