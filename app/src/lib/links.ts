@@ -12,6 +12,9 @@ export const LINKS = {
   deleteAccount: `${SITE}/delete-account`,
 } as const;
 
+/** Circlo on the App Store (iPhone and iPad). Without a country, so it opens in each visitor's own store. */
+export const APP_STORE_URL = 'https://apps.apple.com/app/circlo-family-friends/id6828949778';
+
 export function openLink(url: string) {
   void Linking.openURL(url);
 }

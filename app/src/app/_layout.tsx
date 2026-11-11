@@ -32,6 +32,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { AppBanner } from '@/components/app-banner';
 import { AppFrame } from '@/components/app-frame';
 import { DialogHost } from '@/components/ui/dialog-host';
 import { BackButton, HeaderBar } from '@/components/ui/header';
@@ -146,6 +147,8 @@ export default function RootLayout() {
         <SessionProvider>
           {/* On the web: a centred column instead of the full browser width. Phones: full screen, unchanged. */}
           <AppFrame>
+            {/* Web app on an iPhone or iPad only: a way to the App Store (lib/app-banner). */}
+            <AppBanner />
             <Navigator />
             <ToastHost />
           </AppFrame>

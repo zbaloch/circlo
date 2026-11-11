@@ -11,3 +11,9 @@ export const CHAT_ENABLED = true;
  * likes and the app code behind them are kept intact.
  */
 export const LIKES_ENABLED = false;
+
+/**
+ * The web app's "Get Circlo for iPhone" banner (components/app-banner). Off until App Store review approves 1.1:
+ * 1.0 has no chat, so sending people there from the web app would be a step down. Turn on once 1.1 is live.
+ */
+export const APP_BANNER_ENABLED = false;
