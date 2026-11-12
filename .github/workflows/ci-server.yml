@@ -46,7 +46,7 @@ jobs:
           for i in $(seq 1 30); do curl -fsS http://127.0.0.1:9000/minio/health/live && break; sleep 1; done
           docker exec -e MC_HOST_local=http://test-only-not-a-secret:test-only-not-a-secret@localhost:9000 \
             circlo-minio mc mb --ignore-existing local/circlo-media-test
-      - uses: actions/setup-java@v6.1.0
+      - uses: actions/setup-java@v6.2.0
         with:
           distribution: temurin
           java-version: "21"
