@@ -2,6 +2,8 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
 
+import { BoardPicker } from '@/components/desk/board-picker';
+import { Comments } from '@/components/desk/comments';
 import { DateSheet } from '@/components/desk/date-sheet';
 import { Button, ErrorText } from '@/components/form';
 import { IconButton } from '@/components/icon-button';
@@ -9,8 +11,8 @@ import { KeyboardSpacer } from '@/components/keyboard-spacer';
 import { Icon } from '@/components/ui/icon';
 import { Text, TextInput } from '@/components/ui/text';
 import { describeError } from '@/lib/account';
-import { addDays, dayText, dueLabel, localDate, type DeskList, type DeskRepeat } from '@/lib/desk';
-import { deleteTodo, fetchLists, fetchTodo, updateTodo, type TodoDetail } from '@/lib/desk-api';
+import { addDays, dayText, dueLabel, localDate, type DeskRepeat } from '@/lib/desk';
+import { deleteTodo, fetchTodo, updateTodo, type TodoDetail } from '@/lib/desk-api';
 import { showAlert } from '@/lib/dialog';
 import { usePalette } from '@/theme/use-palette';
 
@@ -42,38 +44,41 @@ function Label({ children }: { children: string }) {
   return <Text className="pb-2 pt-5 text-sm font-semibold text-ink dark:text-ink-dark">{children}</Text>;
 }
 
-/** One to-do: its title and notes, when it's due, how it repeats, which list it's in, and when it was done before. */
+/**
+ * One to-do: its title and description, when it's due, how it repeats, which board it's on, when it was done before,
+ * and comments.
+ */
 export default function TodoScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const palette = usePalette();
   const today = localDate();
-  const [todo, setTodo] = useState<TodoDetail | null>(null);
-  const [lists, setLists] = useState<DeskList[]>([]);
+  const [detail, setDetail] = useState<TodoDetail | null>(null);
   const [missing, setMissing] = useState(false);
   const [title, setTitle] = useState('');
-  const [notes, setNotes] = useState('');
+  const [description, setDescription] = useState('');
   const [due, setDue] = useState<string | null>(null);
   const [kind, setKind] = useState<Kind>('none');
   const [every, setEvery] = useState(1);
-  const [listId, setListId] = useState('');
+  const [board, setBoard] = useState({ id: '', name: '' });
   const [picking, setPicking] = useState(false);
+  const [moving, setMoving] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string>();
 
   useEffect(() => {
     fetchTodo(id).then(
-      (t) => {
-        setTodo(t);
+      (d) => {
+        const t = d.todo;
+        setDetail(d);
         setTitle(t.title);
-        setNotes(t.notes);
+        setDescription(t.description);
         setDue(t.dueDate ?? null);
         setKind(t.repeat?.kind ?? 'none');
         setEvery(t.repeat?.every ?? 1);
-        setListId(t.listId);
+        setBoard({ id: t.boardId, name: t.boardName });
       },
       () => setMissing(true),
     );
-    fetchLists().then(setLists, () => undefined);
   }, [id]);
 
   if (missing) {
@@ -83,7 +88,8 @@ export default function TodoScreen() {
       </View>
     );
   }
-  if (!todo) return null;
+  if (!detail) return null;
+  const todo = detail.todo;
 
   const repeat = REPEATS.find((r) => r.kind === kind)!;
   const chooseRepeat = (k: Kind) => {
@@ -97,7 +103,7 @@ export default function TodoScreen() {
     try {
       // A scheduled repeat counts from its due date: today unless one is chosen.
       const dueDate = kind !== 'none' && kind !== 'after' && !due ? today : due;
-      await updateTodo(id, { listId, title: title.trim(), notes: notes.trim(), dueDate, repeat: kind === 'none' ? null : { kind, every: kind === 'weekdays' ? 1 : every } });
+      await updateTodo(id, { boardId: board.id, title: title.trim(), description, dueDate, repeat: kind === 'none' ? null : { kind, every: kind === 'weekdays' ? 1 : every } });
       router.back();
     } catch (e) {
       setError(describeError(e));
@@ -126,11 +132,11 @@ export default function TodoScreen() {
           className="py-2 text-xl font-bold text-ink dark:text-ink-dark"
         />
         <TextInput
-          accessibilityLabel="Notes"
-          placeholder="Notes"
+          accessibilityLabel="Description"
+          placeholder="Add a description"
           placeholderTextColor={palette.muted}
-          value={notes}
-          onChangeText={setNotes}
+          value={description}
+          onChangeText={setDescription}
           maxLength={10_000}
           multiline
           autoCapitalize="sentences"
@@ -169,16 +175,16 @@ export default function TodoScreen() {
           </View>
         ) : null}
 
-        {lists.length > 1 ? (
-          <>
-            <Label>List</Label>
-            <View className="flex-row flex-wrap gap-2">
-              {lists.map((l) => (
-                <Chip key={l.id} label={l.name} selected={listId === l.id} onPress={() => setListId(l.id)} />
-              ))}
-            </View>
-          </>
-        ) : null}
+        <Label>Board</Label>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`Board: ${board.name}. Change`}
+          onPress={() => setMoving(true)}
+          className="flex-row items-center gap-3 rounded-xl border border-border px-3 py-2.5 active:opacity-60 dark:border-border-dark">
+          <Icon name="board-outline" size={20} color={palette.muted} />
+          <Text className="flex-1 text-[15px] text-ink dark:text-ink-dark">{board.name}</Text>
+          <Text className="text-[15px] font-semibold text-primary dark:text-primary-dark">Change</Text>
+        </Pressable>
 
         <View className="gap-3 pt-6">
           <ErrorText>{error}</ErrorText>
@@ -186,10 +192,10 @@ export default function TodoScreen() {
           <Button label="Delete to-do" variant="outline" onPress={remove} />
         </View>
 
-        {todo.history.length > 0 ? (
+        {detail.history.length > 0 ? (
           <>
             <Label>Done before</Label>
-            {todo.history.map((h) => (
+            {detail.history.map((h) => (
               <View key={h.id} className="flex-row items-center gap-2 py-1">
                 <Icon name="checkmark-circle" size={16} color={palette.primary} />
                 <Text className="text-[15px] text-muted dark:text-muted-dark">
@@ -200,9 +206,18 @@ export default function TodoScreen() {
             ))}
           </>
         ) : null}
+
+        <Comments on="todos" id={todo.id} initial={detail.comments} />
       </ScrollView>
       <KeyboardSpacer />
       <DateSheet visible={picking} value={due} today={today} onPick={setDue} onClose={() => setPicking(false)} />
+      <BoardPicker
+        visible={moving}
+        title="Move to board"
+        current={board.id}
+        onClose={() => setMoving(false)}
+        onPick={(b) => setBoard({ id: b.id, name: b.name })}
+      />
     </View>
   );
 }

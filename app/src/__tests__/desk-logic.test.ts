@@ -1,4 +1,4 @@
-import { addDays, deskMime, monthGrid, monthTitle, dueLabel, fileIcon, localDate, photoName, repeatLabel, toAttachment } from '@/lib/desk';
+import { addDays, boardLine, deskMime, fileTitle, monthGrid, monthTitle, dueLabel, fileIcon, localDate, photoName, repeatLabel, toAttachment } from '@/lib/desk';
 
 describe('Desk dates', () => {
   it('uses the phone’s own calendar day', () => {
@@ -44,7 +44,23 @@ describe('Desk dates', () => {
   });
 });
 
+describe('Desk boards', () => {
+  it('says what’s on a board in a few words', () => {
+    expect(boardLine({ todos: 3, notes: 2, files: 1 })).toBe('3 to-dos · 2 notes · 1 file');
+    expect(boardLine({ todos: 1, notes: 0, files: 4 })).toBe('1 to-do · 4 files');
+    expect(boardLine({ todos: 0, notes: 0, files: 0 })).toBe('Empty');
+  });
+});
+
 describe('Desk files', () => {
+  it('titles a file by its name without the extension', () => {
+    expect(fileTitle('Boarding pass.pdf')).toBe('Boarding pass');
+    expect(fileTitle('Photo 2026-11-14 09.05.jpg')).toBe('Photo 2026-11-14 09.05');
+    expect(fileTitle('.env')).toBe('.env');
+    expect(fileTitle('README')).toBe('README');
+    expect(fileTitle('x'.repeat(250) + '.txt')).toHaveLength(200);
+  });
+
   it('keeps types the server accepts, and anything else as a plain download', () => {
     expect(deskMime('Boarding pass.pdf', 'application/pdf')).toBe('application/pdf');
     expect(deskMime('Notes.txt', undefined)).toBe('text/plain');
@@ -73,8 +89,9 @@ describe('Desk files', () => {
 
   it('opens a photo or video file in the media viewer', () => {
     const file = {
-      id: 'f1', folderId: null, name: 'Hotel.jpg', mime: 'image/jpeg', kind: 'image' as const, sizeBytes: 10, width: 800, height: 600,
-      durationMs: 0, objectKey: 'a'.repeat(64), url: 'https://x/a', previewKey: 'b'.repeat(64), previewUrl: 'https://x/b', createdAt: '2026-11-14T00:00:00Z',
+      id: 'f1', boardId: 'b1', boardName: 'Trip', title: 'Hotel', description: '', fileName: 'Hotel.jpg', mime: 'image/jpeg', kind: 'image' as const,
+      sizeBytes: 10, width: 800, height: 600, durationMs: 0, objectKey: 'a'.repeat(64), url: 'https://x/a', previewKey: 'b'.repeat(64),
+      previewUrl: 'https://x/b', commentCount: 0, createdAt: '2026-11-14T00:00:00Z',
     };
     expect(toAttachment(file)).toEqual({
       type: 'image', mime: 'image/jpeg', width: 800, height: 600, durationMs: 0, objectKey: 'a'.repeat(64), url: 'https://x/a',

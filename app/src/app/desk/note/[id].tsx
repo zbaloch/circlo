@@ -1,51 +1,59 @@
 import { router, useLocalSearchParams, useNavigation } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Pressable, ScrollView, View } from 'react-native';
+import { ScrollView, View } from 'react-native';
 
 import { ActionSheet, type SheetAction } from '@/components/action-sheet';
+import { BoardPicker } from '@/components/desk/board-picker';
+import { Comments } from '@/components/desk/comments';
 import { Button, ErrorText } from '@/components/form';
 import { IconButton } from '@/components/icon-button';
 import { KeyboardSpacer } from '@/components/keyboard-spacer';
 import { Icon } from '@/components/ui/icon';
 import { Text, TextInput } from '@/components/ui/text';
 import { describeError } from '@/lib/account';
-import { type DeskNote } from '@/lib/desk';
-import { addFollowup, createNote, deleteFollowup, deleteNote, fetchNote, updateNote } from '@/lib/desk-api';
+import type { DeskComment, DeskNote } from '@/lib/desk';
+import { createNote, deleteNote, fetchNote, updateNote } from '@/lib/desk-api';
 import { showAlert } from '@/lib/dialog';
-import { fullTime } from '@/lib/time';
 import { usePalette } from '@/theme/use-palette';
 
 /**
- * A note: a title and a body, then follow-ups added over time, oldest first (a running log of how things moved on).
- * `id` is "new" for a note not written yet. ⋯ pins or deletes it.
+ * A note on a board: a title and an optional description, then comments added over time, oldest first. `id` is "new"
+ * for a note not written yet, on the board in `board`. ⋯ pins it, moves it to another board, or deletes it.
  */
 export default function NoteScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, board: newOn } = useLocalSearchParams<{ id: string; board?: string }>();
   const isNew = id === 'new';
   const navigation = useNavigation();
   const palette = usePalette();
   const [note, setNote] = useState<DeskNote | null>(null);
+  const [comments, setComments] = useState<DeskComment[]>([]);
   const [missing, setMissing] = useState(false);
   const [title, setTitle] = useState('');
-  const [body, setBody] = useState('');
-  const [followup, setFollowup] = useState('');
-  const [busy, setBusy] = useState<'save' | 'followup' | null>(null);
+  const [description, setDescription] = useState('');
+  const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string>();
   const [menu, setMenu] = useState<SheetAction[] | null>(null);
+  const [moving, setMoving] = useState(false);
 
   useEffect(() => {
     if (isNew) return;
     fetchNote(id).then(
-      (n) => {
-        setNote(n);
-        setTitle(n.title);
-        setBody(n.body);
+      (d) => {
+        setNote(d.note);
+        setComments(d.comments);
+        setTitle(d.note.title);
+        setDescription(d.note.description);
       },
       () => setMissing(true),
     );
   }, [id, isNew]);
 
   useEffect(() => {
+    const change = (n: DeskNote, patch: { boardId?: string; pinned?: boolean }) =>
+      updateNote(n.id, { boardId: patch.boardId ?? n.boardId, title: n.title, description: n.description, pinned: patch.pinned ?? n.pinned }).then(
+        setNote,
+        (e) => setError(describeError(e)),
+      );
     navigation.setOptions({
       title: isNew ? 'New note' : 'Note',
       headerRight: note
@@ -54,15 +62,13 @@ export default function NoteScreen() {
               accessibilityLabel="Note options"
               onPress={() =>
                 setMenu([
-                  {
-                    label: note.pinned ? 'Unpin' : 'Pin to the top',
-                    onPress: () => updateNote(note.id, { title: note.title, body: note.body, pinned: !note.pinned }).then(setNote, (e) => setError(describeError(e))),
-                  },
+                  { label: note.pinned ? 'Unpin' : 'Pin to the top', onPress: () => change(note, { pinned: !note.pinned }) },
+                  { label: 'Move to board…', onPress: () => setMoving(true) },
                   {
                     label: 'Delete note',
                     destructive: true,
                     onPress: () =>
-                      showAlert('Delete this note?', 'Its follow-ups are deleted too. This can’t be undone.', [
+                      showAlert('Delete this note?', 'Its comments are deleted too. This can’t be undone.', [
                         { text: 'Cancel', style: 'cancel' },
                         { text: 'Delete', style: 'destructive', onPress: () => deleteNote(note.id).then(() => router.back(), (e) => setError(describeError(e))) },
                       ]),
@@ -85,57 +91,36 @@ export default function NoteScreen() {
   }
   if (!isNew && !note) return null;
 
-  const dirty = isNew ? !!(title.trim() || body.trim()) : title !== note!.title || body !== note!.body;
+  const dirty = isNew ? !!title.trim() : title !== note!.title || description !== note!.description;
 
   const save = async () => {
-    setBusy('save');
+    if (!title.trim()) return;
+    setBusy(true);
     setError(undefined);
     try {
       if (isNew) {
-        const created = await createNote(title.trim(), body);
+        const created = await createNote({ boardId: newOn ?? '', title: title.trim(), description });
         router.replace({ pathname: '/desk/note/[id]', params: { id: created.id } });
       } else {
-        setNote(await updateNote(note!.id, { title: title.trim(), body }));
+        setNote(await updateNote(note!.id, { boardId: note!.boardId, title: title.trim(), description }));
       }
     } catch (e) {
       setError(describeError(e));
     } finally {
-      setBusy(null);
+      setBusy(false);
     }
   };
-
-  const addOne = async () => {
-    const text = followup.trim();
-    if (!text || !note || busy) return;
-    setBusy('followup');
-    try {
-      const f = await addFollowup(note.id, text);
-      setNote({ ...note, followups: [...note.followups, f] });
-      setFollowup('');
-    } catch (e) {
-      setError(describeError(e));
-    } finally {
-      setBusy(null);
-    }
-  };
-
-  const removeFollowup = (fid: string) =>
-    showAlert('Delete this follow-up?', undefined, [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: () =>
-          deleteFollowup(note!.id, fid).then(
-            () => setNote((n) => (n ? { ...n, followups: n.followups.filter((f) => f.id !== fid) } : n)),
-            (e) => setError(describeError(e)),
-          ),
-      },
-    ]);
 
   return (
     <View className="flex-1 bg-surface dark:bg-surface-dark">
       <ScrollView keyboardShouldPersistTaps="handled" contentContainerClassName="px-4 pb-10 pt-2">
+        {note ? (
+          <View className="flex-row items-center gap-1.5 pb-1">
+            <Icon name="board-outline" size={14} color={palette.muted} />
+            <Text className="text-[13px] text-muted dark:text-muted-dark">{note.boardName}</Text>
+            {note.pinned ? <Text className="text-[13px] text-muted dark:text-muted-dark">· Pinned</Text> : null}
+          </View>
+        ) : null}
         <TextInput
           accessibilityLabel="Title"
           placeholder="Title"
@@ -148,59 +133,39 @@ export default function NoteScreen() {
           className="py-2 text-xl font-bold text-ink dark:text-ink-dark"
         />
         <TextInput
-          accessibilityLabel="Note"
-          placeholder="Write something…"
+          accessibilityLabel="Description"
+          placeholder="Add a description (optional)"
           placeholderTextColor={palette.muted}
-          value={body}
-          onChangeText={setBody}
+          value={description}
+          onChangeText={setDescription}
           maxLength={50_000}
           multiline
           autoCapitalize="sentences"
           textAlignVertical="top"
-          className="min-h-[160px] py-2 text-[16px] leading-6 text-ink dark:text-ink-dark"
+          className="min-h-[120px] py-2 text-[16px] leading-6 text-ink dark:text-ink-dark"
         />
         <ErrorText>{error}</ErrorText>
         {dirty ? (
           <View className="items-end pt-2">
-            <Button label={isNew ? 'Save note' : 'Save changes'} loading={busy === 'save'} onPress={save} />
+            <Button label={isNew ? 'Save note' : 'Save changes'} disabled={!title.trim()} loading={busy} onPress={save} />
           </View>
         ) : null}
 
-        {note ? (
-          <View className="mt-6 border-t border-border pt-4 dark:border-border-dark">
-            <Text accessibilityRole="header" className="pb-2 text-lg font-extrabold text-ink dark:text-ink-dark">
-              Follow-ups
-            </Text>
-            {note.followups.length === 0 ? (
-              <Text className="pb-2 text-[15px] text-muted dark:text-muted-dark">Add how things move on: calls made, decisions, what happened next.</Text>
-            ) : null}
-            {note.followups.map((f) => (
-              <Pressable key={f.id} onLongPress={() => removeFollowup(f.id)} accessibilityHint="Long press to delete" className="gap-1 border-l-2 border-primary-soft py-2 pl-3 dark:border-primary-soft-dark">
-                <Text className="text-[13px] text-muted dark:text-muted-dark">{fullTime(Date.parse(f.createdAt))}</Text>
-                <Text className="text-[15px] leading-[21px] text-ink dark:text-ink-dark">{f.body}</Text>
-              </Pressable>
-            ))}
-            <View className="mt-3 flex-row items-end gap-2 rounded-2xl border border-border px-3 py-1 dark:border-border-dark">
-              <TextInput
-                accessibilityLabel="Add a follow-up"
-                placeholder="Add a follow-up"
-                placeholderTextColor={palette.muted}
-                value={followup}
-                onChangeText={setFollowup}
-                maxLength={5000}
-                multiline
-                autoCapitalize="sentences"
-                className="max-h-32 flex-1 py-2 text-[15px] text-ink dark:text-ink-dark"
-              />
-              <IconButton accessibilityLabel="Add follow-up" onPress={addOne} className={followup.trim() ? 'bg-primary dark:bg-primary-dark' : 'opacity-40'}>
-                <Icon name="arrow-up" size={18} color={followup.trim() ? palette.onPrimary : palette.muted} />
-              </IconButton>
-            </View>
-          </View>
-        ) : null}
+        {note ? <Comments key={note.id} on="notes" id={note.id} initial={comments} /> : null}
       </ScrollView>
       <KeyboardSpacer />
       <ActionSheet actions={menu} onClose={() => setMenu(null)} />
+      {note ? (
+        <BoardPicker
+          visible={moving}
+          title="Move to board"
+          current={note.boardId}
+          onClose={() => setMoving(false)}
+          onPick={(b) =>
+            updateNote(note.id, { boardId: b.id, title: note.title, description: note.description }).then(setNote, (e) => setError(describeError(e)))
+          }
+        />
+      ) : null}
     </View>
   );
 }

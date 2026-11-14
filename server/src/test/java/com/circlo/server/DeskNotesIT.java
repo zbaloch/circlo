@@ -1,95 +1,126 @@
 package com.circlo.server;
 
+import static com.circlo.server.DeskTodosIT.board;
+import static com.circlo.server.DeskTodosIT.items;
+import static com.circlo.server.DeskTodosIT.part;
+import static com.circlo.server.DeskTodosIT.todo;
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 /**
- * Desk notes (owner decision 2026-11-14): a title, a body and follow-ups I add over time, like Basecamp's message
- * board but just for me. Only their owner can ever see or change them; anyone else gets 404.
+ * Desk notes and comments (owner decision 2026-11-14, boards 2026-11-15): notes on a board, like messages with one
+ * reader, and comments on to-dos, notes and files. Only their owner can ever see or change them; anyone else gets 404.
  */
 class DeskNotesIT extends IntegrationTest {
 
-    @SuppressWarnings("unchecked")
-    private static List<Map<String, Object>> items(Map<String, Object> m, String key) {
-        return (List<Map<String, Object>>) m.get(key);
-    }
-
-    private String note(TestUser u, String title, String body) {
-        var r = u.call("POST", "/v1/desk/notes", Map.of("title", title, "body", body));
-        assertThat(r.getStatusCode().value()).isEqualTo(201);
+    private static String note(TestUser u, String boardId, String title, String description) {
+        Map<String, Object> body = new HashMap<>(Map.of("boardId", boardId, "title", title));
+        if (description != null) body.put("description", description);
+        var r = u.call("POST", "/v1/desk/notes", body);
+        assertThat(r.getStatusCode().value()).as("create note").isEqualTo(201);
         return (String) r.getBody().get("id");
     }
 
+    private static Map<String, Object> comment(TestUser u, String kind, String id, String body) {
+        var r = u.call("POST", "/v1/desk/" + kind + "/" + id + "/comments", Map.of("body", body));
+        assertThat(r.getStatusCode().value()).as("comment").isEqualTo(201);
+        return r.getBody();
+    }
+
     @Test
-    void writeEditFollowUpAndDelete() {
+    void writeEditPinAndDelete() {
         TestUser a = user("notes_owner");
-        assertThat(a.get("/v1/desk/notes")).isEmpty();
+        String trip = board(a, "Karachi trip");
+        String hotels = note(a, trip, "Hotels", "Pearl Continental or Movenpick.\n\nAsk about the airport shuttle.");
+        String packing = note(a, trip, "Packing", null);
 
-        String hotels = note(a, "Hotel options", "Three places near the beach.\nSecond line.");
-        String ideas = note(a, "", "Untitled thoughts");
-
-        // Newest change first; the list carries a short snippet, not the whole body.
-        List<Map<String, Object>> all = a.get("/v1/desk/notes");
-        assertThat(all).extracting(n -> n.get("id")).containsExactly(ideas, hotels);
-        assertThat(all.get(1)).containsEntry("title", "Hotel options").containsEntry("snippet", "Three places near the beach. Second line.")
-                .containsEntry("followups", 0).containsEntry("pinned", false);
-
-        // Follow-ups: a running log on the note, oldest first. Adding one moves the note to the top.
-        assertThat(a.status("POST", "/v1/desk/notes/" + hotels + "/followups", Map.of("body", "Called, the second one is full"))).isEqualTo(201);
-        var second = a.call("POST", "/v1/desk/notes/" + hotels + "/followups", Map.of("body", "Booked the third"));
-        String followupId = (String) second.getBody().get("id");
         Map<String, Object> view = a.call("GET", "/v1/desk/notes/" + hotels, null).getBody();
-        assertThat(view).containsEntry("body", "Three places near the beach.\nSecond line.");
-        assertThat(items(view, "followups")).extracting(f -> f.get("body")).containsExactly("Called, the second one is full", "Booked the third");
-        assertThat(a.get("/v1/desk/notes")).extracting(n -> n.get("id")).containsExactly(hotels, ideas);
-        assertThat(a.get("/v1/desk/notes").get(0)).containsEntry("followups", 2);
+        assertThat(part(view, "note")).containsEntry("title", "Hotels").containsEntry("boardId", trip).containsEntry("boardName", "Karachi trip")
+                .containsEntry("pinned", false).containsEntry("description", "Pearl Continental or Movenpick.\n\nAsk about the airport shuttle.");
+        assertThat(items(view, "comments")).isEmpty();
 
-        assertThat(a.status("DELETE", "/v1/desk/notes/" + hotels + "/followups/" + followupId, null)).isEqualTo(200);
-        assertThat(items(a.call("GET", "/v1/desk/notes/" + hotels, null).getBody(), "followups")).hasSize(1);
+        // The board's notes: newest change first, a one-line snippet of the description.
+        List<Map<String, Object>> list = a.list("GET", "/v1/desk/boards/" + trip + "/notes", null).getBody();
+        assertThat(list).extracting(n -> n.get("title")).containsExactly("Packing", "Hotels");
+        assertThat(list.get(1)).containsEntry("snippet", "Pearl Continental or Movenpick. Ask about the airport shuttle.").containsEntry("commentCount", 0);
+        assertThat(list.get(0)).containsEntry("snippet", "");
+        assertThat(a.call("GET", "/v1/desk/boards/" + trip, null).getBody()).containsEntry("notes", 2);
 
-        // Edit, and pinned notes stay on top.
-        var put = a.call("PUT", "/v1/desk/notes/" + ideas, Map.of("title", "Ideas", "body", "Better thoughts", "pinned", true));
-        assertThat(put.getStatusCode().value()).isEqualTo(200);
-        assertThat(put.getBody()).containsEntry("title", "Ideas").containsEntry("pinned", true);
-        a.call("POST", "/v1/desk/notes/" + hotels + "/followups", Map.of("body", "Paid the deposit"));
-        assertThat(a.get("/v1/desk/notes")).extracting(n -> n.get("id")).containsExactly(ideas, hotels);
+        // Pinned goes first; a comment moves a note up among the rest.
+        var pinned = a.call("PUT", "/v1/desk/notes/" + hotels, Map.of("boardId", trip, "title", "Hotels", "description", "Booked the PC.", "pinned", true));
+        assertThat(pinned.getBody()).containsEntry("pinned", true).containsEntry("description", "Booked the PC.");
+        assertThat(a.list("GET", "/v1/desk/boards/" + trip + "/notes", null).getBody()).extracting(n -> n.get("title")).containsExactly("Hotels", "Packing");
+
+        // Moving it to another board.
+        String home = board(a, "Home");
+        a.call("PUT", "/v1/desk/notes/" + packing, Map.of("boardId", home, "title", "Packing list", "description", ""));
+        assertThat(a.list("GET", "/v1/desk/boards/" + home + "/notes", null).getBody()).extracting(n -> n.get("title")).containsExactly("Packing list");
 
         assertThat(a.status("DELETE", "/v1/desk/notes/" + hotels, null)).isEqualTo(200);
         assertThat(a.status("GET", "/v1/desk/notes/" + hotels, null)).isEqualTo(404);
-        assertThat(a.get("/v1/desk/notes")).hasSize(1);
     }
 
     @Test
-    void aNoteNeedsSomething() {
-        TestUser a = user("notes_invalid");
-        assertThat(a.status("POST", "/v1/desk/notes", Map.of("title", "  ", "body", " \n "))).isEqualTo(400);
-        assertThat(a.status("POST", "/v1/desk/notes", Map.of("title", "x".repeat(201), "body", ""))).isEqualTo(400);
-        assertThat(a.status("POST", "/v1/desk/notes", Map.of("title", "", "body", "x".repeat(50_001)))).isEqualTo(400);
-        String id = note(a, "Ok", "");
-        assertThat(a.status("POST", "/v1/desk/notes/" + id + "/followups", Map.of("body", "   "))).isEqualTo(400);
+    void aNoteNeedsATitle() {
+        TestUser a = user("notes_empty");
+        String b = board(a, "B");
+        assertThat(a.status("POST", "/v1/desk/notes", Map.of("boardId", b, "title", "  ", "description", "words"))).isEqualTo(400);
+        assertThat(a.status("POST", "/v1/desk/notes", Map.of("boardId", b, "title", "a\nb"))).isEqualTo(400);
+        assertThat(a.status("POST", "/v1/desk/notes", Map.of("boardId", b, "title", "x".repeat(201)))).isEqualTo(400);
     }
 
     @Test
-    void nobodyElseCanSeeOrTouchMyNotes() {
+    void commentsOnTodosAndNotes() {
+        TestUser a = user("comments_owner");
+        String b = board(a, "Garden");
+        String todo = (String) todo(a, b, "Plant tulips", null, null).get("id");
+        String n = note(a, b, "Ideas", "Raised beds");
+
+        Map<String, Object> c1 = comment(a, "todos", todo, "Bought 40 bulbs");
+        assertThat(c1).containsEntry("body", "Bought 40 bulbs");
+        assertThat(c1.get("createdAt")).isNotNull();
+        comment(a, "todos", todo, "Half planted");
+        comment(a, "notes", n, "Cedar is best");
+
+        Map<String, Object> view = a.call("GET", "/v1/desk/todos/" + todo, null).getBody();
+        assertThat(items(view, "comments")).extracting(c -> c.get("body")).containsExactly("Bought 40 bulbs", "Half planted");
+        assertThat(part(view, "todo")).containsEntry("commentCount", 2);
+        assertThat(items(a.call("GET", "/v1/desk/boards/" + b + "/todos", null).getBody(), "open").get(0)).containsEntry("commentCount", 2);
+        assertThat(a.list("GET", "/v1/desk/boards/" + b + "/notes", null).getBody().get(0)).containsEntry("commentCount", 1);
+
+        // Deleting a comment; deleting the to-do takes its comments with it.
+        assertThat(a.status("DELETE", "/v1/desk/comments/" + c1.get("id"), null)).isEqualTo(200);
+        assertThat(items(a.call("GET", "/v1/desk/todos/" + todo, null).getBody(), "comments")).hasSize(1);
+        assertThat(a.status("POST", "/v1/desk/todos/" + todo + "/comments", Map.of("body", "  "))).isEqualTo(400);
+        assertThat(a.status("POST", "/v1/desk/todos/" + todo + "/comments", Map.of("body", "x".repeat(5001)))).isEqualTo(400);
+        assertThat(a.status("DELETE", "/v1/desk/todos/" + todo, null)).isEqualTo(200);
+        assertThat(a.status("POST", "/v1/desk/todos/" + todo + "/comments", Map.of("body", "late"))).isEqualTo(404);
+    }
+
+    @Test
+    void nobodyElseCanSeeOrTouchMyNotesOrComments() {
         TestUser a = user("notes_mine");
         TestUser b = user("notes_snoop");
         a.befriend(b, List.of(1), List.of(1));
-        String id = note(a, "Diary", "Private");
-        String f = (String) a.call("POST", "/v1/desk/notes/" + id + "/followups", Map.of("body", "More private")).getBody().get("id");
+        String board = board(a, "Private");
+        String id = note(a, board, "Diary", "Private thoughts");
+        String c = (String) comment(a, "notes", id, "More thoughts").get("id");
 
-        assertThat(b.get("/v1/desk/notes")).isEmpty();
+        assertThat(b.status("GET", "/v1/desk/boards/" + board + "/notes", null)).isEqualTo(404);
         assertThat(b.status("GET", "/v1/desk/notes/" + id, null)).isEqualTo(404);
-        assertThat(b.status("PUT", "/v1/desk/notes/" + id, Map.of("title", "x", "body", "y", "pinned", false))).isEqualTo(404);
+        assertThat(b.status("PUT", "/v1/desk/notes/" + id, Map.of("boardId", board, "title", "x"))).isEqualTo(404);
         assertThat(b.status("DELETE", "/v1/desk/notes/" + id, null)).isEqualTo(404);
-        assertThat(b.status("POST", "/v1/desk/notes/" + id + "/followups", Map.of("body", "hi"))).isEqualTo(404);
-        assertThat(b.status("DELETE", "/v1/desk/notes/" + id + "/followups/" + f, null)).isEqualTo(404);
-        // A follow-up can't be deleted through another note of mine either.
-        String other = note(a, "Other", "x");
-        assertThat(a.status("DELETE", "/v1/desk/notes/" + other + "/followups/" + f, null)).isEqualTo(404);
+        assertThat(b.status("POST", "/v1/desk/notes", Map.of("boardId", board, "title", "sneaky"))).isEqualTo(404);
+        assertThat(b.status("POST", "/v1/desk/notes/" + id + "/comments", Map.of("body", "hi"))).isEqualTo(404);
+        assertThat(b.status("DELETE", "/v1/desk/comments/" + c, null)).isEqualTo(404);
+        String theirs = board(b, "Theirs");
+        String theirNote = note(b, theirs, "Theirs", null);
+        assertThat(b.status("PUT", "/v1/desk/notes/" + theirNote, Map.of("boardId", board, "title", "moved"))).isEqualTo(404);
 
-        assertThat(items(a.call("GET", "/v1/desk/notes/" + id, null).getBody(), "followups")).hasSize(1);
+        assertThat(items(a.call("GET", "/v1/desk/notes/" + id, null).getBody(), "comments")).extracting(x -> x.get("body")).containsExactly("More thoughts");
     }
 }

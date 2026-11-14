@@ -7,27 +7,27 @@ import { Fab } from '@/components/fab';
 import { Icon } from '@/components/ui/icon';
 import { Text } from '@/components/ui/text';
 import { dayText, localDate, type DeskNoteSummary } from '@/lib/desk';
-import { fetchNotes } from '@/lib/desk-api';
+import { fetchBoardNotes } from '@/lib/desk-api';
 import { usePalette } from '@/theme/use-palette';
 
-const openNote = (id: string) => router.push({ pathname: '/desk/note/[id]', params: { id } });
-
-/** Notes, like a message board with one reader: pinned first, then the most recently changed. */
-export function NotesSection() {
+/** A board's notes, like a message board with one reader: pinned first, then the most recently changed. */
+export function BoardNotes({ boardId }: { boardId: string }) {
   const palette = usePalette();
   const [notes, setNotes] = useState<DeskNoteSummary[] | null>(null);
   const [error, setError] = useState<string>();
   const [pulling, setPulling] = useState(false);
   const today = localDate();
 
+  const openNote = (id: string) => router.push({ pathname: '/desk/note/[id]', params: id === 'new' ? { id, board: boardId } : { id } });
+
   const load = useCallback(async () => {
     try {
-      setNotes(await fetchNotes());
+      setNotes(await fetchBoardNotes(boardId));
       setError(undefined);
     } catch {
-      setError('Couldn’t load your notes. Pull to try again.');
+      setError('Couldn’t load the notes. Pull to try again.');
     }
-  }, []);
+  }, [boardId]);
   useFocusEffect(
     useCallback(() => {
       load();
@@ -53,11 +53,11 @@ export function NotesSection() {
         ListHeaderComponent={error ? <Text className="px-4 py-2 text-center text-sm text-danger dark:text-danger-dark">{error}</Text> : undefined}
         ListEmptyComponent={
           notes ? (
-            <View className="h-[440px]">
+            <View className="h-[400px]">
               <EmptyState
-                icon="document-outline"
+                icon="note-outline"
                 title="Write things down"
-                body="Ideas, plans, decisions, a journal. Add follow-ups to a note as things move on."
+                body="Ideas, plans, decisions, things to remember. Add comments as things move on."
                 actionLabel="New note"
                 onAction={() => openNote('new')}
               />
@@ -72,21 +72,19 @@ export function NotesSection() {
             <View className="flex-row items-center gap-2">
               {item.pinned ? <Icon name="pin" size={14} color={palette.primary} accessibilityLabel="Pinned" /> : null}
               <Text numberOfLines={1} className="flex-1 text-[15px] font-bold text-ink dark:text-ink-dark">
-                {item.title || item.snippet || 'Note'}
+                {item.title}
               </Text>
               <Text className="text-[13px] text-muted dark:text-muted-dark">{dayText(localDate(new Date(item.updatedAt)), today)}</Text>
             </View>
-            {item.title && item.snippet ? (
+            {item.snippet ? (
               <Text numberOfLines={2} className="text-[15px] leading-5 text-muted dark:text-muted-dark">
                 {item.snippet}
               </Text>
             ) : null}
-            {item.followups > 0 ? (
+            {item.commentCount > 0 ? (
               <View className="flex-row items-center gap-1">
                 <Icon name="chatbubble-outline" size={13} color={palette.muted} />
-                <Text className="text-[13px] text-muted dark:text-muted-dark">
-                  {item.followups === 1 ? '1 follow-up' : `${item.followups} follow-ups`}
-                </Text>
+                <Text className="text-[13px] text-muted dark:text-muted-dark">{item.commentCount === 1 ? '1 comment' : `${item.commentCount} comments`}</Text>
               </View>
             ) : null}
           </Pressable>

@@ -1108,63 +1108,101 @@ paths:
       responses:
         "200": { $ref: "#/components/responses/Status" }
 
-  # ---------------- desk (owner decision 2026-11-14) ----------------
-  # A personal space for to-dos, notes and files. Everything in it belongs to one person and is never shared:
-  # anything that isn't mine is 404, exactly as if it didn't exist.
-  /v1/desk/lists:
+  # ---------------- desk (owner decision 2026-11-14, boards 2026-11-15) ----------------
+  # A personal space of boards, each with its own to-dos, notes and files, all of which take comments. Everything in
+  # it belongs to one person and is never shared: anything that isn't mine is 404, exactly as if it didn't exist.
+  /v1/desk/boards:
     get:
-      summary: My to-do lists, oldest first, with how many to-dos are open and done
+      summary: My boards by name, with how many open to-dos, notes and files each has
       responses:
         "200":
-          description: Lists
+          description: Boards
           content:
             application/json:
-              schema: { type: array, items: { $ref: "#/components/schemas/DeskList" } }
+              schema: { type: array, items: { $ref: "#/components/schemas/DeskBoard" } }
     post:
-      summary: Start a to-do list (up to 200)
+      summary: Start a board (up to 200)
       requestBody: { $ref: "#/components/requestBodies/DeskName" }
       responses:
         "201":
-          description: The new list
+          description: The new board
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/DeskList" }
+              schema: { $ref: "#/components/schemas/DeskBoard" }
         "400": { $ref: "#/components/responses/Error" }
         "409": { $ref: "#/components/responses/Error" }
-  /v1/desk/lists/{id}:
+  /v1/desk/boards/{id}:
     parameters:
       - { $ref: "#/components/parameters/DeskId" }
     get:
-      summary: A list with its open to-dos (oldest first) and the 30 most recently done
+      summary: One of my boards
       responses:
         "200":
-          description: The list
+          description: The board
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DeskBoard" }
+        "404": { $ref: "#/components/responses/Error" }
+    put:
+      summary: Rename a board
+      requestBody: { $ref: "#/components/requestBodies/DeskName" }
+      responses:
+        "200":
+          description: The board
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DeskBoard" }
+        "400": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+    delete:
+      summary: Delete a board and everything on it (its files' storage is freed)
+      responses:
+        "200": { $ref: "#/components/responses/Status" }
+        "404": { $ref: "#/components/responses/Error" }
+  /v1/desk/boards/{id}/todos:
+    parameters:
+      - { $ref: "#/components/parameters/DeskId" }
+    get:
+      summary: A board's open to-dos (oldest first) and the 30 most recently done
+      responses:
+        "200":
+          description: To-dos
           content:
             application/json:
               schema:
                 type: object
-                required: [id, name, open, done]
+                required: [open, done]
                 properties:
-                  id: { $ref: "#/components/schemas/Id" }
-                  name: { type: string }
                   open: { type: array, items: { $ref: "#/components/schemas/DeskTodo" } }
                   done: { type: array, items: { $ref: "#/components/schemas/DeskTodo" } }
         "404": { $ref: "#/components/responses/Error" }
-    put:
-      summary: Rename a list
-      requestBody: { $ref: "#/components/requestBodies/DeskName" }
+  /v1/desk/boards/{id}/notes:
+    parameters:
+      - { $ref: "#/components/parameters/DeskId" }
+    get:
+      summary: A board's notes, pinned first, then the most recently changed or commented on (up to 1000)
       responses:
-        "200": { $ref: "#/components/responses/Status" }
-        "400": { $ref: "#/components/responses/Error" }
+        "200":
+          description: Notes
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: "#/components/schemas/DeskNoteSummary" } }
         "404": { $ref: "#/components/responses/Error" }
-    delete:
-      summary: Delete a list and every to-do in it
+  /v1/desk/boards/{id}/files:
+    parameters:
+      - { $ref: "#/components/parameters/DeskId" }
+    get:
+      summary: A board's files, newest first, with download URLs (up to 2000)
       responses:
-        "200": { $ref: "#/components/responses/Status" }
+        "200":
+          description: Files
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: "#/components/schemas/DeskFile" } }
         "404": { $ref: "#/components/responses/Error" }
   /v1/desk/today:
     get:
-      summary: Open to-dos due on or before `date` (my today) in all my lists, earliest first
+      summary: Open to-dos due on or before `date` (my today) on all my boards, earliest first
       parameters:
         - { name: date, in: query, required: true, schema: { type: string, format: date } }
       responses:
@@ -1176,7 +1214,7 @@ paths:
         "400": { $ref: "#/components/responses/Error" }
   /v1/desk/todos:
     post:
-      summary: Add a to-do to one of my lists
+      summary: Add a to-do to one of my boards
       requestBody: { $ref: "#/components/requestBodies/DeskTodoInput" }
       responses:
         "201":
@@ -1190,22 +1228,22 @@ paths:
     parameters:
       - { $ref: "#/components/parameters/DeskId" }
     get:
-      summary: A to-do, with the earlier ones of its repeating series that were done (newest first, up to 20)
+      summary: A to-do with its comments, and the earlier ones of its repeating series that were done (newest first, up to 20)
       responses:
         "200":
           description: The to-do
           content:
             application/json:
               schema:
-                allOf:
-                  - { $ref: "#/components/schemas/DeskTodo" }
-                  - type: object
-                    required: [history]
-                    properties:
-                      history: { type: array, items: { $ref: "#/components/schemas/DeskTodo" } }
+                type: object
+                required: [todo, history, comments]
+                properties:
+                  todo: { $ref: "#/components/schemas/DeskTodo" }
+                  history: { type: array, items: { $ref: "#/components/schemas/DeskTodo" } }
+                  comments: { type: array, items: { $ref: "#/components/schemas/DeskComment" } }
         "404": { $ref: "#/components/responses/Error" }
     put:
-      summary: Replace a to-do's list, title, notes, due date and repeat (a new due date or repeat restarts its schedule)
+      summary: Replace a to-do's board, title, description, due date and repeat (a new due date or repeat restarts its schedule)
       requestBody: { $ref: "#/components/requestBodies/DeskTodoInput" }
       responses:
         "200":
@@ -1216,7 +1254,7 @@ paths:
         "400": { $ref: "#/components/responses/Error" }
         "404": { $ref: "#/components/responses/Error" }
     delete:
-      summary: Delete a to-do
+      summary: Delete a to-do and its comments
       responses:
         "200": { $ref: "#/components/responses/Status" }
         "404": { $ref: "#/components/responses/Error" }
@@ -1254,17 +1292,19 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/DeskTodo" }
         "404": { $ref: "#/components/responses/Error" }
-  /v1/desk/notes:
-    get:
-      summary: My notes, pinned first, then the most recently changed (up to 1000)
-      responses:
-        "200":
-          description: Notes
-          content:
-            application/json:
-              schema: { type: array, items: { $ref: "#/components/schemas/DeskNoteSummary" } }
+  /v1/desk/todos/{id}/comments:
+    parameters:
+      - { $ref: "#/components/parameters/DeskId" }
     post:
-      summary: Write a note (a title or a body, or both)
+      summary: Comment on a to-do
+      requestBody: { $ref: "#/components/requestBodies/DeskCommentInput" }
+      responses:
+        "201": { $ref: "#/components/responses/DeskComment" }
+        "400": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+  /v1/desk/notes:
+    post:
+      summary: Write a note on one of my boards
       requestBody: { $ref: "#/components/requestBodies/DeskNoteInput" }
       responses:
         "201":
@@ -1273,20 +1313,26 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/DeskNote" }
         "400": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
   /v1/desk/notes/{id}:
     parameters:
       - { $ref: "#/components/parameters/DeskId" }
     get:
-      summary: A note with its follow-ups, oldest first
+      summary: A note with its comments, oldest first
       responses:
         "200":
           description: The note
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/DeskNote" }
+              schema:
+                type: object
+                required: [note, comments]
+                properties:
+                  note: { $ref: "#/components/schemas/DeskNote" }
+                  comments: { type: array, items: { $ref: "#/components/schemas/DeskComment" } }
         "404": { $ref: "#/components/responses/Error" }
     put:
-      summary: Replace a note's title and body; `pinned` left out keeps it
+      summary: Replace a note's board, title and description; `pinned` left out keeps it
       requestBody: { $ref: "#/components/requestBodies/DeskNoteInput" }
       responses:
         "200":
@@ -1297,36 +1343,19 @@ paths:
         "400": { $ref: "#/components/responses/Error" }
         "404": { $ref: "#/components/responses/Error" }
     delete:
-      summary: Delete a note and its follow-ups
+      summary: Delete a note and its comments
       responses:
         "200": { $ref: "#/components/responses/Status" }
         "404": { $ref: "#/components/responses/Error" }
-  /v1/desk/notes/{id}/followups:
+  /v1/desk/notes/{id}/comments:
     parameters:
       - { $ref: "#/components/parameters/DeskId" }
     post:
-      summary: Add a follow-up to the end of a note (up to 5000 characters); the note moves up the list
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { type: object, required: [body], properties: { body: { type: string } } }
+      summary: Comment on a note; the note moves up its board
+      requestBody: { $ref: "#/components/requestBodies/DeskCommentInput" }
       responses:
-        "201":
-          description: The follow-up
-          content:
-            application/json:
-              schema: { $ref: "#/components/schemas/DeskFollowup" }
+        "201": { $ref: "#/components/responses/DeskComment" }
         "400": { $ref: "#/components/responses/Error" }
-        "404": { $ref: "#/components/responses/Error" }
-  /v1/desk/notes/{id}/followups/{followupId}:
-    parameters:
-      - { $ref: "#/components/parameters/DeskId" }
-      - { name: followupId, in: path, required: true, schema: { $ref: "#/components/schemas/Id" } }
-    delete:
-      summary: Delete a follow-up
-      responses:
-        "200": { $ref: "#/components/responses/Status" }
         "404": { $ref: "#/components/responses/Error" }
   /v1/desk/uploads:
     post:
@@ -1369,22 +1398,20 @@ paths:
                     mime: { type: string }
         "400": { $ref: "#/components/responses/Error" }
   /v1/desk/files:
-    get:
-      summary: The top level of my files, folders and files that aren't in a folder
-      responses:
-        "200": { $ref: "#/components/responses/DeskListing" }
     post:
-      summary: Keep an uploaded file (and its thumbnail or poster frame) in one of my folders, or at the top level
+      summary: Keep an uploaded file (and its thumbnail or poster frame) on one of my boards
       requestBody:
         required: true
         content:
           application/json:
             schema:
               type: object
-              required: [name, objectKey]
+              required: [boardId, title, fileName, objectKey]
               properties:
-                folderId: { type: [string, "null"], format: uuid }
-                name: { type: string, description: "1-200 characters, one line" }
+                boardId: { $ref: "#/components/schemas/Id" }
+                title: { type: string, description: "1-200 characters, one line" }
+                description: { type: string, description: "Up to 10000 characters" }
+                fileName: { type: string, description: "The file's own name, 1-200 characters, one line" }
                 objectKey: { $ref: "#/components/schemas/ObjectKey" }
                 previewKey: { $ref: "#/components/schemas/ObjectKey" }
                 width: { type: integer }
@@ -1402,26 +1429,32 @@ paths:
     parameters:
       - { $ref: "#/components/parameters/DeskId" }
     get:
-      summary: One of my files, with fresh download URLs
+      summary: One of my files, with fresh download URLs, and its comments
       responses:
         "200":
           description: The file
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/DeskFile" }
+              schema:
+                type: object
+                required: [file, comments]
+                properties:
+                  file: { $ref: "#/components/schemas/DeskFile" }
+                  comments: { type: array, items: { $ref: "#/components/schemas/DeskComment" } }
         "404": { $ref: "#/components/responses/Error" }
     put:
-      summary: Rename a file and put it in `folderId` (the top level when left out)
+      summary: Change a file's title and description and put it on `boardId`
       requestBody:
         required: true
         content:
           application/json:
             schema:
               type: object
-              required: [name]
+              required: [boardId, title]
               properties:
-                name: { type: string }
-                folderId: { type: [string, "null"], format: uuid }
+                boardId: { $ref: "#/components/schemas/Id" }
+                title: { type: string, description: "1-200 characters, one line" }
+                description: { type: string, description: "Up to 10000 characters" }
       responses:
         "200":
           description: The file
@@ -1431,44 +1464,25 @@ paths:
         "400": { $ref: "#/components/responses/Error" }
         "404": { $ref: "#/components/responses/Error" }
     delete:
-      summary: Delete a file (its storage is freed)
+      summary: Delete a file and its comments (its storage is freed)
       responses:
         "200": { $ref: "#/components/responses/Status" }
         "404": { $ref: "#/components/responses/Error" }
-  /v1/desk/folders:
-    post:
-      summary: Make a folder, at the top level or in `parentId` (up to 1000 folders, 20 deep)
-      requestBody: { $ref: "#/components/requestBodies/DeskFolderInput" }
-      responses:
-        "201":
-          description: The folder
-          content:
-            application/json:
-              schema: { $ref: "#/components/schemas/DeskFolderRef" }
-        "400": { $ref: "#/components/responses/Error" }
-        "404": { $ref: "#/components/responses/Error" }
-        "409": { $ref: "#/components/responses/Error" }
-  /v1/desk/folders/{id}:
+  /v1/desk/files/{id}/comments:
     parameters:
       - { $ref: "#/components/parameters/DeskId" }
-    get:
-      summary: A folder's subfolders and files, and the path to it from the top
+    post:
+      summary: Comment on a file
+      requestBody: { $ref: "#/components/requestBodies/DeskCommentInput" }
       responses:
-        "200": { $ref: "#/components/responses/DeskListing" }
-        "404": { $ref: "#/components/responses/Error" }
-    put:
-      summary: Rename a folder and put it in `parentId` (the top level when left out); never inside itself
-      requestBody: { $ref: "#/components/requestBodies/DeskFolderInput" }
-      responses:
-        "200":
-          description: The folder
-          content:
-            application/json:
-              schema: { $ref: "#/components/schemas/DeskFolderRef" }
+        "201": { $ref: "#/components/responses/DeskComment" }
         "400": { $ref: "#/components/responses/Error" }
         "404": { $ref: "#/components/responses/Error" }
+  /v1/desk/comments/{id}:
+    parameters:
+      - { $ref: "#/components/parameters/DeskId" }
     delete:
-      summary: Delete a folder and everything in it
+      summary: Delete one of my comments
       responses:
         "200": { $ref: "#/components/responses/Status" }
         "404": { $ref: "#/components/responses/Error" }
@@ -1504,11 +1518,11 @@ components:
         application/json:
           schema:
             type: object
-            required: [listId, title]
+            required: [boardId, title]
             properties:
-              listId: { $ref: "#/components/schemas/Id" }
+              boardId: { $ref: "#/components/schemas/Id" }
               title: { type: string, description: "1-500 characters" }
-              notes: { type: string, description: "Up to 10000 characters" }
+              description: { type: string, description: "Up to 10000 characters" }
               dueDate: { type: [string, "null"], format: date }
               repeat: { oneOf: [{ $ref: "#/components/schemas/DeskRepeat" }, { type: "null" }] }
     DeskNoteInput:
@@ -1517,21 +1531,17 @@ components:
         application/json:
           schema:
             type: object
-            required: [title, body]
+            required: [boardId, title]
             properties:
-              title: { type: string, description: "Up to 200 characters, one line" }
-              body: { type: string, description: "Up to 50000 characters" }
+              boardId: { $ref: "#/components/schemas/Id" }
+              title: { type: string, description: "1-200 characters, one line" }
+              description: { type: string, description: "Up to 50000 characters" }
               pinned: { type: boolean }
-    DeskFolderInput:
+    DeskCommentInput:
       required: true
       content:
         application/json:
-          schema:
-            type: object
-            required: [name]
-            properties:
-              name: { type: string, description: "1-100 characters, one line" }
-              parentId: { type: [string, "null"], format: uuid }
+          schema: { type: object, required: [body], properties: { body: { type: string, description: "1-5000 characters" } } }
   responses:
     Error:
       description: A fixed error code, plus fixed details for some codes
@@ -1574,32 +1584,11 @@ components:
       content:
         application/json:
           schema: { type: array, items: { $ref: "#/components/schemas/Post" } }
-    DeskListing:
-      description: A level of my files
+    DeskComment:
+      description: The comment
       content:
         application/json:
-          schema:
-            type: object
-            required: [folder, path, folders, files]
-            properties:
-              folder:
-                description: Null at the top level
-                oneOf: [{ $ref: "#/components/schemas/DeskFolderRef" }, { type: "null" }]
-              path:
-                description: From the top level down to this folder
-                type: array
-                items: { $ref: "#/components/schemas/DeskFolderRef" }
-              folders:
-                type: array
-                items:
-                  type: object
-                  required: [id, name, items, createdAt]
-                  properties:
-                    id: { $ref: "#/components/schemas/Id" }
-                    name: { type: string }
-                    items: { type: integer }
-                    createdAt: { type: string, format: date-time }
-              files: { type: array, items: { $ref: "#/components/schemas/DeskFile" } }
+          schema: { $ref: "#/components/schemas/DeskComment" }
   schemas:
     Id: { type: string, format: uuid }
     ObjectKey: { type: string, pattern: "^[0-9a-f]{64}$" }
@@ -1728,14 +1717,15 @@ components:
         readSeq: { type: integer, format: int64 }
         updatedAt: { type: string, format: date-time }
 
-    DeskList:
+    DeskBoard:
       type: object
-      required: [id, name, open, done, createdAt]
+      required: [id, name, todos, notes, files, createdAt]
       properties:
         id: { $ref: "#/components/schemas/Id" }
         name: { type: string }
-        open: { type: integer }
-        done: { type: integer }
+        todos: { type: integer, description: "Open to-dos" }
+        notes: { type: integer }
+        files: { type: integer }
         createdAt: { type: string, format: date-time }
     DeskRepeat:
       description: >-
@@ -1748,60 +1738,61 @@ components:
         every: { type: integer, minimum: 1, maximum: 365 }
     DeskTodo:
       type: object
-      required: [id, listId, listName, title, notes, dueDate, repeat, doneAt, createdAt]
+      required: [id, boardId, boardName, title, description, dueDate, repeat, doneAt, commentCount, createdAt]
       properties:
         id: { $ref: "#/components/schemas/Id" }
-        listId: { $ref: "#/components/schemas/Id" }
-        listName: { type: string }
+        boardId: { $ref: "#/components/schemas/Id" }
+        boardName: { type: string }
         title: { type: string }
-        notes: { type: string }
+        description: { type: string }
         dueDate: { type: [string, "null"], format: date }
         repeat: { oneOf: [{ $ref: "#/components/schemas/DeskRepeat" }, { type: "null" }] }
         doneAt: { type: [string, "null"], format: date-time }
+        commentCount: { type: integer }
         createdAt: { type: string, format: date-time }
     DeskNoteSummary:
       type: object
-      required: [id, title, snippet, pinned, followups, createdAt, updatedAt]
+      required: [id, boardId, title, snippet, pinned, commentCount, createdAt, updatedAt]
       properties:
         id: { $ref: "#/components/schemas/Id" }
+        boardId: { $ref: "#/components/schemas/Id" }
         title: { type: string }
-        snippet: { type: string, description: "The start of the body on one line" }
+        snippet: { type: string, description: "The start of the description on one line" }
         pinned: { type: boolean }
-        followups: { type: integer }
+        commentCount: { type: integer }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
-    DeskFollowup:
+    DeskNote:
+      type: object
+      required: [id, boardId, boardName, title, description, pinned, commentCount, createdAt, updatedAt]
+      properties:
+        id: { $ref: "#/components/schemas/Id" }
+        boardId: { $ref: "#/components/schemas/Id" }
+        boardName: { type: string }
+        title: { type: string }
+        description: { type: string }
+        pinned: { type: boolean }
+        commentCount: { type: integer }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    DeskComment:
       type: object
       required: [id, body, createdAt]
       properties:
         id: { $ref: "#/components/schemas/Id" }
         body: { type: string }
         createdAt: { type: string, format: date-time }
-    DeskNote:
-      type: object
-      required: [id, title, body, pinned, createdAt, updatedAt, followups]
-      properties:
-        id: { $ref: "#/components/schemas/Id" }
-        title: { type: string }
-        body: { type: string }
-        pinned: { type: boolean }
-        createdAt: { type: string, format: date-time }
-        updatedAt: { type: string, format: date-time }
-        followups: { type: array, items: { $ref: "#/components/schemas/DeskFollowup" } }
-    DeskFolderRef:
-      type: object
-      required: [id, name, parentId]
-      properties:
-        id: { $ref: "#/components/schemas/Id" }
-        name: { type: string }
-        parentId: { type: [string, "null"], format: uuid }
     DeskFile:
       type: object
-      required: [id, folderId, name, mime, kind, sizeBytes, width, height, durationMs, objectKey, url, previewKey, previewUrl, createdAt]
+      required: [id, boardId, boardName, title, description, fileName, mime, kind, sizeBytes, width, height, durationMs, objectKey, url,
+        previewKey, previewUrl, commentCount, createdAt]
       properties:
         id: { $ref: "#/components/schemas/Id" }
-        folderId: { type: [string, "null"], format: uuid }
-        name: { type: string }
+        boardId: { $ref: "#/components/schemas/Id" }
+        boardName: { type: string }
+        title: { type: string }
+        description: { type: string }
+        fileName: { type: string }
         mime: { type: string }
         kind: { type: string, enum: [image, video, file], description: "image and video have a thumbnail or poster frame" }
         sizeBytes: { type: integer, format: int64 }
@@ -1812,4 +1803,5 @@ components:
         url: { type: string, description: "Presigned GET URL (1 hour)" }
         previewKey: { type: [string, "null"], pattern: "^[0-9a-f]{64}$" }
         previewUrl: { type: [string, "null"] }
+        commentCount: { type: integer }
         createdAt: { type: string, format: date-time }

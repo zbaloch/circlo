@@ -2,28 +2,36 @@
 
 Memory file for Claude Code sessions. Read this first when resuming. Keep it accurate.
 
-## 2026-11-14: Desk, a personal space (branch `desk`, on trial)
+## 2026-11-14/15: Desk, a personal space of boards (branch `desk`, on trial)
 
 Owner decision: try a personal space for to-dos, notes and files (Basecamp-style, but just for one person), so Circlo
 is useful before you've connected with anyone. Kept on its own branch until the owner decides whether to ship it.
 Nothing in the Desk is ever shared: every row has an owner and every query is scoped to it (404 for anyone else).
+On 2026-11-15 the owner reshaped it into **boards** (Home renovation, Taxes 2026...): each board has its own to-dos
+(one flat list), notes and files, everything has a title and an optional description, and to-dos, notes and files all
+take comments. Boards replace folders and to-do lists. V31 was rewritten for this (the branch was never merged); the
+dev database's few Desk rows were moved across by hand and V31's checksum updated.
 
-- **Server** (`com.circlo.server.desk`, V31): to-do lists and to-dos with due dates (calendar days on the owner's clock)
-  and repeats (daily / weekdays / weekly / monthly / yearly every N, counted from the first due date so the 31st
-  doesn't drift; or N days after it was done). Ticking off a repeating to-do makes the next one; undo takes it back;
-  each to-do shows when its series was done before. Notes with a title, body, pin and follow-ups (a running log).
-  Folders (nested, 20 deep, never inside themselves) and files: `/v1/desk/uploads` gives presigned PUTs for a wider
-  set of types (PDF, office, text, audio, zip...) but never HTML, SVG or scripts; anything else is kept as
-  `application/octet-stream`, which only downloads. Desk files are uploads with `media_uploads.desk_file_id`, so the
-  sweeper leaves them alone, deleting a file or folder hands them back to it, and Settings → Storage counts them
-  (`deskBytes`, `deskFiles`). Export includes the Desk; account deletion removes it. 22 new tests (DeskTodosIT,
-  DeskNotesIT, DeskFilesIT, RepeatsTest); 127 in all.
-- **App**: a Desk tab (between People and Notifications, behind `DESK_ENABLED` in lib/features) with To-dos (Today
-  across lists, then lists), Notes and Files. List, to-do (due chips + calendar, repeat, list, history), note
-  (editor, pin, follow-ups) and folder screens. Photos and videos added to the Desk go through `lib/media` prepare
-  like post photos (re-encoded, metadata removed, named by date); other documents upload as they are (new
-  `expo-document-picker`). Files open in the viewer, the video player or the browser; rename, move and delete from ⋯.
-  277 tests, lint, typecheck, web build.
+- **Server** (`com.circlo.server.desk`, V31): boards (by name, with counts of open to-dos, notes and files; deleting
+  one deletes everything on it and lets its files' uploads go). To-dos with due dates (calendar days on the owner's
+  clock) and repeats (daily / weekdays / weekly / monthly / yearly every N, counted from the first due date so the 31st
+  doesn't drift; or N days after it was done). Ticking off a repeating to-do makes the next one (with the same
+  description); undo takes it back; each to-do shows when its series was done before. Notes: title, optional
+  description, pin. Files: title (the file's name without its extension to start with), optional description and the
+  file's own name; `/v1/desk/uploads` gives presigned PUTs for a wider set of types (PDF, office, text, audio, zip...)
+  but never HTML, SVG or scripts; anything else is kept as `application/octet-stream`, which only downloads. Desk files
+  are uploads with `media_uploads.desk_file_id`, so the sweeper leaves them alone, deleting a file or board hands them
+  back to it, and Settings → Storage counts them (`deskBytes`, `deskFiles`). Comments (`desk_comments`, on exactly one
+  to-do, note or file; a comment moves a note up its board). To-dos, notes and files can move between boards. Export
+  includes the Desk (boards with everything on them and their comments); account deletion removes it. 15 Desk ITs
+  (DeskTodosIT, DeskNotesIT, DeskFilesIT) and RepeatsTest.
+- **App**: a Desk tab (between People and Notifications, behind `DESK_ENABLED` in lib/features): Today (due or late on
+  every board) then Boards and New board. A board screen with To-dos / Notes / Files tabs (⋯ renames or deletes it);
+  to-do (description, due chips + calendar, repeat, board, history, comments), note (title, description, pin, move,
+  comments) and file (preview or Open, title, description, move, delete, comments) screens. Photos and videos added to
+  the Desk go through `lib/media` prepare like post photos (re-encoded, metadata removed, named by date); other
+  documents upload as they are (`expo-document-picker`). Files open in the viewer, the video player or the browser.
+  281 tests, lint, typecheck, web build.
 
 ## 2026-11-01: no more end-to-end encryption (branch `plain-accounts`)
 
@@ -554,7 +562,7 @@ See docs/HARDENING.md for how to repeat each check.
 | 2026-11-07 | **A code by email at login** (owner: a second factor, not just username and password): apps from 1.1.0 send `emailCode: true`; the right password emails a 6-digit sign-in code and answers 202 with the address partly hidden and a one-time challenge; `/v1/auth/login/verify` with the code and challenge signs in (and only then the "New sign-in" alert); `/login/resend` works only for a live attempt. Codes: hash only, 15 minutes, 5 tries, tied to the attempt (V29). Apps already in the stores are unchanged (password only) until `CIRCLO_LOGIN_CODE_FOR_OLD_APPS=true`, which sends them the code through their existing "Check your email" screen (`LoginCodeIT`, `LoginCodeForOldAppsIT`) | A stolen password alone no longer opens an account; the server is deployed before store apps update, so old apps must keep working |
 | 2026-11-07 | **Right-to-left text and Arabic-script fonts** (owner): posts, replies, messages and bios are drawn paragraph by paragraph in their own direction (first real letter, like `dir="auto"`), so Sindhi, Urdu, Persian and Arabic are right-aligned, and so are the compose, reply and message boxes while you type them. The language is told from its letters, once per text: Sindhi and Arabic in Noto Naskh Arabic, Urdu and Persian in Noto Nastaliq Urdu (taller line height). Latin, Greek and Cyrillic stay in Inter; Chinese, Japanese, Korean and the rest use the phone's fonts. Fonts are bundled from the `@expo-google-fonts` packages (OFL), so nothing is fetched from Google or any other site, on the phone or the web (`lib/script`, `ContentText`) | A Sindhi post was left-aligned in a generic Arabic font |
 | 2026-11-07 | **One People tab: People, Circles, Invite** (owner): your people (requests, sent requests, people with their circles), your circles (Only me, Everyone, your circles, New circle; the My Circles list) and Invite (your QR code and link, then "Got an invite?" to scan or paste) in one tab. It opens on Invite while you have nobody yet. My Circles leaves the side menu (its screen stays for links); links to the old Got an invite? go to Invite | People and circles were in two places, and inviting is the first thing a new user needs |
-| 2026-11-14 | **Desk** (owner, on trial on branch `desk`): a personal space with to-dos (lists, due dates, repeats), notes (follow-ups, pin) and files (folders), never shared with anyone; a Desk tab behind `DESK_ENABLED`. Desk files count towards storage; export and account deletion include them | Make Circlo useful before someone has connections. Basecamp's to-dos, message board and docs & files, for one person. A logbook was left out (a friend's separate app) |
+| 2026-11-14 | **Desk** (owner, on trial on branch `desk`): a personal space with to-dos (due dates, repeats), notes and files, never shared with anyone; a Desk tab behind `DESK_ENABLED`. Desk files count towards storage; export and account deletion include them. 2026-11-15: reshaped into **boards**, each with its own to-dos (one flat list), notes and files; every item has a title and an optional description and takes comments (only its owner's); boards replace folders and to-do lists; Today on top of the Desk, boards below | Make Circlo useful before someone has connections. Basecamp's to-dos, message board and docs & files, for one person. A logbook was left out (a friend's separate app) |
 
 ## Waiting on owner
 
@@ -574,10 +582,10 @@ See docs/HARDENING.md for how to repeat each check.
 
 ## Needs manual check
 
-- (Desk, branch `desk`) On a phone and the web app: add a list and to-dos, tick one off and undo it; give one a
-  weekly repeat and check the next one appears; write a note, pin it, add follow-ups; make folders, add a photo, a
-  video and a PDF from Files, open each, rename and move them, delete a folder with files in it, and see Settings →
-  Storage change. Check a second account sees none of it.
+- (Desk, branch `desk`) On a phone and the web app: make a board, add to-dos, tick one off and undo it; give one a
+  description and a weekly repeat and check the next one appears in Today when due; write a note, pin it, comment on
+  it; add a photo, a video and a PDF, open each, give one a description, comment on it, move it to another board;
+  delete a board with files on it and see Settings → Storage change. Check a second account sees none of it.
 
 - (Phase 12) Release build with pins on a physical phone: the app works against the real HTTPS host; with a wrong
   pin it refuses to connect (Android and iOS). Root warning shows on a rooted test phone and not on a normal one.

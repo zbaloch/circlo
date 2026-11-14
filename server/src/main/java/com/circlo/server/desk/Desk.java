@@ -6,7 +6,9 @@ import com.circlo.server.web.Ids;
 import com.circlo.server.web.RateLimiter;
 import java.sql.Timestamp;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.oauth2.jwt.Jwt;
 
 /**
@@ -50,12 +52,30 @@ final class Desk {
         return s;
     }
 
-    /** A name for a list or folder (up to 100 characters) or file (200): one line. */
-    static String name(String raw, int max) {
-        String s = text(raw, max, true, "invalid_name");
+    /** One line of required text (a board's name, a note's or file's title) of at most `max` characters. */
+    static String line(String raw, int max, String error) {
+        String s = text(raw, max, true, error);
         if (s.contains("\n") || s.contains("\r")) {
-            throw ApiException.badRequest("invalid_name");
+            throw ApiException.badRequest(error);
         }
         return s;
+    }
+
+    /** An optional description: trailing space dropped, at most `max` characters, "" when blank. */
+    static String description(String raw, int max) {
+        String s = raw == null ? "" : raw.stripTrailing();
+        if (s.codePointCount(0, s.length()) > max) {
+            throw ApiException.badRequest("invalid_description");
+        }
+        return s.isBlank() ? "" : s;
+    }
+
+    /** The name of one of my boards; 404 if it isn't mine. */
+    static String board(JdbcTemplate jdbc, byte[] me, UUID boardId) {
+        List<String> name = jdbc.queryForList("SELECT name FROM desk_boards WHERE id = ? AND owner_id = ?", String.class, bytes(boardId), me);
+        if (name.isEmpty()) {
+            throw ApiException.notFound();
+        }
+        return name.get(0);
     }
 }

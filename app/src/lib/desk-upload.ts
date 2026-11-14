@@ -11,7 +11,7 @@ import { Image } from 'react-native';
 import { api, ok } from '@/api/client';
 import { discardPicked, discardPrepared, fileSize, prepare, putFile, upload, type PickedMedia } from '@/lib/media';
 
-import { deskMime, photoName, type DeskFile } from './desk';
+import { deskMime, fileTitle, photoName, type DeskFile } from './desk';
 
 export type Progress = (done: number, total: number) => void;
 
@@ -21,8 +21,8 @@ function imageSize(uri: string): Promise<{ width: number; height: number }> {
   return new Promise((resolve, reject) => Image.getSize(uri, (width, height) => resolve({ width, height }), reject));
 }
 
-/** Re-encodes a photo or video and keeps it in `folderId` (null: the top level). */
-async function keepMedia(media: PickedMedia, folderId: string | null, at: Date): Promise<DeskFile> {
+/** Re-encodes a photo or video and keeps it on a board, titled by when it was added. */
+async function keepMedia(media: PickedMedia, boardId: string, at: Date): Promise<DeskFile> {
   const item = await prepare(media);
   try {
     // A video picked as a document has no size from the picker: its poster frame has the same shape.
@@ -31,25 +31,27 @@ async function keepMedia(media: PickedMedia, folderId: string | null, at: Date):
       item.full.height = item.preview.height;
     }
     const [a] = await upload([item]);
+    const fileName = photoName(item.type, at, item.full.mime);
     return ok(await api.POST('/v1/desk/files', {
-      body: { folderId, name: photoName(item.type, at, item.full.mime), objectKey: a.objectKey, previewKey: a.previewKey, width: a.width, height: a.height, durationMs: a.durationMs },
+      body: { boardId, title: fileTitle(fileName), fileName, objectKey: a.objectKey, previewKey: a.previewKey, width: a.width, height: a.height, durationMs: a.durationMs },
     }));
   } finally {
     discardPrepared([item]);
   }
 }
 
-/** Uploads a document as it is and keeps it under its own name. */
-async function keepDocument(asset: DocumentPicker.DocumentPickerAsset, folderId: string | null): Promise<DeskFile> {
+/** Uploads a document as it is and keeps it on a board, titled by its own name. */
+async function keepDocument(asset: DocumentPicker.DocumentPickerAsset, boardId: string): Promise<DeskFile> {
   const mime = deskMime(asset.name, asset.mimeType);
   const size = asset.size ?? (await fileSize(asset.uri));
   const [slot] = ok(await api.POST('/v1/desk/uploads', { body: { files: [{ size, mime }] } }));
   await putFile(slot.putUrl, asset.uri, mime);
-  return ok(await api.POST('/v1/desk/files', { body: { folderId, name: asset.name.trim().slice(0, 200) || 'File', objectKey: slot.objectKey } }));
+  const fileName = asset.name.replace(/\s+/g, ' ').trim().slice(0, 200) || 'File';
+  return ok(await api.POST('/v1/desk/files', { body: { boardId, title: fileTitle(fileName), fileName, objectKey: slot.objectKey } }));
 }
 
 /** Photos and videos from the library. Returns how many were added. */
-export async function addFromLibrary(folderId: string | null, onProgress?: Progress): Promise<number> {
+export async function addFromLibrary(boardId: string, onProgress?: Progress): Promise<number> {
   const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images', 'videos'], allowsMultipleSelection: true, selectionLimit: PICK_LIMIT, exif: false, quality: 1 });
   if (res.canceled) return 0;
   const picked: PickedMedia[] = res.assets.map((a) => ({
@@ -64,7 +66,7 @@ export async function addFromLibrary(folderId: string | null, onProgress?: Progr
     const at = new Date();
     for (let i = 0; i < picked.length; i++) {
       onProgress?.(i, picked.length);
-      await keepMedia(picked[i], folderId, new Date(at.getTime() + i * 60_000));
+      await keepMedia(picked[i], boardId, new Date(at.getTime() + i * 60_000));
     }
     onProgress?.(picked.length, picked.length);
     return picked.length;
@@ -74,7 +76,7 @@ export async function addFromLibrary(folderId: string | null, onProgress?: Progr
 }
 
 /** Any files, from the phone's Files app or the computer. Returns how many were added. */
-export async function addDocuments(folderId: string | null, onProgress?: Progress): Promise<number> {
+export async function addDocuments(boardId: string, onProgress?: Progress): Promise<number> {
   const res = await DocumentPicker.getDocumentAsync({ multiple: true, copyToCacheDirectory: true });
   if (res.canceled) return 0;
   const assets = res.assets.slice(0, PICK_LIMIT);
@@ -85,11 +87,11 @@ export async function addDocuments(folderId: string | null, onProgress?: Progres
     const mime = deskMime(a.name, a.mimeType);
     if (/^image\/(jpeg|png|webp|heic|heif)$/.test(mime)) {
       const { width, height } = await imageSize(a.uri);
-      await keepMedia({ uri: a.uri, type: 'image', width, height, mimeType: mime }, folderId, at);
+      await keepMedia({ uri: a.uri, type: 'image', width, height, mimeType: mime }, boardId, at);
     } else if (/^video\/(mp4|quicktime|webm)$/.test(mime)) {
-      await keepMedia({ uri: a.uri, type: 'video', width: 0, height: 0, mimeType: mime }, folderId, at);
+      await keepMedia({ uri: a.uri, type: 'video', width: 0, height: 0, mimeType: mime }, boardId, at);
     } else {
-      await keepDocument(a, folderId);
+      await keepDocument(a, boardId);
     }
   }
   onProgress?.(assets.length, assets.length);

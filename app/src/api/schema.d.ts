@@ -2842,14 +2842,14 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/desk/lists": {
+    "/v1/desk/boards": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** My to-do lists, oldest first, with how many to-dos are open and done */
+        /** My boards by name, with how many open to-dos, notes and files each has */
         get: {
             parameters: {
                 query?: never;
@@ -2859,19 +2859,19 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                /** @description Lists */
+                /** @description Boards */
                 200: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["DeskList"][];
+                        "application/json": components["schemas"]["DeskBoard"][];
                     };
                 };
             };
         };
         put?: never;
-        /** Start a to-do list (up to 200) */
+        /** Start a board (up to 200) */
         post: {
             parameters: {
                 query?: never;
@@ -2881,13 +2881,13 @@ export interface paths {
             };
             requestBody: components["requestBodies"]["DeskName"];
             responses: {
-                /** @description The new list */
+                /** @description The new board */
                 201: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["DeskList"];
+                        "application/json": components["schemas"]["DeskBoard"];
                     };
                 };
                 400: components["responses"]["Error"];
@@ -2900,7 +2900,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/desk/lists/{id}": {
+    "/v1/desk/boards/{id}": {
         parameters: {
             query?: never;
             header?: never;
@@ -2909,7 +2909,7 @@ export interface paths {
             };
             cookie?: never;
         };
-        /** A list with its open to-dos (oldest first) and the 30 most recently done */
+        /** One of my boards */
         get: {
             parameters: {
                 query?: never;
@@ -2921,24 +2921,19 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                /** @description The list */
+                /** @description The board */
                 200: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            id: components["schemas"]["Id"];
-                            name: string;
-                            open: components["schemas"]["DeskTodo"][];
-                            done: components["schemas"]["DeskTodo"][];
-                        };
+                        "application/json": components["schemas"]["DeskBoard"];
                     };
                 };
                 404: components["responses"]["Error"];
             };
         };
-        /** Rename a list */
+        /** Rename a board */
         put: {
             parameters: {
                 query?: never;
@@ -2950,13 +2945,21 @@ export interface paths {
             };
             requestBody: components["requestBodies"]["DeskName"];
             responses: {
-                200: components["responses"]["Status"];
+                /** @description The board */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["DeskBoard"];
+                    };
+                };
                 400: components["responses"]["Error"];
                 404: components["responses"]["Error"];
             };
         };
         post?: never;
-        /** Delete a list and every to-do in it */
+        /** Delete a board and everything on it (its files' storage is freed) */
         delete: {
             parameters: {
                 query?: never;
@@ -2977,6 +2980,132 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/desk/boards/{id}/todos": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["DeskId"];
+            };
+            cookie?: never;
+        };
+        /** A board's open to-dos (oldest first) and the 30 most recently done */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: components["parameters"]["DeskId"];
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description To-dos */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            open: components["schemas"]["DeskTodo"][];
+                            done: components["schemas"]["DeskTodo"][];
+                        };
+                    };
+                };
+                404: components["responses"]["Error"];
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/desk/boards/{id}/notes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["DeskId"];
+            };
+            cookie?: never;
+        };
+        /** A board's notes, pinned first, then the most recently changed or commented on (up to 1000) */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: components["parameters"]["DeskId"];
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Notes */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["DeskNoteSummary"][];
+                    };
+                };
+                404: components["responses"]["Error"];
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/desk/boards/{id}/files": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["DeskId"];
+            };
+            cookie?: never;
+        };
+        /** A board's files, newest first, with download URLs (up to 2000) */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: components["parameters"]["DeskId"];
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Files */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["DeskFile"][];
+                    };
+                };
+                404: components["responses"]["Error"];
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/desk/today": {
         parameters: {
             query?: never;
@@ -2984,7 +3113,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Open to-dos due on or before `date` (my today) in all my lists, earliest first */
+        /** Open to-dos due on or before `date` (my today) on all my boards, earliest first */
         get: {
             parameters: {
                 query: {
@@ -3025,7 +3154,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Add a to-do to one of my lists */
+        /** Add a to-do to one of my boards */
         post: {
             parameters: {
                 query?: never;
@@ -3063,7 +3192,7 @@ export interface paths {
             };
             cookie?: never;
         };
-        /** A to-do, with the earlier ones of its repeating series that were done (newest first, up to 20) */
+        /** A to-do with its comments, and the earlier ones of its repeating series that were done (newest first, up to 20) */
         get: {
             parameters: {
                 query?: never;
@@ -3081,15 +3210,17 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["DeskTodo"] & {
+                        "application/json": {
+                            todo: components["schemas"]["DeskTodo"];
                             history: components["schemas"]["DeskTodo"][];
+                            comments: components["schemas"]["DeskComment"][];
                         };
                     };
                 };
                 404: components["responses"]["Error"];
             };
         };
-        /** Replace a to-do's list, title, notes, due date and repeat (a new due date or repeat restarts its schedule) */
+        /** Replace a to-do's board, title, description, due date and repeat (a new due date or repeat restarts its schedule) */
         put: {
             parameters: {
                 query?: never;
@@ -3115,7 +3246,7 @@ export interface paths {
             };
         };
         post?: never;
-        /** Delete a to-do */
+        /** Delete a to-do and its comments */
         delete: {
             parameters: {
                 query?: never;
@@ -3211,6 +3342,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/desk/todos/{id}/comments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["DeskId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Comment on a to-do */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: components["parameters"]["DeskId"];
+                };
+                cookie?: never;
+            };
+            requestBody: components["requestBodies"]["DeskCommentInput"];
+            responses: {
+                201: components["responses"]["DeskComment"];
+                400: components["responses"]["Error"];
+                404: components["responses"]["Error"];
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/desk/notes": {
         parameters: {
             query?: never;
@@ -3218,29 +3383,9 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** My notes, pinned first, then the most recently changed (up to 1000) */
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Notes */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["DeskNoteSummary"][];
-                    };
-                };
-            };
-        };
+        get?: never;
         put?: never;
-        /** Write a note (a title or a body, or both) */
+        /** Write a note on one of my boards */
         post: {
             parameters: {
                 query?: never;
@@ -3260,6 +3405,7 @@ export interface paths {
                     };
                 };
                 400: components["responses"]["Error"];
+                404: components["responses"]["Error"];
             };
         };
         delete?: never;
@@ -3277,7 +3423,7 @@ export interface paths {
             };
             cookie?: never;
         };
-        /** A note with its follow-ups, oldest first */
+        /** A note with its comments, oldest first */
         get: {
             parameters: {
                 query?: never;
@@ -3295,13 +3441,16 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["DeskNote"];
+                        "application/json": {
+                            note: components["schemas"]["DeskNote"];
+                            comments: components["schemas"]["DeskComment"][];
+                        };
                     };
                 };
                 404: components["responses"]["Error"];
             };
         };
-        /** Replace a note's title and body; `pinned` left out keeps it */
+        /** Replace a note's board, title and description; `pinned` left out keeps it */
         put: {
             parameters: {
                 query?: never;
@@ -3327,7 +3476,7 @@ export interface paths {
             };
         };
         post?: never;
-        /** Delete a note and its follow-ups */
+        /** Delete a note and its comments */
         delete: {
             parameters: {
                 query?: never;
@@ -3348,7 +3497,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/desk/notes/{id}/followups": {
+    "/v1/desk/notes/{id}/comments": {
         parameters: {
             query?: never;
             header?: never;
@@ -3359,7 +3508,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Add a follow-up to the end of a note (up to 5000 characters); the note moves up the list */
+        /** Comment on a note; the note moves up its board */
         post: {
             parameters: {
                 query?: never;
@@ -3369,63 +3518,14 @@ export interface paths {
                 };
                 cookie?: never;
             };
-            requestBody: {
-                content: {
-                    "application/json": {
-                        body: string;
-                    };
-                };
-            };
+            requestBody: components["requestBodies"]["DeskCommentInput"];
             responses: {
-                /** @description The follow-up */
-                201: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["DeskFollowup"];
-                    };
-                };
+                201: components["responses"]["DeskComment"];
                 400: components["responses"]["Error"];
                 404: components["responses"]["Error"];
             };
         };
         delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/desk/notes/{id}/followups/{followupId}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: components["parameters"]["DeskId"];
-                followupId: components["schemas"]["Id"];
-            };
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        /** Delete a follow-up */
-        delete: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    id: components["parameters"]["DeskId"];
-                    followupId: components["schemas"]["Id"];
-                };
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                200: components["responses"]["Status"];
-                404: components["responses"]["Error"];
-            };
-        };
         options?: never;
         head?: never;
         patch?: never;
@@ -3491,21 +3591,9 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** The top level of my files, folders and files that aren't in a folder */
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                200: components["responses"]["DeskListing"];
-            };
-        };
+        get?: never;
         put?: never;
-        /** Keep an uploaded file (and its thumbnail or poster frame) in one of my folders, or at the top level */
+        /** Keep an uploaded file (and its thumbnail or poster frame) on one of my boards */
         post: {
             parameters: {
                 query?: never;
@@ -3516,10 +3604,13 @@ export interface paths {
             requestBody: {
                 content: {
                     "application/json": {
-                        /** Format: uuid */
-                        folderId?: string | null;
+                        boardId: components["schemas"]["Id"];
                         /** @description 1-200 characters, one line */
-                        name: string;
+                        title: string;
+                        /** @description Up to 10000 characters */
+                        description?: string;
+                        /** @description The file's own name, 1-200 characters, one line */
+                        fileName: string;
                         objectKey: components["schemas"]["ObjectKey"];
                         previewKey?: components["schemas"]["ObjectKey"];
                         width?: number;
@@ -3557,7 +3648,7 @@ export interface paths {
             };
             cookie?: never;
         };
-        /** One of my files, with fresh download URLs */
+        /** One of my files, with fresh download URLs, and its comments */
         get: {
             parameters: {
                 query?: never;
@@ -3575,13 +3666,16 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["DeskFile"];
+                        "application/json": {
+                            file: components["schemas"]["DeskFile"];
+                            comments: components["schemas"]["DeskComment"][];
+                        };
                     };
                 };
                 404: components["responses"]["Error"];
             };
         };
-        /** Rename a file and put it in `folderId` (the top level when left out) */
+        /** Change a file's title and description and put it on `boardId` */
         put: {
             parameters: {
                 query?: never;
@@ -3594,9 +3688,11 @@ export interface paths {
             requestBody: {
                 content: {
                     "application/json": {
-                        name: string;
-                        /** Format: uuid */
-                        folderId?: string | null;
+                        boardId: components["schemas"]["Id"];
+                        /** @description 1-200 characters, one line */
+                        title: string;
+                        /** @description Up to 10000 characters */
+                        description?: string;
                     };
                 };
             };
@@ -3615,7 +3711,7 @@ export interface paths {
             };
         };
         post?: never;
-        /** Delete a file (its storage is freed) */
+        /** Delete a file and its comments (its storage is freed) */
         delete: {
             parameters: {
                 query?: never;
@@ -3636,46 +3732,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/desk/folders": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Make a folder, at the top level or in `parentId` (up to 1000 folders, 20 deep) */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody: components["requestBodies"]["DeskFolderInput"];
-            responses: {
-                /** @description The folder */
-                201: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["DeskFolderRef"];
-                    };
-                };
-                400: components["responses"]["Error"];
-                404: components["responses"]["Error"];
-                409: components["responses"]["Error"];
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/desk/folders/{id}": {
+    "/v1/desk/files/{id}/comments": {
         parameters: {
             query?: never;
             header?: never;
@@ -3684,8 +3741,10 @@ export interface paths {
             };
             cookie?: never;
         };
-        /** A folder's subfolders and files, and the path to it from the top */
-        get: {
+        get?: never;
+        put?: never;
+        /** Comment on a file */
+        post: {
             parameters: {
                 query?: never;
                 header?: never;
@@ -3694,39 +3753,32 @@ export interface paths {
                 };
                 cookie?: never;
             };
-            requestBody?: never;
+            requestBody: components["requestBodies"]["DeskCommentInput"];
             responses: {
-                200: components["responses"]["DeskListing"];
-                404: components["responses"]["Error"];
-            };
-        };
-        /** Rename a folder and put it in `parentId` (the top level when left out); never inside itself */
-        put: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    id: components["parameters"]["DeskId"];
-                };
-                cookie?: never;
-            };
-            requestBody: components["requestBodies"]["DeskFolderInput"];
-            responses: {
-                /** @description The folder */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["DeskFolderRef"];
-                    };
-                };
+                201: components["responses"]["DeskComment"];
                 400: components["responses"]["Error"];
                 404: components["responses"]["Error"];
             };
         };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/desk/comments/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["DeskId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
         post?: never;
-        /** Delete a folder and everything in it */
+        /** Delete one of my comments */
         delete: {
             parameters: {
                 query?: never;
@@ -3864,11 +3916,13 @@ export interface components {
             /** Format: date-time */
             updatedAt: string;
         };
-        DeskList: {
+        DeskBoard: {
             id: components["schemas"]["Id"];
             name: string;
-            open: number;
-            done: number;
+            /** @description Open to-dos */
+            todos: number;
+            notes: number;
+            files: number;
             /** Format: date-time */
             createdAt: string;
         };
@@ -3880,58 +3934,58 @@ export interface components {
         };
         DeskTodo: {
             id: components["schemas"]["Id"];
-            listId: components["schemas"]["Id"];
-            listName: string;
+            boardId: components["schemas"]["Id"];
+            boardName: string;
             title: string;
-            notes: string;
+            description: string;
             /** Format: date */
             dueDate: string | null;
             repeat: components["schemas"]["DeskRepeat"] | null;
             /** Format: date-time */
             doneAt: string | null;
+            commentCount: number;
             /** Format: date-time */
             createdAt: string;
         };
         DeskNoteSummary: {
             id: components["schemas"]["Id"];
+            boardId: components["schemas"]["Id"];
             title: string;
-            /** @description The start of the body on one line */
+            /** @description The start of the description on one line */
             snippet: string;
             pinned: boolean;
-            followups: number;
+            commentCount: number;
             /** Format: date-time */
             createdAt: string;
             /** Format: date-time */
             updatedAt: string;
-        };
-        DeskFollowup: {
-            id: components["schemas"]["Id"];
-            body: string;
-            /** Format: date-time */
-            createdAt: string;
         };
         DeskNote: {
             id: components["schemas"]["Id"];
+            boardId: components["schemas"]["Id"];
+            boardName: string;
             title: string;
-            body: string;
+            description: string;
             pinned: boolean;
+            commentCount: number;
             /** Format: date-time */
             createdAt: string;
             /** Format: date-time */
             updatedAt: string;
-            followups: components["schemas"]["DeskFollowup"][];
         };
-        DeskFolderRef: {
+        DeskComment: {
             id: components["schemas"]["Id"];
-            name: string;
-            /** Format: uuid */
-            parentId: string | null;
+            body: string;
+            /** Format: date-time */
+            createdAt: string;
         };
         DeskFile: {
             id: components["schemas"]["Id"];
-            /** Format: uuid */
-            folderId: string | null;
-            name: string;
+            boardId: components["schemas"]["Id"];
+            boardName: string;
+            title: string;
+            description: string;
+            fileName: string;
             mime: string;
             /**
              * @description image and video have a thumbnail or poster frame
@@ -3948,6 +4002,7 @@ export interface components {
             url: string;
             previewKey: string | null;
             previewUrl: string | null;
+            commentCount: number;
             /** Format: date-time */
             createdAt: string;
         };
@@ -4012,26 +4067,13 @@ export interface components {
                 "application/json": components["schemas"]["Post"][];
             };
         };
-        /** @description A level of my files */
-        DeskListing: {
+        /** @description The comment */
+        DeskComment: {
             headers: {
                 [name: string]: unknown;
             };
             content: {
-                "application/json": {
-                    /** @description Null at the top level */
-                    folder: components["schemas"]["DeskFolderRef"] | null;
-                    /** @description From the top level down to this folder */
-                    path: components["schemas"]["DeskFolderRef"][];
-                    folders: {
-                        id: components["schemas"]["Id"];
-                        name: string;
-                        items: number;
-                        /** Format: date-time */
-                        createdAt: string;
-                    }[];
-                    files: components["schemas"]["DeskFile"][];
-                };
+                "application/json": components["schemas"]["DeskComment"];
             };
         };
     };
@@ -4069,11 +4111,11 @@ export interface components {
         DeskTodoInput: {
             content: {
                 "application/json": {
-                    listId: components["schemas"]["Id"];
+                    boardId: components["schemas"]["Id"];
                     /** @description 1-500 characters */
                     title: string;
                     /** @description Up to 10000 characters */
-                    notes?: string;
+                    description?: string;
                     /** Format: date */
                     dueDate?: string | null;
                     repeat?: components["schemas"]["DeskRepeat"] | null;
@@ -4083,21 +4125,20 @@ export interface components {
         DeskNoteInput: {
             content: {
                 "application/json": {
-                    /** @description Up to 200 characters, one line */
+                    boardId: components["schemas"]["Id"];
+                    /** @description 1-200 characters, one line */
                     title: string;
                     /** @description Up to 50000 characters */
-                    body: string;
+                    description?: string;
                     pinned?: boolean;
                 };
             };
         };
-        DeskFolderInput: {
+        DeskCommentInput: {
             content: {
                 "application/json": {
-                    /** @description 1-100 characters, one line */
-                    name: string;
-                    /** Format: uuid */
-                    parentId?: string | null;
+                    /** @description 1-5000 characters */
+                    body: string;
                 };
             };
         };

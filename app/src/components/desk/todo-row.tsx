@@ -7,12 +7,12 @@ import { usePalette } from '@/theme/use-palette';
 
 /**
  * One to-do: a round tick box, its title, and a line with when it's due (red when late), how it repeats and, in
- * Today, which list it's in. Tapping the box ticks it off; tapping the rest opens it.
+ * Today, which board it's on. Tapping the box ticks it off; tapping the rest opens it.
  */
-export function TodoRow({ todo, today, showList = false, onToggle, onOpen }: {
+export function TodoRow({ todo, today, showBoard = false, onToggle, onOpen }: {
   todo: DeskTodo;
   today: string;
-  showList?: boolean;
+  showBoard?: boolean;
   onToggle: () => void;
   onOpen: () => void;
 }) {
@@ -32,7 +32,7 @@ export function TodoRow({ todo, today, showList = false, onToggle, onOpen }: {
       </Pressable>
       <Pressable accessibilityRole="button" accessibilityHint="Opens the to-do" onPress={onOpen} className="flex-1 gap-0.5 active:opacity-60">
         <Text className={`text-[15px] ${done ? 'text-muted line-through dark:text-muted-dark' : 'text-ink dark:text-ink-dark'}`}>{todo.title}</Text>
-        {due || todo.repeat || showList || todo.notes ? (
+        {due || todo.repeat || showBoard || todo.description || todo.commentCount > 0 ? (
           <View className="flex-row flex-wrap items-center gap-x-2">
             {due ? (
               <Text className={`text-[13px] font-semibold ${due.late ? 'text-danger dark:text-danger-dark' : 'text-primary dark:text-primary-dark'}`}>{due.text}</Text>
@@ -43,8 +43,14 @@ export function TodoRow({ todo, today, showList = false, onToggle, onOpen }: {
                 <Text className="text-[13px] text-muted dark:text-muted-dark">{repeatLabel(todo.repeat)}</Text>
               </View>
             ) : null}
-            {showList ? <Text className="text-[13px] text-muted dark:text-muted-dark">{todo.listName}</Text> : null}
-            {todo.notes ? <Icon name="document-outline" size={13} color={palette.muted} accessibilityLabel="Has notes" /> : null}
+            {showBoard ? <Text className="text-[13px] text-muted dark:text-muted-dark">{todo.boardName}</Text> : null}
+            {todo.description ? <Icon name="document-outline" size={13} color={palette.muted} accessibilityLabel="Has a description" /> : null}
+            {todo.commentCount > 0 ? (
+              <View className="flex-row items-center gap-1">
+                <Icon name="chatbubble-outline" size={12} color={palette.muted} />
+                <Text className="text-[13px] text-muted dark:text-muted-dark">{todo.commentCount}</Text>
+              </View>
+            ) : null}
           </View>
         ) : null}
       </Pressable>

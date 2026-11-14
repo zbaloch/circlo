@@ -1,20 +1,18 @@
 /**
- * Desk (owner decision 2026-11-14): a personal space for to-dos, notes and files that only its owner ever sees. Pure
- * helpers shared by the Desk screens; the server calls are in lib/desk-api.
+ * Desk (owner decision 2026-11-14, boards 2026-11-15): a personal space of boards, each with its own to-dos, notes and
+ * files, that only its owner ever sees. Pure helpers shared by the Desk screens; the server calls are in lib/desk-api.
  */
 import type { components } from '@/api/schema';
 import type { IconName } from '@/components/ui/icon';
 import type { Attachment } from '@/lib/media';
 
-export type DeskList = components['schemas']['DeskList'];
+export type DeskBoard = components['schemas']['DeskBoard'];
 export type DeskTodo = components['schemas']['DeskTodo'];
 export type DeskRepeat = components['schemas']['DeskRepeat'];
 export type DeskNoteSummary = components['schemas']['DeskNoteSummary'];
 export type DeskNote = components['schemas']['DeskNote'];
-export type DeskFollowup = components['schemas']['DeskFollowup'];
+export type DeskComment = components['schemas']['DeskComment'];
 export type DeskFile = components['schemas']['DeskFile'];
-export type DeskFolderRef = components['schemas']['DeskFolderRef'];
-export type DeskListing = components['responses']['DeskListing']['content']['application/json'];
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -78,6 +76,19 @@ export function monthGrid(year: number, month: number): (string | null)[][] {
 }
 
 const plural = (n: number, one: string) => (n === 1 ? `1 ${one}` : `${n} ${one}s`);
+
+/** What's on a board, in a few words: "3 to-dos · 2 notes · 1 file", or "Empty". */
+export function boardLine(b: Pick<DeskBoard, 'todos' | 'notes' | 'files'>): string {
+  const parts = [b.todos ? plural(b.todos, 'to-do') : '', b.notes ? plural(b.notes, 'note') : '', b.files ? plural(b.files, 'file') : ''].filter(Boolean);
+  return parts.length ? parts.join(' · ') : 'Empty';
+}
+
+/** The title a picked file starts with: its name without the extension. */
+export function fileTitle(fileName: string): string {
+  const dot = fileName.lastIndexOf('.');
+  const base = (dot > 0 ? fileName.slice(0, dot) : fileName).trim();
+  return (base || fileName.trim() || 'File').slice(0, 200);
+}
 
 export function repeatLabel(r: DeskRepeat | null | undefined): string {
   if (!r) return 'Doesn’t repeat';

@@ -1,56 +1,136 @@
-import { Redirect } from 'expo-router';
-import { useState } from 'react';
-import { Pressable, View } from 'react-native';
+import { Redirect, router, useFocusEffect } from 'expo-router';
+import { useCallback, useState } from 'react';
+import { Pressable, RefreshControl, ScrollView, View } from 'react-native';
 
-import { FilesView } from '@/components/desk/files-view';
-import { NotesSection } from '@/components/desk/notes-section';
-import { TodosSection } from '@/components/desk/todos-section';
+import { NameSheet } from '@/components/desk/name-sheet';
+import { toggleTodo } from '@/components/desk/todo-actions';
+import { TodoRow } from '@/components/desk/todo-row';
 import { Screen } from '@/components/screen';
 import { Icon } from '@/components/ui/icon';
 import { Text } from '@/components/ui/text';
+import { boardLine, localDate, type DeskBoard, type DeskTodo } from '@/lib/desk';
+import { createBoard, fetchBoards, fetchToday } from '@/lib/desk-api';
 import { DESK_ENABLED } from '@/lib/features';
 import { usePalette } from '@/theme/use-palette';
-
-type Section = 'todos' | 'notes' | 'files';
-const SECTIONS: { key: Section; label: string }[] = [
-  { key: 'todos', label: 'To-dos' },
-  { key: 'notes', label: 'Notes' },
-  { key: 'files', label: 'Files' },
-];
 
 /** Behind lib/features' DESK_ENABLED: when the Desk is switched off, a direct link lands on Home. */
 export default function DeskScreenRoute() {
   return DESK_ENABLED ? <DeskScreen /> : <Redirect href="/" />;
 }
 
+function Heading({ children }: { children: string }) {
+  return (
+    <Text accessibilityRole="header" className="px-4 pb-1 pt-5 text-xl font-extrabold text-ink dark:text-ink-dark">
+      {children}
+    </Text>
+  );
+}
+
+const openBoard = (id: string) => router.push({ pathname: '/desk/board/[id]', params: { id } });
+
 /**
- * The Desk (owner decision 2026-11-14): a personal space for to-dos, notes and files, useful before you've connected
- * with anyone. Nothing in it is ever shared; only its owner can see it, and the server answers 404 to anyone else.
+ * The Desk (owner decision 2026-11-14, boards 2026-11-15): a personal space, useful before you've connected with
+ * anyone. Today first (what's due or late on every board), then your boards, each with its own to-dos, notes and files.
+ * Nothing in it is ever shared; only its owner can see it, and the server answers 404 to anyone else.
  */
 export function DeskScreen() {
   const palette = usePalette();
-  const [section, setSection] = useState<Section>('todos');
+  const [today, setToday] = useState(localDate());
+  const [due, setDue] = useState<DeskTodo[] | null>(null);
+  const [boards, setBoards] = useState<DeskBoard[] | null>(null);
+  const [error, setError] = useState<string>();
+  const [pulling, setPulling] = useState(false);
+  const [naming, setNaming] = useState(false);
+
+  const load = useCallback(async () => {
+    const day = localDate();
+    setToday(day);
+    try {
+      const [d, b] = await Promise.all([fetchToday(day), fetchBoards()]);
+      setDue(d);
+      setBoards(b);
+      setError(undefined);
+    } catch {
+      setError('Couldn’t load your Desk. Pull to try again.');
+    }
+  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      load();
+    }, [load]),
+  );
+
+  const pull = async () => {
+    setPulling(true);
+    await load();
+    setPulling(false);
+  };
+
   return (
     <Screen>
-      <View accessibilityRole="tablist" className="flex-row border-b border-border dark:border-border-dark">
-        {SECTIONS.map((t) => (
+      <ScrollView refreshControl={<RefreshControl refreshing={pulling} onRefresh={pull} />} contentContainerClassName="pb-28">
+        <View className="flex-row items-center gap-2 px-4 pt-3">
+          <Icon name="lock-closed-outline" size={14} color={palette.muted} />
+          <Text className="flex-1 text-[13px] text-muted dark:text-muted-dark">Only you can see your Desk. Nothing here is ever shared.</Text>
+        </View>
+        {error ? <Text className="px-4 pt-3 text-center text-sm text-danger dark:text-danger-dark">{error}</Text> : null}
+
+        <Heading>Today</Heading>
+        {due && due.length === 0 ? <Text className="px-4 py-2 text-[15px] text-muted dark:text-muted-dark">Nothing due today.</Text> : null}
+        {(due ?? []).map((t) => (
+          <TodoRow
+            key={t.id}
+            todo={t}
+            today={today}
+            showBoard
+            onToggle={() => {
+              setDue((d) => d?.filter((x) => x.id !== t.id) ?? null);
+              toggleTodo(t, today, load);
+            }}
+            onOpen={() => router.push({ pathname: '/desk/todo/[id]', params: { id: t.id } })}
+          />
+        ))}
+
+        <Heading>Boards</Heading>
+        {boards && boards.length === 0 ? (
+          <Text className="px-4 py-2 text-[15px] leading-[21px] text-muted dark:text-muted-dark">
+            A board for each part of your life: Home, a trip, Taxes 2026, a side project. Each has its own to-dos, notes and files.
+          </Text>
+        ) : null}
+        {(boards ?? []).map((b) => (
           <Pressable
-            key={t.key}
-            accessibilityRole="tab"
-            accessibilityLabel={t.label}
-            accessibilityState={{ selected: section === t.key }}
-            onPress={() => setSection(t.key)}
-            className="flex-1 items-center pt-3 active:opacity-60">
-            <Text className={section === t.key ? 'font-bold text-ink dark:text-ink-dark' : 'text-muted dark:text-muted-dark'}>{t.label}</Text>
-            <View className={`mt-3 h-1 w-14 rounded-full ${section === t.key ? 'bg-primary dark:bg-primary-dark' : 'bg-transparent'}`} />
+            key={b.id}
+            accessibilityRole="link"
+            onPress={() => openBoard(b.id)}
+            className="flex-row items-center gap-3 px-4 py-3 active:bg-surface-raised dark:active:bg-surface-raised-dark">
+            <View className="h-10 w-10 items-center justify-center rounded-md bg-primary-soft dark:bg-primary-soft-dark">
+              <Icon name="board-outline" size={22} color={palette.primary} />
+            </View>
+            <View className="flex-1 gap-0.5">
+              <Text className="text-[15px] font-semibold text-ink dark:text-ink-dark">{b.name}</Text>
+              <Text className="text-[13px] text-muted dark:text-muted-dark">{boardLine(b)}</Text>
+            </View>
+            <Icon name="chevron-forward" size={18} color={palette.muted} />
           </Pressable>
         ))}
-      </View>
-      <View className="flex-row items-center gap-2 px-4 py-2">
-        <Icon name="lock-closed-outline" size={14} color={palette.muted} />
-        <Text className="flex-1 text-[13px] text-muted dark:text-muted-dark">Only you can see your Desk. Nothing here is ever shared.</Text>
-      </View>
-      {section === 'todos' ? <TodosSection /> : section === 'notes' ? <NotesSection /> : <FilesView folderId={null} />}
+        <Pressable accessibilityRole="button" onPress={() => setNaming(true)} className="flex-row items-center gap-3 px-4 py-3 active:bg-surface-raised dark:active:bg-surface-raised-dark">
+          <View className="h-10 w-10 items-center justify-center">
+            <Icon name="add" size={24} color={palette.primary} />
+          </View>
+          <Text className="text-[15px] font-semibold text-primary dark:text-primary-dark">New board</Text>
+        </Pressable>
+      </ScrollView>
+      <NameSheet
+        visible={naming}
+        title="New board"
+        label="Board name"
+        actionLabel="Create board"
+        onClose={() => setNaming(false)}
+        onSave={async (name) => {
+          const b = await createBoard(name);
+          openBoard(b.id);
+        }}
+      />
     </Screen>
   );
 }
