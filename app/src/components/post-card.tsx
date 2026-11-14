@@ -69,7 +69,7 @@ export function PostDetail({ post, name, handle, avatarUrl, audience, onReply, o
     <View className="gap-3 border-b border-border px-4 pb-1 pt-3 dark:border-border-dark">
       <View className="flex-row items-center gap-3">
         <Pressable accessibilityRole="button" accessibilityLabel={`${name}'s profile`} onPress={onAuthor} disabled={!onAuthor} className="flex-1 flex-row items-center gap-3 active:opacity-70">
-          <Avatar id={post.authorId} name={name} uri={avatarUrl} />
+          <Avatar size="post" id={post.authorId} name={name} uri={avatarUrl} />
           <View className="flex-1">
             <View className="flex-row items-center gap-1">
               <Text numberOfLines={1} className="shrink text-base font-bold text-ink dark:text-ink-dark">{name}</Text>
@@ -111,35 +111,42 @@ export function PostCard({ post, name, handle, avatarUrl, audience, onOpen, onRe
   return (
     <Pressable onPress={onOpen} disabled={!onOpen} className="flex-row gap-3 border-b border-border px-4 py-3 active:bg-surface-raised dark:border-border-dark dark:active:bg-surface-raised-dark">
       <Pressable accessibilityRole="button" accessibilityLabel={`${name}'s profile`} onPress={onAuthor} disabled={!onAuthor} className="self-start active:opacity-70">
-        <Avatar id={post.authorId} name={name} uri={avatarUrl} />
+        <Avatar size="post" id={post.authorId} name={name} uri={avatarUrl} />
       </Pressable>
       <View className="flex-1 gap-2">
-        <View className="flex-row items-center gap-1">
-          <Text numberOfLines={1} onPress={onAuthor} className="shrink text-[15px] font-bold text-ink dark:text-ink-dark">
-            {name}
-          </Text>
-          {post.mine && !hideYou ? (
-            <YouTag />
-          ) : handle ? (
-            <Text numberOfLines={1} className="shrink text-[15px] text-muted dark:text-muted-dark">
-              @{handle}
-            </Text>
-          ) : null}
-          <Text className="text-[15px] text-muted dark:text-muted-dark">· {relativeTime(post.createdAtMs, now)}</Text>
-          <View className="flex-1" />
-          {onMore ? (
-            <Pressable accessibilityRole="button" accessibilityLabel="More options" onPress={onMore} hitSlop={8}>
-              <Icon name="ellipsis-horizontal" size={18} color={palette.muted} />
-            </Pressable>
-          ) : null}
-        </View>
-        {audience ? (
+        {/* The name line and the text sit close together; photos and actions get more room. */}
+        <View className="gap-0.5">
           <View className="flex-row items-center gap-1">
-            <Icon name="lock-closed" size={12} color={palette.muted} />
-            <Text className="shrink text-xs text-muted dark:text-muted-dark">{audience}</Text>
+            <Text numberOfLines={1} onPress={onAuthor} className="shrink text-[15px] font-bold text-ink dark:text-ink-dark">
+              {name}
+            </Text>
+            {post.mine && !hideYou ? (
+              <YouTag />
+            ) : handle ? (
+              <Text numberOfLines={1} className="shrink text-[15px] text-muted dark:text-muted-dark">
+                @{handle}
+              </Text>
+            ) : null}
+            <Text className="shrink-0 text-[15px] text-muted dark:text-muted-dark">· {relativeTime(post.createdAtMs, now)}</Text>
+            {audience ? (
+              // Who it's for, after the time (only ever on my own posts), so it doesn't take a line of its own.
+              <View className="shrink flex-row items-center gap-1">
+                <Text className="text-[15px] text-muted dark:text-muted-dark">·</Text>
+                <Icon name="lock-closed" size={12} color={palette.muted} />
+                <Text numberOfLines={1} className="shrink text-[15px] text-muted dark:text-muted-dark">
+                  {audience}
+                </Text>
+              </View>
+            ) : null}
+            <View className="flex-1" />
+            {onMore ? (
+              <Pressable accessibilityRole="button" accessibilityLabel="More options" onPress={onMore} hitSlop={8}>
+                <Icon name="ellipsis-horizontal" size={18} color={palette.muted} />
+              </Pressable>
+            ) : null}
           </View>
-        ) : null}
-        {post.text ? <PostText text={post.text} className="text-[15px] leading-5 text-ink dark:text-ink-dark" /> : null}
+          {post.text ? <PostText text={post.text} className="text-[15px] leading-5 text-ink dark:text-ink-dark" /> : null}
+        </View>
         {post.media.length ? <MediaGrid media={post.media} onPress={onMediaPress} /> : null}
         {onReply || (LIKES_ENABLED && onLike) ? (
           <View className="flex-row items-center gap-10 pt-1">
