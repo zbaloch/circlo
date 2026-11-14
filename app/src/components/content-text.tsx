@@ -5,22 +5,15 @@ import { Text } from '@/components/ui/text';
 import { runs, type Run } from '@/lib/script';
 import { linkParts } from '@/lib/view-logic';
 
-/** Pure: the classes for one run: right-aligned when right to left, and Nastaliq's taller lines (Lateef's size is
- * set with its font, components/ui/text). Exported for tests. */
+/** Pure: the classes for one run: right-aligned when right to left. Exported for tests. */
 export function runClass(className: string, run: Run): string {
-  let cls = className;
-  if (run.script === 'nastaliq') {
-    // Nastaliq's letters sit on a slanted baseline and need about twice the font size in line height.
-    const big = /(^|\s)(text-\[1[6-9]px\]|text-base|text-lg|text-xl)(\s|$)/.test(cls);
-    cls = cls.replace(/(^|\s)leading-\S+/g, ' ').trim() + (big ? ' leading-9' : ' leading-8');
-  }
-  return run.dir === 'rtl' ? `${cls} text-right` : cls;
+  return run.dir === 'rtl' ? `${className} text-right` : className;
 }
 
 /**
- * What people wrote (posts, replies, messages, bios), each paragraph in its own direction and its script's font
- * (lib/script): a Sindhi verse right-aligned in Lateef, an Urdu line in Noto Nastaliq Urdu, English in
- * Inter as before. Links are tappable.
+ * What people wrote (posts, replies, messages, bios), each paragraph in its own direction (lib/script): a Sindhi verse
+ * right-aligned, English as before. Latin, Greek and Cyrillic are in Inter; any other script in the phone's own fonts.
+ * Links are tappable.
  */
 export function ContentText({ text, className, links = true, numberOfLines }: {
   text: string;
@@ -46,7 +39,7 @@ export function ContentText({ text, className, links = true, numberOfLines }: {
   };
   if (parts.length === 1) {
     return (
-      <Text numberOfLines={numberOfLines} script={parts[0].script} className={runClass(className, parts[0])}>
+      <Text numberOfLines={numberOfLines} system={parts[0].system} className={runClass(className, parts[0])}>
         {body(parts[0].text)}
       </Text>
     );
@@ -54,7 +47,7 @@ export function ContentText({ text, className, links = true, numberOfLines }: {
   return (
     <View>
       {parts.map((run, i) => (
-        <Text key={i} script={run.script} className={runClass(className, run)}>
+        <Text key={i} system={run.system} className={runClass(className, run)}>
           {body(run.text)}
         </Text>
       ))}

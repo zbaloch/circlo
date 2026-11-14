@@ -14,27 +14,14 @@ module.exports = {
   theme: {
     extend: {
       colors,
-      // Inter, bundled with the app; components/ui/text.tsx maps font-weight classes to these families.
+      // Inter, bundled with the app; components/ui/text.tsx maps font-weight classes to these families. Scripts Inter
+      // doesn't cover get no family, so the phone's own fonts draw them (lib/script).
       fontFamily: {
         sans: ['Inter_400Regular'],
         'sans-medium': ['Inter_500Medium'],
         'sans-semibold': ['Inter_600SemiBold'],
         'sans-bold': ['Inter_700Bold'],
         'sans-extrabold': ['Inter_800ExtraBold'],
-        // Arabic-script text (lib/script): Lateef for Sindhi, Naskh for Arabic, Nastaliq for Urdu and Persian. Bundled.
-        lateef: ['Lateef_400Regular'],
-        'lateef-medium': ['Lateef_500Medium'],
-        'lateef-semibold': ['Lateef_600SemiBold'],
-        'lateef-bold': ['Lateef_700Bold'],
-        'lateef-extrabold': ['Lateef_800ExtraBold'],
-        naskh: ['NotoNaskhArabic_400Regular'],
-        'naskh-medium': ['NotoNaskhArabic_500Medium'],
-        'naskh-semibold': ['NotoNaskhArabic_600SemiBold'],
-        'naskh-bold': ['NotoNaskhArabic_700Bold'],
-        nastaliq: ['NotoNastaliqUrdu_400Regular'],
-        'nastaliq-medium': ['NotoNastaliqUrdu_500Medium'],
-        'nastaliq-semibold': ['NotoNastaliqUrdu_600SemiBold'],
-        'nastaliq-bold': ['NotoNastaliqUrdu_700Bold'],
       },
     },
   },

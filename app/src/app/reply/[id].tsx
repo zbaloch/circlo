@@ -1,5 +1,5 @@
 import { ContentText } from '@/components/content-text';
-import { scriptOf, textDirection } from '@/lib/script';
+import { textDirection, usesSystemFont } from '@/lib/script';
 import { Icon } from '@/components/ui/icon';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useRef, useState } from 'react';
@@ -154,8 +154,8 @@ export default function ReplyScreen() {
               value={text}
               onChangeText={setText}
               {...follow}
-              // Typing in Sindhi, Urdu, Persian or Arabic: right-aligned, in that script's font.
-              script={scriptOf(text)}
+              // Typing in Sindhi, Urdu, Persian or Arabic: right-aligned; any script Inter hasn't got, in the phone's font.
+              system={usesSystemFont(text)}
               className={`flex-1 pt-2 text-lg text-ink dark:text-ink-dark ${textDirection(text) === 'rtl' ? 'text-right' : ''}`}
             />
           </View>
