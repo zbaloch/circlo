@@ -58,3 +58,13 @@ describe('my own posts and replies say "(you)"', () => {
     expect(screen.getByText('(you)')).toBeTruthy();
   });
 });
+
+describe('who my post is for', () => {
+  it('sits on the name line, after the time, not on a line of its own', async () => {
+    await render(<PostCard post={post(true)} name="Zaheer" handle="zaheer" audience="Closest friends+" />);
+    const label = screen.getByText('Closest friends+');
+    const nameLine = screen.getByText(/^· /).parent; // the row with the name and the time
+    const inside = (node: typeof label | null): boolean => !!node && (node === nameLine || inside(node.parent));
+    expect(inside(label)).toBe(true);
+  });
+});
