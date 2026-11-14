@@ -1,5 +1,5 @@
 import { ContentText } from '@/components/content-text';
-import { scriptOf, textDirection } from '@/lib/script';
+import { textDirection, usesSystemFont } from '@/lib/script';
 import { Icon } from '@/components/ui/icon';
 import * as ImagePicker from 'expo-image-picker';
 import { Redirect, router, useFocusEffect, useLocalSearchParams, useNavigation } from 'expo-router';
@@ -233,7 +233,7 @@ export function ChatScreen() {
             value={text}
             onChangeText={setText}
             maxLength={4000}
-            script={scriptOf(text)}
+            system={usesSystemFont(text)}
             className={`max-h-28 flex-1 rounded-2xl bg-surface-raised px-4 py-2 text-base text-ink dark:bg-surface-raised-dark dark:text-ink-dark ${textDirection(text) === 'rtl' ? 'text-right' : ''}`}
           />
           <Pressable
