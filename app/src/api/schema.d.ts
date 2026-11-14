@@ -694,7 +694,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** How much storage my account uses: the photos and videos on my posts and chat messages (with their thumbnails and poster frames, counted as photos) and my profile photo */
+        /** How much storage my account uses: the photos and videos on my posts and chat messages (with their thumbnails and poster frames, counted as photos), my profile photo and my Desk files */
         get: {
             parameters: {
                 query?: never;
@@ -723,6 +723,13 @@ export interface paths {
                             photos: number;
                             /** Format: int64 */
                             videos: number;
+                            /**
+                             * Format: int64
+                             * @description My Desk files, whatever their type, with their thumbnails
+                             */
+                            deskBytes: number;
+                            /** Format: int64 */
+                            deskFiles: number;
                         };
                     };
                 };
@@ -2835,6 +2842,911 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/desk/lists": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** My to-do lists, oldest first, with how many to-dos are open and done */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Lists */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["DeskList"][];
+                    };
+                };
+            };
+        };
+        put?: never;
+        /** Start a to-do list (up to 200) */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: components["requestBodies"]["DeskName"];
+            responses: {
+                /** @description The new list */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["DeskList"];
+                    };
+                };
+                400: components["responses"]["Error"];
+                409: components["responses"]["Error"];
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/desk/lists/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["DeskId"];
+            };
+            cookie?: never;
+        };
+        /** A list with its open to-dos (oldest first) and the 30 most recently done */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: components["parameters"]["DeskId"];
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The list */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            id: components["schemas"]["Id"];
+                            name: string;
+                            open: components["schemas"]["DeskTodo"][];
+                            done: components["schemas"]["DeskTodo"][];
+                        };
+                    };
+                };
+                404: components["responses"]["Error"];
+            };
+        };
+        /** Rename a list */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: components["parameters"]["DeskId"];
+                };
+                cookie?: never;
+            };
+            requestBody: components["requestBodies"]["DeskName"];
+            responses: {
+                200: components["responses"]["Status"];
+                400: components["responses"]["Error"];
+                404: components["responses"]["Error"];
+            };
+        };
+        post?: never;
+        /** Delete a list and every to-do in it */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: components["parameters"]["DeskId"];
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                200: components["responses"]["Status"];
+                404: components["responses"]["Error"];
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/desk/today": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Open to-dos due on or before `date` (my today) in all my lists, earliest first */
+        get: {
+            parameters: {
+                query: {
+                    date: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description To-dos */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["DeskTodo"][];
+                    };
+                };
+                400: components["responses"]["Error"];
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/desk/todos": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Add a to-do to one of my lists */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: components["requestBodies"]["DeskTodoInput"];
+            responses: {
+                /** @description The new to-do */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["DeskTodo"];
+                    };
+                };
+                400: components["responses"]["Error"];
+                404: components["responses"]["Error"];
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/desk/todos/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["DeskId"];
+            };
+            cookie?: never;
+        };
+        /** A to-do, with the earlier ones of its repeating series that were done (newest first, up to 20) */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: components["parameters"]["DeskId"];
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The to-do */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["DeskTodo"] & {
+                            history: components["schemas"]["DeskTodo"][];
+                        };
+                    };
+                };
+                404: components["responses"]["Error"];
+            };
+        };
+        /** Replace a to-do's list, title, notes, due date and repeat (a new due date or repeat restarts its schedule) */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: components["parameters"]["DeskId"];
+                };
+                cookie?: never;
+            };
+            requestBody: components["requestBodies"]["DeskTodoInput"];
+            responses: {
+                /** @description The to-do */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["DeskTodo"];
+                    };
+                };
+                400: components["responses"]["Error"];
+                404: components["responses"]["Error"];
+            };
+        };
+        post?: never;
+        /** Delete a to-do */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: components["parameters"]["DeskId"];
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                200: components["responses"]["Status"];
+                404: components["responses"]["Error"];
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/desk/todos/{id}/done": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["DeskId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Tick a to-do off. A repeating one makes the next straight away; `today` is my calendar day (within 2 days of the server's), which "after N days" repeats count from. Already done: nothing changes and `next` is null. */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: components["parameters"]["DeskId"];
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /** Format: date */
+                        today: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description The to-do, and the next one if it repeats */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            todo: components["schemas"]["DeskTodo"];
+                            next?: components["schemas"]["DeskTodo"] | null;
+                        };
+                    };
+                };
+                400: components["responses"]["Error"];
+                404: components["responses"]["Error"];
+            };
+        };
+        /** Un-tick a to-do; the next one its repeat made goes again unless that has been done too */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: components["parameters"]["DeskId"];
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The to-do */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["DeskTodo"];
+                    };
+                };
+                404: components["responses"]["Error"];
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/desk/notes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** My notes, pinned first, then the most recently changed (up to 1000) */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Notes */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["DeskNoteSummary"][];
+                    };
+                };
+            };
+        };
+        put?: never;
+        /** Write a note (a title or a body, or both) */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: components["requestBodies"]["DeskNoteInput"];
+            responses: {
+                /** @description The note */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["DeskNote"];
+                    };
+                };
+                400: components["responses"]["Error"];
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/desk/notes/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["DeskId"];
+            };
+            cookie?: never;
+        };
+        /** A note with its follow-ups, oldest first */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: components["parameters"]["DeskId"];
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The note */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["DeskNote"];
+                    };
+                };
+                404: components["responses"]["Error"];
+            };
+        };
+        /** Replace a note's title and body; `pinned` left out keeps it */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: components["parameters"]["DeskId"];
+                };
+                cookie?: never;
+            };
+            requestBody: components["requestBodies"]["DeskNoteInput"];
+            responses: {
+                /** @description The note */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["DeskNote"];
+                    };
+                };
+                400: components["responses"]["Error"];
+                404: components["responses"]["Error"];
+            };
+        };
+        post?: never;
+        /** Delete a note and its follow-ups */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: components["parameters"]["DeskId"];
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                200: components["responses"]["Status"];
+                404: components["responses"]["Error"];
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/desk/notes/{id}/followups": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["DeskId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Add a follow-up to the end of a note (up to 5000 characters); the note moves up the list */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: components["parameters"]["DeskId"];
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        body: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description The follow-up */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["DeskFollowup"];
+                    };
+                };
+                400: components["responses"]["Error"];
+                404: components["responses"]["Error"];
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/desk/notes/{id}/followups/{followupId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["DeskId"];
+                followupId: components["schemas"]["Id"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete a follow-up */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: components["parameters"]["DeskId"];
+                    followupId: components["schemas"]["Id"];
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                200: components["responses"]["Status"];
+                404: components["responses"]["Error"];
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/desk/uploads": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Upload slots for a Desk file and, for a photo or video, its thumbnail or poster frame (presigned PUTs locked to size and type, 15 minutes). Photos up to 25 MB, videos 512 MB, anything else 100 MB. No HTML, SVG or scripts; other files can be kept as application/octet-stream. */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        files: {
+                            /** Format: int64 */
+                            size: number;
+                            mime: string;
+                        }[];
+                    };
+                };
+            };
+            responses: {
+                /** @description One slot per file, in order */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            objectKey: components["schemas"]["ObjectKey"];
+                            putUrl: string;
+                            /** Format: int64 */
+                            size: number;
+                            mime: string;
+                        }[];
+                    };
+                };
+                400: components["responses"]["Error"];
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/desk/files": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The top level of my files, folders and files that aren't in a folder */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                200: components["responses"]["DeskListing"];
+            };
+        };
+        put?: never;
+        /** Keep an uploaded file (and its thumbnail or poster frame) in one of my folders, or at the top level */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        folderId?: string | null;
+                        /** @description 1-200 characters, one line */
+                        name: string;
+                        objectKey: components["schemas"]["ObjectKey"];
+                        previewKey?: components["schemas"]["ObjectKey"];
+                        width?: number;
+                        height?: number;
+                        durationMs?: number;
+                    };
+                };
+            };
+            responses: {
+                /** @description The file */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["DeskFile"];
+                    };
+                };
+                400: components["responses"]["Error"];
+                404: components["responses"]["Error"];
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/desk/files/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["DeskId"];
+            };
+            cookie?: never;
+        };
+        /** One of my files, with fresh download URLs */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: components["parameters"]["DeskId"];
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The file */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["DeskFile"];
+                    };
+                };
+                404: components["responses"]["Error"];
+            };
+        };
+        /** Rename a file and put it in `folderId` (the top level when left out) */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: components["parameters"]["DeskId"];
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        name: string;
+                        /** Format: uuid */
+                        folderId?: string | null;
+                    };
+                };
+            };
+            responses: {
+                /** @description The file */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["DeskFile"];
+                    };
+                };
+                400: components["responses"]["Error"];
+                404: components["responses"]["Error"];
+            };
+        };
+        post?: never;
+        /** Delete a file (its storage is freed) */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: components["parameters"]["DeskId"];
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                200: components["responses"]["Status"];
+                404: components["responses"]["Error"];
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/desk/folders": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Make a folder, at the top level or in `parentId` (up to 1000 folders, 20 deep) */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: components["requestBodies"]["DeskFolderInput"];
+            responses: {
+                /** @description The folder */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["DeskFolderRef"];
+                    };
+                };
+                400: components["responses"]["Error"];
+                404: components["responses"]["Error"];
+                409: components["responses"]["Error"];
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/desk/folders/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["DeskId"];
+            };
+            cookie?: never;
+        };
+        /** A folder's subfolders and files, and the path to it from the top */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: components["parameters"]["DeskId"];
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                200: components["responses"]["DeskListing"];
+                404: components["responses"]["Error"];
+            };
+        };
+        /** Rename a folder and put it in `parentId` (the top level when left out); never inside itself */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: components["parameters"]["DeskId"];
+                };
+                cookie?: never;
+            };
+            requestBody: components["requestBodies"]["DeskFolderInput"];
+            responses: {
+                /** @description The folder */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["DeskFolderRef"];
+                    };
+                };
+                400: components["responses"]["Error"];
+                404: components["responses"]["Error"];
+            };
+        };
+        post?: never;
+        /** Delete a folder and everything in it */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: components["parameters"]["DeskId"];
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                200: components["responses"]["Status"];
+                404: components["responses"]["Error"];
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -2952,6 +3864,93 @@ export interface components {
             /** Format: date-time */
             updatedAt: string;
         };
+        DeskList: {
+            id: components["schemas"]["Id"];
+            name: string;
+            open: number;
+            done: number;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        /** @description daily, weekly, monthly and yearly repeat every N of them from the first due date; weekdays is Monday to Friday; after is N days after it was last done */
+        DeskRepeat: {
+            /** @enum {string} */
+            kind: "daily" | "weekdays" | "weekly" | "monthly" | "yearly" | "after";
+            every: number;
+        };
+        DeskTodo: {
+            id: components["schemas"]["Id"];
+            listId: components["schemas"]["Id"];
+            listName: string;
+            title: string;
+            notes: string;
+            /** Format: date */
+            dueDate: string | null;
+            repeat: components["schemas"]["DeskRepeat"] | null;
+            /** Format: date-time */
+            doneAt: string | null;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        DeskNoteSummary: {
+            id: components["schemas"]["Id"];
+            title: string;
+            /** @description The start of the body on one line */
+            snippet: string;
+            pinned: boolean;
+            followups: number;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        DeskFollowup: {
+            id: components["schemas"]["Id"];
+            body: string;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        DeskNote: {
+            id: components["schemas"]["Id"];
+            title: string;
+            body: string;
+            pinned: boolean;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            followups: components["schemas"]["DeskFollowup"][];
+        };
+        DeskFolderRef: {
+            id: components["schemas"]["Id"];
+            name: string;
+            /** Format: uuid */
+            parentId: string | null;
+        };
+        DeskFile: {
+            id: components["schemas"]["Id"];
+            /** Format: uuid */
+            folderId: string | null;
+            name: string;
+            mime: string;
+            /**
+             * @description image and video have a thumbnail or poster frame
+             * @enum {string}
+             */
+            kind: "image" | "video" | "file";
+            /** Format: int64 */
+            sizeBytes: number;
+            width: number;
+            height: number;
+            durationMs: number;
+            objectKey: components["schemas"]["ObjectKey"];
+            /** @description Presigned GET URL (1 hour) */
+            url: string;
+            previewKey: string | null;
+            previewUrl: string | null;
+            /** Format: date-time */
+            createdAt: string;
+        };
     };
     responses: {
         /** @description A fixed error code, plus fixed details for some codes */
@@ -3013,12 +4012,35 @@ export interface components {
                 "application/json": components["schemas"]["Post"][];
             };
         };
+        /** @description A level of my files */
+        DeskListing: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": {
+                    /** @description Null at the top level */
+                    folder: components["schemas"]["DeskFolderRef"] | null;
+                    /** @description From the top level down to this folder */
+                    path: components["schemas"]["DeskFolderRef"][];
+                    folders: {
+                        id: components["schemas"]["Id"];
+                        name: string;
+                        items: number;
+                        /** Format: date-time */
+                        createdAt: string;
+                    }[];
+                    files: components["schemas"]["DeskFile"][];
+                };
+            };
+        };
     };
     parameters: {
         Before: string;
         Limit: number;
         PostId: components["schemas"]["Id"];
         ChatId: components["schemas"]["Id"];
+        DeskId: components["schemas"]["Id"];
     };
     requestBodies: {
         Email: {
@@ -3033,6 +4055,49 @@ export interface components {
                 "application/json": {
                     /** @description 1-40 characters */
                     name: string;
+                };
+            };
+        };
+        DeskName: {
+            content: {
+                "application/json": {
+                    /** @description 1-100 characters, one line */
+                    name: string;
+                };
+            };
+        };
+        DeskTodoInput: {
+            content: {
+                "application/json": {
+                    listId: components["schemas"]["Id"];
+                    /** @description 1-500 characters */
+                    title: string;
+                    /** @description Up to 10000 characters */
+                    notes?: string;
+                    /** Format: date */
+                    dueDate?: string | null;
+                    repeat?: components["schemas"]["DeskRepeat"] | null;
+                };
+            };
+        };
+        DeskNoteInput: {
+            content: {
+                "application/json": {
+                    /** @description Up to 200 characters, one line */
+                    title: string;
+                    /** @description Up to 50000 characters */
+                    body: string;
+                    pinned?: boolean;
+                };
+            };
+        };
+        DeskFolderInput: {
+            content: {
+                "application/json": {
+                    /** @description 1-100 characters, one line */
+                    name: string;
+                    /** Format: uuid */
+                    parentId?: string | null;
                 };
             };
         };

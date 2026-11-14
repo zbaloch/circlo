@@ -117,6 +117,17 @@ export async function uploadAvatar(media: PickedMedia): Promise<string> {
   return slot.objectKey;
 }
 
+/** Size in bytes of a picked document (a Desk file that isn't a photo or video). */
+export async function fileSize(uri: string): Promise<number> {
+  return (await (await fetch(uri)).blob()).size;
+}
+
+/** Uploads a picked document as it is (Desk files that aren't photos or videos; those go through prepare()). */
+export async function putFile(url: string, uri: string, mime: string, onProgress?: (sent: number) => void): Promise<void> {
+  const blob = await (await fetch(uri)).blob();
+  await put(url, { blob, mime, width: 0, height: 0 }, (sent) => onProgress?.(sent));
+}
+
 export function discardPrepared(_items: PreparedItem[]) {
   // Blobs are garbage-collected.
 }

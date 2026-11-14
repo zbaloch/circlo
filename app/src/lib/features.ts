@@ -17,3 +17,10 @@ export const LIKES_ENABLED = false;
  * 1.0 has no chat, so sending people there from the web app would be a step down. Turn on once 1.1 is live.
  */
 export const APP_BANNER_ENABLED = false;
+
+/**
+ * The Desk tab (owner decision 2026-11-14, being tried on the `desk` branch): a personal space for to-dos, notes and
+ * files that only its owner can see, so Circlo is useful before you've connected with anyone. Set this to false to
+ * hide the tab; the screens and the server's /v1/desk endpoints stay intact either way.
+ */
+export const DESK_ENABLED = true;

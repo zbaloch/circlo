@@ -53,13 +53,13 @@ public class Attachments {
     }
 
     /**
-     * Checks that I uploaded this file recently, it isn't attached to anything yet, and it's in the bucket with the size
+     * Checks that I uploaded this file recently, it isn't attached to anything yet (a post, message, avatar or Desk file), and it's in the bucket with the size
      * I declared. Returns its type. Locks the row; call inside the transaction that attaches it.
      */
     public String claim(byte[] me, String objectKey) {
         List<Object[]> rows = jdbc.query("""
                 SELECT size_bytes, mime FROM media_uploads
-                WHERE object_key = ? AND owner_id = ? AND post_id IS NULL AND message_id IS NULL AND is_avatar = FALSE
+                WHERE object_key = ? AND owner_id = ? AND post_id IS NULL AND message_id IS NULL AND is_avatar = FALSE AND desk_file_id IS NULL
                   AND created_at > ? FOR UPDATE""",
                 (rs, i) -> new Object[] {rs.getLong(1), rs.getString(2)}, objectKey, me,
                 Timestamp.from(Instant.now().minus(MediaSweeper.ATTACH_WINDOW)));

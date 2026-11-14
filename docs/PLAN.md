@@ -17,6 +17,7 @@ and there is a web app.
 | Media | Metadata removed on the device, then presigned upload to a private bucket; presigned downloads (1 hour) |
 | Clients | iOS, Android and the **web app at app.hellocirclo.com**, all one Expo codebase (`app/`, `.web.ts` siblings for native-only modules) |
 | Email | SMTP (`CIRCLO_MAIL_*`); the local profile prints codes to the console |
+| Desk (trial, branch `desk`) | A personal space: to-dos with due dates and repeats, notes with follow-ups, files in folders. Owner only, never shared (owner decision 2026-11-14) |
 | Removed | `core/` (Rust crypto core), OPAQUE, MLS, key backups, recovery phrases and passkeys, device linking, safety numbers, sealed reports, the leaked-database drill |
 
 Sections 1–3 and the crypto parts of the phases below describe the original end-to-end encrypted design. They are

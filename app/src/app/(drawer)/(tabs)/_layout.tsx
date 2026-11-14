@@ -2,7 +2,7 @@ import { Tabs } from 'expo-router';
 
 import { DrawerAvatarButton, HeaderBar } from '@/components/ui/header';
 import { TabBar, type TabSpec } from '@/components/ui/tab-bar';
-import { CHAT_ENABLED } from '@/lib/features';
+import { CHAT_ENABLED, DESK_ENABLED } from '@/lib/features';
 import { useActivity } from '@/lib/activity';
 import { hasUnreadChats, useBlocked } from '@/lib/blocks';
 import { useConversations } from '@/lib/messaging';
@@ -11,16 +11,17 @@ import { useConnectionsSync, useHasUnseenRequests } from '@/lib/use-connections'
 const ALL_TABS: TabSpec[] = [
   { name: 'index', label: 'Home', icon: 'home-outline', iconActive: 'home' },
   { name: 'search', label: 'People', icon: 'people-outline', iconActive: 'people' },
+  { name: 'desk', label: 'Desk', icon: 'desk-outline', iconActive: 'desk' },
   { name: 'notifications', label: 'Notifications', icon: 'notifications-outline', iconActive: 'notifications' },
   { name: 'messages', label: 'Messages', icon: 'mail-outline', iconActive: 'mail' },
 ];
 
-/** Pure: the tabs shown. Messages only while chat is enabled (lib/features). Exported for tests. */
-export function visibleTabs(chat: boolean): TabSpec[] {
-  return chat ? ALL_TABS : ALL_TABS.filter((t) => t.name !== 'messages');
+/** Pure: the tabs shown. Messages only while chat is enabled, Desk only while the Desk is (lib/features). Exported for tests. */
+export function visibleTabs(chat: boolean, desk = false): TabSpec[] {
+  return ALL_TABS.filter((t) => (t.name !== 'messages' || chat) && (t.name !== 'desk' || desk));
 }
 
-export const TABS = visibleTabs(CHAT_ENABLED);
+export const TABS = visibleTabs(CHAT_ENABLED, DESK_ENABLED);
 
 /** Bottom tab bar with icons only (PLAN.md 2A). Labels exist for screen readers. Same on iOS and Android. */
 export default function TabLayout() {

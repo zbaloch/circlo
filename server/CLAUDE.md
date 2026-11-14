@@ -4,7 +4,8 @@
 - Owner decision 2026-11-01: no end-to-end encryption. The server stores accounts, posts, replies, chats and media as
   they are sent (over TLS) and **decides who may see what**. Every read goes through an access check:
   posts via `posts.PostAccess` (author; Everyone = current friends; circles = whoever is in the post's
-  circles now, from `post_circles` and `circle_members`), chats via membership, profiles via a connection (`social.People.relation`).
+  circles now, from `post_circles` and `circle_members`), chats via membership, profiles via a connection (`social.People.relation`). The Desk (`desk.*`, to-dos, notes,
+  files) is owner-only: every query is scoped to `owner_id = me` and anything else is 404; it is never shared.
 - Circle names, memberships and a post's audience are returned **only to their owner**. Never add them to a view
   another user can fetch. Responses about other people use `People.Person` (name, username, photo), never their email.
 - Passwords: Argon2id via `auth.PasswordHasher` only; never stored, logged or returned. Emailed codes are stored only

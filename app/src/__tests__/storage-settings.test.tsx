@@ -3,7 +3,7 @@ import { render, screen } from '@testing-library/react-native';
 import StorageScreen from '@/app/settings/storage';
 import { formatBytes } from '@/lib/storage-usage';
 
-const mockUsage = { usedBytes: 1_234_000_000, photoBytes: 834_000_000, videoBytes: 399_700_000, profilePhotoBytes: 300_000, photos: 1204, videos: 23 };
+const mockUsage = { usedBytes: 1_234_000_000, photoBytes: 834_000_000, videoBytes: 399_700_000, profilePhotoBytes: 300_000, photos: 1204, videos: 23, deskBytes: 45_000_000, deskFiles: 12 };
 jest.mock('@/lib/storage-usage', () => ({
   ...jest.requireActual('@/lib/storage-usage'),
   fetchStorage: jest.fn(async () => mockUsage),
@@ -32,6 +32,8 @@ describe('storage used', () => {
     expect(screen.getByText('400 MB')).toBeTruthy();
     expect(screen.getByText('Profile photo')).toBeTruthy();
     expect(screen.getByText('300 KB')).toBeTruthy();
+    expect(screen.getByText('Desk: 12 files')).toBeTruthy();
+    expect(screen.getByText('45 MB')).toBeTruthy();
     // Other people's photos and videos don't count.
     expect(screen.getByText(/other people share with you don’t use your space/)).toBeTruthy();
   });

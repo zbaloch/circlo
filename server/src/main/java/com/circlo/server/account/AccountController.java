@@ -190,7 +190,7 @@ public class AccountController {
 
     /**
      * A copy of what I've put into Circlo: my profile, circles, friends, posts with their replies to me, my replies and
-     * likes, and the chats I'm in. Photos and videos are listed with download links (valid for an hour).
+     * likes, the chats I'm in, and my Desk. Photos, videos and files are listed with download links (valid for an hour).
      */
     @GetMapping("/v1/me/export")
     public Map<String, Object> export(@AuthenticationPrincipal Jwt jwt) {
@@ -231,7 +231,49 @@ public class AccountController {
                     WHERE m.chat_id = ? ORDER BY m.seq""", (Object) chat));
             return c;
         }, (Object) me));
+        out.put("desk", desk(me));
         return out;
+    }
+
+    /** My Desk: to-do lists with their to-dos, notes with their follow-ups, and folders and files (with download links). */
+    private Map<String, Object> desk(byte[] me) {
+        Map<String, Object> desk = new LinkedHashMap<>();
+        List<Map<String, Object>> lists = jdbc.queryForList("SELECT id, name, created_at FROM desk_lists WHERE owner_id = ? ORDER BY created_at",
+                (Object) me);
+        for (Map<String, Object> l : lists) {
+            byte[] id = (byte[]) l.remove("id");
+            l.put("todos", jdbc.queryForList("""
+                    SELECT title, notes, due_date, repeat_kind, repeat_every, done_at, created_at FROM desk_todos
+                    WHERE list_id = ? ORDER BY created_at""", (Object) id));
+        }
+        desk.put("todoLists", lists);
+        List<Map<String, Object>> notes = jdbc.queryForList(
+                "SELECT id, title, body, pinned, created_at, updated_at FROM desk_notes WHERE owner_id = ? ORDER BY created_at", (Object) me);
+        for (Map<String, Object> n : notes) {
+            byte[] id = (byte[]) n.remove("id");
+            n.put("followups", jdbc.queryForList("SELECT body, created_at FROM desk_note_followups WHERE note_id = ? ORDER BY created_at",
+                    (Object) id));
+        }
+        desk.put("notes", notes);
+        List<Map<String, Object>> folders = jdbc.queryForList("SELECT id, parent_id, name, created_at FROM desk_folders WHERE owner_id = ? ORDER BY created_at",
+                (Object) me);
+        for (Map<String, Object> f : folders) {
+            f.put("id", Ids.uuid((byte[]) f.get("id")));
+            f.put("parent_id", f.get("parent_id") == null ? null : Ids.uuid((byte[]) f.get("parent_id")));
+        }
+        desk.put("folders", folders);
+        desk.put("files", jdbc.query("SELECT folder_id, name, mime, size_bytes, object_key, created_at FROM desk_files WHERE owner_id = ? ORDER BY created_at",
+                (rs, i) -> {
+                    Map<String, Object> f = new LinkedHashMap<>();
+                    f.put("folderId", rs.getBytes(1) == null ? null : Ids.uuid(rs.getBytes(1)));
+                    f.put("name", rs.getString(2));
+                    f.put("mime", rs.getString(3));
+                    f.put("sizeBytes", rs.getLong(4));
+                    f.put("url", signer.url(rs.getString(5)));
+                    f.put("createdAt", rs.getTimestamp(6).toInstant());
+                    return f;
+                }, (Object) me));
+        return desk;
     }
 
     public record DeleteAccount(@NotNull @Size(max = 512) String password) {}
