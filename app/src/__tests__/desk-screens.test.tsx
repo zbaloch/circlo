@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react-nativ
 
 import { DeskScreen } from '@/app/(drawer)/(tabs)/desk';
 import BoardScreen from '@/app/desk/board/[id]';
+import BoardFormScreen from '@/app/desk/board-form';
 import FileScreen from '@/app/desk/file/[id]';
 import NoteScreen from '@/app/desk/note/[id]';
 import TodoScreen from '@/app/desk/todo/[id]';
@@ -44,10 +45,12 @@ const note = {
 const mockApi = {
   fetchToday: jest.fn(async () => [todo('t1', 'Pay electricity bill', { dueDate: today, repeat: { kind: 'monthly', every: 1 }, boardName: 'Bills' })]),
   fetchBoards: jest.fn(async () => [
-    { id: 'b1', name: 'Home', todos: 3, notes: 2, files: 1, createdAt: '2026-11-01T00:00:00Z' },
-    { id: 'b2', name: 'Bills', todos: 1, notes: 0, files: 0, createdAt: '2026-11-01T00:00:00Z' },
+    { id: 'b1', name: 'Home', description: 'Everything about the flat', todos: 3, notes: 2, files: 1, createdAt: '2026-11-01T00:00:00Z' },
+    { id: 'b2', name: 'Bills', description: '', todos: 1, notes: 0, files: 0, createdAt: '2026-11-01T00:00:00Z' },
   ]),
-  fetchBoard: jest.fn(async () => ({ id: 'b1', name: 'Home', todos: 1, notes: 1, files: 1, createdAt: '2026-11-01T00:00:00Z' })),
+  fetchBoard: jest.fn(async () => ({ id: 'b1', name: 'Home', description: 'Everything about the flat', todos: 1, notes: 1, files: 1, createdAt: '2026-11-01T00:00:00Z' })),
+  createBoard: jest.fn(async (b: { name: string }) => ({ id: 'b5', name: b.name, description: '', todos: 0, notes: 0, files: 0, createdAt: '2026-11-15T00:00:00Z' })),
+  updateBoard: jest.fn(async () => ({})),
   completeTodo: jest.fn(async (id: string) => ({ todo: todo(id, 'x', { doneAt: '2026-11-14T09:00:00Z' }), next: todo('t9', 'x', { dueDate: '2026-12-14' }) })),
   uncompleteTodo: jest.fn(async () => todo('t1', 'x')),
   fetchBoardTodos: jest.fn(async () => ({ open: [todo('t2', 'Fix the tap', { commentCount: 2 })], done: [todo('t3', 'Clean gutters', { doneAt: '2026-11-12T00:00:00Z' })] })),
@@ -76,6 +79,7 @@ describe('the Desk tab', () => {
     expect(mockApi.fetchToday).toHaveBeenCalledWith(today);
     expect(screen.getByText('Every month')).toBeTruthy();
     expect(await screen.findByText('3 to-dos · 2 notes · 1 file')).toBeTruthy();
+    expect(screen.getByText('Everything about the flat')).toBeTruthy();
     expect(screen.getAllByText('Bills')).toHaveLength(2); // the board, and the board the due to-do is on
     // It says plainly that the Desk is private.
     expect(screen.getByText(/Only you can see your Desk/)).toBeTruthy();
@@ -85,6 +89,32 @@ describe('the Desk tab', () => {
 
     await fireEvent.press(screen.getByText('Home'));
     expect(mockPush).toHaveBeenCalledWith({ pathname: '/desk/board/[id]', params: { id: 'b1' } });
+    await fireEvent.press(screen.getByText('New board'));
+    expect(mockPush).toHaveBeenCalledWith('/desk/board-form');
+  });
+});
+
+describe('the board form', () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  it('makes a board with a name and an optional description, then opens it', async () => {
+    mockParams = {};
+    await render(<BoardFormScreen />);
+    await fireEvent.changeText(screen.getByLabelText('Description (optional)'), 'Kitchen first');
+    expect(screen.getByRole('button', { name: 'Create board' }).props.accessibilityState?.disabled).toBe(true);
+    await fireEvent.changeText(screen.getByLabelText('Name'), 'Renovation');
+    await fireEvent.press(screen.getByRole('button', { name: 'Create board' }));
+    await waitFor(() => expect(mockApi.createBoard).toHaveBeenCalledWith({ name: 'Renovation', description: 'Kitchen first' }));
+    expect(mockReplace).toHaveBeenCalledWith({ pathname: '/desk/board/[id]', params: { id: 'b5' } });
+  });
+
+  it('edits a board’s name and description', async () => {
+    mockParams = { id: 'b1' };
+    await render(<BoardFormScreen />);
+    expect(await screen.findByDisplayValue('Everything about the flat')).toBeTruthy();
+    await fireEvent.changeText(screen.getByLabelText('Name'), 'Flat');
+    await fireEvent.press(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(mockApi.updateBoard).toHaveBeenCalledWith('b1', { name: 'Flat', description: 'Everything about the flat' }));
   });
 });
 
@@ -97,6 +127,7 @@ describe('a board', () => {
   it('shows open to-dos, adds new ones, and keeps done ones folded away', async () => {
     await render(<BoardScreen />);
     expect(await screen.findByText('Fix the tap')).toBeTruthy();
+    expect(screen.getByText('Everything about the flat')).toBeTruthy(); // the board's description
     expect(screen.queryByText('Clean gutters')).toBeNull();
     await fireEvent.press(screen.getByText('Show 1 done'));
     expect(screen.getByText('Clean gutters')).toBeTruthy();

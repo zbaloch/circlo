@@ -2879,7 +2879,7 @@ export interface paths {
                 path?: never;
                 cookie?: never;
             };
-            requestBody: components["requestBodies"]["DeskName"];
+            requestBody: components["requestBodies"]["DeskBoardInput"];
             responses: {
                 /** @description The new board */
                 201: {
@@ -2933,7 +2933,7 @@ export interface paths {
                 404: components["responses"]["Error"];
             };
         };
-        /** Rename a board */
+        /** Replace a board's name and description */
         put: {
             parameters: {
                 query?: never;
@@ -2943,7 +2943,7 @@ export interface paths {
                 };
                 cookie?: never;
             };
-            requestBody: components["requestBodies"]["DeskName"];
+            requestBody: components["requestBodies"]["DeskBoardInput"];
             responses: {
                 /** @description The board */
                 200: {
@@ -3919,6 +3919,7 @@ export interface components {
         DeskBoard: {
             id: components["schemas"]["Id"];
             name: string;
+            description: string;
             /** @description Open to-dos */
             todos: number;
             notes: number;
@@ -4100,11 +4101,13 @@ export interface components {
                 };
             };
         };
-        DeskName: {
+        DeskBoardInput: {
             content: {
                 "application/json": {
                     /** @description 1-100 characters, one line */
                     name: string;
+                    /** @description Up to 10000 characters */
+                    description?: string;
                 };
             };
         };

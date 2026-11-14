@@ -2,14 +2,13 @@ import { Redirect, router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Pressable, RefreshControl, ScrollView, View } from 'react-native';
 
-import { NameSheet } from '@/components/desk/name-sheet';
 import { toggleTodo } from '@/components/desk/todo-actions';
 import { TodoRow } from '@/components/desk/todo-row';
 import { Screen } from '@/components/screen';
 import { Icon } from '@/components/ui/icon';
 import { Text } from '@/components/ui/text';
 import { boardLine, localDate, type DeskBoard, type DeskTodo } from '@/lib/desk';
-import { createBoard, fetchBoards, fetchToday } from '@/lib/desk-api';
+import { fetchBoards, fetchToday } from '@/lib/desk-api';
 import { DESK_ENABLED } from '@/lib/features';
 import { usePalette } from '@/theme/use-palette';
 
@@ -40,7 +39,6 @@ export function DeskScreen() {
   const [boards, setBoards] = useState<DeskBoard[] | null>(null);
   const [error, setError] = useState<string>();
   const [pulling, setPulling] = useState(false);
-  const [naming, setNaming] = useState(false);
 
   const load = useCallback(async () => {
     const day = localDate();
@@ -108,29 +106,23 @@ export function DeskScreen() {
             </View>
             <View className="flex-1 gap-0.5">
               <Text className="text-[15px] font-semibold text-ink dark:text-ink-dark">{b.name}</Text>
+              {b.description ? (
+                <Text numberOfLines={1} className="text-[14px] text-muted dark:text-muted-dark">
+                  {b.description}
+                </Text>
+              ) : null}
               <Text className="text-[13px] text-muted dark:text-muted-dark">{boardLine(b)}</Text>
             </View>
             <Icon name="chevron-forward" size={18} color={palette.muted} />
           </Pressable>
         ))}
-        <Pressable accessibilityRole="button" onPress={() => setNaming(true)} className="flex-row items-center gap-3 px-4 py-3 active:bg-surface-raised dark:active:bg-surface-raised-dark">
+        <Pressable accessibilityRole="button" onPress={() => router.push('/desk/board-form')} className="flex-row items-center gap-3 px-4 py-3 active:bg-surface-raised dark:active:bg-surface-raised-dark">
           <View className="h-10 w-10 items-center justify-center">
             <Icon name="add" size={24} color={palette.primary} />
           </View>
           <Text className="text-[15px] font-semibold text-primary dark:text-primary-dark">New board</Text>
         </Pressable>
       </ScrollView>
-      <NameSheet
-        visible={naming}
-        title="New board"
-        label="Board name"
-        actionLabel="Create board"
-        onClose={() => setNaming(false)}
-        onSave={async (name) => {
-          const b = await createBoard(name);
-          openBoard(b.id);
-        }}
-      />
     </Screen>
   );
 }

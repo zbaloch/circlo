@@ -6,6 +6,7 @@ import { api, ok } from '@/api/client';
 
 import type { DeskBoard, DeskComment, DeskFile, DeskNote, DeskNoteSummary, DeskRepeat, DeskTodo } from './desk';
 
+export type BoardInput = { name: string; description: string };
 export type BoardTodos = { open: DeskTodo[]; done: DeskTodo[] };
 export type TodoDetail = { todo: DeskTodo; history: DeskTodo[]; comments: DeskComment[] };
 export type NoteDetail = { note: DeskNote; comments: DeskComment[] };
@@ -28,12 +29,12 @@ export async function fetchBoard(id: string): Promise<DeskBoard> {
   return ok(await api.GET('/v1/desk/boards/{id}', path(id)));
 }
 
-export async function createBoard(name: string): Promise<DeskBoard> {
-  return ok(await api.POST('/v1/desk/boards', { body: { name } }));
+export async function createBoard(board: BoardInput): Promise<DeskBoard> {
+  return ok(await api.POST('/v1/desk/boards', { body: board }));
 }
 
-export async function renameBoard(id: string, name: string): Promise<DeskBoard> {
-  return ok(await api.PUT('/v1/desk/boards/{id}', { ...path(id), body: { name } }));
+export async function updateBoard(id: string, board: BoardInput): Promise<DeskBoard> {
+  return ok(await api.PUT('/v1/desk/boards/{id}', { ...path(id), body: board }));
 }
 
 export async function deleteBoard(id: string): Promise<void> {

@@ -12,7 +12,8 @@ On 2026-11-15 the owner reshaped it into **boards** (Home renovation, Taxes 2026
 take comments. Boards replace folders and to-do lists. V31 was rewritten for this (the branch was never merged); the
 dev database's few Desk rows were moved across by hand and V31's checksum updated.
 
-- **Server** (`com.circlo.server.desk`, V31): boards (by name, with counts of open to-dos, notes and files; deleting
+- **Server** (`com.circlo.server.desk`, V31): boards (a name and an optional description; listed by name, with counts
+  of open to-dos, notes and files; deleting
   one deletes everything on it and lets its files' uploads go). To-dos with due dates (calendar days on the owner's
   clock) and repeats (daily / weekdays / weekly / monthly / yearly every N, counted from the first due date so the 31st
   doesn't drift; or N days after it was done). Ticking off a repeating to-do makes the next one (with the same
@@ -26,12 +27,14 @@ dev database's few Desk rows were moved across by hand and V31's checksum update
   includes the Desk (boards with everything on them and their comments); account deletion removes it. 15 Desk ITs
   (DeskTodosIT, DeskNotesIT, DeskFilesIT) and RepeatsTest.
 - **App**: a Desk tab (between People and Notifications, behind `DESK_ENABLED` in lib/features): Today (due or late on
-  every board) then Boards and New board. A board screen with To-dos / Notes / Files tabs (⋯ renames or deletes it);
+  every board) then Boards and New board. New board and Edit board are a full screen (name, optional description), not
+  a sheet, so the keyboard never covers the fields. A board screen shows its description over To-dos / Notes / Files
+  tabs (⋯ edits or deletes it);
   to-do (description, due chips + calendar, repeat, board, history, comments), note (title, description, pin, move,
   comments) and file (preview or Open, title, description, move, delete, comments) screens. Photos and videos added to
   the Desk go through `lib/media` prepare like post photos (re-encoded, metadata removed, named by date); other
   documents upload as they are (`expo-document-picker`). Files open in the viewer, the video player or the browser.
-  281 tests, lint, typecheck, web build.
+  283 tests, lint, typecheck, web build.
 
 ## 2026-11-01: no more end-to-end encryption (branch `plain-accounts`)
 

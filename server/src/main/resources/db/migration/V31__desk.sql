@@ -2,12 +2,13 @@
 -- files, all of which take comments. Everything in it belongs to one person and is never shared with anyone: every row
 -- has its owner, and every query is scoped to it.
 
--- Boards ("Home renovation", "Taxes 2026"), listed by name.
+-- Boards ("Home renovation", "Taxes 2026"): a name and an optional description, listed by name.
 CREATE TABLE desk_boards (
-    id         BINARY(16)   NOT NULL PRIMARY KEY,
-    owner_id   BINARY(16)   NOT NULL,
-    name       VARCHAR(400) NOT NULL,
-    created_at DATETIME(6)  NOT NULL,
+    id          BINARY(16)   NOT NULL PRIMARY KEY,
+    owner_id    BINARY(16)   NOT NULL,
+    name        VARCHAR(400) NOT NULL,
+    description TEXT         NOT NULL,
+    created_at  DATETIME(6)  NOT NULL,
     INDEX ix_desk_boards_owner (owner_id, name),
     CONSTRAINT fk_desk_boards_owner FOREIGN KEY (owner_id) REFERENCES users (id) ON DELETE CASCADE
 );

@@ -237,7 +237,7 @@ public class AccountController {
 
     /** My Desk: each board with its to-dos, notes and files (with download links), and the comments on each. */
     private Map<String, Object> desk(byte[] me) {
-        List<Map<String, Object>> boards = jdbc.queryForList("SELECT id, name, created_at FROM desk_boards WHERE owner_id = ? ORDER BY created_at",
+        List<Map<String, Object>> boards = jdbc.queryForList("SELECT id, name, description, created_at FROM desk_boards WHERE owner_id = ? ORDER BY created_at",
                 (Object) me);
         for (Map<String, Object> b : boards) {
             byte[] id = (byte[]) b.remove("id");

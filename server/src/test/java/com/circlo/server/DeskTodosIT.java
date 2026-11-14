@@ -21,7 +21,8 @@ class DeskTodosIT extends IntegrationTest {
     static String board(TestUser u, String name) {
         var r = u.call("POST", "/v1/desk/boards", Map.of("name", name));
         assertThat(r.getStatusCode().value()).isEqualTo(201);
-        assertThat(r.getBody()).containsEntry("name", name).containsEntry("todos", 0).containsEntry("notes", 0).containsEntry("files", 0);
+        assertThat(r.getBody()).containsEntry("name", name).containsEntry("description", "").containsEntry("todos", 0).containsEntry("notes", 0)
+                .containsEntry("files", 0);
         return (String) r.getBody().get("id");
     }
 
@@ -84,8 +85,13 @@ class DeskTodosIT extends IntegrationTest {
         assertThat(a.status("DELETE", "/v1/desk/todos/" + id + "/done", null)).isEqualTo(200);
         assertThat(items(todos(a, bills), "open")).hasSize(1);
 
-        // Rename and delete a board (its to-dos go with it).
-        assertThat(a.call("PUT", "/v1/desk/boards/" + home, Map.of("name", "House")).getBody()).containsEntry("name", "House");
+        // A board can have a description; rename and describe it, then delete one (its to-dos go with it).
+        var described = a.call("POST", "/v1/desk/boards", Map.of("name", "Garden", "description", "Front and back.\nVeg patch too."));
+        assertThat(described.getBody()).containsEntry("description", "Front and back.\nVeg patch too.");
+        assertThat(a.call("PUT", "/v1/desk/boards/" + home, Map.of("name", "House", "description", "Everything about the flat")).getBody())
+                .containsEntry("name", "House").containsEntry("description", "Everything about the flat");
+        assertThat(a.call("PUT", "/v1/desk/boards/" + home, Map.of("name", "House")).getBody()).containsEntry("description", "");
+        a.call("DELETE", "/v1/desk/boards/" + described.getBody().get("id"), null);
         assertThat(a.status("DELETE", "/v1/desk/boards/" + bills, null)).isEqualTo(200);
         assertThat(a.status("GET", "/v1/desk/todos/" + id, null)).isEqualTo(404);
         assertThat(a.status("GET", "/v1/desk/boards/" + bills, null)).isEqualTo(404);
@@ -153,6 +159,7 @@ class DeskTodosIT extends IntegrationTest {
         String home = board(a, "Home");
         assertThat(a.status("POST", "/v1/desk/boards", Map.of("name", "   "))).isEqualTo(400);
         assertThat(a.status("POST", "/v1/desk/boards", Map.of("name", "two\nlines"))).isEqualTo(400);
+        assertThat(a.status("POST", "/v1/desk/boards", Map.of("name", "x", "description", "y".repeat(10_001)))).isEqualTo(400);
         assertThat(a.status("POST", "/v1/desk/todos", Map.of("boardId", home, "title", ""))).isEqualTo(400);
         assertThat(a.status("POST", "/v1/desk/todos", Map.of("boardId", home, "title", "x".repeat(501)))).isEqualTo(400);
         assertThat(a.status("POST", "/v1/desk/todos", Map.of("boardId", home, "title", "x", "description", "y".repeat(10_001)))).isEqualTo(400);

@@ -1,17 +1,16 @@
-import { router, useLocalSearchParams, useNavigation } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { router, useFocusEffect, useLocalSearchParams, useNavigation } from 'expo-router';
+import { useCallback, useEffect, useState } from 'react';
 import { Pressable, View } from 'react-native';
 
 import { ActionSheet, type SheetAction } from '@/components/action-sheet';
 import { BoardFiles } from '@/components/desk/board-files';
 import { BoardNotes } from '@/components/desk/board-notes';
 import { BoardTodos } from '@/components/desk/board-todos';
-import { NameSheet } from '@/components/desk/name-sheet';
 import { IconButton } from '@/components/icon-button';
 import { Icon } from '@/components/ui/icon';
 import { Text } from '@/components/ui/text';
 import type { DeskBoard } from '@/lib/desk';
-import { deleteBoard, fetchBoard, renameBoard } from '@/lib/desk-api';
+import { deleteBoard, fetchBoard } from '@/lib/desk-api';
 import { showAlert } from '@/lib/dialog';
 import { usePalette } from '@/theme/use-palette';
 
@@ -22,7 +21,10 @@ const TABS: { key: Tab; label: string }[] = [
   { key: 'files', label: 'Files' },
 ];
 
-/** A board: its to-dos, notes and files in three tabs. ⋯ renames the board or deletes it with everything on it. */
+/**
+ * A board: its description, then its to-dos, notes and files in three tabs. ⋯ edits the board's name and description or
+ * deletes it with everything on it.
+ */
 export default function BoardScreen() {
   const { id, tab: initialTab } = useLocalSearchParams<{ id: string; tab?: Tab }>();
   const navigation = useNavigation();
@@ -31,11 +33,14 @@ export default function BoardScreen() {
   const [missing, setMissing] = useState(false);
   const [tab, setTab] = useState<Tab>(initialTab && TABS.some((t) => t.key === initialTab) ? initialTab : 'todos');
   const [menu, setMenu] = useState<SheetAction[] | null>(null);
-  const [renaming, setRenaming] = useState(false);
+  const [showAll, setShowAll] = useState(false);
 
-  useEffect(() => {
-    fetchBoard(id).then(setBoard, () => setMissing(true));
-  }, [id]);
+  // Again on coming back, after editing the board.
+  useFocusEffect(
+    useCallback(() => {
+      fetchBoard(id).then(setBoard, () => setMissing(true));
+    }, [id]),
+  );
 
   useEffect(() => {
     navigation.setOptions({
@@ -46,7 +51,7 @@ export default function BoardScreen() {
               accessibilityLabel="Board options"
               onPress={() =>
                 setMenu([
-                  { label: 'Rename board', onPress: () => setRenaming(true) },
+                  { label: 'Edit board', onPress: () => router.push({ pathname: '/desk/board-form', params: { id: board.id } }) },
                   {
                     label: 'Delete board',
                     destructive: true,
@@ -79,6 +84,13 @@ export default function BoardScreen() {
 
   return (
     <View className="flex-1 bg-surface dark:bg-surface-dark">
+      {board?.description ? (
+        <Pressable accessibilityRole="button" accessibilityHint={showAll ? 'Shows less' : 'Shows all of it'} onPress={() => setShowAll(!showAll)} className="px-4 pt-3">
+          <Text numberOfLines={showAll ? undefined : 3} className="text-[15px] leading-[21px] text-muted dark:text-muted-dark">
+            {board.description}
+          </Text>
+        </Pressable>
+      ) : null}
       <View accessibilityRole="tablist" className="flex-row border-b border-border dark:border-border-dark">
         {TABS.map((t) => (
           <Pressable
@@ -95,15 +107,6 @@ export default function BoardScreen() {
       </View>
       {tab === 'todos' ? <BoardTodos boardId={id} /> : tab === 'notes' ? <BoardNotes boardId={id} /> : <BoardFiles boardId={id} />}
       <ActionSheet actions={menu} onClose={() => setMenu(null)} />
-      <NameSheet
-        visible={renaming}
-        title="Rename board"
-        label="Board name"
-        initial={board?.name ?? ''}
-        actionLabel="Save"
-        onClose={() => setRenaming(false)}
-        onSave={async (name) => setBoard(await renameBoard(id, name))}
-      />
     </View>
   );
 }
