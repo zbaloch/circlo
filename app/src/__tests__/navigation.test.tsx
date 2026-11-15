@@ -1,4 +1,4 @@
-import { act, render, screen } from '@testing-library/react-native';
+import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import { useEffect as mockUseEffect } from 'react';
 
 import { TABS, visibleTabs } from '@/app/(drawer)/(tabs)/_layout';
@@ -10,10 +10,12 @@ import { DRAWER_ITEMS } from '@/components/app-drawer';
 const mockSession = { status: 'signedIn', account: { userId: 'u', handle: 'me' } };
 jest.mock('@/lib/session', () => ({ useSession: () => mockSession }));
 const mockListeners: Record<string, () => void> = {};
+let mockFocused = true;
 jest.mock('expo-router', () => ({
   router: { push: jest.fn() },
   useNavigation: () => ({
     dispatch: jest.fn(),
+    isFocused: () => mockFocused,
     addListener: (event: string, cb: () => void) => {
       mockListeners[event] = cb;
       return () => delete mockListeners[event];
@@ -38,16 +40,28 @@ jest.mock('react-native-reanimated', () => ({
   useAnimatedStyle: () => ({}),
   withTiming: (v: number) => v,
 }));
-jest.mock('@shopify/flash-list', () => ({ FlashList: jest.requireActual('react-native').FlatList }));
+// FlatList stands in for FlashList; its ref offers the one method Home uses.
+const mockScrollTo = jest.fn();
+jest.mock('@shopify/flash-list', () => {
+  const React = jest.requireActual('react');
+  const { FlatList } = jest.requireActual('react-native');
+  return {
+    FlashList: React.forwardRef(function FlashList(props: object, ref: unknown) {
+      React.useImperativeHandle(ref, () => ({ scrollToOffset: mockScrollTo }));
+      return React.createElement(FlatList, props);
+    }),
+  };
+});
 jest.mock('@/components/post-actions', () => ({ usePostActions: () => ({ cardProps: () => ({}), sheet: null }) }));
 jest.mock('@/lib/feed-store', () => ({
   useFeed: () => ({ posts: [], ids: [], pending: [], refreshing: false, loading: false, hasMore: false, loaded: true }),
-  refreshFeed: async () => {},
+  refreshFeed: async () => mockRefresh(),
   loadMoreFeed: async () => {},
   checkForNewPosts: async () => {},
   showPendingPosts: () => mockShowPending(),
 }));
 const mockShowPending = jest.fn();
+const mockRefresh = jest.fn();
 
 // The full drawer + tabs navigator needs Reanimated's native runtime, which doesn't load under jest-expo;
 // it is checked on the emulator (docs/PROGRESS.md "Needs manual check").
@@ -74,11 +88,43 @@ describe('app shell', () => {
     expect(screen.getByRole('button', { name: 'Compose post' })).toBeTruthy();
   });
 
-  it('tapping Home goes to the start of the feed, with any new posts shown', async () => {
-    await render(<HomeScreen />);
-    expect(mockListeners.tabPress).toBeDefined();
-    await act(async () => mockListeners.tabPress());
-    expect(mockShowPending).toHaveBeenCalled();
+  describe('tapping Home, like X', () => {
+    beforeEach(() => {
+      mockFocused = true;
+      mockShowPending.mockClear();
+      mockScrollTo.mockClear();
+    });
+    const tap = () => act(async () => mockListeners.tabPress());
+
+    it('from another tab just switches to Home', async () => {
+      await render(<HomeScreen />);
+      await act(async () => undefined);
+      mockFocused = false;
+      mockRefresh.mockClear();
+      await tap();
+      expect(mockShowPending).not.toHaveBeenCalled();
+      expect(mockRefresh).not.toHaveBeenCalled();
+    });
+
+    it('on Home, scrolled down, goes back to the top without refreshing', async () => {
+      await render(<HomeScreen />);
+      await act(async () => undefined);
+      await fireEvent.scroll(screen.getByTestId('home-feed'), { nativeEvent: { contentOffset: { y: 1200 } } });
+      mockRefresh.mockClear();
+      await tap();
+      expect(mockScrollTo).toHaveBeenCalledWith({ offset: 0, animated: true });
+      expect(mockRefresh).not.toHaveBeenCalled();
+      expect(mockShowPending).not.toHaveBeenCalled();
+    });
+
+    it('on Home, at the top, refreshes the feed and shows new posts', async () => {
+      await render(<HomeScreen />);
+      await act(async () => undefined);
+      mockRefresh.mockClear();
+      await tap();
+      expect(mockShowPending).toHaveBeenCalled();
+      expect(mockRefresh).toHaveBeenCalled();
+    });
   });
 
   it('Messages has a labelled new-message button', async () => {

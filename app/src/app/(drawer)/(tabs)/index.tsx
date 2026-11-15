@@ -106,16 +106,22 @@ export default function HomeScreen() {
   };
   const headerStyle = useAnimatedStyle(() => ({ transform: [{ translateY: offset.value }] }));
 
-  // Tapping Home (from another tab, or on Home) goes to the start of the feed, with any new posts shown, like X.
+  // Tapping Home, like X (owner request 2026-11-15): from another tab it just switches here; on Home scrolled down it
+  // goes back to the top; on Home already at the top it shows any new posts and refreshes.
   const navigation = useNavigation<BottomTabNavigationProp<Record<string, object | undefined>>>();
   useEffect(
     () =>
       navigation.addListener('tabPress', () => {
-        showPendingPosts();
-        list.current?.scrollToOffset({ offset: 0, animated: true });
-        offset.value = withTiming(0, { duration: 180 });
+        if (!navigation.isFocused()) return;
+        if (lastY.current > 0) {
+          list.current?.scrollToOffset({ offset: 0, animated: true });
+          offset.value = withTiming(0, { duration: 180 });
+        } else {
+          showPendingPosts();
+          pull();
+        }
       }),
-    [navigation, offset],
+    [navigation, offset, pull],
   );
 
   if (!account) return null;
@@ -124,6 +130,7 @@ export default function HomeScreen() {
   return (
     <Screen>
       <FlashList
+        testID="home-feed"
         ref={(r) => {
           list.current = r;
         }}
