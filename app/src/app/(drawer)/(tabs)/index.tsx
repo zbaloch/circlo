@@ -1,5 +1,6 @@
 import { FlashList } from '@shopify/flash-list';
-import { router, useFocusEffect } from 'expo-router';
+import { router, useFocusEffect, useNavigation } from 'expo-router';
+import type { BottomTabNavigationProp } from 'expo-router/tabs';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable, RefreshControl, View, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
@@ -104,6 +105,18 @@ export default function HomeScreen() {
     lastY.current = y;
   };
   const headerStyle = useAnimatedStyle(() => ({ transform: [{ translateY: offset.value }] }));
+
+  // Tapping Home (from another tab, or on Home) goes to the start of the feed, with any new posts shown, like X.
+  const navigation = useNavigation<BottomTabNavigationProp<Record<string, object | undefined>>>();
+  useEffect(
+    () =>
+      navigation.addListener('tabPress', () => {
+        showPendingPosts();
+        list.current?.scrollToOffset({ offset: 0, animated: true });
+        offset.value = withTiming(0, { duration: 180 });
+      }),
+    [navigation, offset],
+  );
 
   if (!account) return null;
   const pending = outbox.filter((i) => i.status !== 'done');

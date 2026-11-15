@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react-native';
+import { act, render, screen } from '@testing-library/react-native';
 import { useEffect as mockUseEffect } from 'react';
 
 import { TABS, visibleTabs } from '@/app/(drawer)/(tabs)/_layout';
@@ -9,9 +9,16 @@ import { DRAWER_ITEMS } from '@/components/app-drawer';
 // Jest hoists this above the imports; Home reads the session.
 const mockSession = { status: 'signedIn', account: { userId: 'u', handle: 'me' } };
 jest.mock('@/lib/session', () => ({ useSession: () => mockSession }));
+const mockListeners: Record<string, () => void> = {};
 jest.mock('expo-router', () => ({
   router: { push: jest.fn() },
-  useNavigation: () => ({ dispatch: jest.fn() }),
+  useNavigation: () => ({
+    dispatch: jest.fn(),
+    addListener: (event: string, cb: () => void) => {
+      mockListeners[event] = cb;
+      return () => delete mockListeners[event];
+    },
+  }),
   useFocusEffect: (cb: () => void) => mockUseEffect(cb, [cb]),
 }));
 jest.mock('@/lib/addressbook', () => ({ loadAddressBook: async () => ({ v: 1, myEpochs: [], contacts: {} }) }));
@@ -38,8 +45,9 @@ jest.mock('@/lib/feed-store', () => ({
   refreshFeed: async () => {},
   loadMoreFeed: async () => {},
   checkForNewPosts: async () => {},
-  showPendingPosts: () => {},
+  showPendingPosts: () => mockShowPending(),
 }));
+const mockShowPending = jest.fn();
 
 // The full drawer + tabs navigator needs Reanimated's native runtime, which doesn't load under jest-expo;
 // it is checked on the emulator (docs/PROGRESS.md "Needs manual check").
@@ -64,6 +72,13 @@ describe('app shell', () => {
     expect(await screen.findByText('Get started')).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Invite' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Compose post' })).toBeTruthy();
+  });
+
+  it('tapping Home goes to the start of the feed, with any new posts shown', async () => {
+    await render(<HomeScreen />);
+    expect(mockListeners.tabPress).toBeDefined();
+    await act(async () => mockListeners.tabPress());
+    expect(mockShowPending).toHaveBeenCalled();
   });
 
   it('Messages has a labelled new-message button', async () => {
