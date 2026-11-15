@@ -29,8 +29,8 @@ export function avatarColor(id: string | undefined) {
 }
 
 // post: the author's photo on a post (owner request 2026-11-15: a bit bigger than a list's).
-const SIZES = { sm: 'h-8 w-8', md: 'h-10 w-10', post: 'h-12 w-12', lg: 'h-16 w-16' };
-const TEXT = { sm: 'text-sm', md: 'text-base', post: 'text-lg', lg: 'text-2xl' };
+const SIZES = { sm: 'h-8 w-8', md: 'h-10 w-10', post: 'h-11 w-11', lg: 'h-16 w-16' };
+const TEXT = { sm: 'text-sm', md: 'text-base', post: 'text-base', lg: 'text-2xl' };
 
 /** Someone's photo, or their initial while they have none (or it can't load). */
 export function Avatar({ id, name, uri, size = 'md' }: Props) {
