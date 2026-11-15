@@ -68,10 +68,12 @@ const mockRefresh = jest.fn();
 describe('app shell', () => {
   it('has the icon-only tabs from PLAN.md 2A, each with a screen-reader label; Messages only while chat is on', () => {
     // Chat is on again (owner decision 2026-11-07).
-    expect(TABS.map((t) => t.label)).toEqual(['Home', 'People', 'Notifications', 'Messages']);
+    // The Desk is being tried on its branch (owner decision 2026-11-14).
+    expect(TABS.map((t) => t.label)).toEqual(['Home', 'People', 'Desk', 'Notifications', 'Messages']);
     expect(visibleTabs(false).map((t) => t.label)).toEqual(['Home', 'People', 'Notifications']);
     expect(visibleTabs(true).map((t) => t.label)).toEqual(['Home', 'People', 'Notifications', 'Messages']);
-    for (const t of visibleTabs(true)) {
+    expect(visibleTabs(true, true).map((t) => t.label)).toEqual(['Home', 'People', 'Desk', 'Notifications', 'Messages']);
+    for (const t of visibleTabs(true, true)) {
       expect(t.icon).toBeTruthy();
       expect(t.iconActive).toBeTruthy();
     }

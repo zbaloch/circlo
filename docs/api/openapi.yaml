@@ -266,7 +266,7 @@ paths:
     get:
       summary: >-
         How much storage my account uses: the photos and videos on my posts and chat messages (with their thumbnails
-        and poster frames, counted as photos) and my profile photo
+        and poster frames, counted as photos), my profile photo and my Desk files
       responses:
         "200":
           description: Storage used, in bytes, and how many photos and videos
@@ -274,7 +274,7 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [usedBytes, photoBytes, videoBytes, profilePhotoBytes, photos, videos]
+                required: [usedBytes, photoBytes, videoBytes, profilePhotoBytes, photos, videos, deskBytes, deskFiles]
                 properties:
                   usedBytes: { type: integer, format: int64 }
                   photoBytes: { type: integer, format: int64 }
@@ -282,6 +282,8 @@ paths:
                   profilePhotoBytes: { type: integer, format: int64 }
                   photos: { type: integer, format: int64 }
                   videos: { type: integer, format: int64 }
+                  deskBytes: { type: integer, format: int64, description: "My Desk files, whatever their type, with their thumbnails" }
+                  deskFiles: { type: integer, format: int64 }
   /v1/me/preview/{friendId}:
     get:
       summary: My posts exactly as this friend sees them
@@ -1106,6 +1108,385 @@ paths:
       responses:
         "200": { $ref: "#/components/responses/Status" }
 
+  # ---------------- desk (owner decision 2026-11-14, boards 2026-11-15) ----------------
+  # A personal space of boards, each with its own to-dos, notes and files, all of which take comments. Everything in
+  # it belongs to one person and is never shared: anything that isn't mine is 404, exactly as if it didn't exist.
+  /v1/desk/boards:
+    get:
+      summary: My boards by name, with how many open to-dos, notes and files each has
+      responses:
+        "200":
+          description: Boards
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: "#/components/schemas/DeskBoard" } }
+    post:
+      summary: Start a board (up to 200)
+      requestBody: { $ref: "#/components/requestBodies/DeskBoardInput" }
+      responses:
+        "201":
+          description: The new board
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DeskBoard" }
+        "400": { $ref: "#/components/responses/Error" }
+        "409": { $ref: "#/components/responses/Error" }
+  /v1/desk/boards/{id}:
+    parameters:
+      - { $ref: "#/components/parameters/DeskId" }
+    get:
+      summary: One of my boards
+      responses:
+        "200":
+          description: The board
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DeskBoard" }
+        "404": { $ref: "#/components/responses/Error" }
+    put:
+      summary: Replace a board's name and description
+      requestBody: { $ref: "#/components/requestBodies/DeskBoardInput" }
+      responses:
+        "200":
+          description: The board
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DeskBoard" }
+        "400": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+    delete:
+      summary: Delete a board and everything on it (its files' storage is freed)
+      responses:
+        "200": { $ref: "#/components/responses/Status" }
+        "404": { $ref: "#/components/responses/Error" }
+  /v1/desk/boards/{id}/todos:
+    parameters:
+      - { $ref: "#/components/parameters/DeskId" }
+    get:
+      summary: A board's open to-dos (oldest first) and the 30 most recently done
+      responses:
+        "200":
+          description: To-dos
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [open, done]
+                properties:
+                  open: { type: array, items: { $ref: "#/components/schemas/DeskTodo" } }
+                  done: { type: array, items: { $ref: "#/components/schemas/DeskTodo" } }
+        "404": { $ref: "#/components/responses/Error" }
+  /v1/desk/boards/{id}/notes:
+    parameters:
+      - { $ref: "#/components/parameters/DeskId" }
+    get:
+      summary: A board's notes, pinned first, then the most recently changed or commented on (up to 1000)
+      responses:
+        "200":
+          description: Notes
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: "#/components/schemas/DeskNoteSummary" } }
+        "404": { $ref: "#/components/responses/Error" }
+  /v1/desk/boards/{id}/files:
+    parameters:
+      - { $ref: "#/components/parameters/DeskId" }
+    get:
+      summary: A board's files, newest first, with download URLs (up to 2000)
+      responses:
+        "200":
+          description: Files
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: "#/components/schemas/DeskFile" } }
+        "404": { $ref: "#/components/responses/Error" }
+  /v1/desk/today:
+    get:
+      summary: Open to-dos due on or before `date` (my today) on all my boards, earliest first
+      parameters:
+        - { name: date, in: query, required: true, schema: { type: string, format: date } }
+      responses:
+        "200":
+          description: To-dos
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: "#/components/schemas/DeskTodo" } }
+        "400": { $ref: "#/components/responses/Error" }
+  /v1/desk/todos:
+    post:
+      summary: Add a to-do to one of my boards
+      requestBody: { $ref: "#/components/requestBodies/DeskTodoInput" }
+      responses:
+        "201":
+          description: The new to-do
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DeskTodo" }
+        "400": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+  /v1/desk/todos/{id}:
+    parameters:
+      - { $ref: "#/components/parameters/DeskId" }
+    get:
+      summary: A to-do with its comments, and the earlier ones of its repeating series that were done (newest first, up to 20)
+      responses:
+        "200":
+          description: The to-do
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [todo, history, comments]
+                properties:
+                  todo: { $ref: "#/components/schemas/DeskTodo" }
+                  history: { type: array, items: { $ref: "#/components/schemas/DeskTodo" } }
+                  comments: { type: array, items: { $ref: "#/components/schemas/DeskComment" } }
+        "404": { $ref: "#/components/responses/Error" }
+    put:
+      summary: Replace a to-do's board, title, description, due date and repeat (a new due date or repeat restarts its schedule)
+      requestBody: { $ref: "#/components/requestBodies/DeskTodoInput" }
+      responses:
+        "200":
+          description: The to-do
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DeskTodo" }
+        "400": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+    delete:
+      summary: Delete a to-do and its comments
+      responses:
+        "200": { $ref: "#/components/responses/Status" }
+        "404": { $ref: "#/components/responses/Error" }
+  /v1/desk/todos/{id}/done:
+    parameters:
+      - { $ref: "#/components/parameters/DeskId" }
+    post:
+      summary: >-
+        Tick a to-do off. A repeating one makes the next straight away; `today` is my calendar day (within 2 days of
+        the server's), which "after N days" repeats count from. Already done: nothing changes and `next` is null.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [today], properties: { today: { type: string, format: date } } }
+      responses:
+        "200":
+          description: The to-do, and the next one if it repeats
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [todo]
+                properties:
+                  todo: { $ref: "#/components/schemas/DeskTodo" }
+                  next: { oneOf: [{ $ref: "#/components/schemas/DeskTodo" }, { type: "null" }] }
+        "400": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+    delete:
+      summary: Un-tick a to-do; the next one its repeat made goes again unless that has been done too
+      responses:
+        "200":
+          description: The to-do
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DeskTodo" }
+        "404": { $ref: "#/components/responses/Error" }
+  /v1/desk/todos/{id}/comments:
+    parameters:
+      - { $ref: "#/components/parameters/DeskId" }
+    post:
+      summary: Comment on a to-do
+      requestBody: { $ref: "#/components/requestBodies/DeskCommentInput" }
+      responses:
+        "201": { $ref: "#/components/responses/DeskComment" }
+        "400": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+  /v1/desk/notes:
+    post:
+      summary: Write a note on one of my boards
+      requestBody: { $ref: "#/components/requestBodies/DeskNoteInput" }
+      responses:
+        "201":
+          description: The note
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DeskNote" }
+        "400": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+  /v1/desk/notes/{id}:
+    parameters:
+      - { $ref: "#/components/parameters/DeskId" }
+    get:
+      summary: A note with its comments, oldest first
+      responses:
+        "200":
+          description: The note
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [note, comments]
+                properties:
+                  note: { $ref: "#/components/schemas/DeskNote" }
+                  comments: { type: array, items: { $ref: "#/components/schemas/DeskComment" } }
+        "404": { $ref: "#/components/responses/Error" }
+    put:
+      summary: Replace a note's board, title and description; `pinned` left out keeps it
+      requestBody: { $ref: "#/components/requestBodies/DeskNoteInput" }
+      responses:
+        "200":
+          description: The note
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DeskNote" }
+        "400": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+    delete:
+      summary: Delete a note and its comments
+      responses:
+        "200": { $ref: "#/components/responses/Status" }
+        "404": { $ref: "#/components/responses/Error" }
+  /v1/desk/notes/{id}/comments:
+    parameters:
+      - { $ref: "#/components/parameters/DeskId" }
+    post:
+      summary: Comment on a note; the note moves up its board
+      requestBody: { $ref: "#/components/requestBodies/DeskCommentInput" }
+      responses:
+        "201": { $ref: "#/components/responses/DeskComment" }
+        "400": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+  /v1/desk/uploads:
+    post:
+      summary: >-
+        Upload slots for a Desk file and, for a photo or video, its thumbnail or poster frame (presigned PUTs locked to
+        size and type, 15 minutes). Photos up to 25 MB, videos 512 MB, anything else 100 MB. No HTML, SVG or scripts;
+        other files can be kept as application/octet-stream.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [files]
+              properties:
+                files:
+                  type: array
+                  minItems: 1
+                  maxItems: 2
+                  items:
+                    type: object
+                    required: [size, mime]
+                    properties:
+                      size: { type: integer, format: int64 }
+                      mime: { type: string }
+      responses:
+        "200":
+          description: One slot per file, in order
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  required: [objectKey, putUrl, size, mime]
+                  properties:
+                    objectKey: { $ref: "#/components/schemas/ObjectKey" }
+                    putUrl: { type: string }
+                    size: { type: integer, format: int64 }
+                    mime: { type: string }
+        "400": { $ref: "#/components/responses/Error" }
+  /v1/desk/files:
+    post:
+      summary: Keep an uploaded file (and its thumbnail or poster frame) on one of my boards
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [boardId, title, fileName, objectKey]
+              properties:
+                boardId: { $ref: "#/components/schemas/Id" }
+                title: { type: string, description: "1-200 characters, one line" }
+                description: { type: string, description: "Up to 10000 characters" }
+                fileName: { type: string, description: "The file's own name, 1-200 characters, one line" }
+                objectKey: { $ref: "#/components/schemas/ObjectKey" }
+                previewKey: { $ref: "#/components/schemas/ObjectKey" }
+                width: { type: integer }
+                height: { type: integer }
+                durationMs: { type: integer }
+      responses:
+        "201":
+          description: The file
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DeskFile" }
+        "400": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+  /v1/desk/files/{id}:
+    parameters:
+      - { $ref: "#/components/parameters/DeskId" }
+    get:
+      summary: One of my files, with fresh download URLs, and its comments
+      responses:
+        "200":
+          description: The file
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [file, comments]
+                properties:
+                  file: { $ref: "#/components/schemas/DeskFile" }
+                  comments: { type: array, items: { $ref: "#/components/schemas/DeskComment" } }
+        "404": { $ref: "#/components/responses/Error" }
+    put:
+      summary: Change a file's title and description and put it on `boardId`
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [boardId, title]
+              properties:
+                boardId: { $ref: "#/components/schemas/Id" }
+                title: { type: string, description: "1-200 characters, one line" }
+                description: { type: string, description: "Up to 10000 characters" }
+      responses:
+        "200":
+          description: The file
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DeskFile" }
+        "400": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+    delete:
+      summary: Delete a file and its comments (its storage is freed)
+      responses:
+        "200": { $ref: "#/components/responses/Status" }
+        "404": { $ref: "#/components/responses/Error" }
+  /v1/desk/files/{id}/comments:
+    parameters:
+      - { $ref: "#/components/parameters/DeskId" }
+    post:
+      summary: Comment on a file
+      requestBody: { $ref: "#/components/requestBodies/DeskCommentInput" }
+      responses:
+        "201": { $ref: "#/components/responses/DeskComment" }
+        "400": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+  /v1/desk/comments/{id}:
+    parameters:
+      - { $ref: "#/components/parameters/DeskId" }
+    delete:
+      summary: Delete one of my comments
+      responses:
+        "200": { $ref: "#/components/responses/Status" }
+        "404": { $ref: "#/components/responses/Error" }
+
 components:
   securitySchemes:
     bearer: { type: http, scheme: bearer, bearerFormat: JWT }
@@ -1114,6 +1495,7 @@ components:
     Limit: { name: limit, in: query, schema: { type: integer } }
     PostId: { name: postId, in: path, required: true, schema: { $ref: "#/components/schemas/Id" } }
     ChatId: { name: chatId, in: path, required: true, schema: { $ref: "#/components/schemas/Id" } }
+    DeskId: { name: id, in: path, required: true, schema: { $ref: "#/components/schemas/Id" } }
   requestBodies:
     Email:
       required: true
@@ -1125,6 +1507,46 @@ components:
       content:
         application/json:
           schema: { type: object, required: [name], properties: { name: { type: string, description: "1-40 characters" } } }
+    DeskBoardInput:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [name]
+            properties:
+              name: { type: string, description: "1-100 characters, one line" }
+              description: { type: string, description: "Up to 10000 characters" }
+    DeskTodoInput:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [boardId, title]
+            properties:
+              boardId: { $ref: "#/components/schemas/Id" }
+              title: { type: string, description: "1-500 characters" }
+              description: { type: string, description: "Up to 10000 characters" }
+              dueDate: { type: [string, "null"], format: date }
+              repeat: { oneOf: [{ $ref: "#/components/schemas/DeskRepeat" }, { type: "null" }] }
+    DeskNoteInput:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [boardId, title]
+            properties:
+              boardId: { $ref: "#/components/schemas/Id" }
+              title: { type: string, description: "1-200 characters, one line" }
+              description: { type: string, description: "Up to 50000 characters" }
+              pinned: { type: boolean }
+    DeskCommentInput:
+      required: true
+      content:
+        application/json:
+          schema: { type: object, required: [body], properties: { body: { type: string, description: "1-5000 characters" } } }
   responses:
     Error:
       description: A fixed error code, plus fixed details for some codes
@@ -1167,6 +1589,11 @@ components:
       content:
         application/json:
           schema: { type: array, items: { $ref: "#/components/schemas/Post" } }
+    DeskComment:
+      description: The comment
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/DeskComment" }
   schemas:
     Id: { type: string, format: uuid }
     ObjectKey: { type: string, pattern: "^[0-9a-f]{64}$" }
@@ -1294,3 +1721,93 @@ components:
         unread: { type: integer }
         readSeq: { type: integer, format: int64 }
         updatedAt: { type: string, format: date-time }
+
+    DeskBoard:
+      type: object
+      required: [id, name, description, todos, notes, files, createdAt]
+      properties:
+        id: { $ref: "#/components/schemas/Id" }
+        name: { type: string }
+        description: { type: string }
+        todos: { type: integer, description: "Open to-dos" }
+        notes: { type: integer }
+        files: { type: integer }
+        createdAt: { type: string, format: date-time }
+    DeskRepeat:
+      description: >-
+        daily, weekly, monthly and yearly repeat every N of them from the first due date; weekdays is Monday to Friday;
+        after is N days after it was last done
+      type: object
+      required: [kind, every]
+      properties:
+        kind: { type: string, enum: [daily, weekdays, weekly, monthly, yearly, after] }
+        every: { type: integer, minimum: 1, maximum: 365 }
+    DeskTodo:
+      type: object
+      required: [id, boardId, boardName, title, description, dueDate, repeat, doneAt, commentCount, createdAt]
+      properties:
+        id: { $ref: "#/components/schemas/Id" }
+        boardId: { $ref: "#/components/schemas/Id" }
+        boardName: { type: string }
+        title: { type: string }
+        description: { type: string }
+        dueDate: { type: [string, "null"], format: date }
+        repeat: { oneOf: [{ $ref: "#/components/schemas/DeskRepeat" }, { type: "null" }] }
+        doneAt: { type: [string, "null"], format: date-time }
+        commentCount: { type: integer }
+        createdAt: { type: string, format: date-time }
+    DeskNoteSummary:
+      type: object
+      required: [id, boardId, title, snippet, pinned, commentCount, createdAt, updatedAt]
+      properties:
+        id: { $ref: "#/components/schemas/Id" }
+        boardId: { $ref: "#/components/schemas/Id" }
+        title: { type: string }
+        snippet: { type: string, description: "The start of the description on one line" }
+        pinned: { type: boolean }
+        commentCount: { type: integer }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    DeskNote:
+      type: object
+      required: [id, boardId, boardName, title, description, pinned, commentCount, createdAt, updatedAt]
+      properties:
+        id: { $ref: "#/components/schemas/Id" }
+        boardId: { $ref: "#/components/schemas/Id" }
+        boardName: { type: string }
+        title: { type: string }
+        description: { type: string }
+        pinned: { type: boolean }
+        commentCount: { type: integer }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    DeskComment:
+      type: object
+      required: [id, body, createdAt]
+      properties:
+        id: { $ref: "#/components/schemas/Id" }
+        body: { type: string }
+        createdAt: { type: string, format: date-time }
+    DeskFile:
+      type: object
+      required: [id, boardId, boardName, title, description, fileName, mime, kind, sizeBytes, width, height, durationMs, objectKey, url,
+        previewKey, previewUrl, commentCount, createdAt]
+      properties:
+        id: { $ref: "#/components/schemas/Id" }
+        boardId: { $ref: "#/components/schemas/Id" }
+        boardName: { type: string }
+        title: { type: string }
+        description: { type: string }
+        fileName: { type: string }
+        mime: { type: string }
+        kind: { type: string, enum: [image, video, file], description: "image and video have a thumbnail or poster frame" }
+        sizeBytes: { type: integer, format: int64 }
+        width: { type: integer }
+        height: { type: integer }
+        durationMs: { type: integer }
+        objectKey: { $ref: "#/components/schemas/ObjectKey" }
+        url: { type: string, description: "Presigned GET URL (1 hour)" }
+        previewKey: { type: [string, "null"], pattern: "^[0-9a-f]{64}$" }
+        previewUrl: { type: [string, "null"] }
+        commentCount: { type: integer }
+        createdAt: { type: string, format: date-time }

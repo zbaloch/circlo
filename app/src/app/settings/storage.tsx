@@ -7,11 +7,12 @@ import { Row, Section } from '@/components/settings-ui';
 import { Spinner } from '@/components/ui/spinner';
 import { Text } from '@/components/ui/text';
 import { describeError } from '@/lib/account';
+import { DESK_ENABLED } from '@/lib/features';
 import { fetchStorage, formatBytes, type StorageUsage } from '@/lib/storage-usage';
 
 const count = (n: number, one: string, many: string) => `${n.toLocaleString('en')} ${n === 1 ? one : many}`;
 
-/** Storage: how much space my photos and videos take on Circlo (owner request 2026-11-08). Only ever my own. */
+/** Storage: how much space my photos, videos and Desk files take on Circlo (owner request 2026-11-08). Only ever my own. */
 export default function StorageScreen() {
   const [usage, setUsage] = useState<StorageUsage | null>(null);
   const [error, setError] = useState<string>();
@@ -33,7 +34,7 @@ export default function StorageScreen() {
         {usage ? (
           <>
             <Text className="text-4xl font-extrabold text-ink dark:text-ink-dark">{formatBytes(usage.usedBytes)}</Text>
-            <Text className="text-[15px] text-muted dark:text-muted-dark">used by your photos and videos</Text>
+            <Text className="text-[15px] text-muted dark:text-muted-dark">used by your photos, videos and files</Text>
           </>
         ) : error ? null : (
           <Spinner size="large" />
@@ -50,6 +51,11 @@ export default function StorageScreen() {
           <Row title="Profile photo">
             <Text className="text-[15px] text-muted dark:text-muted-dark">{formatBytes(usage.profilePhotoBytes)}</Text>
           </Row>
+          {DESK_ENABLED || usage.deskFiles > 0 ? (
+            <Row title={`Desk: ${count(usage.deskFiles, 'file', 'files')}`}>
+              <Text className="text-[15px] text-muted dark:text-muted-dark">{formatBytes(usage.deskBytes)}</Text>
+            </Row>
+          ) : null}
         </Section>
       ) : null}
       <View className="gap-3 px-4 pt-4">
@@ -61,4 +67,4 @@ export default function StorageScreen() {
 }
 
 const NOTE =
-  'This counts the photos and videos you’ve posted or sent in chats, with their small previews, and your profile photo. Photos and videos other people share with you don’t use your space. Deleting a post or message frees the space it used.';
+  'This counts the photos and videos you’ve posted or sent in chats, with their small previews, your profile photo and the files in your Desk. Photos and videos other people share with you don’t use your space. Deleting a post, message or file frees the space it used.';

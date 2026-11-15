@@ -141,6 +141,25 @@ export async function uploadAvatar(media: PickedMedia): Promise<string> {
   }
 }
 
+/** Size in bytes of a picked document (a Desk file that isn't a photo or video). */
+export async function fileSize(uri: string): Promise<number> {
+  return new File(uri).size;
+}
+
+/**
+ * Uploads a picked document as it is, to a slot locked to its size and type. Only for Desk files that aren't photos or
+ * videos: those always go through prepare() first, so no picked original carrying EXIF/GPS is ever uploaded.
+ */
+export async function putFile(url: string, uri: string, mime: string, onProgress?: (sent: number) => void): Promise<void> {
+  const res = await new File(uri).upload(url, {
+    httpMethod: 'PUT',
+    uploadType: UploadType.BINARY_CONTENT,
+    headers: { 'Content-Type': mime },
+    onProgress: ({ bytesSent }) => onProgress?.(bytesSent),
+  });
+  if (res.status !== 200) throw new Error(`upload failed (${res.status})`);
+}
+
 export function discardPrepared(items: PreparedItem[]) {
   for (const i of items) for (const f of [i.full.file, i.preview.file]) if (f.exists) f.delete();
 }

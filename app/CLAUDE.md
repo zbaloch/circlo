@@ -9,7 +9,8 @@
   (https://docs.expo.dev/versions/v58.0.0/ and https://docs.expo.dev/llms.txt) before using an Expo/RN API.
   Add packages with `npx expo install <pkg>` so versions match the SDK.
 - Routes live in `src/app/` (expo-router): signed-out `(auth)` (welcome, signup, verify-email, login, forgot-password),
-  then the drawer + `(tabs)` with Home / Search / Notifications / Messages, plus stack screens. `i/[token]` receives
+  then the drawer + `(tabs)` with Home / Search / Desk / Notifications / Messages, plus stack screens (Desk's under
+  `desk/`, behind `DESK_ENABLED`; owner-only, never shared). `i/[token]` receives
   invite links. Non-route code goes in `src/components`, `src/lib`, `src/theme`.
 - expo-router 58 vendors React Navigation: import navigation types, themes, `useNavigation` from `expo-router` /
   `expo-router/drawer`, never from `@react-navigation/*`.

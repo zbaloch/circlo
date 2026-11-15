@@ -190,7 +190,7 @@ public class AccountController {
 
     /**
      * A copy of what I've put into Circlo: my profile, circles, friends, posts with their replies to me, my replies and
-     * likes, and the chats I'm in. Photos and videos are listed with download links (valid for an hour).
+     * likes, the chats I'm in, and my Desk. Photos, videos and files are listed with download links (valid for an hour).
      */
     @GetMapping("/v1/me/export")
     public Map<String, Object> export(@AuthenticationPrincipal Jwt jwt) {
@@ -231,7 +231,46 @@ public class AccountController {
                     WHERE m.chat_id = ? ORDER BY m.seq""", (Object) chat));
             return c;
         }, (Object) me));
+        out.put("desk", desk(me));
         return out;
+    }
+
+    /** My Desk: each board with its to-dos, notes and files (with download links), and the comments on each. */
+    private Map<String, Object> desk(byte[] me) {
+        List<Map<String, Object>> boards = jdbc.queryForList("SELECT id, name, description, created_at FROM desk_boards WHERE owner_id = ? ORDER BY created_at",
+                (Object) me);
+        for (Map<String, Object> b : boards) {
+            byte[] id = (byte[]) b.remove("id");
+            b.put("todos", withComments("todo_id", jdbc.queryForList("""
+                    SELECT id, title, description, due_date, repeat_kind, repeat_every, done_at, created_at FROM desk_todos
+                    WHERE board_id = ? ORDER BY created_at""", (Object) id)));
+            b.put("notes", withComments("note_id", jdbc.queryForList(
+                    "SELECT id, title, description, pinned, created_at, updated_at FROM desk_notes WHERE board_id = ? ORDER BY created_at", (Object) id)));
+            b.put("files", withComments("file_id", jdbc.query("""
+                    SELECT id, title, description, file_name, mime, size_bytes, object_key, created_at FROM desk_files
+                    WHERE board_id = ? ORDER BY created_at""", (rs, i) -> {
+                        Map<String, Object> f = new LinkedHashMap<>();
+                        f.put("id", rs.getBytes(1));
+                        f.put("title", rs.getString(2));
+                        f.put("description", rs.getString(3));
+                        f.put("fileName", rs.getString(4));
+                        f.put("mime", rs.getString(5));
+                        f.put("sizeBytes", rs.getLong(6));
+                        f.put("url", signer.url(rs.getString(7)));
+                        f.put("createdAt", rs.getTimestamp(8).toInstant());
+                        return f;
+                    }, (Object) id)));
+        }
+        return Map.of("boards", boards);
+    }
+
+    /** Swaps each Desk row's id for the comments on it (by `column` in desk_comments). */
+    private List<Map<String, Object>> withComments(String column, List<Map<String, Object>> rows) {
+        for (Map<String, Object> row : rows) {
+            byte[] id = (byte[]) row.remove("id");
+            row.put("comments", jdbc.queryForList("SELECT body, created_at FROM desk_comments WHERE " + column + " = ? ORDER BY created_at", (Object) id));
+        }
+        return rows;
     }
 
     public record DeleteAccount(@NotNull @Size(max = 512) String password) {}

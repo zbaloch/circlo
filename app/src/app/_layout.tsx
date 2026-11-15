@@ -99,6 +99,11 @@ function Navigator() {
         <Stack.Screen name="security-alert" options={own} />
         <Stack.Screen name="intro" options={own} />
         <Stack.Screen name="change-password" options={page('Change password')} />
+        <Stack.Screen name="desk/board/[id]" options={page('Board')} />
+        <Stack.Screen name="desk/board-form" options={page('New board')} />
+        <Stack.Screen name="desk/todo/[id]" options={page('To-do')} />
+        <Stack.Screen name="desk/note/[id]" options={page('Note')} />
+        <Stack.Screen name="desk/file/[id]" options={page('File')} />
       </Stack.Protected>
     </Stack>
   );
