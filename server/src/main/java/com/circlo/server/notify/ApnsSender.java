@@ -146,7 +146,9 @@ public class ApnsSender implements PushService {
             }
             // Only the status and Apple's reason: never the token.
             Matcher reason = REASON.matcher(res.body());
-            log.warn("APNs push failed: HTTP {} {}", res.statusCode(), reason.find() ? reason.group(1) : "");
+            String why = reason.find() ? reason.group(1) : "";
+            log.warn("APNs push failed: HTTP {} {}{}", res.statusCode(), why, "InvalidProviderToken".equals(why)
+                    ? " (Apple refused the key: CIRCLO_APNS_KEY, CIRCLO_APNS_KEY_ID and CIRCLO_APNS_TEAM_ID must be the same key's)" : "");
             return PushSender.Result.FAILED;
         } catch (IOException e) {
             log.warn("APNs push failed ({})", e.getClass().getSimpleName());

@@ -71,4 +71,15 @@ class ApnsSenderTest {
         assertThat(ApnsSender.TOKEN.matcher("a".repeat(64)).matches()).isTrue();
         assertThat(ApnsSender.TOKEN.matcher("../../etc").matches()).isFalse();
     }
+
+    /** A Windows line ending, spaces or quotes from pasting into an env file would make Apple refuse every push. */
+    @Test
+    void pastedValuesAreCleaned() {
+        ApnsProperties p = new ApnsProperties(" KEY\r\n", "\"46V2XL6376\"", "'P9273YDUQ9'\r", "com.hellocirclo.app ");
+        assertThat(p.key()).isEqualTo("KEY");
+        assertThat(p.keyId()).isEqualTo("46V2XL6376");
+        assertThat(p.teamId()).isEqualTo("P9273YDUQ9");
+        assertThat(p.topic()).isEqualTo("com.hellocirclo.app");
+        assertThat(new ApnsProperties(null, "", "  ", null).configured()).isFalse();
+    }
 }

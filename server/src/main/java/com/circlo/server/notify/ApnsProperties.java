@@ -14,6 +14,25 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 @ConfigurationProperties("circlo.apns")
 public record ApnsProperties(String key, String keyId, String teamId, String topic) {
 
+    /** Values pasted into an env file often bring a stray space, Windows line ending or quotes; Apple refuses those. */
+    public ApnsProperties {
+        key = clean(key);
+        keyId = clean(keyId);
+        teamId = clean(teamId);
+        topic = clean(topic);
+    }
+
+    static String clean(String s) {
+        if (s == null) {
+            return null;
+        }
+        String t = s.strip();
+        if (t.length() >= 2 && (t.startsWith("\"") && t.endsWith("\"") || t.startsWith("'") && t.endsWith("'"))) {
+            t = t.substring(1, t.length() - 1).strip();
+        }
+        return t;
+    }
+
     public boolean configured() {
         return notBlank(key) && notBlank(keyId) && notBlank(teamId) && notBlank(topic);
     }
