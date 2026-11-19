@@ -1,6 +1,6 @@
 import { Appearance } from 'react-native';
 
-import type { ThemeChoice } from '@/lib/theme';
+import type { DarkTheme, ThemeChoice } from '@/lib/theme';
 
 // Dark mode is class-based (tailwind.config.js), so on web the `dark` class on <html> has to follow the chosen theme
 // (Settings → Display, lib/theme): Light, Dark, or the OS setting, the same source usePalette's useColorScheme()
@@ -19,6 +19,11 @@ if (root) {
   Appearance.addChangeListener(sync);
   // Put the class back if anything else changes it.
   new MutationObserver(sync).observe(root, { attributes: true, attributeFilter: ['class'] });
+}
+
+/** Dim or Dark whenever the app is dark: the `dim` class on <html> switches the neutrals' CSS variables. */
+export function applyDarkTheme(theme: DarkTheme): void {
+  root?.classList.toggle('dim', theme === 'dim');
 }
 
 /** Light or Dark for the whole app, or back to the browser's own setting ('system'). */

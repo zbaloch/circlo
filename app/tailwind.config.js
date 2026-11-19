@@ -1,8 +1,11 @@
-const { colors } = require('./src/theme/tokens');
+const plugin = require('tailwindcss/plugin');
+const { neutralVars, tailwindColors } = require('./src/theme/tokens');
 
 /**
  * NativeWind palette from src/theme/tokens.js (docs/PLAN.md section 2A).
- * Every token has a `dark` variant; use them as `bg-surface dark:bg-surface-dark`.
+ * Every token has a `dark` variant; use them as `bg-surface dark:bg-surface-dark`. The neutrals' dark values are CSS
+ * variables with one set per dark theme, Dark or Dim (Settings → Display): defined here for the web (`dim` class on
+ * <html>), and set at the app's root on phones (app/_layout.tsx).
  * @type {import('tailwindcss').Config}
  */
 module.exports = {
@@ -13,7 +16,7 @@ module.exports = {
   darkMode: 'class',
   theme: {
     extend: {
-      colors,
+      colors: tailwindColors,
       // Inter, bundled with the app; components/ui/text.tsx maps font-weight classes to these families. Scripts Inter
       // doesn't cover get no family, so the phone's own fonts draw them (lib/script).
       fontFamily: {
@@ -25,5 +28,9 @@ module.exports = {
       },
     },
   },
-  plugins: [],
+  plugins: [
+    plugin(({ addBase }) => {
+      addBase({ ':root': neutralVars('dark'), ':root.dim': neutralVars('dim') });
+    }),
+  ],
 };

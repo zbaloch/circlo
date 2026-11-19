@@ -15,6 +15,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import { View } from 'react-native';
+import { vars } from 'nativewind';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -26,11 +27,13 @@ import { BackButton, HeaderBar } from '@/components/ui/header';
 import { Spinner } from '@/components/ui/spinner';
 import { ToastHost } from '@/components/ui/toast-host';
 import { SessionProvider, useSession } from '@/lib/session';
-import { loadTheme, useThemeLoaded } from '@/lib/theme';
+import { loadTheme, useDarkTheme, useThemeLoaded } from '@/lib/theme';
+import { neutralVars } from '@/theme/tokens';
 import { usePalette } from '@/theme/use-palette';
 
 // Keep the splash screen up until the bundled fonts are ready, so text never flashes in the system font.
 SplashScreen.preventAutoHideAsync().catch(() => undefined);
+const DARK_THEME_VARS = { dark: vars(neutralVars('dark')), dim: vars(neutralVars('dim')) };
 // The chosen theme (Settings → Display) is applied before the splash screen goes, so nothing flashes the wrong colours.
 void loadTheme();
 
@@ -116,6 +119,7 @@ export default function RootLayout() {
     Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold, Inter_800ExtraBold,
   });
   const themeLoaded = useThemeLoaded();
+  const darkTheme = useDarkTheme();
   const ready = (fontsLoaded || !!fontError) && themeLoaded;
   useEffect(() => {
     if (ready) SplashScreen.hideAsync().catch(() => undefined);
@@ -129,7 +133,9 @@ export default function RootLayout() {
   if (!ready) return null;
 
   return (
-    <GestureHandlerRootView className="flex-1">
+    // The dark theme's neutrals (Dark or Dim) as CSS variables for everything below, sheets included. NativeWind's
+    // vars() is how variables reach phones; on the web the `dim` class on <html> does the same (theme/color-scheme).
+    <GestureHandlerRootView className="flex-1" style={DARK_THEME_VARS[darkTheme]}>
       {/* Keyboard handling that works with Android's edge-to-edge layout (where window resizing no longer happens). */}
       <KeyboardProvider>
       <ThemeProvider value={theme}>

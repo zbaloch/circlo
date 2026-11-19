@@ -40,4 +40,35 @@ const colors = {
   },
 };
 
-module.exports = { colors };
+/**
+ * The two dark themes (Settings → Display, owner 2026-11-19) differ only in these neutrals; accents stay the same.
+ * - dark: near-black with a slight blue tint (the default).
+ * - dim: classic Twitter's Dim, a soft navy, for the retro feel: its background #15202B, border #38444D and grey-blue
+ *   secondary text #8899A6 (5.4:1 on the background), with Circlo's sky accent.
+ */
+const darkNeutrals = {
+  dark: { surface: '#0B0F14', 'surface-raised': '#151B22', ink: '#E7E9EA', muted: '#8B98A5', border: '#2F3336' },
+  dim: { surface: '#15202B', 'surface-raised': '#1E2732', ink: '#F7F9F9', muted: '#8899A6', border: '#38444D' },
+};
+
+/** CSS variable names for the neutrals, set per dark theme (tailwind.config.js for the web, the app's root on phones). */
+const neutralVar = (name) => `--circlo-${name}-dark`;
+
+/**
+ * The palette Tailwind builds classes from: like `colors`, but the neutrals' dark values are variables, so
+ * `dark:bg-surface-dark` shows Dark or Dim without any component knowing which.
+ */
+const tailwindColors = {
+  ...colors,
+  surface: { ...colors.surface, dark: `var(${neutralVar('surface')})`, 'raised-dark': `var(${neutralVar('surface-raised')})` },
+  ink: { ...colors.ink, dark: `var(${neutralVar('ink')})` },
+  muted: { ...colors.muted, dark: `var(${neutralVar('muted')})` },
+  border: { ...colors.border, dark: `var(${neutralVar('border')})` },
+};
+
+/** `{ '--circlo-surface-dark': '#…', … }` for one dark theme. */
+function neutralVars(theme) {
+  return Object.fromEntries(Object.entries(darkNeutrals[theme]).map(([name, value]) => [neutralVar(name), value]));
+}
+
+module.exports = { colors, darkNeutrals, tailwindColors, neutralVars };

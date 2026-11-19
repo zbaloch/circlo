@@ -1,21 +1,23 @@
 import { useColorScheme } from 'react-native';
 
-import { resolveScheme, useThemeChoice } from '@/lib/theme';
+import { resolveScheme, useDarkTheme, useThemeChoice } from '@/lib/theme';
 
-import { colors } from './tokens';
+import { colors, darkNeutrals } from './tokens';
 
 /** Raw colour values for APIs that can't take class names (navigation options, icon colours). */
 export function usePalette() {
   // The chosen theme (Settings → Display), or the device's own setting.
   const dark = resolveScheme(useThemeChoice(), useColorScheme()) === 'dark';
+  // Dark or Dim: they differ only in the neutrals.
+  const night = darkNeutrals[useDarkTheme()];
   return {
     dark,
     primary: dark ? colors.primary.dark : colors.primary.DEFAULT,
     onPrimary: dark ? colors['on-primary'].dark : colors['on-primary'].DEFAULT,
-    surface: dark ? colors.surface.dark : colors.surface.DEFAULT,
-    ink: dark ? colors.ink.dark : colors.ink.DEFAULT,
-    muted: dark ? colors.muted.dark : colors.muted.DEFAULT,
-    border: dark ? colors.border.dark : colors.border.DEFAULT,
+    surface: dark ? night.surface : colors.surface.DEFAULT,
+    ink: dark ? night.ink : colors.ink.DEFAULT,
+    muted: dark ? night.muted : colors.muted.DEFAULT,
+    border: dark ? night.border : colors.border.DEFAULT,
     danger: dark ? colors.danger.dark : colors.danger.DEFAULT,
   };
 }
