@@ -1,10 +1,13 @@
 import { useColorScheme } from 'react-native';
 
+import { resolveScheme, useThemeChoice } from '@/lib/theme';
+
 import { colors } from './tokens';
 
 /** Raw colour values for APIs that can't take class names (navigation options, icon colours). */
 export function usePalette() {
-  const dark = useColorScheme() === 'dark';
+  // The chosen theme (Settings → Display), or the device's own setting.
+  const dark = resolveScheme(useThemeChoice(), useColorScheme()) === 'dark';
   return {
     dark,
     primary: dark ? colors.primary.dark : colors.primary.DEFAULT,

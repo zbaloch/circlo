@@ -26,10 +26,13 @@ import { BackButton, HeaderBar } from '@/components/ui/header';
 import { Spinner } from '@/components/ui/spinner';
 import { ToastHost } from '@/components/ui/toast-host';
 import { SessionProvider, useSession } from '@/lib/session';
+import { loadTheme, useThemeLoaded } from '@/lib/theme';
 import { usePalette } from '@/theme/use-palette';
 
 // Keep the splash screen up until the bundled fonts are ready, so text never flashes in the system font.
 SplashScreen.preventAutoHideAsync().catch(() => undefined);
+// The chosen theme (Settings → Display) is applied before the splash screen goes, so nothing flashes the wrong colours.
+void loadTheme();
 
 /**
  * Signed-out users only reach the onboarding stack. Signed-in users get the drawer + tabs ((drawer)), with every other
@@ -79,6 +82,7 @@ function Navigator() {
         <Stack.Screen name="settings/index" options={page('Settings and privacy')} />
         <Stack.Screen name="settings/account" options={page('Your account')} />
         <Stack.Screen name="settings/storage" options={page('Storage')} />
+        <Stack.Screen name="settings/display" options={page('Display')} />
         <Stack.Screen name="settings/notifications" options={page('Notifications')} />
         <Stack.Screen name="settings/privacy" options={page('Privacy and safety')} />
         <Stack.Screen name="settings/about" options={page('About Circlo')} />
@@ -111,7 +115,8 @@ export default function RootLayout() {
     // Hindi, Japanese…) use the phone's own fonts (lib/script).
     Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold, Inter_800ExtraBold,
   });
-  const ready = fontsLoaded || !!fontError;
+  const themeLoaded = useThemeLoaded();
+  const ready = (fontsLoaded || !!fontError) && themeLoaded;
   useEffect(() => {
     if (ready) SplashScreen.hideAsync().catch(() => undefined);
   }, [ready]);
@@ -138,7 +143,8 @@ export default function RootLayout() {
           </AppFrame>
           <DialogHost />
         </SessionProvider>
-        <StatusBar style="auto" />
+        {/* Follows the chosen theme, not only the device's setting. */}
+        <StatusBar style={palette.dark ? 'light' : 'dark'} />
       </ThemeProvider>
       </KeyboardProvider>
     </GestureHandlerRootView>
