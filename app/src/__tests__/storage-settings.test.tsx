@@ -23,15 +23,14 @@ describe('storage used', () => {
     expect(formatBytes(2_500_000_000_000)).toBe('2.5 TB');
   });
 
-  it('shows the total, and what it is made of', async () => {
+  it('shows the total, and what it is made of, with the profile photo among the photos', async () => {
     await render(<StorageScreen />);
     expect(await screen.findByText('1.2 GB')).toBeTruthy();
-    expect(screen.getByText('1,204 photos')).toBeTruthy();
-    expect(screen.getByText('834 MB')).toBeTruthy();
+    expect(screen.getByText('1,205 photos')).toBeTruthy();
+    expect(screen.getByText('834 MB')).toBeTruthy(); // 834 MB + 300 KB
     expect(screen.getByText('23 videos')).toBeTruthy();
     expect(screen.getByText('400 MB')).toBeTruthy();
-    expect(screen.getByText('Profile photo')).toBeTruthy();
-    expect(screen.getByText('300 KB')).toBeTruthy();
+    expect(screen.queryByText('Profile photo')).toBeNull();
     // Other people's photos and videos don't count.
     expect(screen.getByText(/other people share with you don’t use your space/)).toBeTruthy();
   });

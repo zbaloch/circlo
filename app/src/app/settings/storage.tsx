@@ -11,7 +11,10 @@ import { fetchStorage, formatBytes, type StorageUsage } from '@/lib/storage-usag
 
 const count = (n: number, one: string, many: string) => `${n.toLocaleString('en')} ${n === 1 ? one : many}`;
 
-/** Storage: how much space my photos and videos take on Circlo (owner request 2026-11-08). Only ever my own. */
+/**
+ * Storage: how much space my photos and videos take on Circlo (owner request 2026-11-08). Only ever my own. My profile
+ * photo is one of my photos, not a row of its own (owner 2026-11-19).
+ */
 export default function StorageScreen() {
   const [usage, setUsage] = useState<StorageUsage | null>(null);
   const [error, setError] = useState<string>();
@@ -41,14 +44,11 @@ export default function StorageScreen() {
       </View>
       {usage ? (
         <Section>
-          <Row title={count(usage.photos, 'photo', 'photos')}>
-            <Text className="text-[15px] text-muted dark:text-muted-dark">{formatBytes(usage.photoBytes)}</Text>
+          <Row title={count(usage.photos + (usage.profilePhotoBytes > 0 ? 1 : 0), 'photo', 'photos')}>
+            <Text className="text-[15px] text-muted dark:text-muted-dark">{formatBytes(usage.photoBytes + usage.profilePhotoBytes)}</Text>
           </Row>
           <Row title={count(usage.videos, 'video', 'videos')}>
             <Text className="text-[15px] text-muted dark:text-muted-dark">{formatBytes(usage.videoBytes)}</Text>
-          </Row>
-          <Row title="Profile photo">
-            <Text className="text-[15px] text-muted dark:text-muted-dark">{formatBytes(usage.profilePhotoBytes)}</Text>
           </Row>
         </Section>
       ) : null}
