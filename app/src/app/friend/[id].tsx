@@ -8,14 +8,17 @@ import { CircleBadge } from '@/components/circle-badge';
 import { circlesLine, EveryoneRow, memberLine } from '@/components/circle-choice';
 import { ErrorText } from '@/components/form';
 import { ProfileFeed } from '@/components/profile-feed';
+import { DialogHost } from '@/components/ui/dialog-host';
 import { Spinner } from '@/components/ui/spinner';
 import { Text } from '@/components/ui/text';
 import { describeError } from '@/lib/account';
 import { loadAddressBook, type AddressBook, type Contact } from '@/lib/addressbook';
 import { blockUser } from '@/lib/blocks';
 import { circleDefs, circleName, circlesOf, confirmMembership, setCircles, unfriend } from '@/lib/circles';
-import { showAlert } from '@/lib/dialog';
+import { dialogOpen, dismissDialog, showAlert } from '@/lib/dialog';
+import { CHAT_ENABLED } from '@/lib/features';
 import { loadProfile, type Profile } from '@/lib/friends';
+import { startChat } from '@/lib/messaging';
 import { showToast } from '@/lib/toast';
 import { displayName, useConnections } from '@/lib/use-connections';
 import { ContentText } from '@/components/content-text';
@@ -24,7 +27,8 @@ import { usePalette } from '@/theme/use-palette';
 /**
  * A friend's profile, laid out like X / Bluesky: avatar, name, bio, posts.
  * Everything about MY relationship with them (their circles, removing them) sits behind one button beside the avatar
- * showing their circles. It is author-only: they are never told and never see a label (PLAN.md 2A).
+ * showing their circles. It is author-only: they are never told and never see a label (PLAN.md 2A). A Message
+ * button beside it opens our chat, as on X.
  */
 export default function FriendScreen() {
   // `circles=1`: opened to choose their circles (someone who just joined with my link).
@@ -41,12 +45,15 @@ export default function FriendScreen() {
     loadProfile(id).then(setProfile, () => {});
   }, [id]);
 
+  const loadBook = useCallback(() => {
+    if (account) void loadAddressBook(account).then(setBook);
+  }, [account]);
   const reloadBook = useCallback(() => {
     // The screen stays mounted between visits: reopen with the sheet closed, unless sent here to choose circles.
     setOpen(openOnArrival.current);
     openOnArrival.current = false;
-    if (account) void loadAddressBook(account).then(setBook);
-  }, [account]);
+    loadBook();
+  }, [loadBook]);
   useFocusEffect(reloadBook);
 
   const c = connections?.find((x) => x.userId === id);
@@ -89,6 +96,24 @@ export default function FriendScreen() {
   // The button beside the avatar: Everyone, plus their circles.
   const theirCircles = contact && book ? circlesOf(book, contact) : [];
   const circlesText = book ? circlesLine(book, theirCircles) : '';
+  // Message, X-style: opens our chat (a 1:1 chat with someone reopens the one we have).
+  const messageButton =
+    CHAT_ENABLED && c.status === 'accepted' ? (
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`Message ${name}`}
+        disabled={busy}
+        onPress={() =>
+          void run(async () => {
+            const chatId = await startChat(account, [c.userId]);
+            router.push({ pathname: '/chat/[id]', params: { id: chatId } });
+          })
+        }
+        className="h-10 w-10 items-center justify-center rounded-full border border-border active:bg-surface-raised dark:border-border-dark dark:active:bg-surface-raised-dark">
+        <Icon name="mail-outline" size={20} color={palette.ink} />
+      </Pressable>
+    ) : null;
+
   const circleButton =
     contact && book ? (
       <Pressable
@@ -118,7 +143,8 @@ export default function FriendScreen() {
               void run(async () => {
                 const current = circlesOf(book, contact);
                 await setCircles(account, c.userId, on ? [...current, id] : current.filter((x) => x !== id));
-                reloadBook();
+                // The sheet stays open, so several circles can be changed in a row.
+                loadBook();
                 showToast(done);
               }),
             )
@@ -141,7 +167,14 @@ export default function FriendScreen() {
         handle={c.profile.handle}
         bio={profile?.bio}
         avatarUrl={profile?.avatarUrl ?? c.profile.avatarUrl}
-        headerRight={circleButton ?? undefined}
+        headerRight={
+          messageButton || circleButton ? (
+            <>
+              {messageButton}
+              {circleButton}
+            </>
+          ) : undefined
+        }
         actions={below}
       />
     );
@@ -192,7 +225,8 @@ function FriendSheet({ visible, name, book, contact, busy, onClose, onToggle, on
     </Pressable>
   );
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+    // The back button closes a dialog first (it's drawn inside this sheet), then the sheet.
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={() => (dialogOpen() ? dismissDialog() : onClose())}>
       <Pressable accessibilityLabel="Close" className="flex-1 bg-black/40" onPress={onClose} />
       <View className="max-h-[85%] rounded-t-3xl bg-surface pb-6 dark:bg-surface-dark">
         <View className="items-center py-3">
@@ -238,6 +272,8 @@ function FriendSheet({ visible, name, book, contact, busy, onClose, onToggle, on
           {row('ban-outline', `Block ${name}`, onBlock, true)}
         </ScrollView>
       </View>
+      {/* Dialogs opened from the sheet (circle changes, remove, block) show here, over it, not as a second Modal. */}
+      <DialogHost inline />
     </Modal>
   );
 }

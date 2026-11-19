@@ -32,7 +32,8 @@ import { chatTitle, dayLabel } from '@/lib/view-logic';
 import { onLiveChange } from '@/lib/live';
 import { usePalette } from '@/theme/use-palette';
 import { Text, TextInput } from '@/components/ui/text';
-import { showAlert } from '@/lib/dialog';
+import { DialogHost } from '@/components/ui/dialog-host';
+import { dialogOpen, dismissDialog, showAlert } from '@/lib/dialog';
 import { Spinner } from '@/components/ui/spinner';
 
 type Row = { kind: 'day'; label: string; key: string } | { kind: 'msg'; msg: ChatMessage; key: string; showName: boolean };
@@ -248,7 +249,7 @@ export function ChatScreen() {
       </View>
       <KeyboardSpacer />
 
-      <Modal visible={members} transparent animationType="slide" onRequestClose={() => setMembers(false)}>
+      <Modal visible={members} transparent animationType="slide" onRequestClose={() => (dialogOpen() ? dismissDialog() : setMembers(false))}>
         <Pressable accessibilityLabel="Close" className="flex-1 bg-black/40" onPress={() => setMembers(false)} />
         <View className="max-h-[70%] gap-1 rounded-t-3xl bg-surface pb-8 pt-4 dark:bg-surface-dark">
           <Text className="px-5 pb-2 text-xl font-bold text-ink dark:text-ink-dark">People</Text>
@@ -306,6 +307,8 @@ export function ChatScreen() {
             </Pressable>
           ) : null}
         </View>
+        {/* Dialogs opened from this sheet show inside it, not as a second Modal. */}
+        <DialogHost inline />
       </Modal>
     </SafeAreaView>
   );
