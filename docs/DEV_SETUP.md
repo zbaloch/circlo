@@ -180,6 +180,33 @@ Both platforms get the same pushes and taps open the same screens.
 4. **Test** on a real Android phone with a release build, the same way as on iPhone above; Android 13+ asks for the
    notification permission on Circlo's prompt.
 
+### Testing push (locally and in production)
+
+What pushes: a chat message at once ("New message", at most one per chat a minute; a tap opens the chat), security
+alerts at once, and the calm daily note at about 6pm. Replies and requests are only in the daily note.
+
+1. **Is push on?** The server logs at startup `Push: iPhone (APNs) on|OFF, Android (FCM) on|OFF`.
+2. **Locally:** put the Firebase service account in `server/.env` (git-ignored) as `CIRCLO_FCM_SERVICE_ACCOUNT=...`
+   (base64 of the file, one line) and restart the server. A dev build only gets FCM when it's built with the
+   google-services.json, so build it with the path set:
+   `$env:GOOGLE_SERVICES_FILE="C:\path\outside\the\repo\google-services.json"; npx expo run:android --device`.
+   Open Circlo on the phone and turn notifications on (Settings → Notifications) so it registers its token.
+3. **Send a test** to all your phones. Sign in with curl (password only, as apps before 1.1.0 do, while
+   `CIRCLO_LOGIN_CODE_FOR_OLD_APPS` is off; otherwise add `"emailCode": true` and finish with `/v1/auth/login/verify`),
+   then call the test endpoint with the access token. Use `http://localhost:8080` locally, the API host in production:
+   ```
+   curl -s -X POST $API/v1/auth/login -H 'content-type: application/json' \
+     -d '{"login":"<username>","password":"<password>"}'
+   curl -s -X POST $API/v1/push/test -H "authorization: Bearer <accessToken>"
+   ```
+   The answer says whether each provider has credentials and what happened on each phone:
+   `{"apns":"on","fcm":"on","phones":[{"deviceId":"…","kind":"android","result":"sent"}]}`. Results: `sent`;
+   `notifications_off` (no token: open the app and turn notifications on); `provider_off` (that provider's credentials
+   aren't set); `unregistered` (Apple or Google say the app is gone; it registers again on its next launch); `failed`
+   (the server log has `FCM push failed: HTTP <status> <error code>` or `APNs push failed: HTTP <status> <reason>`).
+   At most 10 tests an hour. The curl sign-in is a device of its own (and your phones get a "New sign-in" alert, itself
+   a test); sign it out afterwards with `curl -s -X POST $API/v1/auth/logout -H "authorization: Bearer <accessToken>"`.
+
 ## 9. GitHub required checks
 
 Only `secret-scan / gitleaks` should be a *required* status check. The per-folder CI workflows use path filters and

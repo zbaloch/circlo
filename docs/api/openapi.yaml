@@ -361,6 +361,38 @@ paths:
       summary: Stop pushes to this device
       responses:
         "200": { $ref: "#/components/responses/Status" }
+  /v1/push/test:
+    post:
+      summary: >-
+        Send a test notification ("This is a test notification from Circlo.", data {type: test}) to all my phones.
+        For checking push end to end, e.g. with curl. At most 10 an hour.
+      responses:
+        "200":
+          description: Whether each provider has credentials, and what happened on each of my phones
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [apns, fcm, phones]
+                properties:
+                  apns: { type: string, enum: ["on", "off"] }
+                  fcm: { type: string, enum: ["on", "off"] }
+                  phones:
+                    type: array
+                    items:
+                      type: object
+                      required: [deviceId, kind, result]
+                      properties:
+                        deviceId: { type: string, format: uuid }
+                        kind: { type: string, enum: [ios, android] }
+                        result:
+                          type: string
+                          description: >-
+                            sent; unregistered (Apple or Google say the app is gone, it registers again on its next
+                            launch); failed (the server log says why); notifications_off; provider_off (no credentials)
+                          enum: [sent, unregistered, failed, notifications_off, provider_off]
+        "401": { $ref: "#/components/responses/Error" }
+        "429": { $ref: "#/components/responses/Error" }
   /v1/events:
     get:
       summary: Live updates. Answers with my version as soon as it differs from `since` (at once if it already does), else after 25 s

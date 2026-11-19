@@ -15,6 +15,11 @@ public interface PushSender {
     /** False when no credentials are configured; nothing is sent then. */
     boolean enabled();
 
+    /** False when the provider for this service (apns, apns_sandbox, fcm) has no credentials. */
+    default boolean enabled(String service) {
+        return enabled();
+    }
+
     /** `service`: apns, apns_sandbox (iPhone) or fcm (Android). */
     Result send(String service, String token, Message message);
 }

@@ -40,6 +40,6 @@ class AcceptedRequestIT extends IntegrationTest {
 
         // Ben's daily note comes that evening.
         sendDaily();
-        assertThat(push.to("acc-tok-ben")).hasSize(1);
+        assertThat(push.to("acc-tok-ben", "digest")).hasSize(1);
     }
 }

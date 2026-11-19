@@ -24,7 +24,10 @@ import java.time.Instant;
 import java.util.Base64;
 import java.util.Date;
 import java.util.Map;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 /**
@@ -34,7 +37,10 @@ import org.springframework.stereotype.Component;
 @Component
 public class FcmSender implements PushService {
 
+    private static final Logger log = LoggerFactory.getLogger(FcmSender.class);
     static final Pattern TOKEN = Pattern.compile("[A-Za-z0-9_:.-]{20,400}");
+    private static final Pattern ERROR_CODE = Pattern.compile("\"errorCode\"\\s*:\\s*\"([A-Z_]{1,60})\"");
+    private static final Pattern STATUS = Pattern.compile("\"status\"\\s*:\\s*\"([A-Z_]{1,60})\"");
     static final String SCOPE = "https://www.googleapis.com/auth/firebase.messaging";
     private static final String TOKEN_URI = "https://oauth2.googleapis.com/token";
 
@@ -100,6 +106,7 @@ public class FcmSender implements PushService {
                     .header("content-type", "application/x-www-form-urlencoded").POST(HttpRequest.BodyPublishers.ofString(form)).build(),
                     HttpResponse.BodyHandlers.ofString());
             if (res.statusCode() != 200) {
+                log.warn("FCM: Google refused the service account (HTTP {} {}); check CIRCLO_FCM_SERVICE_ACCOUNT", res.statusCode(), error(res.body()));
                 throw new IOException("token exchange failed");
             }
             try {
@@ -128,6 +135,17 @@ public class FcmSender implements PushService {
                 + ",\"default_sound\":true}}}}";
     }
 
+    /** Google's error code from a response (the most specific one: errorCode, else status), or "" if there's none. */
+    static String error(String body) {
+        String b = body == null ? "" : body;
+        Matcher code = ERROR_CODE.matcher(b);
+        if (code.find()) {
+            return code.group(1);
+        }
+        Matcher status = STATUS.matcher(b);
+        return status.find() ? status.group(1) : "";
+    }
+
     @Override
     public PushSender.Result send(String service, String token, PushSender.Message m) {
         if (!enabled() || !TOKEN.matcher(token).matches()) {
@@ -148,6 +166,8 @@ public class FcmSender implements PushService {
                     || (res.statusCode() == 400 && res.body().contains("registration token"))) {
                 return PushSender.Result.UNREGISTERED;
             }
+            // Only the status and Google's error code: never the token.
+            log.warn("FCM push failed: HTTP {} {}", res.statusCode(), error(res.body()));
             if (res.statusCode() == 401) {
                 synchronized (this) {
                     accessToken = null;
@@ -155,6 +175,7 @@ public class FcmSender implements PushService {
             }
             return PushSender.Result.FAILED;
         } catch (IOException e) {
+            log.warn("FCM push failed ({})", e.getClass().getSimpleName());
             return PushSender.Result.FAILED;
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();

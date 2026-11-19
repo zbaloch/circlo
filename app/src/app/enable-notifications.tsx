@@ -44,7 +44,7 @@ export default function EnableNotificationsScreen() {
           <Text className="text-center text-3xl font-extrabold text-ink dark:text-ink-dark">Know when something’s new</Text>
           <Text className="text-center text-base text-muted dark:text-muted-dark">
             {usesPush
-              ? `Once a day, around 6pm, and only on days something happened, Circlo lets you know there are new replies${CHAT_ENABLED ? ', messages' : ''} or requests waiting.`
+              ? `New ${CHAT_ENABLED ? 'messages, ' : ''}replies and friend requests as they happen, and a calm reminder around 6pm on days something happened.`
               : `Now and then Circlo checks for new replies${CHAT_ENABLED ? ', messages' : ''} and requests, and lets you know at most once a day.`}
           </Text>
         </View>

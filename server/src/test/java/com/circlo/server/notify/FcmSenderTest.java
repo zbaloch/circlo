@@ -87,4 +87,16 @@ class FcmSenderTest {
         assertThat(fcmOff.handles("fcm")).isTrue();
         assertThat(FcmSender.TOKEN.matcher("dGVzdA:APA91b" + "x".repeat(140)).matches()).isTrue();
     }
+
+    /** Failures log Google's error code (never the message or token), preferring the specific errorCode. */
+    @Test
+    void errorCodeFromGooglesAnswer() {
+        assertThat(FcmSender.error("""
+                {"error": {"code": 403, "message": "SenderId mismatch", "status": "PERMISSION_DENIED",
+                  "details": [{"@type": "type.googleapis.com/google.firebase.fcm.v1.FcmError", "errorCode": "SENDER_ID_MISMATCH"}]}}"""))
+                .isEqualTo("SENDER_ID_MISMATCH");
+        assertThat(FcmSender.error("{\"error\":{\"code\":401,\"status\":\"UNAUTHENTICATED\"}}")).isEqualTo("UNAUTHENTICATED");
+        assertThat(FcmSender.error("not json")).isEmpty();
+        assertThat(FcmSender.error(null)).isEmpty();
+    }
 }

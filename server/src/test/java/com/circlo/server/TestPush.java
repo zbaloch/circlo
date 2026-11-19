@@ -41,6 +41,19 @@ public class TestPush {
         }
     }
 
+    /** Pushes of this type ("digest", "message", "reply", "request", "friend", "security", "test") to this token. */
+    public List<Sent> to(String token, String type) {
+        return to(token).stream().filter(s -> type.equals(s.data().get("type"))).toList();
+    }
+
+    /** Waits up to 3 s for `n` pushes of this type to this token. */
+    public List<Sent> await(String token, String type, int n) throws InterruptedException {
+        for (int i = 0; i < 60 && to(token, type).size() < n; i++) {
+            Thread.sleep(50);
+        }
+        return to(token, type);
+    }
+
     /** Waits up to 3 s for `n` pushes to this token (they are sent after the request's transaction commits). */
     public List<Sent> await(String token, int n) throws InterruptedException {
         for (int i = 0; i < 60 && to(token).size() < n; i++) {

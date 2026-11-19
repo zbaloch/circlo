@@ -88,7 +88,7 @@ class EngagementFlowIT extends IntegrationTest {
     }
 
     @Test
-    void theDailyPushIsCalmAndOnlyReachesTheRecipient() {
+    void theDailyPushIsCalmAndOnlyReachesTheRecipient() throws Exception {
         TestUser a = user("push_author");
         TestUser b = user("push_friend");
         a.befriend(b);
@@ -112,7 +112,7 @@ class EngagementFlowIT extends IntegrationTest {
         assertThat(toA.get(0).alert()).isEqualTo(NotifyChannelsIT.CALM_PUSH);
         assertThat(toA.get(0).service()).isEqualTo("apns");
         assertThat(toA.get(0).data()).isEqualTo(Map.of("type", "digest"));
-        List<TestPush.Sent> toAndroid = push.to("fcm-tok-a");
+        List<TestPush.Sent> toAndroid = push.to("fcm-tok-a", "digest"); // the reply itself was pushed at once too (PushIT)
         assertThat(toAndroid).hasSize(1);
         assertThat(toAndroid.get(0).service()).isEqualTo("fcm");
         assertThat(toAndroid.get(0).data()).isEqualTo(toA.get(0).data());
@@ -120,8 +120,10 @@ class EngagementFlowIT extends IntegrationTest {
 
         String chat = (String) a.call("POST", "/v1/chats", Map.of("userIds", List.of(b.userId.toString()))).getBody().get("chatId");
         a.call("POST", "/v1/chats/" + chat + "/messages", Map.of("text", "meet at 7"));
+        // The message is pushed at once (PushIT), and counts towards B's day.
+        assertThat(push.await("tok-b", 1).get(0).data()).containsEntry("type", "message");
         sendDaily();
-        List<TestPush.Sent> toB = push.to("tok-b");
+        List<TestPush.Sent> toB = push.to("tok-b").stream().filter(s -> "digest".equals(s.data().get("type"))).toList();
         assertThat(toB).hasSize(1);
         assertThat(toB.get(0).service()).isEqualTo("apns_sandbox");
         assertThat(push.to("tok-a").stream().filter(s -> "digest".equals(s.data().get("type")))).hasSize(1); // a quiet day for A
@@ -135,7 +137,7 @@ class EngagementFlowIT extends IntegrationTest {
         b.call("POST", "/v1/blocks/" + a.userId, null);
         a.call("POST", "/v1/chats/" + chat + "/messages", Map.of("text", "hello?"));
         sendDaily();
-        assertThat(push.to("tok-b")).hasSize(1);
+        assertThat(push.to("tok-b")).hasSize(2); // the message and the day, nothing new
         assertThat(a.status("POST", "/v1/auth/logout", null)).isEqualTo(200);
         // Only the device that signed out; A's Android phone is still signed in and keeps its token.
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM devices WHERE push_token_enc IS NOT NULL AND id = ?", Integer.class,
@@ -145,17 +147,18 @@ class EngagementFlowIT extends IntegrationTest {
     }
 
     @Test
-    void friendRequestsAreToldAndUnregisteredTokensAreForgotten() {
+    void friendRequestsAreToldAndUnregisteredTokensAreForgotten() throws Exception {
         TestUser a = user("pushreq_a");
         TestUser b = user("pushreq_b");
         a.call("PUT", "/v1/devices/current/push-token", Map.of("token", "bad-token", "service", "apns"));
         String token = (String) a.call("POST", "/v1/invites", null).getBody().get("token");
         b.call("POST", "/v1/invites/redeem", Map.of("token", token));
         b.call("POST", "/v1/friends/requests", Map.of("toUserId", a.userId.toString(), "circles", List.of()));
-        sendDaily();
-        List<TestPush.Sent> sent = push.to("bad-token");
+        // The request is pushed at once (PushIT).
+        List<TestPush.Sent> sent = push.await("bad-token", 1);
         assertThat(sent).hasSize(1);
-        assertThat(sent.get(0).data()).isEqualTo(Map.of("type", "digest"));
+        assertThat(sent.get(0).data()).isEqualTo(Map.of("type", "request"));
+        sendDaily();
 
         // Apple said the token is gone: it isn't used again.
         b.call("DELETE", "/v1/friends/" + a.userId, null);

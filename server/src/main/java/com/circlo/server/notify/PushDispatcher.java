@@ -30,6 +30,11 @@ public class PushDispatcher implements PushSender {
     }
 
     @Override
+    public boolean enabled(String service) {
+        return services.stream().anyMatch(s -> s.handles(service) && s.enabled());
+    }
+
+    @Override
     public Result send(String service, String token, Message message) {
         for (PushService s : services) {
             if (s.handles(service)) {

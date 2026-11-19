@@ -1,7 +1,8 @@
 /**
  * Notifications (owner decisions 2026-11-01): one calm, content-free push a day on iPhone (APNs) and Android (FCM),
  * around 6pm on the phone's clock and only on days something happened: "You have a few new things waiting". A tap
- * opens Notifications (lib/push-route); names and words stay in Circlo. Account alerts (new sign-in and so on) come by
+ * opens Notifications (lib/push-route); names and words stay in Circlo. Messages, replies, friend requests and new
+ * friends are pushed as they happen (owner 2026-11-18), content-free; a tap opens the chat, the reply or Notifications. Account alerts (new sign-in and so on) come by
  * email straight away. An Android build without FCM (no google-services.json) falls back to background checks: now and
  * then (about every 15 minutes at best) the phone asks for counts with this device's check token, which can read
  * nothing else, and shows the same calm note at most once a day (a new sign-in at once). The web app uses

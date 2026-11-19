@@ -22,7 +22,10 @@ import java.util.Base64;
 import java.util.Date;
 import java.util.Map;
 import java.util.TreeMap;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 /**
@@ -32,7 +35,9 @@ import org.springframework.stereotype.Component;
 @Component
 public class ApnsSender implements PushService {
 
+    private static final Logger log = LoggerFactory.getLogger(ApnsSender.class);
     static final Pattern TOKEN = Pattern.compile("[0-9a-fA-F]{32,200}");
+    private static final Pattern REASON = Pattern.compile("\"reason\"\\s*:\\s*\"([A-Za-z]{1,60})\"");
     private static final Duration JWT_TTL = Duration.ofMinutes(40);
 
     private final ApnsProperties props;
@@ -139,8 +144,12 @@ public class ApnsSender implements PushService {
             if (res.statusCode() == 410 || res.body().contains("BadDeviceToken") || res.body().contains("DeviceTokenNotForTopic")) {
                 return PushSender.Result.UNREGISTERED;
             }
+            // Only the status and Apple's reason: never the token.
+            Matcher reason = REASON.matcher(res.body());
+            log.warn("APNs push failed: HTTP {} {}", res.statusCode(), reason.find() ? reason.group(1) : "");
             return PushSender.Result.FAILED;
         } catch (IOException e) {
+            log.warn("APNs push failed ({})", e.getClass().getSimpleName());
             return PushSender.Result.FAILED;
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();

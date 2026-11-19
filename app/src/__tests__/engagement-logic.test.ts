@@ -22,6 +22,9 @@ describe('tapping a push', () => {
     expect(pushRoute({ type: 'message', chatId: C }, true)).toEqual({ pathname: '/chat/[id]', params: { id: C } });
     expect(pushRoute({ type: 'request' })).toEqual({ pathname: '/search', params: { section: 'friends' } });
     expect(pushRoute({ type: 'security' })).toBe('/');
+    // A new friend (request accepted, joined with my link) and the server's test push open Notifications.
+    expect(pushRoute({ type: 'friend' })).toBe('/notifications');
+    expect(pushRoute({ type: 'test' })).toBe('/notifications');
   });
 
   it('falls back to Notifications for counts-only or malformed data', () => {

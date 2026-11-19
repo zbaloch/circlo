@@ -52,8 +52,20 @@ class NotifyChannelsIT extends IntegrationTest {
         return access;
     }
 
+    /** Replies, and waits until the reply is counted for the author's day (that happens just after the request). */
     private String reply(TestUser from, String post, String text) {
-        return (String) from.call("POST", "/v1/posts/" + post + "/replies", Map.of("text", text)).getBody().get("replyId");
+        String counted = "SELECT COALESCE(SUM(d.replies), 0) FROM posts p LEFT JOIN daily_digests d ON d.user_id = p.author_id WHERE p.id = ?";
+        Object id = Ids.bytes(java.util.UUID.fromString(post));
+        int before = jdbc.queryForObject(counted, Integer.class, id);
+        String reply = (String) from.call("POST", "/v1/posts/" + post + "/replies", Map.of("text", text)).getBody().get("replyId");
+        for (int i = 0; i < 60 && jdbc.queryForObject(counted, Integer.class, id) == before; i++) {
+            try {
+                Thread.sleep(50);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        }
+        return reply;
     }
 
     @Test
@@ -108,13 +120,13 @@ class NotifyChannelsIT extends IntegrationTest {
         String post = a.post("hello", "everyone", List.of());
         sendDaily();
         int emails = daily(a).size();
-        int pushes = push.to("ch-tok").size();
+        int pushes = push.to("ch-tok", "digest").size();
 
         reply(b, post, "one");
         reply(b, post, "two");
-        assertThat(push.to("ch-tok")).hasSize(pushes); // not straight away
+        assertThat(push.to("ch-tok", "digest")).hasSize(pushes); // the day's note waits for the evening (the replies themselves push at once, PushIT)
         sendDaily();
-        List<TestPush.Sent> sent = push.to("ch-tok");
+        List<TestPush.Sent> sent = push.to("ch-tok", "digest");
         assertThat(sent).hasSize(pushes + 1);
         assertThat(sent.get(sent.size() - 1).alert()).isEqualTo(CALM_PUSH);
         assertThat(sent.get(sent.size() - 1).data()).isEqualTo(Map.of("type", "digest"));
@@ -127,24 +139,24 @@ class NotifyChannelsIT extends IntegrationTest {
         assertThat(call("DELETE", "/v1/devices/current/push-token", null, phone).getStatusCode().value()).isEqualTo(200);
         reply(b, post, "three");
         assertThat(emailsTo(a)).hasSize(emails + 2);
-        assertThat(push.to("ch-tok")).hasSize(pushes + 1);
+        assertThat(push.to("ch-tok", "digest")).hasSize(pushes + 1);
 
         // Daily emails turned off, notifications on again: only the push.
         assertThat(a.call("PUT", "/v1/me/notifications", Map.of("email", false)).getStatusCode().value()).isEqualTo(200);
         call("PUT", "/v1/devices/current/push-token", Map.of("token", "ch-tok", "service", "apns"), phone);
         reply(b, post, "four");
         assertThat(emailsTo(a)).hasSize(emails + 2);
-        assertThat(push.to("ch-tok")).hasSize(pushes + 2);
+        assertThat(push.to("ch-tok", "digest")).hasSize(pushes + 2);
 
         // Both off: nothing at all.
         assertThat(call("DELETE", "/v1/devices/current/push-token", null, phone).getStatusCode().value()).isEqualTo(200);
         reply(b, post, "five");
         assertThat(emailsTo(a)).hasSize(emails + 2);
-        assertThat(push.to("ch-tok")).hasSize(pushes + 2);
+        assertThat(push.to("ch-tok", "digest")).hasSize(pushes + 2);
     }
 
     @Test
-    void aDeletedAppStopsGettingPushesButTheEmailCarriesOn() {
+    void aDeletedAppStopsGettingPushesButTheEmailCarriesOn() throws Exception {
         TestUser a = user("ch_gone");
         TestUser b = user("ch_gone_friend");
         a.befriend(b);
@@ -153,8 +165,10 @@ class NotifyChannelsIT extends IntegrationTest {
         String post = a.post("hello", "everyone", List.of());
         int emails = daily(a).size();
 
-        // Google says the token is dead: the phone stops getting pushes; the email comes as every day.
+        // Google says the token is dead (on the reply's own push): the phone stops getting pushes; the email comes as
+        // every day.
         reply(b, post, "one");
+        assertThat(push.await("bad-gone", "reply", 1)).hasSize(1);
         assertThat(emailsTo(a)).hasSize(emails + 1);
         assertThat(push.to("bad-gone")).hasSize(1);
         assertThat(jdbc.queryForObject("SELECT push_lost FROM devices WHERE user_id = ? AND kind = 'android'", Boolean.class,
@@ -167,7 +181,7 @@ class NotifyChannelsIT extends IntegrationTest {
         call("PUT", "/v1/devices/current/push-token", Map.of("token", "ch-gone-new", "service", "fcm"), phone);
         reply(b, post, "three");
         assertThat(emailsTo(a)).hasSize(emails + 3);
-        assertThat(push.to("ch-gone-new")).hasSize(1);
+        assertThat(push.to("ch-gone-new", "digest")).hasSize(1);
     }
 
     @Test

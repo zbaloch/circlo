@@ -79,9 +79,9 @@ export default function NotificationSettingsScreen() {
   );
 }
 
-const CHECKS_TITLE = 'A daily notification';
+const CHECKS_TITLE = usesPush ? 'Notifications on this phone' : 'A daily notification';
 const CHECKS_NOTE = usesPush
-  ? 'Once a day, around 6pm, and only on days something happened: “You have a few new things waiting.” It never says who, what or how many. Turn it off and your phone isn’t told; the daily email below is separate.'
+  ? `New ${CHAT_ENABLED ? 'messages, ' : ''}replies, friend requests and new friends as they happen, and around 6pm, on days something happened, “You have a few new things waiting.” They never say who, what or how many. Turn it off and your phone isn’t told; the daily email below is separate.`
   : 'Your phone asks Circlo now and then, and at most once a day says there are new things waiting. Nothing goes through Apple or Google. Turn it off and your phone isn’t told; the daily email below is separate.';
 
 const EMAIL_TITLE = 'A daily email';

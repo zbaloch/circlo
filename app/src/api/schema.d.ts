@@ -968,6 +968,60 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/push/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Send a test notification ("This is a test notification from Circlo.", data {type: test}) to all my phones. For checking push end to end, e.g. with curl. At most 10 an hour. */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Whether each provider has credentials, and what happened on each of my phones */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** @enum {string} */
+                            apns: "on" | "off";
+                            /** @enum {string} */
+                            fcm: "on" | "off";
+                            phones: {
+                                /** Format: uuid */
+                                deviceId: string;
+                                /** @enum {string} */
+                                kind: "ios" | "android";
+                                /**
+                                 * @description sent; unregistered (Apple or Google say the app is gone, it registers again on its next launch); failed (the server log says why); notifications_off; provider_off (no credentials)
+                                 * @enum {string}
+                                 */
+                                result: "sent" | "unregistered" | "failed" | "notifications_off" | "provider_off";
+                            }[];
+                        };
+                    };
+                };
+                401: components["responses"]["Error"];
+                429: components["responses"]["Error"];
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/events": {
         parameters: {
             query?: never;
