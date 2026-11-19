@@ -169,13 +169,44 @@ class AuthFlowIT extends IntegrationTest {
     @Test
     void refreshTokensRotateAndReuseRevokesEverything() {
         TestUser a = user("rotate_me");
+        Map<String, Object> other = a.loginAgain();
         var r1 = call("POST", "/v1/auth/refresh", Map.of("refreshToken", a.refreshToken), null);
         assertThat(r1.getStatusCode().value()).isEqualTo(200);
         assertThat(r1.getBody()).containsEntry("deviceId", a.deviceId.toString());
-        // The old token was rotated away; presenting it again means it leaked, so every session ends.
+        var r2 = call("POST", "/v1/auth/refresh", Map.of("refreshToken", r1.getBody().get("refreshToken")), null);
+        assertThat(r2.getStatusCode().value()).isEqualTo(200);
+        // The first token was rotated away and so was the one after it: presenting it again means it leaked, so every
+        // session ends, on every device.
         assertThat(call("POST", "/v1/auth/refresh", Map.of("refreshToken", a.refreshToken), null).getStatusCode().value()).isEqualTo(401);
-        assertThat(call("POST", "/v1/auth/refresh", Map.of("refreshToken", r1.getBody().get("refreshToken")), null).getStatusCode().value())
+        assertThat(call("POST", "/v1/auth/refresh", Map.of("refreshToken", r2.getBody().get("refreshToken")), null).getStatusCode().value())
                 .isEqualTo(401);
+        assertThat(call("POST", "/v1/auth/refresh", Map.of("refreshToken", other.get("refreshToken")), null).getStatusCode().value())
+                .isEqualTo(401);
+    }
+
+    /**
+     * Sessions stay put (owner 2026-11-19): if the app never got the answer to a refresh (connection lost, app closed,
+     * server restarting), it presents the same token again. While what replaced it has never been used, that's a retry,
+     * not a theft: it gets a fresh pair for the same device, and the unused one stops working. Nothing else is signed out.
+     */
+    @Test
+    void aRefreshWhoseAnswerWasLostCanBeRetried() {
+        TestUser a = user("rotate_lost");
+        Map<String, Object> other = a.loginAgain();
+        var lost = call("POST", "/v1/auth/refresh", Map.of("refreshToken", a.refreshToken), null);
+        assertThat(lost.getStatusCode().value()).isEqualTo(200);
+
+        var retry = call("POST", "/v1/auth/refresh", Map.of("refreshToken", a.refreshToken), null);
+        assertThat(retry.getStatusCode().value()).isEqualTo(200);
+        assertThat(retry.getBody()).containsEntry("deviceId", a.deviceId.toString());
+        assertThat(call("GET", "/v1/me", null, (String) retry.getBody().get("accessToken")).getStatusCode().value()).isEqualTo(200);
+        // The answer that never arrived is void; the retry's token carries on, and the other device is untouched.
+        assertThat(call("POST", "/v1/auth/refresh", Map.of("refreshToken", lost.getBody().get("refreshToken")), null).getStatusCode().value())
+                .isEqualTo(401);
+        assertThat(call("POST", "/v1/auth/refresh", Map.of("refreshToken", retry.getBody().get("refreshToken")), null).getStatusCode().value())
+                .isEqualTo(200);
+        assertThat(call("POST", "/v1/auth/refresh", Map.of("refreshToken", other.get("refreshToken")), null).getStatusCode().value())
+                .isEqualTo(200);
     }
 
     @Test

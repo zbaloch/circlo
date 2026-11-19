@@ -78,9 +78,10 @@ public class TokenService {
     }
 
     /**
-     * Single use: the presented refresh token is revoked and a new pair issued for the same device. Presenting an
-     * already-rotated token means it leaked (RFC 9700 section 4.14.2), so every session of that user is revoked; the 401
-     * must not roll that back.
+     * Single use: the presented refresh token is revoked and a new pair issued for the same device. Presenting it again
+     * while its replacement is still unused is a retry (the answer was lost) and gets a fresh pair. Presenting an
+     * already-rotated token whose replacement was used means it leaked (RFC 9700 section 4.14.2), so every session of that
+     * user is revoked; the 401 must not roll that back.
      */
     @Transactional(noRollbackFor = ApiException.class)
     public Tokens refresh(String refreshToken) {
@@ -99,6 +100,22 @@ public class TokenService {
                   AND u.status = 'active' FOR UPDATE""",
                 (rs, i) -> new byte[][] {rs.getBytes(1), rs.getBytes(2)}, hash, now);
         if (rows.isEmpty()) {
+            // Rotated, but what replaced it was never used: the app most likely never got our answer (connection lost,
+            // app closed, server restarting) and is retrying. Sessions stay put (owner 2026-11-19): the unused token is
+            // voided and a fresh pair issued for the same device, instead of treating this as a theft.
+            List<byte[][]> retry = jdbc.query("""
+                    SELECT t.user_id, t.device_id FROM refresh_tokens t
+                    JOIN devices d ON d.id = t.device_id JOIN users u ON u.id = t.user_id
+                    WHERE t.token_hash = ? AND t.rotated_at IS NOT NULL AND t.expires_at > ? AND d.revoked_at IS NULL
+                      AND u.status = 'active'
+                      AND NOT EXISTS (SELECT 1 FROM refresh_tokens n WHERE n.device_id = t.device_id AND n.created_at >= t.rotated_at
+                                      AND n.rotated_at IS NOT NULL)
+                    FOR UPDATE""",
+                    (rs, i) -> new byte[][] {rs.getBytes(1), rs.getBytes(2)}, hash, now);
+            if (!retry.isEmpty()) {
+                jdbc.update("UPDATE refresh_tokens SET revoked_at = ? WHERE device_id = ? AND revoked_at IS NULL", now, retry.get(0)[1]);
+                return issue(Ids.uuid(retry.get(0)[0]), Ids.uuid(retry.get(0)[1]));
+            }
             List<byte[]> reused = jdbc.query("SELECT user_id FROM refresh_tokens WHERE token_hash = ? AND rotated_at IS NOT NULL",
                     (rs, i) -> rs.getBytes(1), (Object) hash);
             if (!reused.isEmpty()) {

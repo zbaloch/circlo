@@ -51,7 +51,7 @@
 | Password guessing is slow | Argon2id hashes; 3 failures lock login (15 min → 1 h → 24 h), per account and per typed name; per-IP limits | `AuthFlowIT`, `LoginThrottleTest` |
 | No account enumeration at login | Unknown accounts answer exactly like wrong passwords (same shape, a dummy hash check) | `AuthFlowIT` |
 | Email codes can't be brute-forced | 6 digits, 15 minutes, 5 guesses, single use, hashed at rest; at most 5 emails per address per hour | `AuthFlowIT` |
-| Stolen refresh tokens are caught | Rotation on every use; reusing a rotated token signs out every device | `AuthFlowIT` |
+| Stolen refresh tokens are caught | Rotation on every use; reusing a rotated token whose replacement was already used signs out every device. Presenting it again while the replacement is still unused is a lost answer being retried (owner 2026-11-19: sessions stay put): that device gets a fresh pair and the unused token is voided | `AuthFlowIT` |
 | Sessions can be ended | Sign a device out (Devices); password change signs out the others; reset signs out all | `AuthFlowIT` |
 | New sign-ins are visible | Each login is recorded (time only) and shown on the other devices | `AuthFlowIT` |
 | No location/device leaks in media | Photos re-encoded and EXIF/XMP/IPTC/comment segments removed; video `udta`/`meta` boxes zero-filled; on web, photos are redrawn on a canvas | `strip-metadata.test.ts` |
