@@ -36,16 +36,21 @@ import org.springframework.transaction.support.TransactionTemplate;
  *   <li>an email naming the kinds of things waiting, with a link to the web app and a one-click unsubscribe link
  *       (signed, so it needs no stored token), unless they turned daily emails off.</li>
  * </ul>
- * Neither says who, what or how many.
+ * Neither says who, what or how many. New posts I can see count too (owner decision 2026-11-18): the evening note is
+ * the once-a-day reminder to come back and see what my circles shared, while messages, replies, requests and new
+ * friends are also pushed as they happen (Notifier). The push half follows my "daily reminder" setting.
  */
 @Component
 public class DailyDigests {
 
     static final String PUSH = "You have a few new things waiting. Catch up when you’re ready.";
+    /** The reminder on a day with only new posts. */
+    static final String POSTS_PUSH = "Your circles shared something today. Catch up when you’re ready.";
     static final String SUBJECT = "Your day on Circlo";
 
     private static final Logger log = LoggerFactory.getLogger(DailyDigests.class);
-    private static final Map<String, String> COLUMNS = Map.of("reply", "replies", "message", "messages", "request", "requests", "joined", "friends");
+    private static final Map<String, String> COLUMNS = Map.of("reply", "replies", "message", "messages", "request", "requests", "joined", "friends",
+            "post", "posts");
     /** At most one a day, even if someone moves their hour later. */
     private static final Duration MIN_GAP = Duration.ofHours(20);
 
@@ -74,7 +79,7 @@ public class DailyDigests {
         }
     }
 
-    /** Counts one thing (reply, message, request or joined) towards this person's next daily note. */
+    /** Counts one thing (reply, message, request, joined or post) towards this person's next daily note. */
     public void add(byte[] user, String type) {
         String column = COLUMNS.get(type);
         if (column == null) {
@@ -112,28 +117,31 @@ public class DailyDigests {
         return told;
     }
 
-    private record Digest(int replies, int messages, int requests, int friends, String email, boolean emailOn) {}
+    private record Digest(int posts, int replies, int messages, int requests, int friends, String email, boolean emailOn, boolean pushOn) {}
 
     private boolean sendOne(byte[] user, Instant now) {
         // Taken and cleared together, so what arrives meanwhile waits for the next day instead of being lost.
         Digest d = tx.execute(s -> {
             List<Digest> r = jdbc.query("""
-                    SELECT d.replies, d.messages, d.requests, d.friends, u.email, u.email_notifications FROM daily_digests d
-                    JOIN users u ON u.id = d.user_id WHERE d.user_id = ? AND d.first_at IS NOT NULL FOR UPDATE""",
-                    (rs, i) -> new Digest(rs.getInt(1), rs.getInt(2), rs.getInt(3), rs.getInt(4), rs.getString(5), rs.getBoolean(6)), (Object) user);
-            jdbc.update("UPDATE daily_digests SET replies = 0, messages = 0, requests = 0, friends = 0, first_at = NULL, sent_at = ? WHERE user_id = ?",
+                    SELECT d.posts, d.replies, d.messages, d.requests, d.friends, u.email, u.email_notifications, u.push_daily
+                    FROM daily_digests d JOIN users u ON u.id = d.user_id WHERE d.user_id = ? AND d.first_at IS NOT NULL FOR UPDATE""",
+                    (rs, i) -> new Digest(rs.getInt(1), rs.getInt(2), rs.getInt(3), rs.getInt(4), rs.getInt(5), rs.getString(6),
+                            rs.getBoolean(7), rs.getBoolean(8)), (Object) user);
+            jdbc.update("UPDATE daily_digests SET posts = 0, replies = 0, messages = 0, requests = 0, friends = 0, first_at = NULL, sent_at = ? "
+                    + "WHERE user_id = ?",
                     Timestamp.from(now), user);
             return r.isEmpty() ? null : r.get(0);
         });
         if (d == null) {
             return false;
         }
-        String summary = summary(d.replies(), d.messages(), d.requests(), d.friends());
+        String summary = summary(d.posts(), d.replies(), d.messages(), d.requests(), d.friends());
         if (summary.isEmpty()) {
             return false;
         }
         // Two channels, neither replacing the other (owner decision 2026-11-07): each is off only if they turned it off.
-        boolean pushed = pushToPhones(user);
+        boolean onlyPosts = d.replies() + d.messages() + d.requests() + d.friends() == 0;
+        boolean pushed = d.pushOn() && pushToPhones(user, onlyPosts ? POSTS_PUSH : PUSH);
         if (!d.emailOn()) {
             return pushed;
         }
@@ -156,7 +164,7 @@ public class DailyDigests {
      * Pushes the day's note to my phones that have notifications on. True if at least one was sent; a phone Apple or
      * Google say is gone stops getting them until the app registers again.
      */
-    private boolean pushToPhones(byte[] user) {
+    private boolean pushToPhones(byte[] user, String alert) {
         record Device(byte[] id, byte[] sealed, String service) {}
         // Devices from before the kind was recorded count when they have a push token.
         List<Device> apps = jdbc.query("""
@@ -166,7 +174,7 @@ public class DailyDigests {
                   AND EXISTS (SELECT 1 FROM refresh_tokens t WHERE t.device_id = d.id AND t.revoked_at IS NULL AND t.expires_at > ?)""",
                 (rs, i) -> new Device(rs.getBytes(1), rs.getBytes(2), rs.getString(3)), user, Timestamp.from(Instant.now()));
         int sent = 0;
-        PushSender.Message message = new PushSender.Message(PUSH, Map.of("type", "digest"));
+        PushSender.Message message = new PushSender.Message(alert, Map.of("type", "digest"));
         for (Device d : apps) {
             if (d.sealed() == null) {
                 continue; // notifications are off on that phone
@@ -184,7 +192,15 @@ public class DailyDigests {
 
     /** "new replies, a new message and a friend request": the kinds waiting, never how many (empty if none). */
     static String summary(int replies, int messages, int requests, int friends) {
+        return summary(0, replies, messages, requests, friends);
+    }
+
+    /** As above, with new posts from my circles first. */
+    static String summary(int posts, int replies, int messages, int requests, int friends) {
         List<String> parts = new ArrayList<>();
+        if (posts > 0) {
+            parts.add(posts == 1 ? "a new post from your circles" : "new posts from your circles");
+        }
         if (replies > 0) {
             parts.add(replies == 1 ? "a new reply" : "new replies");
         }

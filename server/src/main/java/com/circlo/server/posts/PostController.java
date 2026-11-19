@@ -104,8 +104,10 @@ public class PostController {
             jdbc.update("INSERT INTO post_circles (post_id, circle_id) VALUES (?, ?)", id, c);
         }
         attachments.attach(me, id, null, media);
-        // Open timelines of everyone who may see it show "New posts" right away.
-        notifier.changed(readers(me, id));
+        // Open timelines of everyone who may see it show "New posts" right away; it counts towards their evening reminder.
+        List<UUID> readers = readers(me, id);
+        notifier.changed(readers);
+        notifier.posted(me, readers);
         return views(me, "WHERE p.id = ?", id).get(0);
     }
 

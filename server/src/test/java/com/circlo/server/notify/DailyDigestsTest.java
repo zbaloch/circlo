@@ -15,6 +15,9 @@ class DailyDigestsTest {
         assertThat(DailyDigests.summary(0, 0, 0, 1)).isEqualTo("a new friend");
         assertThat(DailyDigests.summary(1, 0, 0, 3)).isEqualTo("a new reply and new friends");
         assertThat(DailyDigests.summary(0, 0, 0, 0)).isEmpty();
+        // New posts from my circles come first.
+        assertThat(DailyDigests.summary(1, 0, 0, 0, 0)).isEqualTo("a new post from your circles");
+        assertThat(DailyDigests.summary(5, 1, 0, 0, 0)).isEqualTo("new posts from your circles and a new reply");
     }
 
     @Test

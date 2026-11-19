@@ -39,8 +39,17 @@ export async function saveProfile(name: string, bio: string): Promise<Me> {
 }
 
 /** Emails about activity, sent only while I'm not signed in to the phone app. */
-export async function setEmailNotifications(on: boolean): Promise<Me> {
-  const fresh = ok(await api.PUT('/v1/me/notifications', { body: { email: on } }));
+/** Which notifications I get: the daily email and, for all my phones, each kind of push (left out: unchanged). */
+export type NotificationSettings = {
+  email?: boolean;
+  pushMessages?: boolean;
+  pushReplies?: boolean;
+  pushFriends?: boolean;
+  pushDaily?: boolean;
+};
+
+export async function setNotificationSettings(change: NotificationSettings): Promise<Me> {
+  const fresh = ok(await api.PUT('/v1/me/notifications', { body: change }));
   setMe(fresh);
   return fresh;
 }

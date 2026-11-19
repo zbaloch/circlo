@@ -21,13 +21,17 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
  * Tells people something happened for them, once the change is committed: their open apps wake up at once (live
  * signal), and replies, messages, friend requests and new friends are counted towards their calm daily note
  * (DailyDigests). Each is also pushed to my phones at once (owner decision 2026-11-18), content-free: a fixed text and
- * random ids so a tap opens the right screen, at most once a minute per chat, post or kind. Someone I blocked is never
- * counted or pushed for me.
+ * random ids so a tap opens the right screen, at most once a minute per chat, post or kind, unless I turned that kind
+ * off (Settings, Notifications). New posts I can see only count towards the evening reminder. Someone I blocked is
+ * never counted or pushed for me.
  */
 @Component
 public class Notifier {
 
     private static final Logger log = LoggerFactory.getLogger(Notifier.class);
+    /** Each push kind's setting (users columns, from fixed values only). */
+    private static final Map<String, String> SETTING = Map.of("message", "push_messages", "reply", "push_replies", "request", "push_friends",
+            "friend", "push_friends");
 
     private final JdbcTemplate jdbc;
     private final Signals signals;
@@ -84,11 +88,23 @@ public class Notifier {
                 new PushSender.Message("Someone joined with your invite link", Map.of("type", "friend"))));
     }
 
-    /** Pushes to my phones, at most once a minute per kind and chat or post (a burst is one push; the app shows the rest). */
+    /** A new post: counted towards the evening reminder of everyone who may see it (`readers`, never the author). */
+    public void posted(byte[] author, Collection<UUID> readers) {
+        List<UUID> copy = List.copyOf(readers);
+        for (UUID r : copy) {
+            count(Ids.bytes(r), author, "post", () -> { });
+        }
+    }
+
+    /** Pushes to my phones unless I turned this kind off, at most once a minute per kind and chat or post (a burst is one push; the app shows the rest). */
     private void push(byte[] recipient, String kind, UUID about, PushSender.Message message) {
         ByteBuffer key = ByteBuffer.allocate(32).put(recipient);
         if (about != null) {
             key.putLong(about.getMostSignificantBits()).putLong(about.getLeastSignificantBits());
+        }
+        List<Boolean> on = jdbc.queryForList("SELECT " + SETTING.get(kind) + " FROM users WHERE id = ?", Boolean.class, (Object) recipient);
+        if (on.isEmpty() || !on.get(0)) {
+            return;
         }
         if (limiter.tryAcquire(kind + "-push", key.array(), 1, 60_000)) {
             phones.send(recipient, message);

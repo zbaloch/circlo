@@ -491,7 +491,7 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /** The daily email about activity on or off (only sent while I'm not signed in to the phone app), and the hour (UTC) the daily note comes at; either may be left out */
+        /** The daily email on or off, the hour (UTC) the daily note comes at, and which pushes my phones get (account settings, for all my phones; security alerts ignore them). Any may be left out */
         put: {
             parameters: {
                 query?: never;
@@ -504,6 +504,10 @@ export interface paths {
                     "application/json": {
                         email?: boolean;
                         digestHour?: number;
+                        pushMessages?: boolean;
+                        pushReplies?: boolean;
+                        pushFriends?: boolean;
+                        pushDaily?: boolean;
                     };
                 };
             };
@@ -2906,8 +2910,16 @@ export interface components {
             avatarUrl?: string | null;
             /** Format: date-time */
             createdAt: string;
-            /** @description Emails about activity while I'm not signed in to the phone app */
+            /** @description The daily email, around 6pm on days with something new */
             emailNotifications: boolean;
+            /** @description Messages pushed to my phones as they come */
+            pushMessages: boolean;
+            /** @description Replies pushed to my phones as they come */
+            pushReplies: boolean;
+            /** @description Friend requests and new friends pushed to my phones as they come */
+            pushFriends: boolean;
+            /** @description The 6pm reminder pushed to my phones (new posts from my circles and anything else new) */
+            pushDaily: boolean;
         };
         InviteLink: {
             token: string;

@@ -116,16 +116,20 @@ class EngagementFlowIT extends IntegrationTest {
         assertThat(toAndroid).hasSize(1);
         assertThat(toAndroid.get(0).service()).isEqualTo("fcm");
         assertThat(toAndroid.get(0).data()).isEqualTo(toA.get(0).data());
-        assertThat(push.to("tok-b")).isEmpty(); // never my own activity
+        // Never my own activity; B only hears that A posted, in the evening reminder (NotificationSettingsIT).
+        assertThat(push.to("tok-b")).allSatisfy(s -> assertThat(s.alert()).isEqualTo(NotificationSettingsIT.POSTS_PUSH));
+        int bBefore = push.to("tok-b").size();
 
         String chat = (String) a.call("POST", "/v1/chats", Map.of("userIds", List.of(b.userId.toString()))).getBody().get("chatId");
         a.call("POST", "/v1/chats/" + chat + "/messages", Map.of("text", "meet at 7"));
         // The message is pushed at once (PushIT), and counts towards B's day.
-        assertThat(push.await("tok-b", 1).get(0).data()).containsEntry("type", "message");
+        assertThat(push.await("tok-b", "message", 1)).hasSize(1);
         sendDaily();
         List<TestPush.Sent> toB = push.to("tok-b").stream().filter(s -> "digest".equals(s.data().get("type"))).toList();
-        assertThat(toB).hasSize(1);
+        assertThat(toB).hasSize(bBefore + 1);
+        toB = toB.subList(bBefore, toB.size());
         assertThat(toB.get(0).service()).isEqualTo("apns_sandbox");
+        assertThat(toB.get(0).alert()).isEqualTo(NotifyChannelsIT.CALM_PUSH);
         assertThat(push.to("tok-a").stream().filter(s -> "digest".equals(s.data().get("type")))).hasSize(1); // a quiet day for A
 
         // Nothing a push says names anyone or quotes anything.
@@ -137,7 +141,7 @@ class EngagementFlowIT extends IntegrationTest {
         b.call("POST", "/v1/blocks/" + a.userId, null);
         a.call("POST", "/v1/chats/" + chat + "/messages", Map.of("text", "hello?"));
         sendDaily();
-        assertThat(push.to("tok-b")).hasSize(2); // the message and the day, nothing new
+        assertThat(push.to("tok-b")).hasSize(bBefore + 2); // the message and the day, nothing new
         assertThat(a.status("POST", "/v1/auth/logout", null)).isEqualTo(200);
         // Only the device that signed out; A's Android phone is still signed in and keeps its token.
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM devices WHERE push_token_enc IS NOT NULL AND id = ?", Integer.class,

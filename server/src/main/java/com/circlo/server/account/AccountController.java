@@ -64,9 +64,12 @@ public class AccountController {
 
     // ---------- profile ----------
 
-    /** `name` is null until I set one. `emailNotifications`: emails about activity when I'm not using the phone app. */
+    /**
+     * `name` is null until I set one. `emailNotifications`: the daily email. `push*`: which pushes my phones get
+     * (messages, replies, friend requests and new friends as they happen; the 6pm reminder). Only ever returned to me.
+     */
     public record Me(UUID userId, String name, String username, String email, String bio, String avatarUrl, Instant createdAt,
-            boolean emailNotifications) {}
+            boolean emailNotifications, boolean pushMessages, boolean pushReplies, boolean pushFriends, boolean pushDaily) {}
 
     @GetMapping("/v1/me")
     public Me me(@AuthenticationPrincipal Jwt jwt) {
@@ -74,9 +77,11 @@ public class AccountController {
     }
 
     private Me load(byte[] me) {
-        return jdbc.query("SELECT id, name, username, email, bio, avatar_key, created_at, email_notifications FROM users WHERE id = ? AND status = 'active'",
+        return jdbc.query("SELECT id, name, username, email, bio, avatar_key, created_at, email_notifications, push_messages, push_replies, "
+                        + "push_friends, push_daily FROM users WHERE id = ? AND status = 'active'",
                         (rs, i) -> new Me(Ids.uuid(rs.getBytes(1)), rs.getString(2), rs.getString(3), rs.getString(4), rs.getString(5),
-                                signer.url(rs.getString(6)), rs.getTimestamp(7).toInstant(), rs.getBoolean(8)),
+                                signer.url(rs.getString(6)), rs.getTimestamp(7).toInstant(), rs.getBoolean(8), rs.getBoolean(9),
+                                rs.getBoolean(10), rs.getBoolean(11), rs.getBoolean(12)),
                         (Object) me)
                 .stream().findFirst().orElseThrow(ApiException::unauthorized);
     }
@@ -93,8 +98,10 @@ public class AccountController {
     /**
      * `email`: the daily email about activity on or off (it's only sent while I'm not signed in to the phone app).
      * `digestHour`: when the daily note comes, as an hour in UTC (the app sends 6pm on the phone's clock).
+     * `push*`: which pushes my phones get. Any may be left out (unchanged).
      */
-    public record NotificationSettings(Boolean email, @Min(0) @Max(23) Integer digestHour) {}
+    public record NotificationSettings(Boolean email, @Min(0) @Max(23) Integer digestHour, Boolean pushMessages, Boolean pushReplies,
+            Boolean pushFriends, Boolean pushDaily) {}
 
     @PutMapping("/v1/me/notifications")
     @Transactional
@@ -106,6 +113,17 @@ public class AccountController {
         if (r.digestHour() != null) {
             jdbc.update("UPDATE users SET digest_hour = ? WHERE id = ?", r.digestHour(), me);
         }
+        // Fixed column names, never from the request.
+        Map<String, Boolean> push = new LinkedHashMap<>();
+        push.put("push_messages", r.pushMessages());
+        push.put("push_replies", r.pushReplies());
+        push.put("push_friends", r.pushFriends());
+        push.put("push_daily", r.pushDaily());
+        push.forEach((column, on) -> {
+            if (on != null) {
+                jdbc.update("UPDATE users SET " + column + " = ? WHERE id = ?", on, me);
+            }
+        });
         return load(me);
     }
 

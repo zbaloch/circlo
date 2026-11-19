@@ -8,38 +8,60 @@ import { Toggle } from '@/components/ui/toggle';
 import { describeError } from '@/lib/account';
 import { backgroundChecksOn, disableBackgroundChecks, enableBackgroundChecks, notificationPermission, usesPush } from '@/lib/background-check';
 import { CHAT_ENABLED } from '@/lib/features';
-import { refreshMe, setEmailNotifications, useMe } from '@/lib/me';
+import { type NotificationSettings, refreshMe, setNotificationSettings, useMe } from '@/lib/me';
 
-/** Notifications: the daily phone notification, the daily email, and the security alerts that always go out. */
+type Kind = keyof Omit<NotificationSettings, 'email'>;
+
+/**
+ * Notifications, X-style (owner decision 2026-11-18): this phone's push on or off, then each kind as it happens
+ * (messages, replies, friend requests and new friends), the 6pm reminder, the daily email, and the security alerts
+ * that always go out. The kinds are account settings, so they apply to all my phones.
+ */
 export default function NotificationSettingsScreen() {
   const [error, setError] = useState<string>();
   const me = useMe();
-  // Background checks: on, off, or off because notifications are blocked in the phone's settings.
-  const [checks, setChecks] = useState<'on' | 'off' | 'blocked' | null>(null);
-  const loadChecks = useCallback(async () => {
-    if (await backgroundChecksOn()) return setChecks('on');
-    setChecks((await notificationPermission()) === 'blocked' ? 'blocked' : 'off');
+  // This phone: on, off, or off because notifications are blocked in the phone's settings.
+  const [phone, setPhone] = useState<'on' | 'off' | 'blocked' | null>(null);
+  const loadPhone = useCallback(async () => {
+    if (await backgroundChecksOn()) return setPhone('on');
+    setPhone((await notificationPermission()) === 'blocked' ? 'blocked' : 'off');
   }, []);
 
   useFocusEffect(
     useCallback(() => {
-      loadChecks().catch(() => {});
+      loadPhone().catch(() => {});
       refreshMe().catch(() => {});
-    }, [loadChecks]),
+    }, [loadPhone]),
   );
+
+  const change = async (c: NotificationSettings) => {
+    setError(undefined);
+    try {
+      await setNotificationSettings(c);
+    } catch (e) {
+      setError(describeError(e));
+    }
+  };
+
+  const kindRow = (kind: Kind, title: string, subtitle: string) => (
+    <Row key={kind} title={title} subtitle={subtitle}>
+      {me ? <Toggle accessibilityLabel={title} value={me[kind]} onValueChange={(on) => change({ [kind]: on })} /> : null}
+    </Row>
+  );
+
+  // Browsers get no push: the web app's Notifications tab updates while it's open.
+  const native = Platform.OS !== 'web';
+  const kinds = native && usesPush && phone === 'on';
 
   return (
     <ScrollView className="flex-1 bg-surface dark:bg-surface-dark" contentContainerClassName="pb-10">
-      <Section>
-        {/* Browsers get no background checks: the web app's Notifications tab updates while it's open. */}
-        {Platform.OS !== 'web' ? (
-          <Row
-            title={CHECKS_TITLE}
-            subtitle={checks === 'blocked' ? `Notifications are blocked in your phone’s settings. ${CHECKS_NOTE}` : CHECKS_NOTE}>
-            {checks === null ? null : (
+      {native ? (
+        <Section title="On this phone">
+          <Row title={PHONE_TITLE} subtitle={phone === 'blocked' ? `Notifications are blocked in your phone’s settings. ${PHONE_NOTE}` : PHONE_NOTE}>
+            {phone === null ? null : (
               <Toggle
-                accessibilityLabel={CHECKS_TITLE}
-                value={checks === 'on'}
+                accessibilityLabel={PHONE_TITLE}
+                value={phone === 'on'}
                 onValueChange={async (on) => {
                   setError(undefined);
                   try {
@@ -48,28 +70,29 @@ export default function NotificationSettingsScreen() {
                   } catch (e) {
                     setError(describeError(e));
                   }
-                  await loadChecks();
+                  await loadPhone();
                 }}
               />
             )}
           </Row>
-        ) : null}
+        </Section>
+      ) : null}
+      {kinds ? (
+        <>
+          <Section title="As it happens">
+            {CHAT_ENABLED ? kindRow('pushMessages', 'Messages', 'New messages in your chats.') : null}
+            {kindRow('pushReplies', 'Replies', 'Replies to your posts and to your replies.')}
+            {kindRow('pushFriends', 'Friend requests and new friends', 'Someone asks to connect, accepts your request or joins with your link.')}
+          </Section>
+          <Section title="Once a day">{kindRow('pushDaily', 'Daily reminder', DAILY_NOTE)}</Section>
+        </>
+      ) : null}
+      <Section title="Email">
         <Row title={EMAIL_TITLE} subtitle={EMAIL_NOTE}>
-          {me ? (
-            <Toggle
-              accessibilityLabel={EMAIL_TITLE}
-              value={me.emailNotifications}
-              onValueChange={async (on) => {
-                setError(undefined);
-                try {
-                  await setEmailNotifications(on);
-                } catch (e) {
-                  setError(describeError(e));
-                }
-              }}
-            />
-          ) : null}
+          {me ? <Toggle accessibilityLabel={EMAIL_TITLE} value={me.emailNotifications} onValueChange={(on) => change({ email: on })} /> : null}
         </Row>
+      </Section>
+      <Section title="Always on">
         <Row title="Security alerts" subtitle={SECURITY_NOTE} />
       </Section>
       <View className="px-4">
@@ -79,14 +102,15 @@ export default function NotificationSettingsScreen() {
   );
 }
 
-const CHECKS_TITLE = usesPush ? 'Notifications on this phone' : 'A daily notification';
-const CHECKS_NOTE = usesPush
-  ? `New ${CHAT_ENABLED ? 'messages, ' : ''}replies, friend requests and new friends as they happen, and around 6pm, on days something happened, “You have a few new things waiting.” They never say who, what or how many. Turn it off and your phone isn’t told; the daily email below is separate.`
+const PHONE_TITLE = usesPush ? 'Push notifications' : 'A daily notification';
+const PHONE_NOTE = usesPush
+  ? 'Lets Circlo notify this phone. Notifications never say who, what or how many. Turn it off and this phone isn’t told anything; the email below is separate.'
   : 'Your phone asks Circlo now and then, and at most once a day says there are new things waiting. Nothing goes through Apple or Google. Turn it off and your phone isn’t told; the daily email below is separate.';
+const DAILY_NOTE = 'Around 6pm, on days your circles shared something or anything else is new: a calm note to come and catch up.';
 
-const EMAIL_TITLE = 'A daily email';
-const EMAIL_WHAT = CHAT_ENABLED ? 'new replies, messages, friends or requests' : 'new replies, friends or requests';
-const EMAIL_NOTE = `Once a day, around 6pm, on days with ${EMAIL_WHAT}: what kind of things are waiting, never who or what. It’s separate from notifications on your phone.`;
+const EMAIL_TITLE = 'Daily email';
+const EMAIL_WHAT = CHAT_ENABLED ? 'new posts from your circles, replies, messages, friends or requests' : 'new posts from your circles, replies, friends or requests';
+const EMAIL_NOTE = `Around 6pm, on days with ${EMAIL_WHAT}: what kind of things are waiting, never who or what. It’s separate from notifications on your phone.`;
 const SECURITY_NOTE = usesPush
   ? 'A new sign-in, a password change, or another device signed out from Devices is always emailed straight away, and your phones with notifications on are told too, whatever you choose here.'
   : 'A new sign-in, a password change, or another device signed out from Devices is always emailed straight away, whatever you choose here.';
