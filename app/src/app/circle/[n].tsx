@@ -4,9 +4,22 @@ import { Pressable, ScrollView, View } from 'react-native';
 
 import { Button, ErrorText, TextField } from '@/components/form';
 import { PersonRow, RowButton } from '@/components/person-row';
+import { Toggle } from '@/components/ui/toggle';
 import { describeError } from '@/lib/account';
 import { loadAddressBook, type AddressBook, type Contact } from '@/lib/addressbook';
-import { circleDefs, circleName, circlesOf, createCircle, deleteCircle, confirmMembership, membersOf, renameCircle, setCircles } from '@/lib/circles';
+import { membersVisibleChange } from '@/lib/circle-mates';
+import {
+  circleDefs,
+  circleName,
+  circlesOf,
+  createCircle,
+  deleteCircle,
+  confirmMembership,
+  membersOf,
+  renameCircle,
+  setCircles,
+  setMembersVisible,
+} from '@/lib/circles';
 import { showAlert } from '@/lib/dialog';
 import { useSession } from '@/lib/session';
 import { showToast } from '@/lib/toast';
@@ -19,7 +32,7 @@ function name(c: Contact) {
 /**
  * One circle: name it, see who's in it (X followers-list rows that open each profile), add or remove friends after a
  * confirmation, or delete it. `n` is the circle's id, or "new" to make one. Every membership change is silent: nobody
- * is told.
+ * is told. A switch lets its people see each other on my profile, never its name (owner decision 2026-11-20).
  */
 export default function CircleScreen() {
   const { n } = useLocalSearchParams<{ n: string }>();
@@ -92,6 +105,24 @@ export default function CircleScreen() {
   const members = membersOf(book, id);
   const others = Object.keys(book.contacts).filter((userId) => !members.includes(userId));
   const circle = circleName(book, id);
+  const visible = circleDefs(book).find((c) => c.id === id)?.membersVisible ?? false;
+  // Who sees whom changes, so it's confirmed first, saying what it means, and a toast says it's done. Nobody is told.
+  const switchVisible = (on: boolean) => {
+    const what = membersVisibleChange(circle, members.length, on);
+    showAlert(what.title, what.message, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: what.confirm,
+        style: on ? 'default' : 'destructive',
+        onPress: () =>
+          void run('visible', async () => {
+            await setMembersVisible(account, id, on);
+            showToast(what.done);
+            reload();
+          }),
+      },
+    ]);
+  };
   // Adding or removing someone changes what they can see (earlier posts too), so it's confirmed first and a toast says
   // it's done. Nobody is told.
   const change = (userId: string, join: boolean) =>
@@ -147,6 +178,15 @@ export default function CircleScreen() {
             })
           }
         />
+        <View className="flex-row items-center gap-4">
+          <View className="flex-1 gap-0.5">
+            <Text className="text-[15px] font-semibold text-ink dark:text-ink-dark">People in this circle can see each other</Text>
+            <Text className="text-[13px] leading-[18px] text-muted dark:text-muted-dark">
+              They see each other on your profile and can ask each other to connect. They never see the circle’s name.
+            </Text>
+          </View>
+          <Toggle accessibilityLabel="People in this circle can see each other" value={visible} disabled={!!busy} onValueChange={switchVisible} />
+        </View>
         <ErrorText>{error}</ErrorText>
 
         <View>

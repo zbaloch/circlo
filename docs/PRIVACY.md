@@ -25,7 +25,7 @@ lose) and makes the web app possible.
 
 | Data | Form | Why |
 |---|---|---|
-| Account | Random id, name, @username, email, Argon2id password hash, bio, photo, signup time, when the email was verified | Sign in, reset a forgotten password, show your profile to your people |
+| Account | Random id, name, @username, email, Argon2id password hash, bio, photo, signup time, when the email was verified, and whether people in the same circles of a friend may see you | Sign in, reset a forgotten password, show your profile to your people |
 | Email codes | A hash of the latest 6-digit code, its purpose and expiry (15 minutes) | Confirm your email, reset your password |
 | Unfinished signups | As above, deleted after a day if the email is never confirmed | Finish signing up |
 | Devices | Random id, signed-in and signed-out times, which kind of app it is (iPhone app, Android app or web browser: no model, OS version or browser name); if notifications are on, the push token sealed with a server key, or a hash of the background-check token | List and sign out your devices; push messages, replies, friend requests and new friends to your phone as they happen |
@@ -34,7 +34,7 @@ lose) and makes the web app possible.
 | Sign-ins | The time of each login (no device, place or address), kept 30 days | Warn your other devices: "New sign-in to your account" |
 | Login lock | Per account (or per typed name, if no account matches): failed-attempt count and lock time, deleted a week after the last failure | Lock login after 3 wrong passwords (15 min, 1 h, then 24 h) |
 | Friends, invites, blocks | Pairs of ids, status, time, whether someone joined with your link; invite tokens only as hashes (your permanent link is derived from a random value with a server key, never stored); people you removed, so your link stops working for them | Who is connected with whom |
-| Circles | Your circle names and who is in them | Choose who sees each post. Shown only to you |
+| Circles | Your circle names, who is in them, and whether each circle's people see each other | Choose who sees each post. The names are shown only to you; in circles where you let people see each other (Family and Close Friends unless you turn it off), they see each other on your profile, never which circle |
 | Posts, replies, likes | Text, times, who wrote or liked them; each post's audience (for circle posts, which of your circles) | Show posts to the people you chose. The audience is shown only to you |
 | Photos and videos | Files with random names in a private bucket, served through links that expire after an hour | Media in posts, chats and profile photos |
 | Chats | Members, messages, and how far each member has read | Deliver messages, show unread counts on every device |

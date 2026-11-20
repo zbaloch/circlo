@@ -9,7 +9,7 @@ import { usePalette } from '@/theme/use-palette';
 
 /**
  * One person in a list, X followers-list style: photo, name, @handle and bio, with an optional button on the right.
- * Tapping the row opens their profile.
+ * Tapping the row opens their profile; without `onPress` (someone whose profile I can't open yet) it's not a button.
  */
 export function PersonRow({ id, name, handle, bio, note, avatarUrl, onPress, action }: {
   id: string;
@@ -19,16 +19,18 @@ export function PersonRow({ id, name, handle, bio, note, avatarUrl, onPress, act
   /** A line of my own about them, such as the circles I put them in (only I see it). */
   note?: string;
   avatarUrl?: string | null;
-  onPress: () => void;
+  onPress?: () => void;
   action?: ReactNode;
 }) {
   const palette = usePalette();
+  const label = [name, handle ? `@${handle}` : '', note ?? '', bio ?? ''].filter(Boolean).join(', ');
+  const Row = onPress ? Pressable : View;
   return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={[name, handle ? `@${handle}` : '', note ?? '', bio ?? ''].filter(Boolean).join(', ')}
+    <Row
+      accessibilityRole={onPress ? 'button' : undefined}
+      accessibilityLabel={onPress ? label : undefined}
       onPress={onPress}
-      className="flex-row gap-3 py-3 active:opacity-60">
+      className={`flex-row gap-3 py-3 ${onPress ? 'active:opacity-60' : ''}`}>
       <Avatar id={id} name={name} uri={avatarUrl} />
       <View className="flex-1 gap-0.5">
         <View className="flex-row items-center gap-3">
@@ -47,7 +49,7 @@ export function PersonRow({ id, name, handle, bio, note, avatarUrl, onPress, act
         ) : null}
         {bio ? <ContentText text={bio} links={false} numberOfLines={3} className="text-ink dark:text-ink-dark" /> : null}
       </View>
-    </Pressable>
+    </Row>
   );
 }
 

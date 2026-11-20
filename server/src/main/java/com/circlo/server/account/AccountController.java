@@ -66,10 +66,12 @@ public class AccountController {
 
     /**
      * `name` is null until I set one. `emailNotifications`: the daily email. `push*`: which pushes my phones get
-     * (messages, replies, friend requests and new friends as they happen; the 6pm reminder). Only ever returned to me.
+     * (messages, replies, friend requests and new friends as they happen; the 6pm reminder). `showInCircles`: whether
+     * people in the same circles as me see me on that friend's profile. Only ever returned to me.
      */
     public record Me(UUID userId, String name, String username, String email, String bio, String avatarUrl, Instant createdAt,
-            boolean emailNotifications, boolean pushMessages, boolean pushReplies, boolean pushFriends, boolean pushDaily) {}
+            boolean emailNotifications, boolean pushMessages, boolean pushReplies, boolean pushFriends, boolean pushDaily,
+            boolean showInCircles) {}
 
     @GetMapping("/v1/me")
     public Me me(@AuthenticationPrincipal Jwt jwt) {
@@ -78,10 +80,10 @@ public class AccountController {
 
     private Me load(byte[] me) {
         return jdbc.query("SELECT id, name, username, email, bio, avatar_key, created_at, email_notifications, push_messages, push_replies, "
-                        + "push_friends, push_daily FROM users WHERE id = ? AND status = 'active'",
+                        + "push_friends, push_daily, show_in_circles FROM users WHERE id = ? AND status = 'active'",
                         (rs, i) -> new Me(Ids.uuid(rs.getBytes(1)), rs.getString(2), rs.getString(3), rs.getString(4), rs.getString(5),
                                 signer.url(rs.getString(6)), rs.getTimestamp(7).toInstant(), rs.getBoolean(8), rs.getBoolean(9),
-                                rs.getBoolean(10), rs.getBoolean(11), rs.getBoolean(12)),
+                                rs.getBoolean(10), rs.getBoolean(11), rs.getBoolean(12), rs.getBoolean(13)),
                         (Object) me)
                 .stream().findFirst().orElseThrow(ApiException::unauthorized);
     }
@@ -124,6 +126,16 @@ public class AccountController {
                 jdbc.update("UPDATE users SET " + column + " = ? WHERE id = ?", on, me);
             }
         });
+        return load(me);
+    }
+
+    /** `showInCircles`: let people in the same circles as me see me on that friend's profile (and ask to connect). */
+    public record PrivacySettings(@NotNull Boolean showInCircles) {}
+
+    @PutMapping("/v1/me/privacy")
+    public Me privacySettings(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody PrivacySettings r) {
+        byte[] me = userId(jwt);
+        jdbc.update("UPDATE users SET show_in_circles = ? WHERE id = ?", r.showInCircles(), me);
         return load(me);
     }
 

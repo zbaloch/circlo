@@ -39,7 +39,8 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Friends: invites (a link or QR code is the only way to connect; there is no search), requests, and profiles. A
+ * Friends: invites (a link or QR code; there is no search), requests, and profiles. People in the same circle of a
+ * friend may also ask each other to connect from that friend's profile (owner decision 2026-11-20, {@link CircleMates}). A
  * profile is visible to people you're connected with (friends and pending requests either way), never to strangers.
  * Everyone has one invite link that stays the same until they reset it, and opening it connects at once (owner decision
  * 2026-11-01). One-time invites from before still work until they expire.
@@ -56,10 +57,12 @@ public class SocialController {
     private final People people;
     private final String inviteBase;
     private final Notifier notifier;
+    private final CircleMates mates;
     private final SecretKeySpec linkKey;
 
-    public SocialController(JdbcTemplate jdbc, People people, Notifier notifier, ServerSecrets secrets,
+    public SocialController(JdbcTemplate jdbc, People people, Notifier notifier, CircleMates mates, ServerSecrets secrets,
             @Value("${circlo.invite-base:https://www.hellocirclo.com/i/}") String inviteBase) {
+        this.mates = mates;
         this.jdbc = jdbc;
         this.people = people;
         this.inviteBase = inviteBase;
@@ -277,7 +280,10 @@ public class SocialController {
 
     public record FriendRequest(@NotNull UUID toUserId, @Size(max = CircleController.MAX_CIRCLES) List<Integer> circles) {}
 
-    /** Asks someone whose invite I redeemed to connect, and puts them in my circles (they aren't told which). */
+    /**
+     * Asks someone to connect, and puts them in my circles (they aren't told which): someone whose invite I redeemed,
+     * or someone I see among a friend's circle mates.
+     */
     @PostMapping("/v1/friends/requests")
     @ResponseStatus(HttpStatus.CREATED)
     @Transactional
@@ -290,7 +296,7 @@ public class SocialController {
         if (people.relation(me, to) != null) {
             throw ApiException.conflict("already_connected");
         }
-        if (jdbc.queryForList("SELECT 1 FROM invites WHERE inviter_id = ? AND redeemed_by = ?", to, me).isEmpty()) {
+        if (jdbc.queryForList("SELECT 1 FROM invites WHERE inviter_id = ? AND redeemed_by = ?", to, me).isEmpty() && !mates.visibleTo(me, to)) {
             throw ApiException.forbidden();
         }
         sendRequest(me, to, r.circles());
@@ -404,6 +410,37 @@ public class SocialController {
     }
 
     // ---------- profiles ----------
+
+    /**
+     * The people I see on a friend's profile: the others in their circles that I'm in too, where they switched it on.
+     * No circle names, ids or grouping. Strangers get 404; my own list is empty (I know my circles).
+     */
+    @GetMapping("/v1/users/{userId}/circle-mates")
+    public List<CircleMates.Mate> circleMates(@AuthenticationPrincipal Jwt jwt, @PathVariable("userId") UUID userId) {
+        byte[] me = me(jwt);
+        byte[] owner = Ids.bytes(userId);
+        if (Arrays.equals(me, owner)) {
+            return List.of();
+        }
+        if (!people.friends(me, owner)) {
+            throw ApiException.notFound();
+        }
+        return mates.of(owner, me);
+    }
+
+    /**
+     * "See what they can see": the people this friend sees on my profile. Without how they're connected to each other:
+     * that's theirs.
+     */
+    @GetMapping("/v1/me/preview/{friendId}/circle-mates")
+    public List<CircleMates.Mate> previewCircleMates(@AuthenticationPrincipal Jwt jwt, @PathVariable("friendId") UUID friendId) {
+        byte[] me = me(jwt);
+        byte[] friend = Ids.bytes(friendId);
+        if (!people.friends(me, friend)) {
+            throw ApiException.notFound();
+        }
+        return mates.of(me, friend).stream().map(m -> new CircleMates.Mate(m.userId(), m.name(), m.username(), m.avatarUrl(), null)).toList();
+    }
 
     public record Profile(UUID userId, String name, String username, String bio, String avatarUrl, String relation, int friendCount) {}
 

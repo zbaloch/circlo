@@ -226,6 +226,21 @@ paths:
       responses:
         "200": { $ref: "#/components/responses/Me" }
         "400": { $ref: "#/components/responses/Error" }
+  /v1/me/privacy:
+    put:
+      summary: Whether people in the same circles as me see me on that friend's profile (and may ask to connect)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [showInCircles]
+              properties:
+                showInCircles: { type: boolean }
+      responses:
+        "200": { $ref: "#/components/responses/Me" }
+        "400": { $ref: "#/components/responses/Error" }
   /v1/email/unsubscribe:
     parameters:
       - { name: u, in: query, required: true, schema: { $ref: "#/components/schemas/Id" } }
@@ -466,6 +481,32 @@ paths:
                   relation: { type: string, enum: [me, accepted, incoming, outgoing] }
                   friendCount: { type: integer }
         "404": { $ref: "#/components/responses/Error" }
+  /v1/users/{userId}/circle-mates:
+    get:
+      summary: >-
+        The people I see on a friend's profile: the others in their circles that I'm in too, where they switched it on.
+        One list sorted by name, never which circle. Empty for my own profile
+      parameters:
+        - { name: userId, in: path, required: true, schema: { $ref: "#/components/schemas/Id" } }
+      responses:
+        "200":
+          description: Circle mates
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: "#/components/schemas/CircleMate" } }
+        "404": { $ref: "#/components/responses/Error" }
+  /v1/me/preview/{friendId}/circle-mates:
+    get:
+      summary: The people this friend sees on my profile (relation is always null here)
+      parameters:
+        - { name: friendId, in: path, required: true, schema: { $ref: "#/components/schemas/Id" } }
+      responses:
+        "200":
+          description: Circle mates as they see them
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: "#/components/schemas/CircleMate" } }
+        "404": { $ref: "#/components/responses/Error" }
   /v1/users/{userId}/posts:
     get:
       summary: Someone's posts that I may see, newest first
@@ -615,7 +656,7 @@ paths:
                     circles: { type: array, items: { type: integer } }
   /v1/friends/requests:
     post:
-      summary: Ask someone whose invite I redeemed to connect, putting them in my circles
+      summary: Ask someone whose invite I redeemed, or someone I see among a friend's circle mates, to connect, putting them in my circles
       requestBody:
         required: true
         content:
@@ -710,6 +751,23 @@ paths:
         - { name: id, in: path, required: true, schema: { type: integer } }
       responses:
         "200": { $ref: "#/components/responses/Status" }
+        "404": { $ref: "#/components/responses/Error" }
+  /v1/circles/{id}/members-visible:
+    put:
+      summary: Whether the people in my circle see each other on my profile (never its name). Nobody is told
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [visible], properties: { visible: { type: boolean } } }
+      responses:
+        "200":
+          description: The switch as it is now
+          content:
+            application/json:
+              schema: { type: object, required: [membersVisible], properties: { membersVisible: { type: boolean } } }
         "404": { $ref: "#/components/responses/Error" }
   /v1/blocks:
     get:
@@ -1208,7 +1266,7 @@ components:
     ObjectKey: { type: string, pattern: "^[0-9a-f]{64}$" }
     Me:
       type: object
-      required: [userId, name, username, email, bio, createdAt, emailNotifications, pushMessages, pushReplies, pushFriends, pushDaily]
+      required: [userId, name, username, email, bio, createdAt, emailNotifications, pushMessages, pushReplies, pushFriends, pushDaily, showInCircles]
       properties:
         userId: { $ref: "#/components/schemas/Id" }
         name: { type: [string, "null"], description: "Null until I set one" }
@@ -1222,6 +1280,7 @@ components:
         pushReplies: { type: boolean, description: "Replies pushed to my phones as they come" }
         pushFriends: { type: boolean, description: "Friend requests and new friends pushed to my phones as they come" }
         pushDaily: { type: boolean, description: "The 6pm reminder pushed to my phones (new posts from my circles and anything else new)" }
+        showInCircles: { type: boolean, description: "People in the same circles as me see me on that friend's profile" }
     InviteLink:
       type: object
       required: [token, link]
@@ -1239,11 +1298,22 @@ components:
         avatarUrl: { type: [string, "null"] }
     Circle:
       type: object
-      required: [id, name, members]
+      required: [id, name, membersVisible, members]
       properties:
         id: { type: integer, minimum: 1, maximum: 8 }
         name: { type: string }
+        membersVisible: { type: boolean, description: "Its people see each other on my profile (never its name)" }
         members: { type: array, items: { $ref: "#/components/schemas/Id" } }
+    CircleMate:
+      description: Someone in the same circle of a friend as me, with how we're connected (null if we aren't)
+      type: object
+      required: [userId, name, username, relation]
+      properties:
+        userId: { $ref: "#/components/schemas/Id" }
+        name: { type: string }
+        username: { type: string }
+        avatarUrl: { type: [string, "null"] }
+        relation: { type: [string, "null"], enum: [accepted, incoming, outgoing, null] }
     Audience:
       type: object
       required: [kind]

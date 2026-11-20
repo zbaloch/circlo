@@ -5,6 +5,7 @@ import { Modal, Pressable, ScrollView, View } from 'react-native';
 
 import { Avatar } from '@/components/avatar';
 import { CircleBadge } from '@/components/circle-badge';
+import { CircleMatesLine } from '@/components/circle-mates-line';
 import { circlesLine, EveryoneRow, memberLine } from '@/components/circle-choice';
 import { ErrorText } from '@/components/form';
 import { ProfileFeed } from '@/components/profile-feed';
@@ -128,6 +129,8 @@ export default function FriendScreen() {
 
   const below = (
     <View className="gap-2">
+      {/* People in the same circle of theirs as me (owner decision 2026-11-20); never which circle. */}
+      {c.status === 'accepted' ? <CircleMatesLine ownerId={c.userId} ownerName={name} /> : null}
       <ErrorText>{error}</ErrorText>
       {contact && book ? (
         <FriendSheet

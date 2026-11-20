@@ -1,5 +1,6 @@
 /**
- * Friends (PLAN.md Phase 5): an invite link or QR code is the only way to connect (no search). Everyone has one link
+ * Friends (PLAN.md Phase 5): people connect with an invite link or QR code (no search), or from a friend's profile
+ * when they're in the same circle of that friend (owner decision 2026-11-20, circle-mates.ts). Everyone has one link
  * that stays the same until they reset it (owner decision 2026-11-01). The person who opens it puts the inviter in
  * their circles and is connected at once; the inviter is told and can choose circles for them (until then: Everyone).
  * Profiles are visible to people you're connected with, never to strangers.
@@ -90,6 +91,20 @@ export async function syncConnections(account: StoredAccount): Promise<Connectio
     status: c.status,
     profile: { displayName: c.displayName, handle: c.handle, avatarUrl: c.avatarUrl, bio: c.bio ?? '' },
   }));
+}
+
+/**
+ * Asks someone I see on a friend's profile to connect. They're in my Everyone until I choose circles for them.
+ */
+export async function sendRequest(account: StoredAccount, userId: string): Promise<void> {
+  const res = await api.POST('/v1/friends/requests', { body: { toUserId: userId, circles: [] } });
+  if (res.response.status === 409) {
+    await refreshAddressBook(account);
+    return;
+  }
+  if (res.response.status === 403 || res.response.status === 404) throw new Error('You can’t connect with them from here any more.');
+  ok(res);
+  await refreshAddressBook(account);
 }
 
 /** Accepts a request and puts them in `circles` (none: they see Everyone posts only). */
