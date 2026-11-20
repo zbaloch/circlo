@@ -3,9 +3,9 @@ import { useEffect } from 'react';
 import { Pressable, View } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 
+import { audienceIcon } from '@/components/audience-icon';
 import { Avatar } from '@/components/avatar';
 import { MediaGrid } from '@/components/post-media';
-import type { Audience } from '@/lib/addressbook';
 import type { OutboxItem } from '@/lib/outbox';
 import type { FeedPost } from '@/lib/posts';
 import { fullTime, relativeTime } from '@/lib/time';
@@ -15,10 +15,7 @@ import { ContentText } from '@/components/content-text';
 import { Text } from '@/components/ui/text';
 import { LIKES_ENABLED } from '@/lib/features';
 
-/** The icon beside who my post is for: a lock only for Only me, a globe for Everyone, a circle for my circles. Pure. */
-export function audienceIcon(kind: Audience['kind'] | undefined): IconName {
-  return kind === 'onlyMe' ? 'lock-closed' : kind === 'everyone' ? 'globe-outline' : 'ellipse-outline';
-}
+export { audienceIcon };
 
 type Props = {
   post: FeedPost;

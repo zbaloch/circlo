@@ -250,14 +250,36 @@ public class PostController {
                 concat(PostAccess.visibleArgs(me), new Object[] {cursor(before), clamp(limit, 100)}));
     }
 
-    /** One person's posts that I may see (mine, or a friend's), newest first. */
+    /**
+     * One person's posts that I may see (mine, or a friend's), newest first. On my own profile, `audience` shows only
+     * the posts I shared with Only me (`onlyMe`), Everyone (`everyone`) or one of my circles (its id). It's refused on
+     * anyone else's posts, since it would reveal their circles.
+     */
     @GetMapping("/v1/users/{userId}/posts")
     public List<PostView> posts(@AuthenticationPrincipal Jwt jwt, @PathVariable("userId") UUID userId,
             @RequestParam(value = "before", required = false) Instant before,
-            @RequestParam(value = "limit", defaultValue = "30") int limit) {
+            @RequestParam(value = "limit", defaultValue = "30") int limit,
+            @RequestParam(value = "audience", required = false) String audience) {
         byte[] me = me(jwt);
-        return views(me, "WHERE p.author_id = ? AND " + PostAccess.VISIBLE + " AND p.created_at < ? ORDER BY p.created_at DESC LIMIT ?",
-                concat(concat(new Object[] {Ids.bytes(userId)}, PostAccess.visibleArgs(me)), new Object[] {cursor(before), clamp(limit, 100)}));
+        String filter = "";
+        Object[] filterArgs = {};
+        if (audience != null) {
+            if (!userId.equals(TokenService.userOf(jwt))) {
+                throw ApiException.badRequest("invalid_audience");
+            }
+            if (audience.equals("onlyMe") || audience.equals("everyone")) {
+                filter = " AND p.audience = ?";
+                filterArgs = new Object[] {audience.equals("onlyMe") ? "only_me" : "everyone"};
+            } else if (audience.matches("\\d{1,9}")) {
+                filter = " AND p.audience = 'circles' AND EXISTS (SELECT 1 FROM post_circles fc WHERE fc.post_id = p.id AND fc.circle_id = ?)";
+                filterArgs = new Object[] {Integer.parseInt(audience)};
+            } else {
+                throw ApiException.badRequest("invalid_audience");
+            }
+        }
+        return views(me, "WHERE p.author_id = ? AND " + PostAccess.VISIBLE + filter + " AND p.created_at < ? ORDER BY p.created_at DESC LIMIT ?",
+                concat(concat(concat(new Object[] {Ids.bytes(userId)}, PostAccess.visibleArgs(me)), filterArgs),
+                        new Object[] {cursor(before), clamp(limit, 100)}));
     }
 
     /** "See what they can see": my posts exactly as this friend sees them (without my audience badges). */
