@@ -63,6 +63,8 @@ public class SecurityConfig {
                         // Background checks: authenticated by the device's check token instead (ActivityController).
                         .requestMatchers(HttpMethod.GET, "/v1/activity/pending").permitAll()
                         .requestMatchers(HttpMethod.GET, "/v1/email/unsubscribe").permitAll()
+                        // An invite link's preview (name and photo only), for the website's /i/<token> page.
+                        .requestMatchers(HttpMethod.GET, "/v1/invites/*/card").permitAll()
                         .requestMatchers("/dev/**").permitAll() // only exists in profile 'local'
                         .requestMatchers("/error").permitAll()
                         .anyRequest().authenticated())

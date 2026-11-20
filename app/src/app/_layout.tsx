@@ -85,6 +85,7 @@ function Navigator() {
         <Stack.Screen name="settings/index" options={page('Settings and privacy')} />
         <Stack.Screen name="settings/account" options={page('Your account')} />
         <Stack.Screen name="settings/storage" options={page('Storage')} />
+        <Stack.Screen name="settings/growth" options={page('Growth')} />
         <Stack.Screen name="settings/display" options={page('Display')} />
         <Stack.Screen name="settings/notifications" options={page('Notifications')} />
         <Stack.Screen name="settings/privacy" options={page('Privacy and safety')} />

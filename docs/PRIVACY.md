@@ -50,6 +50,11 @@ a link to your account) and your reports lose their link to you.
   accepted", "Someone joined with your invite link", a security alert ("New sign-in to your account" and the like), or
   the daily note "You have a few new things waiting. Catch up when you're ready.". Messages and replies also carry the
   chat's, post's or reply's random id so a tap opens it. Never names, words or counts (owner decision 2026-11-18).
+- **Anyone you send your invite link to**, and the chat app that draws the link's preview (WhatsApp, iMessage and the
+  like), sees your name and profile photo, nothing else (owner request 2026-11-20). The website (Vercel) builds that
+  preview from `GET /v1/invites/<token>/card` and keeps nothing; resetting your link stops it within 5 minutes.
+- **Circlo's admins** (accounts listed in `CIRCLO_ADMIN_EMAILS`) see daily totals: sign-ups, invite joins,
+  connections, posts and replies. Counts only, computed from what's stored anyway; never who.
 - **The email provider** sees your email address and what Circlo emails you: codes, the daily note if you don't have
   the app (the kinds of things waiting, never who, what or how many), and security emails straight away (a new
   sign-in, a password change, another device signed out from your Devices list, naming only the kind of device: never where from).

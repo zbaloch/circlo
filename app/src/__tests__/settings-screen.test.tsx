@@ -1,9 +1,11 @@
 import { fireEvent, render, screen } from '@testing-library/react-native';
 import { router } from 'expo-router';
 
-import SettingsScreen, { SETTINGS_PAGES } from '@/app/settings/index';
+import SettingsScreen, { SETTINGS_PAGES, settingsPages } from '@/app/settings/index';
 
 jest.mock('expo-router', () => ({ router: { push: jest.fn() } }));
+let mockMe: { admin: boolean } | null = null;
+jest.mock('@/lib/me', () => ({ useMe: () => mockMe }));
 
 describe('Settings and privacy', () => {
   it('lists one link per area, Devices first, as on X', () => {
@@ -14,9 +16,24 @@ describe('Settings and privacy', () => {
 
   it('opens the page a link is for', async () => {
     await render(<SettingsScreen />);
-    fireEvent.press(screen.getByRole('link', { name: /Privacy and safety/ }));
+    await fireEvent.press(screen.getByRole('link', { name: /Privacy and safety/ }));
     expect(router.push).toHaveBeenCalledWith('/settings/privacy');
-    fireEvent.press(screen.getByRole('link', { name: /Devices/ }));
+    await fireEvent.press(screen.getByRole('link', { name: /Devices/ }));
     expect(router.push).toHaveBeenCalledWith('/devices');
+  });
+
+  it('lists Growth last, and only for Circlo’s admins', async () => {
+    expect(settingsPages(false)).toEqual(SETTINGS_PAGES);
+    expect(settingsPages(true).map((p) => p.href)).toEqual([...SETTINGS_PAGES.map((p) => p.href), '/settings/growth']);
+    mockMe = { admin: false };
+    await render(<SettingsScreen />);
+    expect(screen.queryAllByRole('link')).toHaveLength(SETTINGS_PAGES.length);
+  });
+
+  it('opens Growth for an admin', async () => {
+    mockMe = { admin: true };
+    await render(<SettingsScreen />);
+    await fireEvent.press(screen.getByRole('link', { name: /^Growth\./ }));
+    expect(router.push).toHaveBeenCalledWith('/settings/growth');
   });
 });

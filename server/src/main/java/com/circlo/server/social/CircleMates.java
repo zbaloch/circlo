@@ -5,8 +5,12 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
@@ -72,6 +76,45 @@ public class CircleMates {
             }
         }
         out.sort(Comparator.comparing(Mate::name, String.CASE_INSENSITIVE_ORDER).thenComparing(Mate::username));
+        return out;
+    }
+
+    /** Home's "People you may know": one friend, and the people on their profile I'm not connected with at all yet. */
+    public record Group(People.Person owner, List<People.Person> people) {}
+
+    /** No connection or request either way between me (`cm`) and the other person (`co`). */
+    private static final String UNCONNECTED = """
+              AND NOT EXISTS (SELECT 1 FROM friendships f WHERE (f.user_a = cm.member_id AND f.user_b = co.member_id)
+                                                           OR (f.user_a = co.member_id AND f.user_b = cm.member_id))
+            """;
+
+    /**
+     * Every friend's circle mates (as {@link #of}) that `me` has no connection or request with either way, grouped by
+     * the friend, friends and people sorted by name. Friends with nobody left are left out.
+     */
+    public List<Group> suggestions(byte[] me) {
+        Map<UUID, List<UUID>> byOwner = new LinkedHashMap<>();
+        jdbc.query("SELECT DISTINCT cm.owner_id, co.member_id " + SHARED + UNCONNECTED,
+                rs -> {
+                    byOwner.computeIfAbsent(Ids.uuid(rs.getBytes(1)), k -> new ArrayList<>()).add(Ids.uuid(rs.getBytes(2)));
+                }, (Object) me);
+        if (byOwner.isEmpty()) {
+            return List.of();
+        }
+        Set<UUID> everyone = new HashSet<>(byOwner.keySet());
+        byOwner.values().forEach(everyone::addAll);
+        Map<UUID, People.Person> persons = people.persons(everyone);
+        Comparator<People.Person> byName = Comparator.comparing(People.Person::name, String.CASE_INSENSITIVE_ORDER)
+                .thenComparing(People.Person::username);
+        List<Group> out = new ArrayList<>();
+        byOwner.forEach((owner, ids) -> {
+            People.Person o = persons.get(owner);
+            List<People.Person> ps = ids.stream().map(persons::get).filter(Objects::nonNull).sorted(byName).toList();
+            if (o != null && !ps.isEmpty()) {
+                out.add(new Group(o, ps));
+            }
+        });
+        out.sort(Comparator.comparing(Group::owner, byName));
         return out;
     }
 

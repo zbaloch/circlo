@@ -3,6 +3,7 @@ import { ScrollView } from 'react-native';
 
 import { NavRow } from '@/components/settings-ui';
 import type { IconName } from '@/components/ui/icon';
+import { useMe } from '@/lib/me';
 
 type Page = { icon: IconName; title: string; subtitle: string; href: Href };
 
@@ -17,11 +18,25 @@ export const SETTINGS_PAGES: Page[] = [
   { icon: 'information-circle-outline', title: 'About Circlo', subtitle: 'Terms, privacy policy, child safety and help.', href: '/settings/about' },
 ];
 
+/** Only for Circlo's admins (CIRCLO_ADMIN_EMAILS): counts per day, never who. */
+export const GROWTH_PAGE: Page = {
+  icon: 'trending-up-outline',
+  title: 'Growth',
+  subtitle: 'Sign-ups, invites, connections and posts each day. Only admins see this.',
+  href: '/settings/growth',
+};
+
+/** Pure: the pages listed, Growth last and only for admins. */
+export function settingsPages(admin: boolean): Page[] {
+  return admin ? [...SETTINGS_PAGES, GROWTH_PAGE] : SETTINGS_PAGES;
+}
+
 /** Settings and privacy: a list of links to each settings page. */
 export default function SettingsScreen() {
+  const me = useMe();
   return (
     <ScrollView className="flex-1 bg-surface dark:bg-surface-dark" contentContainerClassName="py-2">
-      {SETTINGS_PAGES.map((p) => (
+      {settingsPages(me?.admin ?? false).map((p) => (
         <NavRow key={p.title} icon={p.icon} title={p.title} subtitle={p.subtitle} href={p.href} />
       ))}
     </ScrollView>

@@ -27,6 +27,7 @@ jest.mock('@/lib/addressbook', () => ({ loadAddressBook: async () => ({ v: 1, my
 jest.mock('@/lib/circles', () => ({ resumePendingRotation: async () => false, labelOf: () => '' }));
 // Post cards use Reanimated and the media pipeline uses native modules; neither loads under jest-expo.
 jest.mock('@/components/post-card', () => ({ PostCard: () => null, OutboxCard: () => null }));
+jest.mock('@/components/people-you-may-know', () => ({ PeopleYouMayKnow: () => null }));
 jest.mock('@/lib/posts', () => ({}));
 jest.mock('@/lib/outbox', () => ({ useOutbox: () => [] }));
 jest.mock('@/lib/background-check', () => ({ offerBackgroundChecksNow: async () => false, onNotificationOpened: () => () => {}, markActiveNow: async () => {} }));

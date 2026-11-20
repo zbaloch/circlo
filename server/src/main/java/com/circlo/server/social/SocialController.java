@@ -201,6 +201,33 @@ public class SocialController {
         return people.person(Ids.uuid(usableOwner(once.isEmpty() ? null : once.get(0), me, false)));
     }
 
+    /** What a shared invite link's preview shows: its owner's name and photo, nothing else. */
+    public record InviteCard(String name, String avatarUrl) {}
+
+    /**
+     * The preview a chat app draws for a shared invite link (owner request 2026-11-20): the website's /i/&lt;token&gt; page
+     * asks for it, signed out. A current link or unused invite of an active account; anything else is 404. Tokens are
+     * 24 random-looking bytes, so they can't be guessed.
+     */
+    @GetMapping("/v1/invites/{token}/card")
+    public InviteCard inviteCard(@PathVariable("token") String token) {
+        if (!token.matches("[A-Za-z0-9_-]{16,64}")) {
+            throw ApiException.notFound();
+        }
+        byte[] hash = inviteHash(token);
+        byte[] owner = linkOwner(hash);
+        if (owner == null) {
+            List<byte[]> once = jdbc.query("SELECT inviter_id FROM invites WHERE token_hash = ? AND used_at IS NULL AND expires_at > ?",
+                    (rs, i) -> rs.getBytes(1), hash, now());
+            owner = once.isEmpty() ? null : once.get(0);
+        }
+        People.Person p = owner == null ? null : people.person(Ids.uuid(owner));
+        if (p == null) {
+            throw ApiException.notFound();
+        }
+        return new InviteCard(p.name(), p.avatarUrl());
+    }
+
     public record JoinInvite(@NotNull @Pattern(regexp = "[A-Za-z0-9_-]{16,64}") String token,
             @Size(max = CircleController.MAX_CIRCLES) List<Integer> circles) {}
 
@@ -426,6 +453,15 @@ public class SocialController {
             throw ApiException.notFound();
         }
         return mates.of(owner, me);
+    }
+
+    /**
+     * Home's "People you may know": the circle mates on all my friends' profiles that I'm not connected with yet,
+     * grouped by the friend (owner request 2026-11-20). The same people {@link #circleMates} shows, nothing more.
+     */
+    @GetMapping("/v1/me/people-you-may-know")
+    public List<CircleMates.Group> peopleYouMayKnow(@AuthenticationPrincipal Jwt jwt) {
+        return mates.suggestions(me(jwt));
     }
 
     /**
