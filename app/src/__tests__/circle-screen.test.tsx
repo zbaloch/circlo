@@ -2,13 +2,14 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-
 
 import CircleScreen from '@/app/circle/[n]';
 import { STARTER_CIRCLES, type AddressBook } from '@/lib/addressbook';
-import { membershipChange } from '@/lib/circles';
+import { hasFixedName, membershipChange } from '@/lib/circles';
 
+let mockN = '1';
 const mockPush = jest.fn();
 const mockBack = jest.fn();
 jest.mock('expo-router', () => ({
   router: { push: (p: unknown) => mockPush(p), back: () => mockBack(), canGoBack: () => true, replace: jest.fn() },
-  useLocalSearchParams: () => ({ n: '1' }),
+  useLocalSearchParams: () => ({ n: mockN }),
   useFocusEffect: (fn: () => void) => jest.requireActual('react').useEffect(fn, [fn]),
 }));
 const mockSession = { status: 'signedIn', account: { userId: 'me', handle: 'me' } };
@@ -46,7 +47,26 @@ function confirm(text: string) {
 }
 
 describe('a circle’s screen', () => {
-  beforeEach(() => jest.clearAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockN = '1';
+  });
+
+  it('Family, Close Friends, School and Work keep their names; other circles can be renamed', async () => {
+    expect(['Family', 'Close Friends', 'School', 'Work'].every(hasFixedName)).toBe(true);
+    expect(hasFixedName('Acquaintances')).toBe(false);
+    expect(hasFixedName('Coffee Meetup')).toBe(false);
+    await render(<CircleScreen />);
+    expect(await screen.findByText('Family is one of Circlo’s starter circles, so its name stays. Only you see it.')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Save name' })).toBeNull();
+  });
+
+  it('a circle that isn’t a fixed starter can be renamed', async () => {
+    mockN = '5';
+    await render(<CircleScreen />);
+    expect(await screen.findByRole('button', { name: 'Save name' })).toBeTruthy();
+    expect(screen.queryByText(/so its name stays/)).toBeNull();
+  });
 
   it('lists people like a followers list: name, @handle and bio; tapping one opens their profile', async () => {
     await render(<CircleScreen />);

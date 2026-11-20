@@ -23,6 +23,8 @@ export function describeError(e: unknown): string {
       return 'That doesn’t look like an email address.';
     case 'invalid_name':
       return 'Enter your name (up to 50 characters).';
+    case 'fixed_circle_name':
+      return 'Family, Close Friends, School and Work keep their names. Choose another name.';
     case 'invalid_bio':
       return 'Your bio can be up to 160 characters.';
     case 'weak_password':

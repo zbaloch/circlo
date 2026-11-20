@@ -119,8 +119,9 @@ class CircleMatesIT extends IntegrationTest {
         Map<String, Object> created = me.call("POST", "/v1/circles", Map.of("name", "Cousins")).getBody();
         assertThat(created).containsEntry("membersVisible", false);
         assertThat(me.status("PUT", "/v1/circles/8/members-visible", Map.of("visible", true))).isEqualTo(404);
-        me.call("PUT", "/v1/circles/" + CLOSE_FRIENDS, Map.of("name", "Besties"));
-        assertThat(me.get("/v1/circles").get(1)).containsEntry("membersVisible", true);
+        me.call("PUT", "/v1/circles/" + created.get("id") + "/members-visible", Map.of("visible", true));
+        me.call("PUT", "/v1/circles/" + created.get("id"), Map.of("name", "Cousins and aunts"));
+        assertThat(me.get("/v1/circles").get(5)).containsEntry("name", "Cousins and aunts").containsEntry("membersVisible", true);
 
         // Only the owner can change it: my coworker switching "their" circle 4 changes theirs, not mine.
         coworker.call("PUT", "/v1/circles/" + WORK + "/members-visible", Map.of("visible", false));

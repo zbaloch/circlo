@@ -15,6 +15,7 @@ import {
   createCircle,
   deleteCircle,
   confirmMembership,
+  hasFixedName,
   membersOf,
   renameCircle,
   setCircles,
@@ -31,7 +32,7 @@ function name(c: Contact) {
 
 /**
  * One circle: name it, see who's in it (X followers-list rows that open each profile), add or remove friends after a
- * confirmation, or delete it. `n` is the circle's id, or "new" to make one. Every membership change is silent: nobody
+ * confirmation, or delete it. Family, Close Friends, School and Work keep their names (owner decision 2026-11-20). `n` is the circle's id, or "new" to make one. Every membership change is silent: nobody
  * is told. A switch lets its people see each other on my profile, never its name (owner decision 2026-11-20).
  */
 export default function CircleScreen() {
@@ -165,19 +166,27 @@ export default function CircleScreen() {
         <Text className="text-muted dark:text-muted-dark">
           Posts to {circleName(book, id)} are seen only by the {members.length === 1 ? 'person' : `${members.length} people`} in it.
         </Text>
-        <TextField label="Name (only you see this)" value={label} onChangeText={setLabel} maxLength={40} />
-        <Button
-          label="Save name"
-          variant="outline"
-          disabled={!label.trim() || label.trim() === circleName(book, id)}
-          loading={busy === 'label'}
-          onPress={() =>
-            run('label', async () => {
-              await renameCircle(account, id, label);
-              reload();
-            })
-          }
-        />
+        {hasFixedName(circleName(book, id)) ? (
+          <Text className="text-[13px] leading-[18px] text-muted dark:text-muted-dark">
+            {circleName(book, id)} is one of Circlo’s starter circles, so its name stays. Only you see it.
+          </Text>
+        ) : (
+          <>
+            <TextField label="Name (only you see this)" value={label} onChangeText={setLabel} maxLength={40} />
+            <Button
+              label="Save name"
+              variant="outline"
+              disabled={!label.trim() || label.trim() === circleName(book, id)}
+              loading={busy === 'label'}
+              onPress={() =>
+                run('label', async () => {
+                  await renameCircle(account, id, label);
+                  reload();
+                })
+              }
+            />
+          </>
+        )}
         <View className="flex-row items-center gap-4">
           <View className="flex-1 gap-0.5">
             <Text className="text-[15px] font-semibold text-ink dark:text-ink-dark">People in this circle can see each other</Text>

@@ -2086,7 +2086,10 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /** Rename a circle */
+        /**
+         * Rename a circle
+         * @description Family, Close Friends, School and Work keep their names, and no circle can be renamed to one of them (`fixed_circle_name`).
+         */
         put: {
             parameters: {
                 query?: never;
@@ -2099,6 +2102,7 @@ export interface paths {
             requestBody: components["requestBodies"]["CircleName"];
             responses: {
                 200: components["responses"]["Status"];
+                400: components["responses"]["Error"];
                 404: components["responses"]["Error"];
             };
         };

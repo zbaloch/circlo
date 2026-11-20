@@ -811,11 +811,15 @@ paths:
   /v1/circles/{id}:
     put:
       summary: Rename a circle
+      description: >-
+        Family, Close Friends, School and Work keep their names, and no circle can be renamed to one of them
+        (`fixed_circle_name`).
       parameters:
         - { name: id, in: path, required: true, schema: { type: integer } }
       requestBody: { $ref: "#/components/requestBodies/CircleName" }
       responses:
         "200": { $ref: "#/components/responses/Status" }
+        "400": { $ref: "#/components/responses/Error" }
         "404": { $ref: "#/components/responses/Error" }
     delete:
       summary: Delete a circle (posts already shared with it keep their audience)
