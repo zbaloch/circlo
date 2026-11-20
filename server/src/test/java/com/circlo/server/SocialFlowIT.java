@@ -65,17 +65,16 @@ class SocialFlowIT extends IntegrationTest {
         var created = a.call("POST", "/v1/circles", Map.of("name", "  Neighbours "));
         assertThat(created.getBody()).containsEntry("id", 6).containsEntry("name", "Neighbours");
         assertThat(a.status("PUT", "/v1/circles/6", Map.of("name", "Street"))).isEqualTo(200);
-        // Renaming is mine alone: my friend still has their own Acquaintances.
-        assertThat(a.status("PUT", "/v1/circles/5", Map.of("name", "Cousins"))).isEqualTo(200);
-        assertThat(a.get("/v1/circles").get(4)).containsEntry("name", "Cousins");
-        assertThat(b.get("/v1/circles").get(4)).containsEntry("name", "Acquaintances");
-        // Family, Close Friends, School and Work keep their names, and no other circle can take one.
-        for (int starter = 1; starter <= 4; starter++) {
+        // The starter circles keep their names, and no other circle can take one.
+        for (int starter = 1; starter <= 5; starter++) {
             assertThat(a.call("PUT", "/v1/circles/" + starter, Map.of("name", "Mine now")).getBody()).containsEntry("error", "fixed_circle_name");
         }
         assertThat(a.call("PUT", "/v1/circles/6", Map.of("name", " Family ")).getBody()).containsEntry("error", "fixed_circle_name");
+        assertThat(a.call("PUT", "/v1/circles/6", Map.of("name", "Acquaintances")).getBody()).containsEntry("error", "fixed_circle_name");
         assertThat(a.get("/v1/circles")).extracting(c -> c.get("name"))
-                .containsExactly("Family", "Close Friends", "School", "Work", "Cousins", "Street");
+                .containsExactly("Family", "Close Friends", "School", "Work", "Acquaintances", "Street");
+        // Renaming is mine alone: my friend has no circle 6.
+        assertThat(b.get("/v1/circles")).hasSize(5);
         assertThat(a.status("PUT", "/v1/circles/7", Map.of("name", "Nope"))).isEqualTo(404);
         assertThat(a.call("PUT", "/v1/friends/" + b.userId + "/circles", Map.of("circles", List.of(6, 2, 99))).getBody())
                 .containsEntry("circles", List.of(2, 6));

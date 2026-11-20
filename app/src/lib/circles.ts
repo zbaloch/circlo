@@ -33,10 +33,10 @@ export const ONLY_ME_TITLE = 'Only me (my mind)';
 export const ONLY_ME_NOTE = 'Posts in this circle are private to you. Nobody else can see them.';
 
 /**
- * Starter circles that keep their names (owner decision 2026-11-20). The server won't rename them, or give another
- * circle one of these names; circles I make, and Acquaintances, are mine to name.
+ * The starter circles keep their names (owner decision 2026-11-20). The server won't rename them, or give another
+ * circle one of these names; circles I make are mine to name.
  */
-export const FIXED_CIRCLE_NAMES = ['Family', 'Close Friends', 'School', 'Work'];
+export const FIXED_CIRCLE_NAMES = ['Family', 'Close Friends', 'School', 'Work', 'Acquaintances'];
 
 /** Whether a circle's name can't be changed. Pure. */
 export function hasFixedName(name: string): boolean {

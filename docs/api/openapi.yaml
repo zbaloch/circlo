@@ -812,7 +812,7 @@ paths:
     put:
       summary: Rename a circle
       description: >-
-        Family, Close Friends, School and Work keep their names, and no circle can be renamed to one of them
+        The starter circles (Family, Close Friends, School, Work and Acquaintances) keep their names, and no circle can be renamed to one of them
         (`fixed_circle_name`).
       parameters:
         - { name: id, in: path, required: true, schema: { type: integer } }

@@ -17,7 +17,7 @@ jest.mock('@/lib/session', () => ({ useSession: () => mockSession }));
 jest.mock('@/api/client', () => ({}));
 
 const mockBook: AddressBook = {
-  circleDefs: STARTER_CIRCLES,
+  circleDefs: [...STARTER_CIRCLES, { id: 6, name: 'Coffee Meetup', membersVisible: false }],
   contacts: {
     m: { status: 'accepted', displayName: 'Ana', handle: 'ana', bio: 'Baker and hiker', avatarUrl: null, circles: [1, 2] },
     i: { status: 'accepted', displayName: 'Ben Carter', handle: 'bencarter', bio: 'Cyclist', avatarUrl: null, circles: [2] },
@@ -52,17 +52,16 @@ describe('a circle’s screen', () => {
     mockN = '1';
   });
 
-  it('Family, Close Friends, School and Work keep their names; other circles can be renamed', async () => {
-    expect(['Family', 'Close Friends', 'School', 'Work'].every(hasFixedName)).toBe(true);
-    expect(hasFixedName('Acquaintances')).toBe(false);
+  it('the starter circles keep their names; circles I make can be renamed', async () => {
+    expect(['Family', 'Close Friends', 'School', 'Work', 'Acquaintances'].every(hasFixedName)).toBe(true);
     expect(hasFixedName('Coffee Meetup')).toBe(false);
     await render(<CircleScreen />);
     expect(await screen.findByText('Family is one of Circlo’s starter circles, so its name stays. Only you see it.')).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Save name' })).toBeNull();
   });
 
-  it('a circle that isn’t a fixed starter can be renamed', async () => {
-    mockN = '5';
+  it('a circle I made can be renamed', async () => {
+    mockN = '6';
     await render(<CircleScreen />);
     expect(await screen.findByRole('button', { name: 'Save name' })).toBeTruthy();
     expect(screen.queryByText(/so its name stays/)).toBeNull();

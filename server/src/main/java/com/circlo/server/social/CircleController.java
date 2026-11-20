@@ -31,9 +31,9 @@ import org.springframework.web.bind.annotation.RestController;
 
 /**
  * My circles (owner decision 2026-10-29): up to 8, ids 1–8. New accounts start with Family, Close Friends, School, Work
- * and Acquaintances (owner decision 2026-11-03). Family, Close Friends, School and Work keep their names (owner decision
- * 2026-11-20): a circle with one of those names can't be renamed, and no circle can be renamed to one. Every other
- * circle is renamable by its owner only. A friend can be in any number of them. Circle names and memberships are returned only to their owner and nobody is told
+ * and Acquaintances (owner decision 2026-11-03), which keep their names (owner decision 2026-11-20): a circle with one
+ * of those names can't be renamed, and no circle can be renamed to one. Circles people make are renamable by their
+ * owner only. A friend can be in any number of them. Circle names and memberships are returned only to their owner and nobody is told
  * when they're added, moved or removed. The one exception (owner decision 2026-11-20): in a circle whose owner
  * switched on "People in this circle can see each other", its people see each other on the owner's profile, never
  * the circle's name ({@link CircleMates}). Family and Close Friends start on, every other circle off.
@@ -45,8 +45,8 @@ public class CircleController {
     static final List<String> STARTERS = List.of("Family", "Close Friends", "School", "Work", "Acquaintances");
     /** Starter circles whose people see each other until the owner switches it off. */
     static final Set<String> MEMBERS_VISIBLE = Set.of("Family", "Close Friends");
-    /** Starter circles whose names stay as they are. */
-    static final Set<String> FIXED_NAMES = Set.of("Family", "Close Friends", "School", "Work");
+    /** The starter circles' names stay as they are. */
+    static final Set<String> FIXED_NAMES = Set.copyOf(STARTERS);
 
     private final JdbcTemplate jdbc;
     private final People people;
@@ -133,7 +133,7 @@ public class CircleController {
         throw ApiException.conflict("too_many_circles");
     }
 
-    /** Renames one of my circles; Family, Close Friends, School and Work keep their names (`fixed_circle_name`). */
+    /** Renames one of my circles; the starter circles keep their names (`fixed_circle_name`). */
     @PutMapping("/v1/circles/{id}")
     public Map<String, String> rename(@AuthenticationPrincipal Jwt jwt, @PathVariable("id") int id, @Valid @RequestBody CircleName r) {
         byte[] me = me(jwt);

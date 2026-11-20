@@ -24,7 +24,7 @@ export function describeError(e: unknown): string {
     case 'invalid_name':
       return 'Enter your name (up to 50 characters).';
     case 'fixed_circle_name':
-      return 'Family, Close Friends, School and Work keep their names. Choose another name.';
+      return 'Family, Close Friends, School, Work and Acquaintances keep their names. Choose another name.';
     case 'invalid_bio':
       return 'Your bio can be up to 160 characters.';
     case 'weak_password':

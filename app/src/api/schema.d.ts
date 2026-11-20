@@ -2088,7 +2088,7 @@ export interface paths {
         get?: never;
         /**
          * Rename a circle
-         * @description Family, Close Friends, School and Work keep their names, and no circle can be renamed to one of them (`fixed_circle_name`).
+         * @description The starter circles (Family, Close Friends, School, Work and Acquaintances) keep their names, and no circle can be renamed to one of them (`fixed_circle_name`).
          */
         put: {
             parameters: {
