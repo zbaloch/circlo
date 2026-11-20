@@ -1,4 +1,5 @@
 import { CameraView } from 'expo-camera';
+import { ClipboardPasteButton } from 'expo-clipboard';
 import { Image } from 'expo-image';
 import { VideoView } from 'expo-video';
 import { cssInterop } from 'nativewind';
@@ -14,5 +15,7 @@ cssInterop(KeyboardAvoidingView, { className: 'style' });
 cssInterop(Image, { className: 'style' });
 cssInterop(CameraView, { className: 'style' });
 cssInterop(VideoView, { className: 'style' });
+// Apple's Paste button (components/paste-image) needs a size to show at all.
+cssInterop(ClipboardPasteButton, { className: 'style' });
 // The spinner and toggle (components/ui) animate with React Native's Animated.
 cssInterop(Animated.View, { className: 'style' });

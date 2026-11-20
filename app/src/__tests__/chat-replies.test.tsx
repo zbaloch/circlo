@@ -18,6 +18,21 @@ jest.mock('expo-image-picker', () => ({}));
 jest.mock('@/components/post-media', () => ({ MediaGrid: () => null }));
 jest.mock('@/components/chat-title', () => ({ ChatTitle: () => null }));
 jest.mock('@/components/keyboard-spacer', () => ({ KeyboardSpacer: () => null }));
+let mockPaste: ((m: unknown[]) => void) | undefined;
+jest.mock('@/components/paste-image', () => ({
+  PasteImageButton: ({ onImages }: { onImages: (m: unknown[]) => void }) => {
+    mockPaste = onImages;
+    return null;
+  },
+  PasteListener: () => null,
+}));
+jest.mock('@/lib/media', () => ({
+  ...jest.requireActual('@/lib/media'),
+  discardPicked: jest.fn(),
+  discardPrepared: jest.fn(),
+  prepare: jest.fn(async () => ({})),
+  upload: jest.fn(async (p: unknown[]) => (p.length ? ['uploaded'] : [])),
+}));
 // The swipe needs Reanimated's native runtime; its maths is tested on its own below.
 const mockSwipes: { enabled: boolean; onReply: () => void }[] = [];
 jest.mock('@/components/swipe-to-reply', () => ({
@@ -170,6 +185,29 @@ describe('replying to a message in a chat', () => {
     expect(screen.getAllByLabelText('Bo’s profile')).toHaveLength(2);
     await fireEvent.press(screen.getAllByLabelText('Bo’s profile')[0]);
     expect(jest.requireMock('expo-router').router.push).toHaveBeenCalledWith({ pathname: '/friend/[id]', params: { id: 'bo' } });
+  });
+
+  it('a pasted image is sent after a check, with what I’d typed', async () => {
+    mockConv = conversation([message(1, 'bo', 'Send me the screenshot')]);
+    await render(<ChatScreen />);
+    await fireEvent(screen.getByLabelText('Message'), 'changeText', 'here');
+    const shot = { uri: 'file:///cache/pasted-1.png', type: 'image', width: 1170, height: 2532, mimeType: 'image/png' };
+    await act(async () => mockPaste!([shot]));
+    expect(mockAlert).toHaveBeenLastCalledWith('Send this photo?', 'With your message: “here”', expect.anything());
+    const buttons: Btn[] = mockAlert.mock.calls.at(-1)![2];
+    await act(async () => buttons.find((b) => b.text === 'Send')!.onPress!());
+    expect(mockSend).toHaveBeenCalledWith(account, 'g1', 'here', ['uploaded'], undefined);
+  });
+
+  it('a pasted image that isn’t wanted is thrown away', async () => {
+    mockConv = conversation([message(1, 'bo', 'hi')]);
+    await render(<ChatScreen />);
+    const shot = { uri: 'file:///cache/pasted-2.png', type: 'image', width: 10, height: 10 };
+    await act(async () => mockPaste!([shot]));
+    const buttons: Btn[] = mockAlert.mock.calls.at(-1)![2];
+    await act(async () => buttons.find((b) => b.text === 'Cancel')!.onPress!());
+    expect(jest.requireMock('@/lib/media').discardPicked).toHaveBeenCalledWith([shot]);
+    expect(mockSend).not.toHaveBeenCalled();
   });
 
   it('the message follows the finger to the reply point, then slows and stops; only to the right', () => {
