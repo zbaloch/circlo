@@ -1,5 +1,5 @@
-import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { router, useFocusEffect, useLocalSearchParams, useNavigation } from 'expo-router';
+import { useCallback, useEffect, useState } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
 
 import { Button, ErrorText, TextField } from '@/components/form';
@@ -35,6 +35,13 @@ function name(c: Contact) {
  * confirmation, or delete it. The starter circles keep their names (owner decision 2026-11-20). `n` is the circle's id, or "new" to make one. Every membership change is silent: nobody
  * is told. A switch lets its people see each other on my profile, never its name (owner decision 2026-11-20).
  */
+/** The screen's heading: the circle's own name (only I see this screen), or New circle. Pure. */
+export function circleTitle(book: AddressBook | null, n: string): string {
+  if (n === 'new') return 'New circle';
+  const id = Number(n);
+  return book && circleDefs(book).some((c) => c.id === id) ? circleName(book, id) : 'Circle';
+}
+
 export default function CircleScreen() {
   const { n } = useLocalSearchParams<{ n: string }>();
   const isNew = n === 'new';
@@ -57,6 +64,11 @@ export default function CircleScreen() {
     );
   }, [account, id, isNew]);
   useFocusEffect(reload);
+
+  // The heading says which circle this is ("Family"), not just "Circle", and follows a rename.
+  const navigation = useNavigation();
+  const title = circleTitle(book, n);
+  useEffect(() => navigation.setOptions({ title }), [navigation, title]);
 
   if (!account || !book) return null;
   if (!isNew && !circleDefs(book).some((c) => c.id === id)) {

@@ -1,15 +1,17 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 
-import CircleScreen from '@/app/circle/[n]';
+import CircleScreen, { circleTitle } from '@/app/circle/[n]';
 import { STARTER_CIRCLES, type AddressBook } from '@/lib/addressbook';
 import { hasFixedName, membershipChange } from '@/lib/circles';
 
 let mockN = '1';
+const mockSetOptions = jest.fn();
 const mockPush = jest.fn();
 const mockBack = jest.fn();
 jest.mock('expo-router', () => ({
   router: { push: (p: unknown) => mockPush(p), back: () => mockBack(), canGoBack: () => true, replace: jest.fn() },
   useLocalSearchParams: () => ({ n: mockN }),
+  useNavigation: () => ({ setOptions: mockSetOptions }),
   useFocusEffect: (fn: () => void) => jest.requireActual('react').useEffect(fn, [fn]),
 }));
 const mockSession = { status: 'signedIn', account: { userId: 'me', handle: 'me' } };
@@ -58,6 +60,15 @@ describe('a circle’s screen', () => {
     await render(<CircleScreen />);
     expect(await screen.findByText('Family is one of Circlo’s starter circles, so its name stays. Only you see it.')).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Save name' })).toBeNull();
+  });
+
+  it('its heading is the circle’s name, not just "Circle"', async () => {
+    await render(<CircleScreen />);
+    await waitFor(() => expect(mockSetOptions).toHaveBeenLastCalledWith({ title: 'Family' }));
+    expect(circleTitle(mockBook, '6')).toBe('Coffee Meetup');
+    expect(circleTitle(mockBook, 'new')).toBe('New circle');
+    expect(circleTitle(null, '1')).toBe('Circle');
+    expect(circleTitle(mockBook, '8')).toBe('Circle');
   });
 
   it('a circle I made can be renamed', async () => {
