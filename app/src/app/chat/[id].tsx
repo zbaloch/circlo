@@ -1,12 +1,13 @@
 import { ContentText } from '@/components/content-text';
 import { textDirection, usesSystemFont } from '@/lib/script';
 import { Icon } from '@/components/ui/icon';
+import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { Redirect, router, useFocusEffect, useLocalSearchParams, useNavigation } from 'expo-router';
 
 import { CHAT_ENABLED } from '@/lib/features';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { FlatList, Modal, Pressable, View, type TextInputInstance } from 'react-native';
+import { FlatList, Modal, Pressable, ScrollView, View, type TextInputInstance } from 'react-native';
 import { KeyboardSpacer } from '@/components/keyboard-spacer';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -16,6 +17,8 @@ import { openProfile } from '@/components/post-actions';
 import { MediaGrid } from '@/components/post-media';
 import { SwipeToReply } from '@/components/swipe-to-reply';
 import { PasteImageButton, PasteListener } from '@/components/paste-image';
+import { addPasted } from '@/lib/paste-logic';
+import { showToast } from '@/lib/toast';
 import { blockUser, refreshBlocked, useBlocked, visibleMessages } from '@/lib/blocks';
 import { openViewer } from '@/lib/feed-store';
 import { useMe } from '@/lib/me';
@@ -59,6 +62,14 @@ export function ChatScreen() {
   const conv = useConversations().find((c) => c.groupId === id);
   const [text, setText] = useState('');
   const [sending, setSending] = useState(false);
+  // Photos or a video waiting to go with the next message (picked or pasted), shown above the composer.
+  const [staged, setStaged] = useState<PickedMedia[]>([]);
+  const stagedNow = useRef<PickedMedia[]>([]);
+  useEffect(() => {
+    stagedNow.current = staged;
+  }, [staged]);
+  // Leaving the chat throws away anything not sent.
+  useEffect(() => () => discardPicked(stagedNow.current), []);
   const [members, setMembers] = useState(false);
   const [hidden, setHidden] = useState<Set<number>>(new Set());
   // The message the next one replies to, and the one briefly highlighted after tapping a quote.
@@ -144,8 +155,10 @@ export function ChatScreen() {
     setTimeout(() => setFlash((f) => (f === quote.messageId ? null : f)), 1500);
   };
 
-  const send = async (picked: PickedMedia[] = []) => {
+  // Sends what's written with the photos or video waiting above the composer, as one message.
+  const send = async () => {
     const t = text.trim();
+    const picked = staged;
     if ((!t && picked.length === 0) || sending) return;
     setSending(true);
     const prepared: PreparedItem[] = [];
@@ -155,6 +168,7 @@ export function ChatScreen() {
       const uploaded = await upload(prepared);
       await sendMessage(account, conv.groupId, t, uploaded, replyingTo?.messageId);
       discardPicked(picked);
+      setStaged([]);
       setText('');
       setReplying(null);
       list.current?.scrollToEnd({ animated: true });
@@ -167,7 +181,14 @@ export function ChatScreen() {
   };
 
   const attach = async () => {
-    const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images', 'videos'], allowsMultipleSelection: true, selectionLimit: MAX_IMAGES, exif: false, quality: 1 });
+    const res = await ImagePicker.launchImageLibraryAsync({
+      // With photos already waiting, only more photos (up to 4 in all); otherwise photos or one video.
+      mediaTypes: staged.length ? ['images'] : ['images', 'videos'],
+      allowsMultipleSelection: true,
+      selectionLimit: MAX_IMAGES - staged.length,
+      exif: false,
+      quality: 1,
+    });
     if (res.canceled) return;
     const picked: PickedMedia[] = res.assets.map((a) => ({
       uri: a.uri,
@@ -177,22 +198,31 @@ export function ChatScreen() {
       durationMs: a.duration ?? undefined,
       mimeType: a.mimeType ?? undefined,
     }));
-    const video = picked.find((p) => p.type === 'video');
-    await send(video ? [video] : picked.slice(0, MAX_IMAGES));
+    stage(picked);
   };
 
   const canSend = conv.active;
+  const canAddMore = !staged.some((m) => m.type === 'video') && staged.length < MAX_IMAGES;
 
-  // A pasted image is sent like an attached one, after a check, since a paste can happen mid-sentence.
-  const sendPasted = (pasted: PickedMedia[]) => {
-    if (!canSend || sending) return discardPicked(pasted);
-    const photos = pasted.slice(0, MAX_IMAGES);
-    discardPicked(pasted.slice(MAX_IMAGES));
-    const t = text.trim();
-    showAlert(photos.length === 1 ? 'Send this photo?' : `Send ${photos.length} photos?`, t ? `With your message: “${t}”` : undefined, [
-      { text: 'Cancel', style: 'cancel', onPress: () => discardPicked(photos) },
-      { text: 'Send', onPress: () => void send(photos) },
-    ]);
+  // Picked or pasted photos wait above the composer, so a message can go with them: up to 4 photos, or one video.
+  const stage = (picked: PickedMedia[]) => {
+    if (!canSend || sending) return discardPicked(picked);
+    const video = picked.find((p) => p.type === 'video');
+    if (video) {
+      discardPicked([...staged, ...picked.filter((p) => p !== video)]);
+      setStaged([video]);
+      return;
+    }
+    const { media, dropped } = addPasted(staged, picked, MAX_IMAGES);
+    if (dropped.length) {
+      discardPicked(dropped);
+      showToast(`A message can have up to ${MAX_IMAGES} photos, or one video.`);
+    }
+    setStaged(media);
+  };
+  const unstage = (index: number) => {
+    discardPicked([staged[index]]);
+    setStaged(staged.filter((_, i) => i !== index));
   };
 
   // Long press: delete my own message for everyone, or hide someone else's here; report it or block them.
@@ -219,7 +249,7 @@ export function ChatScreen() {
 
   return (
     <SafeAreaView edges={['bottom']} className="flex-1 bg-surface dark:bg-surface-dark">
-      <PasteListener onImages={sendPasted} />
+      <PasteListener onImages={stage} />
       <View className="flex-1">
         <FlatList
           ref={list}
@@ -294,17 +324,40 @@ export function ChatScreen() {
         {replyingTo ? (
           <ReplyingBar quote={quoteOf(replyingTo)} nameOf={(u) => (u === account.userId ? 'yourself' : nameOf(u))} onCancel={() => setReplying(null)} color={palette.muted} />
         ) : null}
-        <View className="flex-row items-end gap-2 border-t border-border px-3 py-2 dark:border-border-dark">
-          <Pressable accessibilityRole="button" accessibilityLabel="Attach photos or video" disabled={!canSend || sending} onPress={attach} className={`h-10 w-10 items-center justify-center ${!canSend || sending ? 'opacity-40' : ''}`}>
+        {staged.length ? (
+          <ScrollView horizontal keyboardShouldPersistTaps="handled" className="grow-0 border-t border-border dark:border-border-dark" contentContainerClassName="gap-2 px-3 pt-3">
+            {staged.map((m, i) => (
+              <View key={m.uri} className="relative">
+                <Image source={{ uri: m.uri }} className="h-20 w-20 rounded-xl bg-surface-raised dark:bg-surface-raised-dark" contentFit="cover" />
+                {m.type === 'video' ? (
+                  <View className="absolute bottom-1 left-1 rounded-full bg-black/60 px-2 py-0.5">
+                    <Icon name="videocam" size={12} color="#FFFFFF" />
+                  </View>
+                ) : null}
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={m.type === 'video' ? 'Remove video' : `Remove photo ${i + 1}`}
+                  disabled={sending}
+                  onPress={() => unstage(i)}
+                  hitSlop={6}
+                  className="absolute right-1 top-1 h-6 w-6 items-center justify-center rounded-full bg-black/60">
+                  <Icon name="close" size={14} color="#FFFFFF" />
+                </Pressable>
+              </View>
+            ))}
+          </ScrollView>
+        ) : null}
+        <View className={`flex-row items-end gap-2 px-3 py-2 ${staged.length ? '' : 'border-t border-border dark:border-border-dark'}`}>
+          <Pressable accessibilityRole="button" accessibilityLabel="Attach photos or video" disabled={!canSend || sending || !canAddMore} onPress={attach} className={`h-10 w-10 items-center justify-center ${!canSend || sending || !canAddMore ? 'opacity-40' : ''}`}>
             <Icon name="image-outline" size={24} color={palette.primary} />
           </Pressable>
-          <PasteImageButton onImages={sendPasted} disabled={!canSend || sending} className="h-10 w-10 items-center justify-center" />
+          <PasteImageButton onImages={stage} disabled={!canSend || sending || !canAddMore} className="h-10 w-10 items-center justify-center" />
           <TextInput
             ref={input}
             accessibilityLabel="Message"
             editable={canSend}
             multiline
-            placeholder={conv.active ? 'Start a message' : 'You’re no longer in this chat'}
+            placeholder={!conv.active ? 'You’re no longer in this chat' : staged.length ? 'Add a message' : 'Start a message'}
             placeholderTextColor={palette.muted}
             value={text}
             onChangeText={setText}
@@ -315,9 +368,9 @@ export function ChatScreen() {
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Send message"
-            disabled={!canSend || !text.trim() || sending}
+            disabled={!canSend || (!text.trim() && !staged.length) || sending}
             onPress={() => send()}
-            className={`h-10 w-10 items-center justify-center rounded-full bg-primary dark:bg-primary-dark ${!canSend || !text.trim() || sending ? 'opacity-50' : ''}`}>
+            className={`h-10 w-10 items-center justify-center rounded-full bg-primary dark:bg-primary-dark ${!canSend || (!text.trim() && !staged.length) || sending ? 'opacity-50' : ''}`}>
             {sending ? <Spinner tone="onPrimary" /> : <Icon name="arrow-up" size={20} color={palette.onPrimary} />}
           </Pressable>
         </View>
