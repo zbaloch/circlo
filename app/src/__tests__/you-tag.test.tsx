@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react-native';
 
-import { PostCard, PostDetail, YouTag } from '@/components/post-card';
+import { audienceIcon, PostCard, PostDetail, YouTag } from '@/components/post-card';
 import type { FeedPost } from '@/lib/posts';
 
 jest.mock('@/components/post-media', () => ({ MediaGrid: () => null }));
@@ -60,6 +60,12 @@ describe('my own posts and replies say "(you)"', () => {
 });
 
 describe('who my post is for', () => {
+  it('has a lock only for Only me: a globe for Everyone, a circle for my circles', () => {
+    expect(audienceIcon('onlyMe')).toBe('lock-closed');
+    expect(audienceIcon('everyone')).toBe('globe-outline');
+    expect(audienceIcon('circles')).toBe('ellipse-outline');
+  });
+
   it('sits on the name line, after the time, not on a line of its own', async () => {
     await render(<PostCard post={post(true)} name="Zaheer" handle="zaheer" audience="Closest friends+" />);
     const label = screen.getByText('Closest friends+');

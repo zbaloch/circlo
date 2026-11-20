@@ -5,6 +5,7 @@ import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-na
 
 import { Avatar } from '@/components/avatar';
 import { MediaGrid } from '@/components/post-media';
+import type { Audience } from '@/lib/addressbook';
 import type { OutboxItem } from '@/lib/outbox';
 import type { FeedPost } from '@/lib/posts';
 import { fullTime, relativeTime } from '@/lib/time';
@@ -13,6 +14,11 @@ import { usePalette } from '@/theme/use-palette';
 import { ContentText } from '@/components/content-text';
 import { Text } from '@/components/ui/text';
 import { LIKES_ENABLED } from '@/lib/features';
+
+/** The icon beside who my post is for: a lock only for Only me, a globe for Everyone, a circle for my circles. Pure. */
+export function audienceIcon(kind: Audience['kind'] | undefined): IconName {
+  return kind === 'onlyMe' ? 'lock-closed' : kind === 'everyone' ? 'globe-outline' : 'ellipse-outline';
+}
 
 type Props = {
   post: FeedPost;
@@ -90,7 +96,7 @@ export function PostDetail({ post, name, handle, avatarUrl, audience, onReply, o
         <Text className="text-[15px] text-muted dark:text-muted-dark">{fullTime(post.createdAtMs)}</Text>
         {audience ? (
           <View className="flex-row items-center gap-1">
-            <Icon name="lock-closed" size={12} color={palette.muted} />
+            <Icon name={audienceIcon(post.audience?.kind)} size={12} color={palette.muted} />
             <Text className="shrink text-[15px] text-muted dark:text-muted-dark">{audience}</Text>
           </View>
         ) : null}
@@ -132,7 +138,7 @@ export function PostCard({ post, name, handle, avatarUrl, audience, onOpen, onRe
               // Who it's for, after the time (only ever on my own posts), so it doesn't take a line of its own.
               <View className="shrink flex-row items-center gap-1">
                 <Text className="text-[15px] text-muted dark:text-muted-dark">·</Text>
-                <Icon name="lock-closed" size={12} color={palette.muted} />
+                <Icon name={audienceIcon(post.audience?.kind)} size={12} color={palette.muted} />
                 <Text numberOfLines={1} className="shrink text-[15px] text-muted dark:text-muted-dark">
                   {audience}
                 </Text>
