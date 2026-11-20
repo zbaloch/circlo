@@ -1,10 +1,11 @@
 import { router, useFocusEffect } from "expo-router";
-import { useCallback, useState, type ReactElement } from "react";
+import { useCallback, useRef, useState, type ReactElement } from "react";
 import { FlatList, Pressable, View } from "react-native";
 
 import { Avatar } from "@/components/avatar";
 import { usePostActions } from "@/components/post-actions";
 import { PostCard } from "@/components/post-card";
+import { emptyFilterText, filterValue, PostFilterBar, postFilterOptions } from "@/components/post-filter-bar";
 import { ReplyCard } from "@/components/reply-card";
 import { Spinner } from "@/components/ui/spinner";
 import { Text } from "@/components/ui/text";
@@ -64,6 +65,13 @@ export function ProfileFeed({
   const [cursor, setCursor] = useState<string>();
   const [hasMore, setHasMore] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
+  // My own profile can show only the posts shared with Only me, Everyone or one circle.
+  const [filterKey, setFilterKey] = useState("all");
+  const filterOptions = own ? postFilterOptions(book) : [];
+  const filterOption = filterOptions.find((o) => o.key === filterKey);
+  const audience = own && filterOption ? filterValue(filterKey) : undefined;
+  // Answers to an earlier filter that arrive late are ignored.
+  const loadId = useRef(0);
   const [replies, setReplies] = useState<UserReply[] | null>(null);
   const [repliesMore, setRepliesMore] = useState(true);
   const now = useNow();
@@ -80,16 +88,20 @@ export function ProfileFeed({
 
   const load = useCallback(() => {
     loadAddressBook(account).then(setBook, () => {});
-    fetchAuthorPosts(account, userId).then(
+    const id = ++loadId.current;
+    fetchAuthorPosts(account, userId, { audience }).then(
       (page) => {
+        if (id !== loadId.current) return;
         putPosts(page.posts);
         setAuthored(page.posts);
         setCursor(page.cursor);
         setHasMore(page.hasMore);
       },
-      () => setAuthored([]),
+      () => {
+        if (id === loadId.current) setAuthored([]);
+      },
     );
-  }, [account, userId]);
+  }, [account, userId, audience]);
   useFocusEffect(load);
   useFocusEffect(
     useCallback(() => {
@@ -114,8 +126,10 @@ export function ProfileFeed({
     }
     if (!hasMore || loadingMore || !cursor) return;
     setLoadingMore(true);
+    const id = loadId.current;
     try {
-      const page = await fetchAuthorPosts(account, userId, { before: cursor });
+      const page = await fetchAuthorPosts(account, userId, { before: cursor, audience });
+      if (id !== loadId.current) return;
       putPosts(page.posts);
       setAuthored((prev) => [...(prev ?? []), ...page.posts]);
       setCursor(page.cursor);
@@ -218,13 +232,27 @@ export function ProfileFeed({
                 </Pressable>
               ))}
             </View>
+            {own && (tab === "posts" || tab === "media") ? (
+              <PostFilterBar
+                options={filterOptions}
+                selected={filterOption?.key ?? "all"}
+                onSelect={(o) => {
+                  if (o.key === filterKey) return;
+                  setFilterKey(o.key);
+                  setAuthored(null);
+                  setHasMore(false);
+                }}
+              />
+            ) : null}
             {waiting ? <Spinner className="py-8" /> : null}
           </View>
         }
         ListEmptyComponent={
           waiting ? undefined : (
             <Text className="px-6 py-10 text-center text-muted dark:text-muted-dark">
-              {tab === "likes"
+              {emptyFilterText(filterOption, tab === "media") && (tab === "posts" || tab === "media")
+                ? emptyFilterText(filterOption, tab === "media")
+                : tab === "likes"
                 ? "Posts you like appear here."
                 : tab === "replies"
                   ? "No replies yet."

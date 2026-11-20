@@ -1374,6 +1374,8 @@ export interface paths {
                 query?: {
                     before?: components["parameters"]["Before"];
                     limit?: components["parameters"]["Limit"];
+                    /** @description My own posts only (refused with 400 invalid_audience on anyone else's), just those shared with Only me (onlyMe), Everyone (everyone) or one of my circles (its id). */
+                    audience?: string;
                 };
                 header?: never;
                 path: {
@@ -1384,6 +1386,7 @@ export interface paths {
             requestBody?: never;
             responses: {
                 200: components["responses"]["Posts"];
+                400: components["responses"]["Error"];
             };
         };
         put?: never;

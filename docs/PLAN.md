@@ -355,6 +355,7 @@ Two steps, so the audience is chosen deliberately for every post (owner decision
 ### Profile
 - Avatar (tap it to see the photo full screen), display name, `@handle`, bio, and friend count. No banner: there's no way to set one (owner decision 2026-11-20).
 - Tabs: **Posts** | **Media** | **Likes** (Likes is visible only on your own profile).
+- On your own profile only, a row of chips under Posts and Media (All · Only me · Everyone · each of your circles) shows just the posts you shared with that audience (owner request 2026-11-20). The server refuses this filter on anyone else's posts.
 - On a friend's profile, show only what you can decrypt.
 - Buttons: **Message**. On your own profile: **Edit profile**.
 - **Friend actions are in the overflow menu:** Move to circle (author-only, silent), Unfriend, Block.

@@ -113,10 +113,18 @@ export async function fetchFeedPage(account: StoredAccount, before?: string, lim
   return page(ok(await api.GET('/v1/feed', { params: { query: { before, limit } } })), account.userId, limit);
 }
 
-/** One page of a single person's posts that I may see. */
-export async function fetchAuthorPosts(account: StoredAccount, authorId: string, opts: { before?: string; limit?: number } = {}): Promise<Page> {
+/** Which of my own posts my profile shows: those shared with Only me, Everyone or one of my circles (by id). */
+export type PostFilter = 'onlyMe' | 'everyone' | number;
+
+/** One page of a single person's posts that I may see. `audience` works only on my own posts. */
+export async function fetchAuthorPosts(
+  account: StoredAccount,
+  authorId: string,
+  opts: { before?: string; limit?: number; audience?: PostFilter } = {},
+): Promise<Page> {
   const limit = opts.limit ?? 30;
-  const rows = ok(await api.GET('/v1/users/{userId}/posts', { params: { path: { userId: authorId }, query: { before: opts.before, limit } } }));
+  const audience = opts.audience === undefined ? undefined : String(opts.audience);
+  const rows = ok(await api.GET('/v1/users/{userId}/posts', { params: { path: { userId: authorId }, query: { before: opts.before, limit, audience } } }));
   return page(rows, account.userId, limit);
 }
 

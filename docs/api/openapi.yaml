@@ -532,8 +532,14 @@ paths:
         - { name: userId, in: path, required: true, schema: { $ref: "#/components/schemas/Id" } }
         - { $ref: "#/components/parameters/Before" }
         - { $ref: "#/components/parameters/Limit" }
+        - name: audience
+          in: query
+          required: false
+          description: My own posts only (refused with 400 invalid_audience on anyone else's), just those shared with Only me (onlyMe), Everyone (everyone) or one of my circles (its id).
+          schema: { type: string, pattern: '^(onlyMe|everyone|[0-9]{1,9})$' }
       responses:
         "200": { $ref: "#/components/responses/Posts" }
+        "400": { $ref: "#/components/responses/Error" }
   /v1/users/{userId}/replies:
     get:
       summary: Someone's replies on posts I may see, newest first, each with its post
