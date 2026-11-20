@@ -1,4 +1,4 @@
-import { useFocusEffect } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
 import { useCallback, useState, type ReactElement } from "react";
 import { FlatList, Pressable, View } from "react-native";
 
@@ -9,7 +9,7 @@ import { ReplyCard } from "@/components/reply-card";
 import { Spinner } from "@/components/ui/spinner";
 import { Text } from "@/components/ui/text";
 import { loadAddressBook, type AddressBook } from "@/lib/addressbook";
-import { putPosts, useFeed } from "@/lib/feed-store";
+import { openViewer, photoAttachment, putPosts, useFeed } from "@/lib/feed-store";
 import type { StoredAccount } from "@/lib/keystore";
 import { fetchAuthorPosts, type FeedPost } from "@/lib/posts";
 import { fetchUserReplies, type UserReply } from "@/lib/thread";
@@ -41,7 +41,7 @@ type Props = {
 };
 
 /**
- * Profile (PLAN.md 2A): banner, avatar, name, @handle, bio, friend count, then Posts | Replies | Media | Likes. Replies
+ * Profile (PLAN.md 2A): photo (tap to see it full screen), name, @handle, bio, friend count, then Posts | Replies | Media | Likes. Replies
  * lists their replies on posts I can see, each with the post it answers.
  */
 export function ProfileFeed({
@@ -146,13 +146,25 @@ export function ProfileFeed({
         onEndReachedThreshold={0.5}
         ListHeaderComponent={
           <View>
-            <View className="h-28 bg-primary-soft dark:bg-primary-soft-dark" />
-            <View className="-mt-10 gap-2 px-4">
-              <View className="flex-row items-end justify-between">
-                <View className="rounded-full border-4 border-surface dark:border-surface-dark">
-                  <Avatar size="lg" id={userId} name={name} uri={avatarUrl} />
-                </View>
-                {headerRight ? <View className="mb-1 flex-row items-center gap-2">{headerRight}</View> : null}
+            {/* No banner (owner decision 2026-11-20: there's no way to set one): the photo leads, larger. */}
+            <View className="gap-2 px-4 pt-4">
+              <View className="flex-row items-start justify-between">
+                {avatarUrl ? (
+                  <Pressable
+                    accessibilityRole="imagebutton"
+                    accessibilityLabel={`${name}’s photo`}
+                    accessibilityHint="Opens it full screen"
+                    onPress={() => {
+                      openViewer([photoAttachment(avatarUrl)], 0);
+                      router.push("/viewer");
+                    }}
+                  >
+                    <Avatar size="xl" id={userId} name={name} uri={avatarUrl} />
+                  </Pressable>
+                ) : (
+                  <Avatar size="xl" id={userId} name={name} uri={avatarUrl} />
+                )}
+                {headerRight ? <View className="mt-2 flex-row items-center gap-2">{headerRight}</View> : null}
               </View>
               <Text className="text-2xl font-bold text-ink dark:text-ink-dark">
                 {name}

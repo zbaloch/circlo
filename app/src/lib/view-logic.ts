@@ -55,6 +55,21 @@ export function dayLabel(ms: number, now = Date.now()): string {
   return d.toLocaleDateString('en', { month: 'short', day: 'numeric', ...(sameYear ? {} : { year: 'numeric' }) });
 }
 
+/** A message's time of day, under its bubble: "9:41 AM". */
+export function clockTime(ms: number): string {
+  return new Date(ms).toLocaleTimeString('en', { hour: 'numeric', minute: '2-digit' });
+}
+
+/**
+ * Pure: whether a chat message is the last of its run, so its time shows under it (as on X). A run is one person's
+ * messages sent within 5 minutes of each other on the same day.
+ */
+export function endsRun(m: { senderUser: string; createdAtMs: number }, next?: { senderUser: string; createdAtMs: number }): boolean {
+  if (!next) return true;
+  return next.senderUser !== m.senderUser || next.createdAtMs - m.createdAtMs > 5 * 60_000
+    || new Date(next.createdAtMs).toDateString() !== new Date(m.createdAtMs).toDateString();
+}
+
 /** "iPhone app", "Android app" or "Web browser"; older sign-ins didn't say. */
 export function deviceLabel(d: { kind: 'ios' | 'android' | 'web' | null; current: boolean }): string {
   const kind = d.kind === 'ios' ? 'iPhone app' : d.kind === 'android' ? 'Android app' : d.kind === 'web' ? 'Web browser' : null;

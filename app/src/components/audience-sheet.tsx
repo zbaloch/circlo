@@ -82,6 +82,7 @@ export function AudiencePicker({ book, selected, onChange }: {
     onChange(next.length ? { kind: 'circles', ids: next } : null);
   };
   const circles = circleDefs(book);
+  const palette = usePalette();
   return (
     <>
       <ChoiceRow
@@ -114,6 +115,15 @@ export function AudiencePicker({ book, selected, onChange }: {
           onPress={() => toggle(c.id)}
         />
       ))}
+      {ids.length > 1 ? (
+        // Replies stay in the circle of the person who wrote them (owner decision 2026-11-06).
+        <View className="flex-row items-center gap-2 px-5 pt-3">
+          <Icon name="chatbubble-outline" size={16} color={palette.muted} />
+          <Text className="flex-1 text-sm text-muted dark:text-muted-dark">
+            Each circle sees only its own replies. Someone in two of them sees both.
+          </Text>
+        </View>
+      ) : null}
     </>
   );
 }

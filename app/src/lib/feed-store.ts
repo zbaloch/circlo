@@ -142,6 +142,15 @@ export function usePost(id: string | undefined): FeedPost | undefined {
 
 let viewer: { media: Attachment[]; index: number } | null = null;
 
+/**
+ * Pure: someone's profile photo as a viewer item, so tapping it opens it full screen like a post's photo. The URL is
+ * presigned; its path (the file itself) is the cache key, as in Avatar.
+ */
+export function photoAttachment(url: string): Attachment {
+  const key = url.split('?')[0];
+  return { type: 'image', mime: 'image/jpeg', width: 0, height: 0, durationMs: 0, objectKey: key, url, previewKey: key, previewUrl: url };
+}
+
 export function openViewer(media: Attachment[], index: number) {
   viewer = { media, index };
 }

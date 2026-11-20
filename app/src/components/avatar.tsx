@@ -3,7 +3,7 @@ import { View } from 'react-native';
 import { Text } from '@/components/ui/text';
 
 /** `id`: the person's user id (or a group chat's id), which picks their colour. */
-type Props = { id?: string; name?: string; uri?: string | null; size?: 'sm' | 'md' | 'post' | 'lg' };
+type Props = { id?: string; name?: string; uri?: string | null; size?: 'sm' | 'md' | 'post' | 'lg' | 'xl' };
 
 /** Spelled out in full so Tailwind finds every class (tokens.js `avatar`). */
 export const AVATAR_COLORS = [
@@ -28,9 +28,9 @@ export function avatarColor(id: string | undefined) {
   return AVATAR_COLORS[(h >>> 0) % AVATAR_COLORS.length];
 }
 
-// post: the author's photo on a post (owner request 2026-11-15: a bit bigger than a list's).
-const SIZES = { sm: 'h-8 w-8', md: 'h-10 w-10', post: 'h-11 w-11', lg: 'h-16 w-16' };
-const TEXT = { sm: 'text-sm', md: 'text-base', post: 'text-base', lg: 'text-2xl' };
+// post: the author's photo on a post (owner request 2026-11-15: a bit bigger than a list's). xl: a profile's header.
+const SIZES = { sm: 'h-8 w-8', md: 'h-10 w-10', post: 'h-11 w-11', lg: 'h-16 w-16', xl: 'h-20 w-20' };
+const TEXT = { sm: 'text-sm', md: 'text-base', post: 'text-base', lg: 'text-2xl', xl: 'text-3xl' };
 
 /** Someone's photo, or their initial while they have none (or it can't load). */
 export function Avatar({ id, name, uri, size = 'md' }: Props) {

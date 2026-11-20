@@ -1,5 +1,5 @@
 import { fromMessageRow, memberName, mergeMessages, unreadCount, type ChatMessage } from '@/lib/messaging';
-import { chatTitle, dayLabel } from '@/lib/view-logic';
+import { chatTitle, clockTime, dayLabel, endsRun } from '@/lib/view-logic';
 
 jest.mock('@/api/client', () => ({}));
 
@@ -28,6 +28,21 @@ describe('chat helpers', () => {
     expect(dayLabel(now - 86_400_000, now)).toBe('Yesterday');
     expect(dayLabel(new Date(2026, 9, 1).getTime(), now)).toMatch(/Oct 1/);
     expect(dayLabel(new Date(2024, 0, 3).getTime(), now)).toMatch(/2024/);
+  });
+
+  it('shows the time of day under each message', () => {
+    expect(clockTime(new Date(2026, 9, 27, 9, 5).getTime())).toMatch(/^9:05\sAM$/);
+    expect(clockTime(new Date(2026, 9, 27, 21, 40).getTime())).toMatch(/^9:40\sPM$/);
+  });
+
+  it('puts the time under the last message of a run: same sender, minutes apart, same day', () => {
+    const at = (h: number, m: number) => new Date(2026, 9, 27, h, m).getTime();
+    const msg = (senderUser: string, createdAtMs: number) => ({ senderUser, createdAtMs });
+    expect(endsRun(msg('a', at(9, 0)), msg('a', at(9, 3)))).toBe(false);
+    expect(endsRun(msg('a', at(9, 0)), msg('b', at(9, 1)))).toBe(true);
+    expect(endsRun(msg('a', at(9, 0)), msg('a', at(9, 6)))).toBe(true);
+    expect(endsRun(msg('a', at(9, 0)), undefined)).toBe(true);
+    expect(endsRun(msg('a', at(23, 59)), msg('a', new Date(2026, 9, 28, 0, 1).getTime()))).toBe(true);
   });
 
   it('takes the unread count from the server, so it’s the same on every device', () => {

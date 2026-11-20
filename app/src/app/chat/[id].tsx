@@ -28,7 +28,7 @@ import {
   type ChatMessage,
 } from '@/lib/messaging';
 import { useSession } from '@/lib/session';
-import { chatTitle, dayLabel } from '@/lib/view-logic';
+import { chatTitle, clockTime, dayLabel, endsRun } from '@/lib/view-logic';
 import { onLiveChange } from '@/lib/live';
 import { usePalette } from '@/theme/use-palette';
 import { Text, TextInput } from '@/components/ui/text';
@@ -36,7 +36,7 @@ import { DialogHost } from '@/components/ui/dialog-host';
 import { dialogOpen, dismissDialog, showAlert } from '@/lib/dialog';
 import { Spinner } from '@/components/ui/spinner';
 
-type Row = { kind: 'day'; label: string; key: string } | { kind: 'msg'; msg: ChatMessage; key: string; showName: boolean };
+type Row = { kind: 'day'; label: string; key: string } | { kind: 'msg'; msg: ChatMessage; key: string; showName: boolean; showTime: boolean };
 
 /** Chat (PLAN.md 2A): bubbles (mine on the right in the primary colour), date separators, composer. */
 /** Chat is hidden for now (lib/features): a direct link lands on Home. */
@@ -105,15 +105,15 @@ export function ChatScreen() {
   const rows: Row[] = [];
   let lastDay = '';
   let lastSender = '';
-  for (const m of visibleMessages(conv.messages, blocked)) {
-    if (hidden.has(m.seq)) continue;
+  const shown = visibleMessages(conv.messages, blocked).filter((m) => !hidden.has(m.seq));
+  for (const [i, m] of shown.entries()) {
     const day = dayLabel(m.createdAtMs);
     if (day !== lastDay) {
       rows.push({ kind: 'day', label: day, key: `d${m.seq}` });
       lastDay = day;
       lastSender = '';
     }
-    rows.push({ kind: 'msg', msg: m, key: `m${m.seq}`, showName: !m.mine && conv.members.length > 1 && m.senderUser !== lastSender });
+    rows.push({ kind: 'msg', msg: m, key: `m${m.seq}`, showName: !m.mine && conv.members.length > 1 && m.senderUser !== lastSender, showTime: endsRun(m, shown[i + 1]) });
     lastSender = m.senderUser;
   }
 
@@ -214,6 +214,9 @@ export function ChatScreen() {
                     <View className={`rounded-2xl px-4 py-2 ${item.msg.mine ? 'rounded-br-md bg-primary dark:bg-primary-dark' : 'rounded-bl-md bg-surface-raised dark:bg-surface-raised-dark'}`}>
                       <ContentText text={item.msg.text} className={item.msg.mine ? 'text-base text-on-primary dark:text-on-primary-dark' : 'text-base text-ink dark:text-ink-dark'} />
                     </View>
+                  ) : null}
+                  {item.showTime ? (
+                    <Text className={`px-2 pt-0.5 text-xs text-muted dark:text-muted-dark ${item.msg.mine ? 'text-right' : ''}`}>{clockTime(item.msg.createdAtMs)}</Text>
                   ) : null}
                 </Pressable>
                 {!item.msg.mine ? <MessageMenuButton onPress={() => messageMenu(item.msg)} color={palette.muted} /> : null}

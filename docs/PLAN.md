@@ -353,7 +353,7 @@ Two steps, so the audience is chosen deliberately for every post (owner decision
 - **Readers never see any circle label**, number, or "you're in circle X" indicator anywhere in the UI.
 
 ### Profile
-- Banner, avatar, display name, `@handle`, bio, and friend count.
+- Avatar (tap it to see the photo full screen), display name, `@handle`, bio, and friend count. No banner: there's no way to set one (owner decision 2026-11-20).
 - Tabs: **Posts** | **Media** | **Likes** (Likes is visible only on your own profile).
 - On a friend's profile, show only what you can decrypt.
 - Buttons: **Message**. On your own profile: **Edit profile**.

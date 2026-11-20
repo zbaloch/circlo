@@ -36,11 +36,15 @@ describe('changing who can see my post', () => {
     await render(<ChangeAudienceSheet visible book={book} post={post} onClose={() => {}} onSaved={saved} />);
 
     expect(screen.getByRole('checkbox', { name: /Family/ }).props.accessibilityState.checked).toBe(true);
+    // One circle: its replies are just its own anyway, so no note.
+    expect(screen.queryByText(/Each circle sees only its own replies/)).toBeNull();
     // Nothing changed yet: nothing to save.
     expect(screen.getByRole('button', { name: 'Save' }).props.accessibilityState.disabled).toBe(true);
 
     await fireEvent.press(screen.getByRole('checkbox', { name: /Close Friends/ }));
     expect(screen.getByText(/Family, Close Friends/)).toBeTruthy();
+    // Several circles: say that replies stay in the circle they come from (PostAccess.replyVisibleTo).
+    expect(screen.getByText(/Each circle sees only its own replies/)).toBeTruthy();
     await fireEvent.press(screen.getByRole('button', { name: 'Save' }));
 
     await waitFor(() => expect(saved).toHaveBeenCalledWith({ ...post, audience: { kind: 'circles', ids: [1, 2] } }));
