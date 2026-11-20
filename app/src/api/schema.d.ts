@@ -1283,6 +1283,45 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/me/people-you-may-know": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Home's "People you may know": the circle mates on all my friends' profiles that I have no connection or request with yet, grouped by the friend I'd know them through. Friends and people sorted by name; never which circle */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description One group per friend with anyone left */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            owner: components["schemas"]["Person"];
+                            people: components["schemas"]["Person"][];
+                        }[];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/me/preview/{friendId}/circle-mates": {
         parameters: {
             query?: never;
@@ -1509,6 +1548,104 @@ export interface paths {
                 404: components["responses"]["Error"];
             };
         };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/invites/{token}/card": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** What a shared invite link's preview shows (the website's /i/<token> page, for WhatsApp, iMessage and the like): its owner's name and photo, nothing else. Public; 404 unless it's a current link or an unused invite */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    token: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The inviter, as their link's preview shows them */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** @description Their name, or their username while they haven't set one */
+                            name: string;
+                            /** @description Presigned GET URL (1 hour) */
+                            avatarUrl: string | null;
+                        };
+                    };
+                };
+                404: components["responses"]["Error"];
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/growth": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Admins only (CIRCLO_ADMIN_EMAILS; 404 for anyone else): per UTC day for the last 30 days, newest first, how many people signed up, joined through an invite, connected, posted and replied, plus running totals. Counts only */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Daily totals */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            days: {
+                                /** Format: date */
+                                date: string;
+                                signups: number;
+                                /** @description One-time invites used and invite links opened */
+                                inviteJoins: number;
+                                /** @description Friendships made (requests accepted, links opened) */
+                                connections: number;
+                                posts: number;
+                                replies: number;
+                            }[];
+                            totals: {
+                                people: number;
+                                connections: number;
+                                posts: number;
+                            };
+                        };
+                    };
+                };
+                404: components["responses"]["Error"];
+            };
+        };
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -3082,6 +3219,8 @@ export interface components {
             pushDaily: boolean;
             /** @description People in the same circles as me see me on that friend's profile */
             showInCircles: boolean;
+            /** @description I can see the growth totals (my email is in CIRCLO_ADMIN_EMAILS) */
+            admin: boolean;
         };
         InviteLink: {
             token: string;

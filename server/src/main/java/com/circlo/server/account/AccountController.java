@@ -3,6 +3,7 @@ package com.circlo.server.account;
 import com.circlo.server.auth.Accounts;
 import com.circlo.server.auth.AuthService;
 import com.circlo.server.auth.TokenService;
+import com.circlo.server.growth.Admins;
 import com.circlo.server.media.Attachments;
 import com.circlo.server.media.MediaSweeper;
 import com.circlo.server.notify.SecurityAlerts;
@@ -46,10 +47,12 @@ public class AccountController {
     private final TokenService tokens;
     private final AuthService auth;
     private final SecurityAlerts security;
+    private final Admins admins;
 
     public AccountController(JdbcTemplate jdbc, MediaUrlSigner signer, MediaStore store, Attachments attachments, TokenService tokens,
-            AuthService auth, SecurityAlerts security) {
+            AuthService auth, SecurityAlerts security, Admins admins) {
         this.security = security;
+        this.admins = admins;
         this.jdbc = jdbc;
         this.signer = signer;
         this.store = store;
@@ -67,11 +70,12 @@ public class AccountController {
     /**
      * `name` is null until I set one. `emailNotifications`: the daily email. `push*`: which pushes my phones get
      * (messages, replies, friend requests and new friends as they happen; the 6pm reminder). `showInCircles`: whether
-     * people in the same circles as me see me on that friend's profile. Only ever returned to me.
+     * people in the same circles as me see me on that friend's profile. `admin`: I can see the growth totals
+     * (CIRCLO_ADMIN_EMAILS). Only ever returned to me.
      */
     public record Me(UUID userId, String name, String username, String email, String bio, String avatarUrl, Instant createdAt,
             boolean emailNotifications, boolean pushMessages, boolean pushReplies, boolean pushFriends, boolean pushDaily,
-            boolean showInCircles) {}
+            boolean showInCircles, boolean admin) {}
 
     @GetMapping("/v1/me")
     public Me me(@AuthenticationPrincipal Jwt jwt) {
@@ -83,7 +87,8 @@ public class AccountController {
                         + "push_friends, push_daily, show_in_circles FROM users WHERE id = ? AND status = 'active'",
                         (rs, i) -> new Me(Ids.uuid(rs.getBytes(1)), rs.getString(2), rs.getString(3), rs.getString(4), rs.getString(5),
                                 signer.url(rs.getString(6)), rs.getTimestamp(7).toInstant(), rs.getBoolean(8), rs.getBoolean(9),
-                                rs.getBoolean(10), rs.getBoolean(11), rs.getBoolean(12), rs.getBoolean(13)),
+                                rs.getBoolean(10), rs.getBoolean(11), rs.getBoolean(12), rs.getBoolean(13),
+                                admins.email(rs.getString(4))),
                         (Object) me)
                 .stream().findFirst().orElseThrow(ApiException::unauthorized);
     }

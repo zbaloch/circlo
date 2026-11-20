@@ -45,6 +45,8 @@ circlo:
   cors:
     origins: ${CIRCLO_CORS_ORIGINS:}
   invite-base: ${CIRCLO_INVITE_BASE:https://www.hellocirclo.com/i/}
+  # Emails of the accounts that may see the growth totals (comma-separated). None by default.
+  admin-emails: ${CIRCLO_ADMIN_EMAILS:}
   auth:
     access-ttl: 15m
     refresh-ttl: 30d

@@ -13,7 +13,7 @@
    on the owner's profile, never the circle's name.
 2. **Nobody can find you.** There is no search and no public profile; people connect with an invite link or QR code
    from the person, or from a mutual friend's profile when that friend put them in the same circle (and neither
-   hid themselves).
+   hid themselves). An invite link's preview shows its owner's name and photo, nothing else, to whoever has the link.
 3. **Circlo doesn't track you.** No IPs, locations, device data, analytics or ad identifiers are collected
    (docs/PRIVACY.md), and photo/video metadata is removed on the device before upload.
 4. **A database dump doesn't give away passwords.** Passwords are Argon2id hashes; codes and tokens are SHA-256 hashes.
@@ -51,6 +51,9 @@
 | Chats are members-only | Membership check on every chat call; only friends can be added | `ChatFlowIT` |
 | No discovery | No search endpoint; requests need a redeemed invite from the target, or the target in one of my friends' switched-on circles with me (not hidden, no block); profiles 404 for strangers | `SocialFlowIT`, `CircleMatesIT` |
 | Circle mates don't reveal circles | `/v1/users/{id}/circle-mates` only for the owner's friends; only circles with `members_visible` (owner's switch); only accepted friends of the owner; people with `show_in_circles` off and blocks either way left out; one list sorted by name, no circle id, name or grouping. The owner's preview omits how the others are connected to each other | `CircleMatesIT` |
+| People you may know (Home) shows no one new | `/v1/me/people-you-may-know` is the union of my friends' circle-mates lists (same query, same rules), minus anyone I have any connection or request with; grouped by friend, no circle id or name. Closing the card is remembered on the device only | `PeopleYouMayKnowIT` |
+| Invite previews show only a name and photo | `GET /v1/invites/{token}/card` (public, for the website's /i/<token> page) answers only for a current link or unused, unexpired invite of an active account, with `name` and `avatarUrl` only; anything else is 404. Tokens are 24 bytes from a keyed HMAC or random. The website's page is `noindex` and cached at most 5 minutes, so a reset link stops showing its owner within 5 minutes; nothing is logged | `InviteCardIT`, circlo-web `test/invite.test.ts` |
+| Growth totals are counts only | `GET /v1/admin/growth` returns per-day counts and totals, computed from existing rows (nothing new recorded); 404 unless the caller's email is in `CIRCLO_ADMIN_EMAILS` | `GrowthIT` |
 | Emails stay private | `People.Person` (name, username, photo) is the only shape returned about other people | `SocialFlowIT` |
 | Password guessing is slow | Argon2id hashes; 3 failures lock login (15 min → 1 h → 24 h), per account and per typed name; per-IP limits | `AuthFlowIT`, `LoginThrottleTest` |
 | No account enumeration at login | Unknown accounts answer exactly like wrong passwords (same shape, a dummy hash check) | `AuthFlowIT` |
@@ -82,9 +85,12 @@
    appear or disappear when the owner changes a circle. Mitigations: off for every circle except Family and Close
    Friends, a confirmation saying what it does whenever it's switched, anyone can hide themselves, and "See what they
    can see" shows the owner each person's list.
-5. **Social graph and metadata**: the server knows who is connected, who messages whom, and when.
-6. **Account lockout can be triggered by others** who know your username; resetting the password by email lifts it.
-7. **Screenshots and re-sharing**: anyone who can see a post can copy it. No reposts are offered.
+6. **An invite link shows who sent it** (owner request 2026-11-20). Anyone holding the link, and the chat app that
+   draws its preview, sees the owner's name and photo; a link posted publicly shows them to anyone. Mitigations:
+   nothing else is shown, the page isn't indexed, and resetting the link (Invite → Reset) stops it within 5 minutes.
+7. **Social graph and metadata**: the server knows who is connected, who messages whom, and when.
+8. **Account lockout can be triggered by others** who know your username; resetting the password by email lifts it.
+9. **Screenshots and re-sharing**: anyone who can see a post can copy it. No reposts are offered.
 
 ## Out of scope
 

@@ -9,7 +9,9 @@
   another user can fetch. The one exception is `social.CircleMates` (owner decision 2026-11-20): people in a circle
   with `members_visible` on see each other on the owner's profile, as one list sorted by name with no circle id,
   name or grouping, minus people with `show_in_circles` off and blocks; they may send each other friend requests.
-  Responses about other people use `People.Person` (name, username, photo), never their email.
+  Responses about other people use `People.Person` (name, username, photo), never their email. The only signed-out
+  read of a person is `GET /v1/invites/{token}/card` (name and photo of a current link's owner, for link previews).
+  `GET /v1/admin/growth` (admins by email, `growth.Admins`) returns counts only, never about one person.
 - Passwords: Argon2id via `auth.PasswordHasher` only; never stored, logged or returned. Emailed codes are stored only
   as hashes (`auth.EmailCodes`). Refresh tokens, invite tokens and check tokens are stored only as SHA-256.
 - Email goes through `mail.EmailSender` (SMTP in production; `circlo.mail.mode=log` prints to the console in the

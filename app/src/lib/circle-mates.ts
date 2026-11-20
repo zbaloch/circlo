@@ -6,6 +6,7 @@
  */
 import { api, ok } from '@/api/client';
 import type { components } from '@/api/schema';
+import { getItem, setItem } from '@/lib/storage';
 
 export type CircleMate = components['schemas']['CircleMate'];
 
@@ -42,4 +43,40 @@ export function membersVisibleChange(circle: string, people: number, on: boolean
         confirm: 'Turn off',
         done: `People in ${circle} can’t see each other now`,
       };
+}
+
+/** Home's "People you may know": one friend and the people I may know through them (not connected with yet). */
+export type MayKnowGroup = { owner: Person; people: Person[] };
+type Person = components['schemas']['Person'];
+
+export async function loadPeopleYouMayKnow(): Promise<MayKnowGroup[]> {
+  return ok(await api.GET('/v1/me/people-you-may-know'));
+}
+
+/**
+ * Pure: whether Home shows the card. Closing it remembers who was in it (on this device only); it comes back when
+ * someone new is listed.
+ */
+export function showMayKnow(groups: MayKnowGroup[], dismissed: ReadonlySet<string>): boolean {
+  return groups.some((g) => g.people.some((p) => !dismissed.has(p.userId)));
+}
+
+const dismissedKey = (userId: string) => `circlo.may-know-dismissed.${userId}`;
+
+/** The people shown when the card was last closed on this device. */
+export async function dismissedMayKnow(userId: string): Promise<Set<string>> {
+  try {
+    const raw = await getItem(dismissedKey(userId));
+    return new Set(raw ? (JSON.parse(raw) as string[]) : []);
+  } catch {
+    return new Set();
+  }
+}
+
+/** Closes the card until someone new is listed. Kept to the last 500 people. */
+export async function dismissMayKnow(userId: string, groups: MayKnowGroup[], before: ReadonlySet<string>): Promise<Set<string>> {
+  const all = new Set([...before, ...groups.flatMap((g) => g.people.map((p) => p.userId))]);
+  const kept = [...all].slice(-500);
+  await setItem(dismissedKey(userId), JSON.stringify(kept)).catch(() => undefined);
+  return new Set(kept);
 }
