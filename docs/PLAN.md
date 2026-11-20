@@ -366,7 +366,7 @@ Two steps, so the audience is chosen deliberately for every post (owner decision
 
 ### Messages
 - Inbox list, Twitter DM style: avatar, name, last-message preview (decrypted locally), time, and unread dot.
-- Chat screen with bubbles (yours right-aligned in the primary colour, theirs left), date separators, image/video attachments, a typing composer, and long-press to react or delete for yourself. Reply to one message from its menu: the reply shows a short quote of it (sender and first line), and tapping the quote scrolls to that message.
+- Chat screen with bubbles (yours right-aligned in the primary colour, theirs left), date separators, image/video attachments, a typing composer, and long-press to react or delete for yourself. Reply to one message from its menu or, on phones, by swiping it to the right: the reply shows a short quote of it (sender and first line), and tapping the quote scrolls to that message.
 - A "New message" FAB lets you pick one friend (DM) or several friends (group, with a group name and avatar).
 
 ### Notifications tab

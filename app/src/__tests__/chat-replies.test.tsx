@@ -2,6 +2,7 @@ import { act, fireEvent, render, screen } from '@testing-library/react-native';
 
 import { ChatScreen } from '@/app/chat/[id]';
 import { fromMessageRow, quoteLines, quoteOf, type ChatMessage, type Conversation } from '@/lib/messaging';
+import { SWIPE_MAX, SWIPE_REPLY, swipeOffset, swipeReplies } from '@/lib/swipe';
 
 type Btn = { text: string; onPress?: () => void };
 
@@ -17,6 +18,14 @@ jest.mock('expo-image-picker', () => ({}));
 jest.mock('@/components/post-media', () => ({ MediaGrid: () => null }));
 jest.mock('@/components/chat-title', () => ({ ChatTitle: () => null }));
 jest.mock('@/components/keyboard-spacer', () => ({ KeyboardSpacer: () => null }));
+// The swipe needs Reanimated's native runtime; its maths is tested on its own below.
+const mockSwipes: { enabled: boolean; onReply: () => void }[] = [];
+jest.mock('@/components/swipe-to-reply', () => ({
+  SwipeToReply: ({ children, ...props }: { children: React.ReactNode; enabled: boolean; onReply: () => void }) => {
+    mockSwipes.push(props);
+    return children;
+  },
+}));
 jest.mock('@/components/ui/dialog-host', () => ({ DialogHost: () => null }));
 const mockAlert = jest.fn();
 jest.mock('@/lib/dialog', () => ({
@@ -137,8 +146,31 @@ describe('replying to a message in a chat', () => {
 
   it('there’s no Reply once I’ve left the chat', async () => {
     mockConv = { ...conversation([message(1, 'bo', 'hi')]), active: false };
+    mockSwipes.length = 0;
     await render(<ChatScreen />);
     await fireEvent.press(screen.getByLabelText('Message options'));
     expect(mockAlert.mock.calls[0][2].map((b: Btn) => b.text)).not.toContain('Reply');
+    expect(mockSwipes.every((s) => !s.enabled)).toBe(true);
+  });
+
+  it('swiping a message to the right replies to it', async () => {
+    mockConv = conversation([message(1, 'bo', 'Dinner at 8?'), message(2, 'bo', 'Or 9')]);
+    mockSwipes.length = 0;
+    await render(<ChatScreen />);
+    const swipes = mockSwipes.slice(-2);
+    expect(swipes.every((s) => s.enabled)).toBe(true);
+    await act(async () => swipes[1].onReply());
+    expect(await screen.findByText('Replying to Bo')).toBeTruthy();
+    expect(screen.getAllByText('Or 9')).toHaveLength(2);
+  });
+
+  it('the message follows the finger to the reply point, then slows and stops; only to the right', () => {
+    expect(swipeOffset(-40)).toBe(0);
+    expect(swipeOffset(30)).toBe(30);
+    expect(swipeOffset(SWIPE_REPLY)).toBe(SWIPE_REPLY);
+    expect(swipeOffset(SWIPE_REPLY + 30)).toBe(SWIPE_REPLY + 10);
+    expect(swipeOffset(500)).toBe(SWIPE_MAX);
+    expect(swipeReplies(SWIPE_REPLY - 1)).toBe(false);
+    expect(swipeReplies(SWIPE_REPLY)).toBe(true);
   });
 });

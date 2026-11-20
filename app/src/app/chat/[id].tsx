@@ -13,6 +13,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Avatar } from '@/components/avatar';
 import { ChatTitle } from '@/components/chat-title';
 import { MediaGrid } from '@/components/post-media';
+import { SwipeToReply } from '@/components/swipe-to-reply';
 import { blockUser, refreshBlocked, useBlocked, visibleMessages } from '@/lib/blocks';
 import { openViewer } from '@/lib/feed-store';
 import { useMe } from '@/lib/me';
@@ -223,37 +224,40 @@ export function ChatScreen() {
             item.kind === 'day' ? (
               <Text className="py-2 text-center text-xs text-muted dark:text-muted-dark">{item.label}</Text>
             ) : (
-              // A visible "…" beside each bubble (on the inner side) opens the same menu as a long-press.
-              <View
-                className={`max-w-[85%] flex-row items-center gap-1 rounded-2xl ${item.msg.mine ? 'self-end' : 'self-start'} ${flash === item.msg.messageId ? 'bg-primary-soft dark:bg-primary-soft-dark' : ''}`}>
-                {item.msg.mine ? <MessageMenuButton onPress={() => messageMenu(item.msg)} color={palette.muted} /> : null}
-                <Pressable
-                  onLongPress={() => messageMenu(item.msg)}
-                  className="shrink">
-                  {item.showName ? <Text className="px-2 pb-0.5 text-xs text-muted dark:text-muted-dark">{memberName(conv, item.msg.senderUser, account)}</Text> : null}
-                  {item.msg.replyTo ? <Quote quote={item.msg.replyTo} nameOf={nameOf} mine={item.msg.mine} onPress={() => jump(item.msg.replyTo!)} /> : null}
-                  {item.msg.media.length ? (
-                    <View className="mb-1 w-64">
-                      <MediaGrid
-                        media={item.msg.media}
-                        onPress={(i) => {
-                          openViewer(item.msg.media.filter((m) => m.type === 'image'), i);
-                          router.push('/viewer');
-                        }}
-                      />
-                    </View>
-                  ) : null}
-                  {item.msg.text ? (
-                    <View className={`rounded-2xl px-4 py-2 ${item.msg.mine ? 'rounded-br-md bg-primary dark:bg-primary-dark' : 'rounded-bl-md bg-surface-raised dark:bg-surface-raised-dark'}`}>
-                      <ContentText text={item.msg.text} className={item.msg.mine ? 'text-base text-on-primary dark:text-on-primary-dark' : 'text-base text-ink dark:text-ink-dark'} />
-                    </View>
-                  ) : null}
-                  {item.showTime ? (
-                    <Text className={`px-2 pt-0.5 text-xs text-muted dark:text-muted-dark ${item.msg.mine ? 'text-right' : ''}`}>{clockTime(item.msg.createdAtMs)}</Text>
-                  ) : null}
-                </Pressable>
-                {!item.msg.mine ? <MessageMenuButton onPress={() => messageMenu(item.msg)} color={palette.muted} /> : null}
-              </View>
+              // A visible "…" beside each bubble (on the inner side) opens the same menu as a long-press; on phones a
+              // swipe to the right replies too.
+              <SwipeToReply enabled={canSend} onReply={() => reply(item.msg)} color={palette.muted}>
+                <View
+                  className={`max-w-[85%] flex-row items-center gap-1 rounded-2xl ${item.msg.mine ? 'self-end' : 'self-start'} ${flash === item.msg.messageId ? 'bg-primary-soft dark:bg-primary-soft-dark' : ''}`}>
+                  {item.msg.mine ? <MessageMenuButton onPress={() => messageMenu(item.msg)} color={palette.muted} /> : null}
+                  <Pressable
+                    onLongPress={() => messageMenu(item.msg)}
+                    className="shrink">
+                    {item.showName ? <Text className="px-2 pb-0.5 text-xs text-muted dark:text-muted-dark">{memberName(conv, item.msg.senderUser, account)}</Text> : null}
+                    {item.msg.replyTo ? <Quote quote={item.msg.replyTo} nameOf={nameOf} mine={item.msg.mine} onPress={() => jump(item.msg.replyTo!)} /> : null}
+                    {item.msg.media.length ? (
+                      <View className="mb-1 w-64">
+                        <MediaGrid
+                          media={item.msg.media}
+                          onPress={(i) => {
+                            openViewer(item.msg.media.filter((m) => m.type === 'image'), i);
+                            router.push('/viewer');
+                          }}
+                        />
+                      </View>
+                    ) : null}
+                    {item.msg.text ? (
+                      <View className={`rounded-2xl px-4 py-2 ${item.msg.mine ? 'rounded-br-md bg-primary dark:bg-primary-dark' : 'rounded-bl-md bg-surface-raised dark:bg-surface-raised-dark'}`}>
+                        <ContentText text={item.msg.text} className={item.msg.mine ? 'text-base text-on-primary dark:text-on-primary-dark' : 'text-base text-ink dark:text-ink-dark'} />
+                      </View>
+                    ) : null}
+                    {item.showTime ? (
+                      <Text className={`px-2 pt-0.5 text-xs text-muted dark:text-muted-dark ${item.msg.mine ? 'text-right' : ''}`}>{clockTime(item.msg.createdAtMs)}</Text>
+                    ) : null}
+                  </Pressable>
+                  {!item.msg.mine ? <MessageMenuButton onPress={() => messageMenu(item.msg)} color={palette.muted} /> : null}
+                </View>
+              </SwipeToReply>
             )
           }
         />
