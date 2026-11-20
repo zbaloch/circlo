@@ -54,6 +54,13 @@ export async function setNotificationSettings(change: NotificationSettings): Pro
   return fresh;
 }
 
+/** Whether people in the same circles as me see me on that friend's profile (and can ask to connect). */
+export async function setShowInCircles(showInCircles: boolean): Promise<Me> {
+  const fresh = ok(await api.PUT('/v1/me/privacy', { body: { showInCircles } }));
+  setMe(fresh);
+  return fresh;
+}
+
 export function useMe(): Me | null {
   return useSyncExternalStore(
     (l) => {

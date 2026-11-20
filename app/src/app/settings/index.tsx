@@ -13,7 +13,7 @@ export const SETTINGS_PAGES: Page[] = [
   { icon: 'images', title: 'Storage', subtitle: 'See how much space your photos and videos use.', href: '/settings/storage' },
   { icon: 'contrast-outline', title: 'Display', subtitle: 'Light, dark or dim, or the way your device is set.', href: '/settings/display' },
   { icon: 'notifications-outline', title: 'Notifications', subtitle: 'Choose how Circlo tells you about new things.', href: '/settings/notifications' },
-  { icon: 'shield-checkmark-outline', title: 'Privacy and safety', subtitle: 'Who can add you, and the people you’ve blocked.', href: '/settings/privacy' },
+  { icon: 'shield-checkmark-outline', title: 'Privacy and safety', subtitle: 'Who can add you, who sees you in shared circles, and the people you’ve blocked.', href: '/settings/privacy' },
   { icon: 'information-circle-outline', title: 'About Circlo', subtitle: 'Terms, privacy policy, child safety and help.', href: '/settings/about' },
 ];
 

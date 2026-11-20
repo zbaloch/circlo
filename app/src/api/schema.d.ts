@@ -523,6 +523,41 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/me/privacy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Whether people in the same circles as me see me on that friend's profile (and may ask to connect) */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        showInCircles: boolean;
+                    };
+                };
+            };
+            responses: {
+                200: components["responses"]["Me"];
+                400: components["responses"]["Error"];
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/email/unsubscribe": {
         parameters: {
             query: {
@@ -1209,6 +1244,84 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/users/{userId}/circle-mates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The people I see on a friend's profile: the others in their circles that I'm in too, where they switched it on. One list sorted by name, never which circle. Empty for my own profile */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    userId: components["schemas"]["Id"];
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Circle mates */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["CircleMate"][];
+                    };
+                };
+                404: components["responses"]["Error"];
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/me/preview/{friendId}/circle-mates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The people this friend sees on my profile (relation is always null here) */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    friendId: components["schemas"]["Id"];
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Circle mates as they see them */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["CircleMate"][];
+                    };
+                };
+                404: components["responses"]["Error"];
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/users/{userId}/posts": {
         parameters: {
             query?: never;
@@ -1596,7 +1709,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Ask someone whose invite I redeemed to connect, putting them in my circles */
+        /** Ask someone whose invite I redeemed, or someone I see among a friend's circle mates, to connect, putting them in my circles */
         post: {
             parameters: {
                 query?: never;
@@ -1869,6 +1982,53 @@ export interface paths {
                 404: components["responses"]["Error"];
             };
         };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/circles/{id}/members-visible": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Whether the people in my circle see each other on my profile (never its name). Nobody is told */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: number;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        visible: boolean;
+                    };
+                };
+            };
+            responses: {
+                /** @description The switch as it is now */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            membersVisible: boolean;
+                        };
+                    };
+                };
+                404: components["responses"]["Error"];
+            };
+        };
+        post?: never;
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -2920,6 +3080,8 @@ export interface components {
             pushFriends: boolean;
             /** @description The 6pm reminder pushed to my phones (new posts from my circles and anything else new) */
             pushDaily: boolean;
+            /** @description People in the same circles as me see me on that friend's profile */
+            showInCircles: boolean;
         };
         InviteLink: {
             token: string;
@@ -2936,7 +3098,18 @@ export interface components {
         Circle: {
             id: number;
             name: string;
+            /** @description Its people see each other on my profile (never its name) */
+            membersVisible: boolean;
             members: components["schemas"]["Id"][];
+        };
+        /** @description Someone in the same circle of a friend as me, with how we're connected (null if we aren't) */
+        CircleMate: {
+            userId: components["schemas"]["Id"];
+            name: string;
+            username: string;
+            avatarUrl?: string | null;
+            /** @enum {string|null} */
+            relation: "accepted" | "incoming" | "outgoing" | null;
         };
         Audience: {
             /** @enum {string} */

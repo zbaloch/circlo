@@ -99,6 +99,7 @@ function Navigator() {
         <Stack.Screen name="viewer" options={own} />
         <Stack.Screen name="video" options={{ ...own, animation: 'fade' }} />
         <Stack.Screen name="preview/[id]" options={page('What they can see')} />
+        <Stack.Screen name="mates/[id]" options={page('People you may know')} />
         <Stack.Screen name="chat/[id]" options={{ title: 'Chat' }} />
         <Stack.Screen name="new-message" options={page('New message')} />
         <Stack.Screen name="report/[id]" options={page('Report')} />

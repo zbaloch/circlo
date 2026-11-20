@@ -8,9 +8,12 @@
 ## Headline guarantees
 
 1. **Nobody sees what wasn't shared with them.** Every read of a post, reply, like, photo, chat or profile is checked
-   on the server; circle names and memberships, and who a post went to, are only ever returned to their owner.
-2. **Nobody can find you.** There is no search and no public profile; the only way to connect is an invite link or QR
-   code from the person.
+   on the server; circle names and memberships, and who a post went to, are only ever returned to their owner. The
+   one exception (owner decision 2026-11-20): people in a circle whose owner lets them see each other see each other
+   on the owner's profile, never the circle's name.
+2. **Nobody can find you.** There is no search and no public profile; people connect with an invite link or QR code
+   from the person, or from a mutual friend's profile when that friend put them in the same circle (and neither
+   hid themselves).
 3. **Circlo doesn't track you.** No IPs, locations, device data, analytics or ad identifiers are collected
    (docs/PRIVACY.md), and photo/video metadata is removed on the device before upload.
 4. **A database dump doesn't give away passwords.** Passwords are Argon2id hashes; codes and tokens are SHA-256 hashes.
@@ -46,7 +49,8 @@
 | Replies don't reveal other circles | On a post shared with several circles, a reply reaches only people who share one of those circles with its writer (plus the post's author); reply counts, profile Replies tabs, likes and reports follow the same rule. The post author's own replies reach the whole audience, except an answer to someone's reply, which stays in that reply's circle at any depth; "Replying to @x" is shown only to people who can see x's reply | `ReplyCirclesIT`, `ReplyThreadsIT` |
 | Circle labels stay private | Audience fields are only set on the author's own posts; `/v1/circles` and circle ids in `/v1/friends` are the caller's own | `PostsFlowIT`, `SocialFlowIT` |
 | Chats are members-only | Membership check on every chat call; only friends can be added | `ChatFlowIT` |
-| No discovery | No search endpoint; requests need a redeemed invite from the target; profiles 404 for strangers | `SocialFlowIT` |
+| No discovery | No search endpoint; requests need a redeemed invite from the target, or the target in one of my friends' switched-on circles with me (not hidden, no block); profiles 404 for strangers | `SocialFlowIT`, `CircleMatesIT` |
+| Circle mates don't reveal circles | `/v1/users/{id}/circle-mates` only for the owner's friends; only circles with `members_visible` (owner's switch); only accepted friends of the owner; people with `show_in_circles` off and blocks either way left out; one list sorted by name, no circle id, name or grouping. The owner's preview omits how the others are connected to each other | `CircleMatesIT` |
 | Emails stay private | `People.Person` (name, username, photo) is the only shape returned about other people | `SocialFlowIT` |
 | Password guessing is slow | Argon2id hashes; 3 failures lock login (15 min → 1 h → 24 h), per account and per typed name; per-IP limits | `AuthFlowIT`, `LoginThrottleTest` |
 | No account enumeration at login | Unknown accounts answer exactly like wrong passwords (same shape, a dummy hash check) | `AuthFlowIT` |
@@ -73,6 +77,11 @@
    steal it. Mitigations: React escapes all text, no `dangerouslySetInnerHTML`, links are http(s) only, security
    headers in `app/vercel.json`; access tokens live in memory only and expire in 15 minutes.
 4. **Download links can be forwarded.** A presigned media URL works for anyone for up to an hour.
+5. **Circle mates can be inferred into circles** (owner decision 2026-11-20). Hiding the name doesn't stop people
+   guessing ("these are his family"), comparing lists ("she sees my brother but not my wife"), or noticing someone
+   appear or disappear when the owner changes a circle. Mitigations: off for every circle except Family and Close
+   Friends, a confirmation saying what it does whenever it's switched, anyone can hide themselves, and "See what they
+   can see" shows the owner each person's list.
 5. **Social graph and metadata**: the server knows who is connected, who messages whom, and when.
 6. **Account lockout can be triggered by others** who know your username; resetting the password by email lifts it.
 7. **Screenshots and re-sharing**: anyone who can see a post can copy it. No reposts are offered.

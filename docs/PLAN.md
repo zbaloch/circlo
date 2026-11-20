@@ -11,7 +11,7 @@ and there is a web app.
 | Accounts | Name, @username, email and password. The email is confirmed with a 6-digit code before the account exists; a forgotten password is reset with an emailed code. The photo can be added or changed later in Edit profile |
 | Passwords | Stored only as Argon2id hashes (server). Strength checked in the app (zxcvbn, 12+ characters) |
 | Data | Sent over HTTPS (TLS), stored as sent. The **server enforces who sees what** (THREAT_MODEL.md v2.0) |
-| Circles | Kept on the server: up to 8 per person (starters Family, Close Friends, School, Work, Acquaintances since 2026-11-03). Names, memberships and a post's audience are returned only to the owner |
+| Circles | Kept on the server: up to 8 per person (starters Family, Close Friends, School, Work, Acquaintances since 2026-11-03). Names, memberships and a post's audience are returned only to the owner, except that people in a circle the owner lets see each other (Family and Close Friends by default) see each other on the owner's profile, never the circle's name (owner decision 2026-11-20) |
 | Post audience | Only me; Everyone (all current friends); or circles: the people in them **now** (owner decision 2026-11-01: taking someone out of a circle closes its posts to them, earlier ones too; putting them back reopens them; deleting a circle leaves posts shared only with it to the author). Unfriend/block removes access to everything |
 | Chats | Server-stored 1:1 and group chats between friends; read state per person, so it's the same on every device |
 | Media | Metadata removed on the device, then presigned upload to a private bucket; presigned downloads (1 hour) |
@@ -571,6 +571,7 @@ Rate limiting. **Do not log request bodies or IPs.**
 
 ### Phase 5: Friends
 - Invite by QR code or link (token plus inviter public-key fingerprint). No handle search: invites are the only way to connect (owner decision 2026-10-28).
+- Update 2026-11-20 (owner): people in the same circle of a friend see each other on that friend's profile and can send each other a request (per-circle switch, on for Family and Close Friends; per-person "Show me" setting, on). Still no search. See PROGRESS.md.
 - Update 2026-11-01 (owner): each person has one permanent invite link (and QR code) until they reset it; opening it connects at once, into the owner's Everyone, and the owner is told and can choose circles. See PROGRESS.md.
 - Friend request, then accept.
 - Both sides exchange `profileKey` and their current `Ck` via `friend_payloads`.
@@ -684,6 +685,6 @@ On the device:
 
 ## 6. Open decisions for you
 
-1. Should handles be searchable at all, or invite-only (more private)? **Decided 2026-10-28: invite-only, no search.**
+1. Should handles be searchable at all, or invite-only (more private)? **Decided 2026-10-28: invite-only, no search.** Still no search; since 2026-11-20 people in the same circle of a friend can also connect from that friend's profile.
 2. Web client later: Next.js plus the core compiled to WASM, with the code-delivery risk noted earlier.
 3. **License** (needed before the first public push). Common choice for E2EE apps is **AGPL-3.0** for the whole repo (Signal does this): anyone running a modified server must publish their changes. Alternatives: Apache-2.0 or MIT (most permissive; others can build closed products on your code). Pick one and Claude Code adds the `LICENSE` file.

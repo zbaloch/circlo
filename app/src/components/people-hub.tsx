@@ -40,8 +40,8 @@ function message(e: unknown) {
  * The People tab: your people, your circles and inviting, in one place (owner decisions 2026-11-07). People (requests
  * to answer, requests I sent, my people with their circles), Circles (Only me, Everyone, my circles, New circle) and
  * Invite (my QR code and link, the same until I reset it, then "Got an invite?" to scan or paste someone's). It opens
- * on Invite while I have nobody yet, since that's the first thing to do. Invites are the only way to connect; there
- * is no search. Whoever scans my code while it's on screen shows up above it, to choose their circles.
+ * on Invite while I have nobody yet, since that's the first thing to do. There is no search: people connect by invite,
+ * or from a friend's profile when they're in the same circle of that friend. Whoever scans my code while it's on screen shows up above it, to choose their circles.
  */
 export function PeopleHub({ only }: { only?: 'invite' | 'join' } = {}) {
   const palette = usePalette();

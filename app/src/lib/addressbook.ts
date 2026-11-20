@@ -10,8 +10,8 @@ import type { StoredAccount } from './keystore';
 /** Who a post is for: only me, all my friends, or one or more of my circles. */
 export type Audience = { kind: 'onlyMe' } | { kind: 'everyone' } | { kind: 'circles'; ids: number[] };
 
-/** One of my circles: an id 1–8 and the name only I see. */
-export type CircleDef = { id: number; name: string };
+/** One of my circles: an id 1–8, the name only I see, and whether its people see each other (without its name). */
+export type CircleDef = { id: number; name: string; membersVisible?: boolean };
 
 export type Contact = {
   status: 'accepted' | 'incoming' | 'outgoing';
@@ -31,11 +31,11 @@ export type AddressBook = {
 
 /** Starter circles of a new account (the server creates them; owner decision 2026-11-03). */
 export const STARTER_CIRCLES: CircleDef[] = [
-  { id: 1, name: 'Family' },
-  { id: 2, name: 'Close Friends' },
-  { id: 3, name: 'School' },
-  { id: 4, name: 'Work' },
-  { id: 5, name: 'Acquaintances' },
+  { id: 1, name: 'Family', membersVisible: true },
+  { id: 2, name: 'Close Friends', membersVisible: true },
+  { id: 3, name: 'School', membersVisible: false },
+  { id: 4, name: 'Work', membersVisible: false },
+  { id: 5, name: 'Acquaintances', membersVisible: false },
 ];
 export const MAX_CIRCLES = 8;
 
@@ -50,13 +50,13 @@ export function resetAddressBookCache() {
 /** Pure: the book from the server's lists. Exported for tests. */
 export function bookFrom(
   friends: { userId: string; status: Contact['status']; name: string; username: string; bio?: string; avatarUrl?: string | null; circles: number[] }[],
-  circles: { id: number; name: string }[],
+  circles: { id: number; name: string; membersVisible?: boolean }[],
 ): AddressBook {
   const contacts: Record<string, Contact> = {};
   for (const f of friends) {
     contacts[f.userId] = { status: f.status, displayName: f.name, handle: f.username, bio: f.bio ?? '', avatarUrl: f.avatarUrl, circles: f.circles };
   }
-  return { contacts, circleDefs: circles.map((c) => ({ id: c.id, name: c.name })) };
+  return { contacts, circleDefs: circles.map((c) => ({ id: c.id, name: c.name, membersVisible: c.membersVisible ?? false })) };
 }
 
 /** Fetches my connections and circles again. */

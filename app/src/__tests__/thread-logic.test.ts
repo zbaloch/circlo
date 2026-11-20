@@ -48,7 +48,7 @@ describe('author names', () => {
   it('names me, connections by their profile, and strangers neutrally', () => {
     expect(authorName(account, book, 'me').name).toBe('zaheer');
     // Once my profile has loaded, my own posts show my display name.
-    setMe({ userId: 'me', name: 'Zaheer B', username: 'zaheer', email: 'z@example.test', bio: '', createdAt: '', emailNotifications: true, pushMessages: true, pushReplies: true, pushFriends: true, pushDaily: true });
+    setMe({ userId: 'me', name: 'Zaheer B', username: 'zaheer', email: 'z@example.test', bio: '', createdAt: '', emailNotifications: true, pushMessages: true, pushReplies: true, pushFriends: true, pushDaily: true, showInCircles: true });
     expect(authorName(account, book, 'me')).toEqual({ name: 'Zaheer B', handle: 'zaheer' });
     setMe(null);
     expect(authorName(account, book, 'b')).toEqual({ name: 'Bob', handle: 'bob' });

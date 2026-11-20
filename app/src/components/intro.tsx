@@ -32,7 +32,7 @@ export const INTRO_PAGES: IntroPage[] = [
     art: 'invite',
     title: 'Invite only',
     lead: 'Nobody can find you unless you let them.',
-    body: 'There’s no search and no public profile. You connect by sharing your invite link or QR code, and choose each person’s circles when they join.',
+    body: 'There’s no search and no public profile. You connect by sharing your invite link or QR code, or with people a friend has put in the same circle as you.',
   },
   {
     art: 'private',

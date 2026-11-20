@@ -152,6 +152,12 @@ export async function renameCircle(account: StoredAccount, id: number, name: str
   await refreshAddressBook(account);
 }
 
+/** Whether the people in my circle see each other on my profile (never its name). Nobody is told. */
+export async function setMembersVisible(account: StoredAccount, id: number, visible: boolean): Promise<void> {
+  ok(await api.PUT('/v1/circles/{id}/members-visible', { params: { path: { id } }, body: { visible } }));
+  await refreshAddressBook(account);
+}
+
 /** Deletes a circle; posts already shared with it keep the audience they had. */
 export async function deleteCircle(account: StoredAccount, id: number): Promise<void> {
   ok(await api.DELETE('/v1/circles/{id}', { params: { path: { id } } }));
