@@ -3098,6 +3098,8 @@ export interface paths {
                     "application/json": {
                         text: string;
                         media?: components["schemas"]["NewAttachment"][];
+                        /** @description A message in this chat that this one replies to (`invalid_reply` otherwise) */
+                        replyTo?: components["schemas"]["Id"];
                     };
                 };
             };
@@ -3316,8 +3318,19 @@ export interface components {
             senderId: components["schemas"]["Id"];
             text: string;
             media: components["schemas"]["Attachment"][];
+            /** @description The message this one replies to, if it's a reply */
+            replyTo?: components["schemas"]["Quote"] | null;
             /** Format: date-time */
             createdAt: string;
+        };
+        /** @description The message a reply answers: its sender and its first 140 characters (with "…" when there's more), or the type of its first photo or video when it has no text. Once it's deleted, or its sender is someone I blocked, `available` is false and only `messageId` is given. */
+        Quote: {
+            messageId: components["schemas"]["Id"];
+            available: boolean;
+            senderId?: components["schemas"]["Id"] | null;
+            text?: string | null;
+            /** @enum {string|null} */
+            mediaType?: "image" | "video" | null;
         };
         Chat: {
             chatId: components["schemas"]["Id"];

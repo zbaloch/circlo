@@ -1242,6 +1242,9 @@ paths:
               properties:
                 text: { type: string }
                 media: { type: array, items: { $ref: "#/components/schemas/NewAttachment" } }
+                replyTo:
+                  description: A message in this chat that this one replies to (`invalid_reply` otherwise)
+                  allOf: [{ $ref: "#/components/schemas/Id" }]
       responses:
         "201":
           description: The message
@@ -1462,7 +1465,28 @@ components:
         senderId: { $ref: "#/components/schemas/Id" }
         text: { type: string }
         media: { type: array, items: { $ref: "#/components/schemas/Attachment" } }
+        replyTo:
+          description: The message this one replies to, if it's a reply
+          oneOf:
+            - { $ref: "#/components/schemas/Quote" }
+            - { type: "null" }
         createdAt: { type: string, format: date-time }
+    Quote:
+      type: object
+      description: >-
+        The message a reply answers: its sender and its first 140 characters (with "…" when there's more), or the type
+        of its first photo or video when it has no text. Once it's deleted, or its sender is someone I blocked,
+        `available` is false and only `messageId` is given.
+      required: [messageId, available]
+      properties:
+        messageId: { $ref: "#/components/schemas/Id" }
+        available: { type: boolean }
+        senderId:
+          oneOf:
+            - { $ref: "#/components/schemas/Id" }
+            - { type: "null" }
+        text: { type: [string, "null"] }
+        mediaType: { type: [string, "null"], enum: [image, video, null] }
     Chat:
       type: object
       required: [chatId, members, unread, readSeq, updatedAt]
