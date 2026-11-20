@@ -50,7 +50,7 @@
     "openapi-fetch": "^0.17.0",
     "react": "19.3.0",
     "react-dom": "19.3.0",
-    "react-native": "0.88.0",
+    "react-native": "0.88.1",
     "react-native-gesture-handler": "~3.3.0",
     "react-native-keyboard-controller": "1.22.7",
     "react-native-qrcode-svg": "^6.3.27",
