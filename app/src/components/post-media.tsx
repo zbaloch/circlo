@@ -65,7 +65,38 @@ export function VideoPoster({ video, className }: { video: Attachment; className
   );
 }
 
-/** PLAN.md 2A media grid: 1 full width, 2 side by side, 3 as one large plus two stacked, 4 as 2×2. */
+// Shapes (width / height) a single photo snaps to, nearest first by ratio. Written out in full so Tailwind finds every
+// class: a photo's own ratio can't be a class, and inline styles are only for animations.
+const SHAPES: { ratio: number; className: string }[] = [
+  { ratio: 1 / 2, className: 'aspect-[1/2]' },
+  { ratio: 9 / 16, className: 'aspect-[9/16]' },
+  { ratio: 2 / 3, className: 'aspect-[2/3]' },
+  { ratio: 3 / 4, className: 'aspect-[3/4]' },
+  { ratio: 4 / 5, className: 'aspect-[4/5]' },
+  { ratio: 1, className: 'aspect-square' },
+  { ratio: 5 / 4, className: 'aspect-[5/4]' },
+  { ratio: 4 / 3, className: 'aspect-[4/3]' },
+  { ratio: 3 / 2, className: 'aspect-[3/2]' },
+  { ratio: 16 / 9, className: 'aspect-video' },
+  { ratio: 2, className: 'aspect-[2/1]' },
+  { ratio: 3, className: 'aspect-[3/1]' },
+];
+
+/**
+ * How a post's only photo is shown (as on Bluesky): in its own shape, snapped to the nearest of SHAPES. A wide or square
+ * photo fills the width; a tall one is as tall as the width and narrower, so it never takes over the timeline.
+ * Unknown sizes show as 4:3. Pure.
+ */
+export function singlePhotoShape(width: number, height: number): { tall: boolean; className: string } {
+  const ratio = width > 0 && height > 0 ? width / height : 4 / 3;
+  const shape = SHAPES.reduce((best, s) => (Math.abs(Math.log(s.ratio / ratio)) < Math.abs(Math.log(best.ratio / ratio)) ? s : best));
+  return { tall: shape.ratio < 1, className: shape.className };
+}
+
+/**
+ * PLAN.md 2A media: one photo in its own shape (singlePhotoShape); 2 side by side, 3 as one large plus two stacked,
+ * 4 as 2×2.
+ */
 export function MediaGrid({ media, onPress }: { media: Attachment[]; onPress?: (index: number) => void }) {
   const video = media.find((m) => m.type === 'video');
   if (video) return <VideoPoster video={video} className="aspect-video w-full rounded-2xl" />;
@@ -76,7 +107,16 @@ export function MediaGrid({ media, onPress }: { media: Attachment[]; onPress?: (
       {child}
     </Pressable>
   );
-  if (tiles.length === 1) return tap(0, <MediaImage objectKey={tiles[0].objectKey} url={tiles[0].url} className="aspect-[4/3] w-full rounded-2xl" />);
+  if (tiles.length === 1) {
+    const shape = singlePhotoShape(tiles[0].width, tiles[0].height);
+    const photo = <MediaImage objectKey={tiles[0].objectKey} url={tiles[0].url} className="h-full w-full rounded-2xl" />;
+    // A tall photo: a square's height, its own width, on the left.
+    return shape.tall ? (
+      <View className="aspect-square w-full flex-row">{tap(0, photo, `h-full ${shape.className}`)}</View>
+    ) : (
+      tap(0, photo, `w-full ${shape.className}`)
+    );
+  }
   const cell = (i: number) => tap(i, <MediaImage objectKey={tiles[i].previewKey} url={tiles[i].previewUrl} className="h-full w-full" />, 'flex-1');
   return (
     <View className="aspect-[16/9] w-full flex-row gap-0.5 overflow-hidden rounded-2xl">

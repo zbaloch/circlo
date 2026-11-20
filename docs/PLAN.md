@@ -333,7 +333,7 @@ Build the familiar Twitter/X interaction model under the **Circlo** brand. Do no
   - avatar
   - **display name** in bold, `@handle`, and relative time (e.g. "2h")
   - text, with links auto-detected
-  - media grid: 1 image full-width, 2 side-by-side, 3 as one large plus two stacked, 4 as a 2×2 grid; video with a poster frame and play button, muted autoplay in view
+  - media grid: 1 image in its own shape as on Bluesky (wide ones full width, tall ones as tall as the width and narrower; snapped to the nearest of 12 shapes from 1:2 to 3:1), 2 side-by-side, 3 as one large plus two stacked, 4 as a 2×2 grid; video with a poster frame and play button, muted autoplay in view
   - action row: **Reply** (count), **Like** (count), **Share-to-DM**, and an overflow menu (Mute, Block; Delete if it's your own post)
 - **No reposts/retweets.** Resharing would leak a post beyond its intended circle. Leave this out deliberately.
 - **Tap a post** to open the thread view: the original post, then replies in order. Replying starts from the post's reply button (owner decision 2026-10-31: no reply bar docked at the bottom).
