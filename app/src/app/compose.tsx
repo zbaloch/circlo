@@ -16,6 +16,9 @@ import { describeError } from '@/lib/account';
 import { loadAddressBook, type AddressBook, type Audience } from '@/lib/addressbook';
 import { audienceLabel, ONLY_ME } from '@/lib/circles';
 import { discardPicked, MAX_IMAGES, type PickedMedia } from '@/lib/media';
+import { usePastedImages } from '@/lib/paste';
+import { addPasted } from '@/lib/paste-logic';
+import { PasteImageButton } from '@/components/paste-image';
 import { useMe } from '@/lib/me';
 import { enqueuePost } from '@/lib/outbox';
 import { MAX_POST_CHARS, validateDraft } from '@/lib/posts';
@@ -75,6 +78,20 @@ export default function ComposeScreen() {
 
   const hasVideo = media.some((m) => m.type === 'video');
   const canAdd = !hasVideo && media.length < MAX_IMAGES;
+
+  // A copied image pasted in (Paste on phones, Ctrl/Cmd+V on the web) joins the photos like a picked one.
+  const paste = (pasted: PickedMedia[]) => {
+    setError(undefined);
+    setMedia((current) => {
+      const { media: next, dropped } = addPasted(current, pasted, MAX_IMAGES);
+      if (dropped.length) {
+        discardPicked(dropped);
+        setError(current.some((m) => m.type === 'video') ? 'A post can have a video or photos, not both.' : `A post can have up to ${MAX_IMAGES} photos.`);
+      }
+      return next;
+    });
+  };
+  usePastedImages(paste);
   const content = { text: text.trim(), media };
   const used = [...text].length;
   // Step 1 checks only the content; the audience is chosen in step 2.
@@ -162,6 +179,7 @@ export default function ComposeScreen() {
       <Pressable accessibilityRole="button" accessibilityLabel="Take a photo" disabled={!canAdd} onPress={() => pick(true)} className={canAdd ? '' : 'opacity-40'}>
         <Icon name="camera-outline" size={24} color={palette.primary} />
       </Pressable>
+      <PasteImageButton onImages={paste} disabled={!canAdd} />
       <View className="flex-1" />
       <CharRing used={used} limit={MAX_POST_CHARS} />
     </View>

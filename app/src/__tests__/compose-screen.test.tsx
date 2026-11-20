@@ -26,6 +26,14 @@ jest.mock('@/lib/addressbook', () => ({ loadAddressBook: jest.fn() }));
 jest.mock('@/lib/outbox', () => ({ enqueuePost: jest.fn() }));
 jest.mock('@/lib/media', () => ({ discardPicked: jest.fn(), MAX_IMAGES: 4 }));
 jest.mock('@/lib/session', () => ({ useSession: () => ({ status: 'signedIn', account: { userId: 'me', handle: 'me' } }) }));
+// Paste: the button hands over whatever the test gives it.
+let mockPaste: ((m: unknown[]) => void) | undefined;
+jest.mock('@/components/paste-image', () => ({
+  PasteImageButton: ({ onImages }: { onImages: (m: unknown[]) => void }) => {
+    mockPaste = onImages;
+    return null;
+  },
+}));
 
 const open = async () => {
   const callbacks = mockFocus;
@@ -43,6 +51,25 @@ beforeEach(() => {
 });
 
 describe('compose screen', () => {
+  it('a pasted image joins the post’s photos, up to four', async () => {
+    const { loadAddressBook } = jest.requireMock('@/lib/addressbook');
+    const { enqueuePost } = jest.requireMock('@/lib/outbox');
+    const { discardPicked } = jest.requireMock('@/lib/media');
+    loadAddressBook.mockResolvedValue(book(['Family']));
+    await render(<ComposeScreen />);
+    await open();
+    const shot = (n: number) => ({ uri: `file:///cache/pasted-${n}.png`, type: 'image', width: 1170, height: 2532, mimeType: 'image/png' });
+    await act(async () => mockPaste!([shot(1), shot(2), shot(3)]));
+    await act(async () => mockPaste!([shot(4), shot(5)]));
+    expect(discardPicked).toHaveBeenCalledWith([shot(5)]);
+    expect(screen.getByText('A post can have up to 4 photos.')).toBeTruthy();
+    await fireEvent.press(screen.getByRole('button', { name: 'Next' }));
+    expect(screen.getByText(/4 photos/)).toBeTruthy();
+    await fireEvent.press(screen.getByRole('checkbox', { name: /Family/ }));
+    await fireEvent.press(screen.getByRole('button', { name: 'Post' }));
+    expect(enqueuePost).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ media: [shot(1), shot(2), shot(3), shot(4)] }));
+  });
+
   it('asks who can see the post every time, with nothing chosen up front', async () => {
     const { loadAddressBook } = jest.requireMock('@/lib/addressbook');
     const { enqueuePost } = jest.requireMock('@/lib/outbox');

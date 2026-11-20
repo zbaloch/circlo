@@ -15,6 +15,7 @@ import { ChatTitle } from '@/components/chat-title';
 import { openProfile } from '@/components/post-actions';
 import { MediaGrid } from '@/components/post-media';
 import { SwipeToReply } from '@/components/swipe-to-reply';
+import { PasteImageButton, PasteListener } from '@/components/paste-image';
 import { blockUser, refreshBlocked, useBlocked, visibleMessages } from '@/lib/blocks';
 import { openViewer } from '@/lib/feed-store';
 import { useMe } from '@/lib/me';
@@ -182,6 +183,18 @@ export function ChatScreen() {
 
   const canSend = conv.active;
 
+  // A pasted image is sent like an attached one, after a check, since a paste can happen mid-sentence.
+  const sendPasted = (pasted: PickedMedia[]) => {
+    if (!canSend || sending) return discardPicked(pasted);
+    const photos = pasted.slice(0, MAX_IMAGES);
+    discardPicked(pasted.slice(MAX_IMAGES));
+    const t = text.trim();
+    showAlert(photos.length === 1 ? 'Send this photo?' : `Send ${photos.length} photos?`, t ? `With your message: “${t}”` : undefined, [
+      { text: 'Cancel', style: 'cancel', onPress: () => discardPicked(photos) },
+      { text: 'Send', onPress: () => void send(photos) },
+    ]);
+  };
+
   // Long press: delete my own message for everyone, or hide someone else's here; report it or block them.
   const messageMenu = (msg: ChatMessage) => {
     const name = memberName(conv, msg.senderUser, account);
@@ -206,6 +219,7 @@ export function ChatScreen() {
 
   return (
     <SafeAreaView edges={['bottom']} className="flex-1 bg-surface dark:bg-surface-dark">
+      <PasteListener onImages={sendPasted} />
       <View className="flex-1">
         <FlatList
           ref={list}
@@ -284,6 +298,7 @@ export function ChatScreen() {
           <Pressable accessibilityRole="button" accessibilityLabel="Attach photos or video" disabled={!canSend || sending} onPress={attach} className={`h-10 w-10 items-center justify-center ${!canSend || sending ? 'opacity-40' : ''}`}>
             <Icon name="image-outline" size={24} color={palette.primary} />
           </Pressable>
+          <PasteImageButton onImages={sendPasted} disabled={!canSend || sending} className="h-10 w-10 items-center justify-center" />
           <TextInput
             ref={input}
             accessibilityLabel="Message"
