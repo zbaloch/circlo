@@ -6,7 +6,7 @@ import { Redirect, router, useFocusEffect, useLocalSearchParams, useNavigation }
 
 import { CHAT_ENABLED } from '@/lib/features';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { FlatList, Modal, Pressable, View } from 'react-native';
+import { FlatList, Modal, Pressable, View, type TextInputInstance } from 'react-native';
 import { KeyboardSpacer } from '@/components/keyboard-spacer';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -21,11 +21,14 @@ import {
   deleteMessage,
   markRead,
   memberName,
+  quoteLines,
+  quoteOf,
   removePerson,
   sendMessage,
   syncMessaging,
   useConversations,
   type ChatMessage,
+  type ChatQuote,
 } from '@/lib/messaging';
 import { useSession } from '@/lib/session';
 import { chatTitle, clockTime, dayLabel, endsRun } from '@/lib/view-logic';
@@ -38,7 +41,7 @@ import { Spinner } from '@/components/ui/spinner';
 
 type Row = { kind: 'day'; label: string; key: string } | { kind: 'msg'; msg: ChatMessage; key: string; showName: boolean; showTime: boolean };
 
-/** Chat (PLAN.md 2A): bubbles (mine on the right in the primary colour), date separators, composer. */
+/** Chat (PLAN.md 2A): bubbles (mine on the right in the primary colour), date separators, replies to one message, composer. */
 /** Chat is hidden for now (lib/features): a direct link lands on Home. */
 export default function ChatScreenRoute() {
   return CHAT_ENABLED ? <ChatScreen /> : <Redirect href="/" />;
@@ -55,6 +58,10 @@ export function ChatScreen() {
   const [sending, setSending] = useState(false);
   const [members, setMembers] = useState(false);
   const [hidden, setHidden] = useState<Set<number>>(new Set());
+  // The message the next one replies to, and the one briefly highlighted after tapping a quote.
+  const [replying, setReplying] = useState<ChatMessage | null>(null);
+  const [flash, setFlash] = useState<string | null>(null);
+  const input = useRef<TextInputInstance>(null);
   const me = useMe();
   const blocked = useBlocked();
   const list = useRef<FlatList<Row>>(null);
@@ -116,6 +123,23 @@ export function ChatScreen() {
     rows.push({ kind: 'msg', msg: m, key: `m${m.seq}`, showName: !m.mine && conv.members.length > 1 && m.senderUser !== lastSender, showTime: endsRun(m, shown[i + 1]) });
     lastSender = m.senderUser;
   }
+  // A reply to a message that has since been deleted or hidden is dropped.
+  const replyingTo = replying && shown.some((m) => m.seq === replying.seq) ? replying : null;
+  const nameOf = (userId: string) => memberName(conv, userId, account);
+
+  const reply = (msg: ChatMessage) => {
+    setReplying(msg);
+    input.current?.focus();
+  };
+
+  // Tapping a quote scrolls to the message it quotes, when it's loaded, and highlights it for a moment.
+  const jump = (quote: ChatQuote) => {
+    const index = rows.findIndex((r) => r.kind === 'msg' && r.msg.messageId === quote.messageId);
+    if (!quote.available || index < 0) return;
+    list.current?.scrollToIndex({ index, animated: true, viewPosition: 0.5 });
+    setFlash(quote.messageId);
+    setTimeout(() => setFlash((f) => (f === quote.messageId ? null : f)), 1500);
+  };
 
   const send = async (picked: PickedMedia[] = []) => {
     const t = text.trim();
@@ -126,9 +150,10 @@ export function ChatScreen() {
       // Same pipeline as posts: metadata removed, then a size-locked upload.
       for (const m of picked) prepared.push(await prepare(m));
       const uploaded = await upload(prepared);
-      await sendMessage(account, conv.groupId, t, uploaded);
+      await sendMessage(account, conv.groupId, t, uploaded, replyingTo?.messageId);
       discardPicked(picked);
       setText('');
+      setReplying(null);
       list.current?.scrollToEnd({ animated: true });
     } catch (e) {
       showAlert('Couldn’t send', e instanceof Error ? e.message : 'Check your connection and try again.');
@@ -165,6 +190,7 @@ export function ChatScreen() {
         { text: 'Block', style: 'destructive', onPress: () => blockUser(account, msg.senderUser, person?.name, person?.handle).catch(() => showAlert('Couldn’t block', 'Check your connection and try again.')) },
       ]);
     showAlert('Message', undefined, [
+      ...(canSend ? [{ text: 'Reply', onPress: () => reply(msg) }] : []),
       msg.mine
         ? { text: 'Delete for everyone', style: 'destructive', onPress: () => deleteMessage(conv.groupId, msg).catch(() => showAlert('Couldn’t delete', 'Check your connection and try again.')) }
         : { text: 'Hide here', style: 'destructive', onPress: () => setHidden(new Set([...hidden, msg.seq])) },
@@ -187,18 +213,25 @@ export function ChatScreen() {
           onContentSizeChange={() => list.current?.scrollToEnd({ animated: false })}
           // The list shrinks while the keyboard opens: keep the newest message in view.
           onLayout={() => list.current?.scrollToEnd({ animated: false })}
+          // Rows far off screen haven't been measured yet: get near the message first, then scroll to it.
+          onScrollToIndexFailed={(info) => {
+            list.current?.scrollToOffset({ offset: info.averageItemLength * info.index, animated: false });
+            setTimeout(() => list.current?.scrollToIndex({ index: info.index, animated: true, viewPosition: 0.5 }), 100);
+          }}
           ListEmptyComponent={<Text className="py-10 text-center text-muted dark:text-muted-dark">Say hello. Only the people in this chat can see it.</Text>}
           renderItem={({ item }) =>
             item.kind === 'day' ? (
               <Text className="py-2 text-center text-xs text-muted dark:text-muted-dark">{item.label}</Text>
             ) : (
               // A visible "…" beside each bubble (on the inner side) opens the same menu as a long-press.
-              <View className={`max-w-[85%] flex-row items-center gap-1 ${item.msg.mine ? 'self-end' : 'self-start'}`}>
+              <View
+                className={`max-w-[85%] flex-row items-center gap-1 rounded-2xl ${item.msg.mine ? 'self-end' : 'self-start'} ${flash === item.msg.messageId ? 'bg-primary-soft dark:bg-primary-soft-dark' : ''}`}>
                 {item.msg.mine ? <MessageMenuButton onPress={() => messageMenu(item.msg)} color={palette.muted} /> : null}
                 <Pressable
                   onLongPress={() => messageMenu(item.msg)}
                   className="shrink">
                   {item.showName ? <Text className="px-2 pb-0.5 text-xs text-muted dark:text-muted-dark">{memberName(conv, item.msg.senderUser, account)}</Text> : null}
+                  {item.msg.replyTo ? <Quote quote={item.msg.replyTo} nameOf={nameOf} mine={item.msg.mine} onPress={() => jump(item.msg.replyTo!)} /> : null}
                   {item.msg.media.length ? (
                     <View className="mb-1 w-64">
                       <MediaGrid
@@ -224,11 +257,15 @@ export function ChatScreen() {
             )
           }
         />
+        {replyingTo ? (
+          <ReplyingBar quote={quoteOf(replyingTo)} nameOf={(u) => (u === account.userId ? 'yourself' : nameOf(u))} onCancel={() => setReplying(null)} color={palette.muted} />
+        ) : null}
         <View className="flex-row items-end gap-2 border-t border-border px-3 py-2 dark:border-border-dark">
           <Pressable accessibilityRole="button" accessibilityLabel="Attach photos or video" disabled={!canSend || sending} onPress={attach} className={`h-10 w-10 items-center justify-center ${!canSend || sending ? 'opacity-40' : ''}`}>
             <Icon name="image-outline" size={24} color={palette.primary} />
           </Pressable>
           <TextInput
+            ref={input}
             accessibilityLabel="Message"
             editable={canSend}
             multiline
@@ -314,6 +351,42 @@ export function ChatScreen() {
         <DialogHost inline />
       </Modal>
     </SafeAreaView>
+  );
+}
+
+/** The quoted message above a reply: who wrote it and its first lines; tapping it shows that message. */
+function Quote({ quote, nameOf, mine, onPress }: { quote: ChatQuote; nameOf: (userId: string) => string; mine: boolean; onPress: () => void }) {
+  const { who, what } = quoteLines(quote, nameOf);
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={who ? `Reply to ${who}: ${what}` : what}
+      disabled={!quote.available}
+      onPress={onPress}
+      className={`mb-0.5 rounded-xl border-l-4 border-primary bg-surface-raised px-3 py-1.5 active:opacity-70 dark:border-primary-dark dark:bg-surface-raised-dark ${mine ? 'self-end' : 'self-start'}`}>
+      {who ? <Text className="text-xs font-bold text-primary dark:text-primary-dark">{who}</Text> : null}
+      <Text numberOfLines={2} system={usesSystemFont(what)} className={`text-sm text-muted dark:text-muted-dark ${who ? '' : 'italic'}`}>
+        {what}
+      </Text>
+    </Pressable>
+  );
+}
+
+/** Above the composer while writing a reply: which message it answers, and a way to stop replying. */
+function ReplyingBar({ quote, nameOf, onCancel, color }: { quote: ChatQuote; nameOf: (userId: string) => string; onCancel: () => void; color: string }) {
+  const { who, what } = quoteLines(quote, nameOf);
+  return (
+    <View className="flex-row items-center gap-3 border-t border-border px-4 py-2 dark:border-border-dark">
+      <View className="flex-1 border-l-4 border-primary pl-3 dark:border-primary-dark">
+        <Text className="text-xs font-bold text-primary dark:text-primary-dark">Replying to {who}</Text>
+        <Text numberOfLines={1} system={usesSystemFont(what)} className="text-sm text-muted dark:text-muted-dark">
+          {what}
+        </Text>
+      </View>
+      <Pressable accessibilityRole="button" accessibilityLabel="Cancel reply" hitSlop={10} onPress={onCancel} className="p-1 active:opacity-60">
+        <Icon name="close" size={20} color={color} />
+      </Pressable>
+    </View>
   );
 }
 

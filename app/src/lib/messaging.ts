@@ -17,8 +17,19 @@ export type ChatMessage = {
   senderUser: string;
   text: string;
   media: Attachment[];
+  /** The message this one replies to, if it's a reply. */
+  replyTo?: ChatQuote | null;
   createdAtMs: number;
   mine: boolean;
+};
+
+/** The message a reply answers, as the server quotes it; `available` is false once it's deleted or from someone I blocked. */
+export type ChatQuote = {
+  messageId: string;
+  available: boolean;
+  senderUser?: string | null;
+  text?: string | null;
+  mediaType?: 'image' | 'video' | null;
 };
 
 export type ChatPerson = { name: string; handle: string; avatarUrl?: string | null };
@@ -56,7 +67,30 @@ function notify() {
 
 /** The app's form of a message (pure; exported for tests). */
 export function fromMessageRow(m: MessageRow, myId: string): ChatMessage {
-  return { seq: m.seq, messageId: m.messageId, senderUser: m.senderId, text: m.text, media: m.media, createdAtMs: Date.parse(m.createdAt), mine: m.senderId === myId };
+  const q = m.replyTo;
+  return {
+    seq: m.seq,
+    messageId: m.messageId,
+    senderUser: m.senderId,
+    text: m.text,
+    media: m.media,
+    replyTo: q ? { messageId: q.messageId, available: q.available, senderUser: q.senderId, text: q.text, mediaType: q.mediaType } : null,
+    createdAtMs: Date.parse(m.createdAt),
+    mine: m.senderId === myId,
+  };
+}
+
+/** A message as a reply would quote it, for the "Replying to" bar while writing one (pure; exported for tests). */
+export function quoteOf(m: ChatMessage): ChatQuote {
+  const first = m.media[0]?.type;
+  return { messageId: m.messageId, available: true, senderUser: m.senderUser, text: m.text.trim(), mediaType: first === 'image' || first === 'video' ? first : null };
+}
+
+/** Who wrote a quoted message and what it says, in a line each (pure; exported for tests). */
+export function quoteLines(q: ChatQuote, nameOf: (userId: string) => string): { who: string | null; what: string } {
+  if (!q.available || !q.senderUser) return { who: null, what: 'Message unavailable' };
+  const what = q.text?.trim() || (q.mediaType === 'video' ? 'Video' : q.mediaType === 'image' ? 'Photo' : '');
+  return { who: nameOf(q.senderUser), what };
 }
 
 function fromChatRow(row: ChatRow, myId: string, previous?: Conversation): Conversation {
@@ -124,10 +158,13 @@ export async function removePerson(account: StoredAccount, groupId: string, user
   await syncMessaging(account, userId === account.userId ? undefined : groupId);
 }
 
-export async function sendMessage(account: StoredAccount, groupId: string, text: string, media: NewAttachment[] = []): Promise<void> {
+/** Sends a message; `replyTo` is the id of a message in this chat it answers. */
+export async function sendMessage(account: StoredAccount, groupId: string, text: string, media: NewAttachment[] = [], replyTo?: string): Promise<void> {
   const conv = conversations[groupId];
   if (conv && !conv.active) throw new Error('You’re no longer in this chat.');
-  const row = ok(await api.POST('/v1/chats/{chatId}/messages', { params: { path: { chatId: groupId } }, body: { text: text.trim(), media } }));
+  const row = ok(
+    await api.POST('/v1/chats/{chatId}/messages', { params: { path: { chatId: groupId } }, body: { text: text.trim(), media, ...(replyTo ? { replyTo } : {}) } }),
+  );
   const msg = fromMessageRow(row, account.userId);
   const current = conversations[groupId];
   if (current) put({ ...current, messages: mergeMessages(current.messages, [msg]), lastMessage: msg, readSeq: msg.seq, updatedAtMs: msg.createdAtMs });

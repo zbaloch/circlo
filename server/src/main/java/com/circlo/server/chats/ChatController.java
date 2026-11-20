@@ -92,21 +92,60 @@ public class ChatController {
 
     // ---------- views ----------
 
+    /**
+     * The message a reply answers: its sender and the start of its text, or of what it is (`mediaType`) when it has
+     * none. `available` is false, with nothing else but the id, once it's deleted or its sender is someone I blocked.
+     */
+    public record Quote(UUID messageId, boolean available, UUID senderId, String text, String mediaType) {}
+
     public record MessageView(long seq, UUID messageId, UUID senderId, String text, List<Attachments.AttachmentView> media,
-            Instant createdAt) {}
+            Quote replyTo, Instant createdAt) {}
+
+    static final int QUOTE_CHARS = 140;
+
+    /** The first `QUOTE_CHARS` characters of a message, with "…" when there's more. */
+    static String quoteText(String body) {
+        String text = body.strip();
+        if (text.codePointCount(0, text.length()) <= QUOTE_CHARS) {
+            return text;
+        }
+        return text.substring(0, text.offsetByCodePoints(0, QUOTE_CHARS)).stripTrailing() + "…";
+    }
 
     /** `members`: everyone else in the chat. */
     public record ChatView(UUID chatId, String name, List<People.Person> members, MessageView lastMessage, int unread, long readSeq,
             Instant updatedAt) {}
 
-    private List<MessageView> messages(String where, Object... args) {
-        record Row(long seq, UUID id, UUID sender, String body, Instant at) {}
-        List<Row> rows = jdbc.query("SELECT seq, id, sender_id, body, created_at FROM chat_messages " + where,
+    /** Messages as `viewer` sees them, with the quote of each reply. */
+    private List<MessageView> messages(byte[] viewer, String where, Object... args) {
+        record Row(long seq, UUID id, UUID sender, String body, UUID replyTo, Instant at) {}
+        List<Row> rows = jdbc.query("SELECT seq, id, sender_id, body, reply_to, created_at FROM chat_messages " + where,
                 (rs, i) -> new Row(rs.getLong(1), Ids.uuid(rs.getBytes(2)), Ids.uuid(rs.getBytes(3)), rs.getString(4),
-                        rs.getTimestamp(5).toInstant()), args);
+                        rs.getBytes(5) == null ? null : Ids.uuid(rs.getBytes(5)), rs.getTimestamp(6).toInstant()), args);
         Map<UUID, List<Attachments.AttachmentView>> media = attachments.of("message_id", rows.stream().map(Row::id).toList());
-        return rows.stream().map(r -> new MessageView(r.seq(), r.id(), r.sender(), r.body(), media.getOrDefault(r.id(), List.of()), r.at()))
+        Map<UUID, Quote> quotes = quotes(viewer, rows.stream().map(Row::replyTo).filter(java.util.Objects::nonNull).distinct().toList());
+        return rows.stream().map(r -> new MessageView(r.seq(), r.id(), r.sender(), r.body(), media.getOrDefault(r.id(), List.of()),
+                r.replyTo() == null ? null : quotes.getOrDefault(r.replyTo(), new Quote(r.replyTo(), false, null, null, null)), r.at()))
                 .toList();
+    }
+
+    /** Quotes of the messages replied to, leaving out deleted ones and those from people `viewer` blocked. */
+    private Map<UUID, Quote> quotes(byte[] viewer, List<UUID> ids) {
+        if (ids.isEmpty()) {
+            return Map.of();
+        }
+        Map<UUID, Quote> out = new HashMap<>();
+        List<Object> args = new ArrayList<>(ids.stream().map(Ids::bytes).toList());
+        args.add(viewer);
+        jdbc.query("""
+                SELECT m.id, m.sender_id, m.body,
+                       (SELECT a.type FROM attachments a WHERE a.message_id = m.id ORDER BY a.position LIMIT 1)
+                FROM chat_messages m WHERE m.id IN (%s)""".formatted(String.join(",", Collections.nCopies(ids.size(), "?")))
+                + NOT_BLOCKED.replace("sender_id", "m.sender_id"), rs -> {
+                    UUID id = Ids.uuid(rs.getBytes(1));
+                    out.put(id, new Quote(id, true, Ids.uuid(rs.getBytes(2)), quoteText(rs.getString(3)), rs.getString(4)));
+                }, args.toArray());
+        return out;
     }
 
     private static final String NOT_BLOCKED = " AND sender_id NOT IN (SELECT blocked_id FROM user_blocks WHERE blocker_id = ?)";
@@ -139,7 +178,7 @@ public class ChatController {
         for (byte[] chat : chatIds) {
             UUID id = Ids.uuid(chat);
             long read = readSeq.getOrDefault(id, 0L);
-            List<MessageView> last = messages("WHERE chat_id = ?" + NOT_BLOCKED + " ORDER BY seq DESC LIMIT 1", chat, me);
+            List<MessageView> last = messages(me, "WHERE chat_id = ?" + NOT_BLOCKED + " ORDER BY seq DESC LIMIT 1", chat, me);
             Integer unread = jdbc.queryForObject("SELECT COUNT(*) FROM chat_messages WHERE chat_id = ? AND seq > ? AND sender_id <> ?" + NOT_BLOCKED,
                     Integer.class, chat, read, me, me);
             List<People.Person> members = others.getOrDefault(id, List.of()).stream().filter(persons::containsKey).map(persons::get).toList();
@@ -254,16 +293,17 @@ public class ChatController {
         requireMember(chat, me);
         int n = Math.max(1, Math.min(limit, 200));
         if (after != null) {
-            return messages("WHERE chat_id = ? AND seq > ?" + NOT_BLOCKED + " ORDER BY seq LIMIT ?", chat, after, me, n);
+            return messages(me, "WHERE chat_id = ? AND seq > ?" + NOT_BLOCKED + " ORDER BY seq LIMIT ?", chat, after, me, n);
         }
-        List<MessageView> page = new ArrayList<>(messages("WHERE chat_id = ? AND seq < ?" + NOT_BLOCKED + " ORDER BY seq DESC LIMIT ?",
+        List<MessageView> page = new ArrayList<>(messages(me, "WHERE chat_id = ? AND seq < ?" + NOT_BLOCKED + " ORDER BY seq DESC LIMIT ?",
                 chat, before == null ? Long.MAX_VALUE : before, me, n));
         Collections.reverse(page);
         return page;
     }
 
+    /** `replyTo`: a message in the same chat this one answers. */
     public record NewMessage(@NotNull @Size(max = 4 * MAX_CHARS) String text,
-            @Size(max = Attachments.MAX_PER_ITEM) List<Attachments.@Valid NewAttachment> media) {}
+            @Size(max = Attachments.MAX_PER_ITEM) List<Attachments.@Valid NewAttachment> media, UUID replyTo) {}
 
     @PostMapping("/v1/chats/{chatId}/messages")
     @ResponseStatus(HttpStatus.CREATED)
@@ -281,11 +321,15 @@ public class ChatController {
         if (chars > MAX_CHARS || (chars == 0 && media.isEmpty())) {
             throw ApiException.badRequest("invalid_text");
         }
+        byte[] replyTo = r.replyTo() == null ? null : Ids.bytes(r.replyTo());
+        if (replyTo != null && jdbc.queryForList("SELECT 1 FROM chat_messages WHERE id = ? AND chat_id = ?", replyTo, chat).isEmpty()) {
+            throw ApiException.badRequest("invalid_reply");
+        }
         UUID id = Ids.newId();
-        jdbc.update("INSERT INTO chat_messages (id, chat_id, sender_id, body, created_at) VALUES (?, ?, ?, ?, ?)", Ids.bytes(id), chat, me,
-                text, now());
+        jdbc.update("INSERT INTO chat_messages (id, chat_id, sender_id, body, reply_to, created_at) VALUES (?, ?, ?, ?, ?, ?)", Ids.bytes(id),
+                chat, me, text, replyTo, now());
         attachments.attach(me, null, Ids.bytes(id), media);
-        MessageView sent = messages("WHERE id = ?", (Object) Ids.bytes(id)).get(0);
+        MessageView sent = messages(me, "WHERE id = ?", (Object) Ids.bytes(id)).get(0);
         jdbc.update("UPDATE chat_members SET read_seq = GREATEST(read_seq, ?) WHERE chat_id = ? AND user_id = ?", sent.seq(), chat, me);
         List<UUID> everyone = members(chat);
         notifier.changed(everyone);
