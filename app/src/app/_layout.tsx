@@ -69,7 +69,13 @@ function Navigator() {
         contentStyle: { backgroundColor: palette.surface },
         // Same header everywhere (components/ui/header.tsx) instead of the platform's native one.
         header: ({ options }) => (
-          <HeaderBar title={options.title} left={<BackButton />} right={options.headerRight?.({ tintColor: palette.ink, canGoBack: true })} />
+          <HeaderBar
+            title={options.title}
+            // A screen's own title, such as a chat's photo and name (it was being dropped, so chats showed only a name).
+            titleNode={typeof options.headerTitle === 'function' ? options.headerTitle({ children: options.title ?? '', tintColor: palette.ink }) : undefined}
+            left={<BackButton />}
+            right={options.headerRight?.({ tintColor: palette.ink, canGoBack: true })}
+          />
         ),
       }}>
       <Stack.Protected guard={!signedIn} redirectTo="/">

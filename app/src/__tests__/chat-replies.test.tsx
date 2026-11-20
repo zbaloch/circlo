@@ -164,6 +164,14 @@ describe('replying to a message in a chat', () => {
     expect(screen.getAllByText('Or 9')).toHaveLength(2);
   });
 
+  it('shows their photo beside the last message of each of their runs, opening their profile', async () => {
+    mockConv = conversation([message(1, 'bo', 'Dinner at 8?'), message(2, 'bo', 'Or 9'), message(3, 'me', '8'), message(4, 'bo', 'ok')]);
+    await render(<ChatScreen />);
+    expect(screen.getAllByLabelText('Bo’s profile')).toHaveLength(2);
+    await fireEvent.press(screen.getAllByLabelText('Bo’s profile')[0]);
+    expect(jest.requireMock('expo-router').router.push).toHaveBeenCalledWith({ pathname: '/friend/[id]', params: { id: 'bo' } });
+  });
+
   it('the message follows the finger to the reply point, then slows and stops; only to the right', () => {
     expect(swipeOffset(-40)).toBe(0);
     expect(swipeOffset(30)).toBe(30);

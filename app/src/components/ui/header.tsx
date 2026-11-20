@@ -11,17 +11,22 @@ import { usePalette } from '@/theme/use-palette';
 import { Avatar } from '../avatar';
 import { Text } from './text';
 
-type Props = { title?: string; left: ReactNode; right?: ReactNode };
+/** `titleNode`: a screen's own title (a chat's photo and name) in place of the plain `title`. */
+type Props = { title?: string; titleNode?: ReactNode; left: ReactNode; right?: ReactNode };
 
 /** Header bar shared by every screen (X style): no shadow, hairline divider, bold title, same on iOS and Android. */
-export function HeaderBar({ title, left, right }: Props) {
+export function HeaderBar({ title, titleNode, left, right }: Props) {
   return (
     <SafeAreaView edges={['top']} className="border-b border-border bg-surface dark:border-border-dark dark:bg-surface-dark">
       <View className="h-[53px] flex-row items-center gap-3 px-2">
         <View className="w-10 items-center">{left}</View>
-        <Text accessibilityRole="header" numberOfLines={1} className="flex-1 text-[19px] font-bold text-ink dark:text-ink-dark">
-          {title}
-        </Text>
+        {titleNode ? (
+          <View className="flex-1 flex-row">{titleNode}</View>
+        ) : (
+          <Text accessibilityRole="header" numberOfLines={1} className="flex-1 text-[19px] font-bold text-ink dark:text-ink-dark">
+            {title}
+          </Text>
+        )}
         <View className="min-w-10 flex-row items-center justify-end">{right}</View>
       </View>
     </SafeAreaView>

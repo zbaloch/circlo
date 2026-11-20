@@ -12,6 +12,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Avatar } from '@/components/avatar';
 import { ChatTitle } from '@/components/chat-title';
+import { openProfile } from '@/components/post-actions';
 import { MediaGrid } from '@/components/post-media';
 import { SwipeToReply } from '@/components/swipe-to-reply';
 import { blockUser, refreshBlocked, useBlocked, visibleMessages } from '@/lib/blocks';
@@ -230,6 +231,21 @@ export function ChatScreen() {
                 <View
                   className={`max-w-[85%] flex-row items-center gap-1 rounded-2xl ${item.msg.mine ? 'self-end' : 'self-start'} ${flash === item.msg.messageId ? 'bg-primary-soft dark:bg-primary-soft-dark' : ''}`}>
                   {item.msg.mine ? <MessageMenuButton onPress={() => messageMenu(item.msg)} color={palette.muted} /> : null}
+                  {!item.msg.mine ? (
+                    // Their photo beside the last message of each run (X style), opening their profile; a gap of the
+                    // same width beside the others keeps their bubbles in line.
+                    item.showTime ? (
+                      <Pressable
+                        accessibilityRole="button"
+                        accessibilityLabel={`${nameOf(item.msg.senderUser)}’s profile`}
+                        onPress={() => openProfile(account, item.msg.senderUser)}
+                        className="mb-[18px] self-end active:opacity-70">
+                        <Avatar size="sm" id={item.msg.senderUser} name={nameOf(item.msg.senderUser)} uri={conv.people[item.msg.senderUser]?.avatarUrl} />
+                      </Pressable>
+                    ) : (
+                      <View className="w-8" />
+                    )
+                  ) : null}
                   <Pressable
                     onLongPress={() => messageMenu(item.msg)}
                     className="shrink">
