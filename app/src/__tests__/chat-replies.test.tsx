@@ -26,12 +26,14 @@ jest.mock('@/components/paste-image', () => ({
   },
   PasteListener: () => null,
 }));
+const mockToast = jest.fn();
+jest.mock('@/lib/toast', () => ({ showToast: (m: string) => mockToast(m) }));
 jest.mock('@/lib/media', () => ({
   ...jest.requireActual('@/lib/media'),
   discardPicked: jest.fn(),
   discardPrepared: jest.fn(),
   prepare: jest.fn(async () => ({})),
-  upload: jest.fn(async (p: unknown[]) => (p.length ? ['uploaded'] : [])),
+  upload: jest.fn(async (p: unknown[]) => p.map(() => 'uploaded')),
 }));
 // The swipe needs Reanimated's native runtime; its maths is tested on its own below.
 const mockSwipes: { enabled: boolean; onReply: () => void }[] = [];
@@ -187,27 +189,46 @@ describe('replying to a message in a chat', () => {
     expect(jest.requireMock('expo-router').router.push).toHaveBeenCalledWith({ pathname: '/friend/[id]', params: { id: 'bo' } });
   });
 
-  it('a pasted image is sent after a check, with what I’d typed', async () => {
-    mockConv = conversation([message(1, 'bo', 'Send me the screenshot')]);
+  it('pasted photos wait above the message box, and go with what I type in one message', async () => {
+    mockConv = conversation([message(1, 'bo', 'Send me the screenshots')]);
     await render(<ChatScreen />);
-    await fireEvent(screen.getByLabelText('Message'), 'changeText', 'here');
-    const shot = { uri: 'file:///cache/pasted-1.png', type: 'image', width: 1170, height: 2532, mimeType: 'image/png' };
-    await act(async () => mockPaste!([shot]));
-    expect(mockAlert).toHaveBeenLastCalledWith('Send this photo?', 'With your message: “here”', expect.anything());
-    const buttons: Btn[] = mockAlert.mock.calls.at(-1)![2];
-    await act(async () => buttons.find((b) => b.text === 'Send')!.onPress!());
-    expect(mockSend).toHaveBeenCalledWith(account, 'g1', 'here', ['uploaded'], undefined);
+    const shot = (n: number) => ({ uri: `file:///cache/pasted-${n}.png`, type: 'image', width: 1170, height: 2532, mimeType: 'image/png' });
+    await act(async () => mockPaste!([shot(1)]));
+    await act(async () => mockPaste!([shot(2)]));
+    // Nothing is sent yet: they wait, and the box asks for words to go with them.
+    expect(mockSend).not.toHaveBeenCalled();
+    expect(mockAlert).not.toHaveBeenCalled();
+    expect(screen.getByLabelText('Remove photo 1')).toBeTruthy();
+    expect(screen.getByLabelText('Remove photo 2')).toBeTruthy();
+    expect(screen.getByPlaceholderText('Add a message')).toBeTruthy();
+    await fireEvent(screen.getByLabelText('Message'), 'changeText', 'here they are');
+    await fireEvent.press(screen.getByLabelText('Send message'));
+    expect(jest.requireMock('@/lib/media').prepare).toHaveBeenCalledTimes(2);
+    expect(mockSend).toHaveBeenCalledWith(account, 'g1', 'here they are', ['uploaded', 'uploaded'], undefined);
+    expect(screen.queryByLabelText('Remove photo 1')).toBeNull();
   });
 
-  it('a pasted image that isn’t wanted is thrown away', async () => {
+  it('photos can go on their own, and one can be taken out before sending', async () => {
     mockConv = conversation([message(1, 'bo', 'hi')]);
     await render(<ChatScreen />);
-    const shot = { uri: 'file:///cache/pasted-2.png', type: 'image', width: 10, height: 10 };
-    await act(async () => mockPaste!([shot]));
-    const buttons: Btn[] = mockAlert.mock.calls.at(-1)![2];
-    await act(async () => buttons.find((b) => b.text === 'Cancel')!.onPress!());
-    expect(jest.requireMock('@/lib/media').discardPicked).toHaveBeenCalledWith([shot]);
-    expect(mockSend).not.toHaveBeenCalled();
+    const a = { uri: 'file:///cache/a.png', type: 'image', width: 10, height: 10 };
+    const b = { uri: 'file:///cache/b.png', type: 'image', width: 10, height: 10 };
+    await act(async () => mockPaste!([a, b]));
+    await fireEvent.press(screen.getByLabelText('Remove photo 1'));
+    expect(jest.requireMock('@/lib/media').discardPicked).toHaveBeenCalledWith([a]);
+    expect(screen.queryByLabelText('Remove photo 2')).toBeNull();
+    await fireEvent.press(screen.getByLabelText('Send message'));
+    expect(mockSend).toHaveBeenCalledWith(account, 'g1', '', ['uploaded'], undefined);
+  });
+
+  it('up to four photos wait; more are let go with a note', async () => {
+    mockConv = conversation([message(1, 'bo', 'hi')]);
+    await render(<ChatScreen />);
+    const shot = (n: number) => ({ uri: `file:///cache/${n}.png`, type: 'image', width: 10, height: 10 });
+    await act(async () => mockPaste!([shot(1), shot(2), shot(3), shot(4), shot(5)]));
+    expect(screen.getByLabelText('Remove photo 4')).toBeTruthy();
+    expect(jest.requireMock('@/lib/media').discardPicked).toHaveBeenCalledWith([shot(5)]);
+    expect(mockToast).toHaveBeenCalledWith('A message can have up to 4 photos, or one video.');
   });
 
   it('the message follows the finger to the reply point, then slows and stops; only to the right', () => {
