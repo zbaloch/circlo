@@ -1,4 +1,4 @@
-import { router } from 'expo-router';
+import { router, type Href } from 'expo-router';
 import { useState } from 'react';
 
 import { ChangeAudienceSheet } from '@/components/change-audience-sheet';
@@ -30,6 +30,18 @@ export function openProfile(account: { userId: string } | null, userId: string) 
 export function audienceBadge(book: Pick<AddressBook, 'circleDefs'> | null, post: Pick<FeedPost, 'mine' | 'audience'>): string | undefined {
   if (!post.mine || !post.audience || !book) return undefined;
   return audienceLabel(book, post.audience);
+}
+
+/**
+ * Where a post's reply icon goes. In a list, a post that already has replies opens its thread so they can be read
+ * first (replying is one more tap there); a post without replies opens the reply composer straight away, with the post
+ * shown above it. In the thread it's always the composer, which comes back to the thread with the new reply
+ * highlighted (elsewhere it shows a toast). Pure.
+ */
+export function replyTarget(post: Pick<FeedPost, 'postId' | 'replyCount'>, inThread = false): Href {
+  if (inThread) return { pathname: '/reply/[id]', params: { id: post.postId, from: 'thread' } };
+  if (post.replyCount > 0) return { pathname: '/post/[id]', params: { id: post.postId } };
+  return { pathname: '/reply/[id]', params: { id: post.postId } };
 }
 
 /** Everything a post card needs, shared by Home, the thread view and profiles. */
@@ -102,9 +114,7 @@ export function usePostActions(account: StoredAccount | null, book: AddressBook 
       avatarUrl: post.authorAvatar,
       audience: audienceBadge(book, post),
       onOpen: opts.inThread ? undefined : open,
-      // X style: the reply icon opens the reply composer, with the post shown above it.
-      // From the thread, the composer goes back to it with the new reply highlighted; elsewhere it shows a toast.
-      onReply: () => router.push({ pathname: '/reply/[id]', params: { id: post.postId, ...(opts.inThread ? { from: 'thread' } : {}) } }),
+      onReply: () => router.push(replyTarget(post, opts.inThread)),
       onAuthor: () => openProfile(account, post.authorId),
       onLike: () => like(post),
       onMore: () => more(post),
