@@ -4,17 +4,18 @@ import { Pressable, View } from 'react-native';
 
 import { Avatar } from '@/components/avatar';
 import { Text } from '@/components/ui/text';
-import { loadCircleMates, matesLine, type CircleMate } from '@/lib/circle-mates';
+import { loadCircleMates, matesLine, notConnected, type CircleMate } from '@/lib/circle-mates';
 
 /**
- * On a friend's profile, X's "Followed by…" line for the people I may know through them: up to three photos and their
- * names, opening the full list. Nothing at all when there's nobody (or the friend switched it off). Never a circle.
+ * On a friend's profile, X's "Followed by…" line for the people I may know through them and am not connected with
+ * yet (no connection or request either way): up to three photos and their names, opening the full list. Nothing at all
+ * when there's nobody left (or the friend switched it off). Never a circle.
  */
 export function CircleMatesLine({ ownerId, ownerName }: { ownerId: string; ownerName: string }) {
   const [mates, setMates] = useState<CircleMate[]>([]);
   useFocusEffect(
     useCallback(() => {
-      loadCircleMates(ownerId).then(setMates, () => setMates([]));
+      loadCircleMates(ownerId).then((all) => setMates(notConnected(all)), () => setMates([]));
     }, [ownerId]),
   );
   if (mates.length === 0) return null;

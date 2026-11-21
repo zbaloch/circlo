@@ -20,6 +20,11 @@ export async function previewCircleMates(friendId: string): Promise<CircleMate[]
   return ok(await api.GET('/v1/me/preview/{friendId}/circle-mates', { params: { path: { friendId } } }));
 }
 
+/** The ones I'm not connected with and have no request with either way: who "You may know" names. Pure. */
+export function notConnected(mates: CircleMate[]): CircleMate[] {
+  return mates.filter((m) => m.relation == null);
+}
+
 /** "Imran", "Imran and Zulfi", "Imran, Zulfi and 2 others". Pure. */
 export function matesLine(names: string[]): string {
   if (names.length <= 2) return names.join(' and ');

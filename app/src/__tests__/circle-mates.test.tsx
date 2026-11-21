@@ -4,7 +4,8 @@ import CircleScreen from '@/app/circle/[n]';
 import MatesScreen from '@/app/mates/[id]';
 import PrivacySettingsScreen from '@/app/settings/privacy';
 import { STARTER_CIRCLES, type AddressBook } from '@/lib/addressbook';
-import { matesLine, membersVisibleChange } from '@/lib/circle-mates';
+import { CircleMatesLine } from '@/components/circle-mates-line';
+import { matesLine, membersVisibleChange, notConnected, type CircleMate } from '@/lib/circle-mates';
 
 // The first screen rendered in a cold jest worker can take longer than the default 5s.
 jest.setTimeout(20_000);
@@ -37,7 +38,7 @@ jest.mock('@/lib/circles', () => ({
   ...jest.requireActual('@/lib/circles'),
   setMembersVisible: (...a: unknown[]) => mockSetVisible(...(a as [])),
 }));
-const mockMates = [
+let mockMates: CircleMate[] = [
   { userId: 'a', name: 'Ali', username: 'ali', avatarUrl: null, relation: null },
   { userId: 'b', name: 'Bushra', username: 'bushra', avatarUrl: null, relation: 'outgoing' },
   { userId: 'c', name: 'Chand', username: 'chand', avatarUrl: null, relation: 'accepted' },
@@ -80,6 +81,29 @@ describe('people in the same circle see each other', () => {
     expect(matesLine(['Imran', 'Zulfi'])).toBe('Imran and Zulfi');
     expect(matesLine(['Imran', 'Zulfi', 'Ali'])).toBe('Imran, Zulfi and 1 other');
     expect(matesLine(['Imran', 'Zulfi', 'Ali', 'Bushra'])).toBe('Imran, Zulfi and 2 others');
+  });
+
+  it('“You may know” leaves out people I’m connected with or have a request with', () => {
+    expect(notConnected(mockMates).map((m) => m.userId)).toEqual(['a']);
+  });
+
+  it('the profile line names only people I’m not connected with yet, and opens the full list', async () => {
+    await render(<CircleMatesLine ownerId="owner" ownerName="Zaheer" />);
+    const line = await screen.findByRole('link', { name: 'People you may know through Zaheer: Ali' });
+    await fireEvent.press(line);
+    expect(mockPush).toHaveBeenCalledWith({ pathname: '/mates/[id]', params: { id: 'owner' } });
+  });
+
+  it('the profile line is gone when I’m already connected with everyone', async () => {
+    const before = mockMates;
+    mockMates = mockMates.filter((m) => m.relation != null);
+    try {
+      await render(<CircleMatesLine ownerId="owner" ownerName="Zaheer" />);
+      await act(async () => {});
+      expect(screen.queryByText(/You may know/)).toBeNull();
+    } finally {
+      mockMates = before;
+    }
   });
 
   it('explains both ways what the circle switch does', () => {
