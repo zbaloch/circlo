@@ -20,7 +20,9 @@ const colors = {
   ink: { DEFAULT: '#0F1419', dark: '#E7E9EA' },
   muted: { DEFAULT: '#536471', dark: '#8B98A5' },
   border: { DEFAULT: '#E1E8ED', dark: '#2F3336' },
-  danger: { DEFAULT: '#D92D20', dark: '#F97066' },
+  // Red text and lines (light: deeper red; dark: softer coral, readable on the dark surfaces). Filled destructive
+  // buttons (Delete, Remove) use `fill`, Tailwind red-500 in both themes, with white text (owner 2026-11-21).
+  danger: { DEFAULT: '#D92D20', dark: '#F97066', fill: '#EF4444' },
   // Logo colours (brand pack): gray-900 letters and ring with a sky-500 dot on light; white with a sky-400 dot on
   // dark. Icons and splash sit on white, or gray-950 in dark mode; sky is never a background.
   brand: { ink: '#101828', accent: '#0EA5E9', 'accent-dark': '#38BDF8', background: '#FFFFFF', 'background-dark': '#030712' },

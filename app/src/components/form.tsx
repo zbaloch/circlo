@@ -41,7 +41,7 @@ const SIZE = { md: 'min-h-[40px] px-4', lg: 'min-h-[48px] px-5' };
 const BUTTON: Record<NonNullable<ButtonProps['variant']>, { box: string; text: string }> = {
   primary: { box: 'bg-primary active:bg-primary-pressed dark:bg-primary-dark dark:active:bg-primary-pressed-dark', text: 'text-on-primary dark:text-on-primary-dark' },
   outline: { box: 'border border-border active:bg-surface-raised dark:border-border-dark dark:active:bg-surface-raised-dark', text: 'text-ink dark:text-ink-dark' },
-  danger: { box: 'bg-danger active:opacity-80 dark:bg-danger-dark', text: 'text-white' },
+  danger: { box: 'bg-danger-fill active:opacity-80', text: 'text-white' },
 };
 
 /** Pill button (X style), the same on iOS and Android. */

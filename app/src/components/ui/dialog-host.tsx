@@ -71,7 +71,7 @@ function DialogCard({ dialog }: { dialog: Dialog | null }) {
                 onPress={() => pressDialogButton(b)}
                 className={
                   b.style === "destructive"
-                    ? "items-center rounded-full bg-danger py-3 active:opacity-80 dark:bg-danger-dark"
+                    ? "items-center rounded-full bg-danger-fill py-3 active:opacity-80"
                     : b.style === "cancel"
                       ? "items-center rounded-full border border-border py-3 active:bg-surface-raised dark:border-border-dark dark:active:bg-surface-raised-dark"
                       : "items-center rounded-full bg-ink py-3 active:opacity-80 dark:bg-ink-dark"
