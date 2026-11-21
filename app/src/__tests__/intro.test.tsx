@@ -19,6 +19,7 @@ jest.mock('@/lib/storage', () => ({
   getItem: async () => mockSeen,
   setItem: (...a: unknown[]) => mockSet(...(a as [])),
 }));
+jest.mock('expo-constants', () => ({ __esModule: true, default: { expoConfig: { version: '9.8.7' } } }));
 const mockOpen = jest.fn();
 jest.mock('@/lib/links', () => ({ ...jest.requireActual('@/lib/links'), openLink: (u: string) => mockOpen(u) }));
 
@@ -104,5 +105,11 @@ describe('About Circlo', () => {
     expect(mockOpen).toHaveBeenCalledWith('https://www.hellocirclo.com/why');
     await fireEvent.press(screen.getByText('Watch the intro again'));
     expect(mockPush).toHaveBeenCalledWith('/intro');
+  });
+
+  it('shows which version this is', async () => {
+    await render(<AboutScreen />);
+    expect(screen.getByText('Version')).toBeTruthy();
+    expect(screen.getByText('9.8.7')).toBeTruthy();
   });
 });
