@@ -21,7 +21,7 @@ const config: ExpoConfig = {
   name: 'Circlo',
   slug: 'circlo',
   scheme: 'circlo',
-  version: '1.1.1',
+  version: '1.1.2',
   orientation: 'portrait',
   icon: './assets/images/icon.png',
   userInterfaceStyle: 'automatic',
