@@ -23,7 +23,10 @@ export const READING_ABOUT =
   'Follow blogs, newsletters, YouTube channels and podcasts with web feeds (RSS). See what’s new here, and open anything on its own site.';
 
 /** Which articles the list shows: all, only unread, or one source's. */
-export type ReadingFilter = { kind: 'all' } | { kind: 'unread' } | { kind: 'source'; sourceId: string };
+/** What Feeds shows: one source or all (null), and unread only or everything. */
+export type ReadingFilter = { sourceId: string | null; unread: boolean };
+
+export const ALL_FEEDS: ReadingFilter = { sourceId: null, unread: false };
 
 export async function loadSources(): Promise<Source[]> {
   return ok(await api.GET('/v1/reading/sources'));
@@ -31,8 +34,8 @@ export async function loadSources(): Promise<Source[]> {
 
 export async function loadArticles(filter: ReadingFilter, before?: string | null): Promise<ArticlePage> {
   const query = {
-    ...(filter.kind === 'unread' ? { unread: true } : {}),
-    ...(filter.kind === 'source' ? { source: filter.sourceId } : {}),
+    ...(filter.unread ? { unread: true } : {}),
+    ...(filter.sourceId ? { source: filter.sourceId } : {}),
     ...(before ? { before } : {}),
     limit: 30,
   };
@@ -153,22 +156,15 @@ export function sourceStatus(s: Pick<Source, 'updatedAt' | 'failingSince'>, now 
 }
 
 /** The chips above the list: All, Unread, then each source by name. Pure. */
-export function filterChips(sources: Pick<Source, 'sourceId' | 'title'>[]): { key: string; label: string; filter: ReadingFilter }[] {
-  return [
-    { key: 'all', label: 'All', filter: { kind: 'all' } },
-    { key: 'unread', label: 'Unread', filter: { kind: 'unread' } },
-    ...sources.map((s) => ({ key: s.sourceId, label: s.title, filter: { kind: 'source', sourceId: s.sourceId } as ReadingFilter })),
-  ];
-}
-
-/** The key of a filter's chip. Pure. */
-export function filterKey(f: ReadingFilter): string {
-  return f.kind === 'source' ? f.sourceId : f.kind;
+/** The source picker's label: "All feeds", or the source's name. Pure. */
+export function filterLabel(sources: Pick<Source, 'sourceId' | 'title'>[], filter: ReadingFilter): string {
+  if (!filter.sourceId) return 'All feeds';
+  return sources.find((s) => s.sourceId === filter.sourceId)?.title ?? 'All feeds';
 }
 
 /** How many unread articles a filter covers, from the sources' counts (kept current as I read). Pure. */
 export function unreadIn(sources: Pick<Source, 'sourceId' | 'unread'>[], filter: ReadingFilter): number {
-  const scope = filter.kind === 'source' ? sources.filter((s) => s.sourceId === filter.sourceId) : sources;
+  const scope = filter.sourceId ? sources.filter((s) => s.sourceId === filter.sourceId) : sources;
   return scope.reduce((n, s) => n + s.unread, 0);
 }
 

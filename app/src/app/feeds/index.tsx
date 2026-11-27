@@ -8,7 +8,7 @@ import { ActionSheet, type SheetAction } from '@/components/action-sheet';
 import { EmptyState } from '@/components/empty-state';
 import { IconButton } from '@/components/icon-button';
 import { MiniPlayer } from '@/components/podcast-player';
-import { ArticleRow, ChipBar } from '@/components/reading-ui';
+import { ArticleRow, FilterBar, SourcePicker } from '@/components/reading-ui';
 import { Screen } from '@/components/screen';
 import { SendToChatSheet } from '@/components/send-to-chat-sheet';
 import { Icon } from '@/components/ui/icon';
@@ -16,8 +16,8 @@ import { Spinner } from '@/components/ui/spinner';
 import { Text } from '@/components/ui/text';
 import { CHAT_ENABLED } from '@/lib/features';
 import {
-  filterChips,
-  filterKey,
+  ALL_FEEDS,
+  filterLabel,
   loadArticles,
   loadSources,
   markAllRead,
@@ -39,8 +39,8 @@ import { useNow } from '@/lib/use-now';
 import { usePalette } from '@/theme/use-palette';
 
 /**
- * Feeds (2.0, from the drawer; "reading" in code): the newest articles from the sources I follow, timeline style. Chips filter by
- * All, Unread or one source; tapping an article marks it read and opens it in Circlo when the feed carries its text
+ * Feeds (2.0, from the drawer; "reading" in code): the newest articles from the sources I follow, timeline style. Above
+ * the list: which source (All feeds, or one picked from a list) and an Unread toggle, together; tapping an article marks it read and opens it in Circlo when the feed carries its text
  * (app/feeds/[id]), otherwise on its own site in the in-app browser.
  * No pushes and no counts; a "New articles" pill when more arrive while I'm here.
  */
@@ -53,12 +53,13 @@ export default function ReadingScreen() {
   const account = session.status === 'signedIn' ? session.account : null;
   const list = useRef<FlatList<Article>>(null);
 
-  // The chip I picked, until Manage sources sends me back here with another source.
+  // What I picked, until Manage sources sends me back here with another source.
   const [chosen, setChosen] = useState<{ under?: string; filter: ReadingFilter } | null>(null);
   const filter = useMemo<ReadingFilter>(
-    () => (chosen && chosen.under === params.source ? chosen.filter : params.source ? { kind: 'source', sourceId: params.source } : { kind: 'all' }),
+    () => (chosen && chosen.under === params.source ? chosen.filter : params.source ? { sourceId: params.source, unread: false } : ALL_FEEDS),
     [chosen, params.source],
   );
+  const [picking, setPicking] = useState(false);
   const setFilter = (f: ReadingFilter) => setChosen({ under: params.source, filter: f });
   const [sources, setSources] = useState<Source[] | null>(null);
   const [articles, setArticles] = useState<Article[]>([]);
@@ -161,13 +162,13 @@ export default function ReadingScreen() {
       ],
     });
 
-  const source = filter.kind === 'source' ? sources?.find((s) => s.sourceId === filter.sourceId) : undefined;
+  const source = filter.sourceId ? sources?.find((s) => s.sourceId === filter.sourceId) : undefined;
   const readAll = useCallback(async () => {
     try {
-      await markAllRead(filter.kind === 'source' ? filter.sourceId : undefined);
+      await markAllRead(filter.sourceId ?? undefined);
       setArticles((list) => list.map((a) => ({ ...a, read: true })));
-      setSources((s) => s && withUnread(s, filter.kind === 'source' ? filter.sourceId : null, 'none'));
-      if (filter.kind === 'unread') setArticles([]);
+      setSources((s) => s && withUnread(s, filter.sourceId, 'none'));
+      if (filter.unread) setArticles([]);
     } catch {
       showToast('Couldn’t mark them read. Try again.');
     }
@@ -216,13 +217,15 @@ export default function ReadingScreen() {
     );
   }
 
-  const chips = filterChips(sources);
-  const empty =
-    filter.kind === 'unread'
-      ? { title: 'You’re all caught up', body: 'New articles from your sources will show here.' }
-      : filter.kind === 'source'
-        ? { title: 'Nothing here yet', body: `${source?.title ?? 'This source'}’s feed is empty for now. Circlo checks it every half hour.` }
-        : { title: 'Nothing yet', body: 'New articles from your sources will show here. Circlo checks them every half hour.' };
+  const empty = filter.unread
+    ? { title: 'You’re all caught up', body: source ? `Nothing unread from ${source.title}.` : 'New articles from your sources will show here.' }
+    : source
+      ? { title: 'Nothing here yet', body: `${source.title}’s feed is empty for now. Circlo checks it every half hour.` }
+      : { title: 'Nothing yet', body: 'New articles from your sources will show here. Circlo checks them every half hour.' };
+  const choose = (f: ReadingFilter) => {
+    setFilter(f);
+    list.current?.scrollToOffset({ offset: 0, animated: false });
+  };
 
   return (
     <Screen>
@@ -234,16 +237,11 @@ export default function ReadingScreen() {
         stickyHeaderIndices={[0]}
         ListHeaderComponent={
           <View className="bg-surface dark:bg-surface-dark">
-            <ChipBar
-              label="Show articles from"
-              chips={chips}
-              selected={filterKey(filter)}
-              onSelect={(key) => {
-                const chip = chips.find((c) => c.key === key);
-                if (!chip) return;
-                setFilter(chip.filter);
-                list.current?.scrollToOffset({ offset: 0, animated: false });
-              }}
+            <FilterBar
+              sourceLabel={filterLabel(sources, filter)}
+              unread={filter.unread}
+              onPickSource={() => setPicking(true)}
+              onToggleUnread={() => choose({ ...filter, unread: !filter.unread })}
             />
             {error ? <Text className="px-4 py-2 text-center text-sm text-danger dark:text-danger-dark">{error}</Text> : null}
           </View>
@@ -276,6 +274,13 @@ export default function ReadingScreen() {
       ) : null}
 
       <MiniPlayer />
+      <SourcePicker
+        visible={picking}
+        sources={sources}
+        selected={filter.sourceId}
+        onSelect={(sourceId) => choose({ ...filter, sourceId })}
+        onClose={() => setPicking(false)}
+      />
       <ActionSheet title={sheet?.title} actions={sheet?.actions ?? null} onClose={() => setSheet(null)} />
       {account ? <SendToChatSheet account={account} text={sending} onClose={() => setSending(null)} /> : null}
     </Screen>

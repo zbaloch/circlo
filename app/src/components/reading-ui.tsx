@@ -1,6 +1,6 @@
 import { Image } from 'expo-image';
-import { useState } from 'react';
-import { Pressable, ScrollView, View } from 'react-native';
+import { useState, type ReactNode } from 'react';
+import { Modal, Pressable, ScrollView, View } from 'react-native';
 
 import { API_URL } from '@/api/client';
 
@@ -10,7 +10,7 @@ import { IconButton } from '@/components/icon-button';
 import { Icon } from '@/components/ui/icon';
 import { Text } from '@/components/ui/text';
 import { lengthLabel } from '@/lib/podcast-player';
-import { imageUri, isVideo, type Article } from '@/lib/reading';
+import { imageUri, isVideo, type Article, type Source } from '@/lib/reading';
 import { relativeTime } from '@/lib/time';
 import { usePalette } from '@/theme/use-palette';
 
@@ -116,34 +116,103 @@ export function ArticleRow({ article, now, onOpen, onMore }: { article: Article;
   );
 }
 
-/** A row of choice chips, the same look as the profile's circle chips. */
-export function ChipBar({ chips, selected, onSelect, label }: {
-  chips: { key: string; label: string }[];
-  selected: string;
-  onSelect: (key: string) => void;
-  label: string;
+const CHIP = 'flex-row items-center gap-1.5 rounded-full border px-3.5 py-1.5';
+const CHIP_ON = 'border-primary bg-primary dark:border-primary-dark dark:bg-primary-dark';
+const CHIP_OFF = 'border-border active:bg-surface-raised dark:border-border-dark dark:active:bg-surface-raised-dark';
+
+/**
+ * What Feeds shows: which source (All feeds, or one, picked from a list) and an Unread toggle, which work together
+ * ("Veritasium, unread only").
+ */
+export function FilterBar({ sourceLabel, unread, onPickSource, onToggleUnread }: {
+  sourceLabel: string;
+  unread: boolean;
+  onPickSource: () => void;
+  onToggleUnread: () => void;
 }) {
+  const palette = usePalette();
   return (
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} accessibilityLabel={label} className="grow-0 border-b border-border dark:border-border-dark" contentContainerClassName="gap-2 px-4 py-2.5">
-      {chips.map((c) => {
-        const on = c.key === selected;
-        return (
-          <Pressable
-            key={c.key}
-            accessibilityRole="button"
-            accessibilityState={{ selected: on }}
-            onPress={() => onSelect(c.key)}
-            className={`flex-row items-center rounded-full border px-3.5 py-1.5 ${
-              on
-                ? 'border-primary bg-primary dark:border-primary-dark dark:bg-primary-dark'
-                : 'border-border active:bg-surface-raised dark:border-border-dark dark:active:bg-surface-raised-dark'
-            }`}>
-            <Text numberOfLines={1} className={on ? 'max-w-[200px] font-semibold text-on-primary dark:text-on-primary-dark' : 'max-w-[200px] text-ink dark:text-ink-dark'}>
-              {c.label}
-            </Text>
-          </Pressable>
-        );
-      })}
-    </ScrollView>
+    <View className="flex-row items-center gap-2 border-b border-border px-4 py-2.5 dark:border-border-dark">
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`Showing ${sourceLabel}`}
+        accessibilityHint="Choose which source to show"
+        onPress={onPickSource}
+        className={`shrink ${CHIP} ${CHIP_OFF}`}>
+        <Text numberOfLines={1} className="shrink font-semibold text-ink dark:text-ink-dark">
+          {sourceLabel}
+        </Text>
+        <Icon name="chevron-down" size={16} color={palette.ink} />
+      </Pressable>
+      <Pressable
+        accessibilityRole="switch"
+        accessibilityLabel="Unread only"
+        accessibilityState={{ checked: unread }}
+        onPress={onToggleUnread}
+        className={`${CHIP} ${unread ? CHIP_ON : CHIP_OFF}`}>
+        {unread ? <Icon name="checkmark" size={16} color={palette.onPrimary} /> : null}
+        <Text className={unread ? 'font-semibold text-on-primary dark:text-on-primary-dark' : 'text-ink dark:text-ink-dark'}>Unread</Text>
+      </Pressable>
+    </View>
+  );
+}
+
+/**
+ * The list of sources to show articles from, with All feeds first: each with its logo and how many are unread, and
+ * a check on the one shown. Scrolls, as people can follow up to 200.
+ */
+export function SourcePicker({ visible, sources, selected, onSelect, onClose }: {
+  visible: boolean;
+  sources: Pick<Source, 'sourceId' | 'title' | 'icon' | 'unread'>[];
+  selected: string | null;
+  onSelect: (sourceId: string | null) => void;
+  onClose: () => void;
+}) {
+  const palette = usePalette();
+  const total = sources.reduce((n, s) => n + s.unread, 0);
+  const row = (key: string, id: string | null, title: string, unread: number, tile: ReactNode) => {
+    const on = selected === id;
+    return (
+      <Pressable
+        key={key}
+        accessibilityRole="button"
+        accessibilityLabel={`${title}${unread > 0 ? `, ${unread} unread` : ''}`}
+        accessibilityState={{ selected: on }}
+        onPress={() => {
+          onClose();
+          onSelect(id);
+        }}
+        className="flex-row items-center gap-3 px-5 py-3 active:bg-surface-raised dark:active:bg-surface-raised-dark">
+        {tile}
+        <Text numberOfLines={1} className={`flex-1 text-base ${on ? 'font-bold' : ''} text-ink dark:text-ink-dark`}>
+          {title}
+        </Text>
+        {unread > 0 ? <Text className="text-sm tabular-nums text-muted dark:text-muted-dark">{unread}</Text> : null}
+        <View className="w-6 items-end">{on ? <Icon name="checkmark" size={20} color={palette.ink} /> : null}</View>
+      </Pressable>
+    );
+  };
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <Pressable accessibilityLabel="Close" className="flex-1 bg-black/40" onPress={onClose} />
+      <View className="max-h-[75%] rounded-t-3xl bg-surface pb-8 pt-3 dark:bg-surface-dark">
+        <View className="items-center pb-2">
+          <View className="h-1 w-10 rounded-full bg-border dark:bg-border-dark" />
+        </View>
+        <Text className="px-5 pb-2 text-base font-bold text-ink dark:text-ink-dark">Show articles from</Text>
+        <ScrollView>
+          {row(
+            'all',
+            null,
+            'All feeds',
+            total,
+            <View className={`items-center justify-center bg-surface-raised dark:bg-surface-raised-dark ${TILE.md}`}>
+              <Icon name="rss-outline" size={20} color={palette.ink} />
+            </View>,
+          )}
+          {sources.map((s) => row(s.sourceId, s.sourceId, s.title, s.unread, <SourceTile id={s.sourceId} title={s.title} icon={s.icon} />))}
+        </ScrollView>
+      </View>
+    </Modal>
   );
 }

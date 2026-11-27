@@ -12,7 +12,7 @@ import {
   describeReadingError,
   imageUri,
   openOnSiteLabel,
-  filterChips,
+  filterLabel,
   importSummary,
   mergeArticles,
   READING_ABOUT,
@@ -86,6 +86,7 @@ const article = (id: string, title: string, read = false, hasContent = false): A
 });
 
 let mockSources: Source[] = [];
+const mockLoadedWith: unknown[] = [];
 let mockArticles: Article[] = [];
 const mockSetRead = jest.fn(async (_id: string, _read: boolean) => {});
 const mockFind = jest.fn(async (_url: string): Promise<FoundSource> => {
@@ -97,7 +98,10 @@ let mockDetail: ArticleDetail | null = null;
 jest.mock('@/lib/reading', () => ({
   ...jest.requireActual('@/lib/reading'),
   loadSources: async () => mockSources,
-  loadArticles: async () => ({ articles: mockArticles, next: null }),
+  loadArticles: async (f: unknown) => {
+    mockLoadedWith.push(f);
+    return { articles: mockArticles, next: null };
+  },
   setRead: (id: string, read: boolean) => mockSetRead(id, read),
   findSource: (url: string) => mockFind(url),
   followSource: (url: string) => mockFollow(url),
@@ -150,8 +154,11 @@ describe('Feeds logic', () => {
     expect(sourceStatus({ updatedAt: null, failingSince: '2026-11-23T11:00:00Z' }, now)).toBe('Couldn’t update since Monday');
   });
 
-  it('chips are All, Unread, then each source', () => {
-    expect(filterChips([source('a', 'Ars'), source('b', 'Bits')]).map((c) => c.label)).toEqual(['All', 'Unread', 'Ars', 'Bits']);
+  it('the source picker says All feeds or the source’s name', () => {
+    const list = [source('a', 'Ars'), source('b', 'Bits')];
+    expect(filterLabel(list, { sourceId: null, unread: true })).toBe('All feeds');
+    expect(filterLabel(list, { sourceId: 'b', unread: false })).toBe('Bits');
+    expect(filterLabel(list, { sourceId: 'gone', unread: false })).toBe('All feeds');
   });
 
   it('pages merge without repeats, and read marks one article', () => {
@@ -163,13 +170,14 @@ describe('Feeds logic', () => {
 
   it('counts unread per filter, and keeps the counts current as I read', () => {
     const list = [source('a', 'Ars', { unread: 2 }), source('b', 'Bits', { unread: 3 })];
-    expect(unreadIn(list, { kind: 'all' })).toBe(5);
-    expect(unreadIn(list, { kind: 'unread' })).toBe(5);
-    expect(unreadIn(list, { kind: 'source', sourceId: 'b' })).toBe(3);
-    expect(unreadIn(withUnread(list, 'a', -1), { kind: 'all' })).toBe(4);
-    expect(unreadIn(withUnread(list, 'a', -5), { kind: 'source', sourceId: 'a' })).toBe(0);
-    expect(unreadIn(withUnread(list, 'b', 'none'), { kind: 'all' })).toBe(2);
-    expect(unreadIn(withUnread(list, null, 'none'), { kind: 'all' })).toBe(0);
+    const all = { sourceId: null, unread: false };
+    expect(unreadIn(list, all)).toBe(5);
+    expect(unreadIn(list, { sourceId: null, unread: true })).toBe(5);
+    expect(unreadIn(list, { sourceId: 'b', unread: true })).toBe(3);
+    expect(unreadIn(withUnread(list, 'a', -1), all)).toBe(4);
+    expect(unreadIn(withUnread(list, 'a', -5), { sourceId: 'a', unread: false })).toBe(0);
+    expect(unreadIn(withUnread(list, 'b', 'none'), all)).toBe(2);
+    expect(unreadIn(withUnread(list, null, 'none'), all)).toBe(0);
   });
 
   it('explains errors in plain words', () => {
@@ -206,13 +214,14 @@ describe('Feeds screen', () => {
     expect(mockSeen).toHaveBeenCalled();
   });
 
-  it('lists articles with chips, and opening one reads it on its own site', async () => {
+  it('lists articles, and opening one reads it on its own site', async () => {
     mockSources = [source('s1', 'Stratechery')];
     mockArticles = [article('a1', 'The AI Unbundling'), article('a2', 'Old news', true)];
     await render(<ReadingScreen />);
     expect(await screen.findByText('The AI Unbundling')).toBeTruthy();
     expect(screen.getByText('About The AI Unbundling')).toBeTruthy();
-    for (const chip of ['All', 'Unread', 'Stratechery']) expect(screen.getByRole('button', { name: chip })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Showing All feeds' })).toBeTruthy();
+    expect(screen.getByRole('switch', { name: 'Unread only' }).props.accessibilityState).toEqual({ checked: false });
 
     await fireEvent.press(screen.getByRole('link', { name: /The AI Unbundling, Stratechery, 1h, unread/ }));
     expect(mockOpen).toHaveBeenCalledWith('https://stratechery.example/a1', expect.objectContaining({ dismissButtonStyle: 'close' }));
@@ -265,6 +274,31 @@ describe('Feeds screen', () => {
     expect(screen.getByRole('link', { name: /Scientists Said/ }).props.accessibilityHint).toBe('Opens the video on YouTube');
     await fireEvent.press(screen.getByRole('link', { name: /Scientists Said/ }));
     expect(mockOpen).toHaveBeenCalledWith('https://www.youtube.com/watch?v=abc', expect.anything());
+  });
+
+  it('shows one source or all, and unread only or everything, together', async () => {
+    mockSources = [source('s1', 'Stratechery', { unread: 2 }), source('s2', 'Veritasium', { unread: 0, icon: '/v1/reading/image?u=v&e=1&s=v' })];
+    mockArticles = [article('a1', 'The AI Unbundling')];
+    mockLoadedWith.length = 0;
+    await render(<ReadingScreen />);
+    await screen.findByText('The AI Unbundling');
+    expect(mockLoadedWith.at(-1)).toEqual({ sourceId: null, unread: false });
+
+    // The picker lists All feeds then each source, with what's unread, and a check on the one shown.
+    await fireEvent.press(screen.getByRole('button', { name: 'Showing All feeds' }));
+    expect(screen.getByRole('button', { name: 'All feeds, 2 unread' }).props.accessibilityState).toEqual({ selected: true });
+    expect(screen.getByRole('button', { name: 'Stratechery, 2 unread' })).toBeTruthy();
+    await fireEvent.press(screen.getByRole('button', { name: 'Veritasium' }));
+    await waitFor(() => expect(mockLoadedWith.at(-1)).toEqual({ sourceId: 's2', unread: false }));
+    expect(screen.getByRole('button', { name: 'Showing Veritasium' })).toBeTruthy();
+
+    // Unread is a toggle that keeps the source.
+    await fireEvent.press(screen.getByRole('switch', { name: 'Unread only' }));
+    await waitFor(() => expect(mockLoadedWith.at(-1)).toEqual({ sourceId: 's2', unread: true }));
+    expect(screen.getByRole('switch', { name: 'Unread only' }).props.accessibilityState).toEqual({ checked: true });
+    await fireEvent.press(screen.getByRole('button', { name: 'Showing Veritasium' }));
+    await fireEvent.press(screen.getByRole('button', { name: 'All feeds, 2 unread' }));
+    await waitFor(() => expect(mockLoadedWith.at(-1)).toEqual({ sourceId: null, unread: true }));
   });
 
   it('the article menu can mark it unread', async () => {
