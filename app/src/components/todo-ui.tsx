@@ -182,7 +182,7 @@ export function ViewPicker({ visible, lists, selected, onSelect, onNewList, onCl
         {row('upcoming', { kind: 'upcoming' }, 'Upcoming', 'time-outline')}
         {row('nodate', { kind: 'nodate' }, 'No date', 'layers-outline')}
         <Text className="px-5 pb-1 pt-4 text-sm font-semibold text-muted dark:text-muted-dark">Lists</Text>
-        {lists.map((l) => row(l.listId, { kind: 'list', listId: l.listId }, l.name, 'checkbox-outline'))}
+        {lists.map((l) => row(l.listId, { kind: 'list', listId: l.listId }, l.name, 'list-todo'))}
         <Pressable
           accessibilityRole="button"
           onPress={() => {

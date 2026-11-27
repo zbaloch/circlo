@@ -209,7 +209,7 @@ export default function TodosScreen() {
       setTimeout(() => {
         timers.current.delete(t.todoId);
         LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-        completeTodoNow(t.todoId, todayIso())
+        completeTodoNow(t.todoId, today)
           .catch(() => showToast("Couldn’t tick it. Try again."))
           .finally(() => setTicking((s) => without(s, t.todoId)));
       }, TICK_MS),
@@ -251,7 +251,7 @@ export default function TodosScreen() {
     return (
       <Screen>
         {error ? (
-          <EmptyState icon="checkbox-outline" title="Todos" body={error} />
+          <EmptyState icon="list-todo" title="Todos" body={error} />
         ) : (
           <Spinner className="flex-1 py-10" />
         )}
@@ -399,7 +399,7 @@ function without(s: Set<string>, id: string): Set<string> {
 function Empty({ title, body }: { title: string; body: string }) {
   return (
     <View className="h-[360px]">
-      <EmptyState icon="checkbox-outline" title={title} body={body} />
+      <EmptyState icon="list-todo" title={title} body={body} />
     </View>
   );
 }

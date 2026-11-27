@@ -20,7 +20,7 @@ export const DRAWER_ITEMS: Item[] = [
   // Feeds (2.0; "reading" in code and the API, as /v1/feed is the timeline): web feeds. A quiet dot when something arrived since I last looked; no counts, no pushes.
   { label: 'Feeds', icon: 'rss-outline', href: '/feeds', dot: 'reading' },
   // Todos (2.0): my own to-do lists. Things-calm: no dot, no count.
-  { label: 'Todos', icon: 'checkbox-outline', href: '/todos' },
+  { label: 'Todos', icon: 'list-todo', href: '/todos' },
   // Devices is the first link inside Settings and privacy.
   { label: 'Settings and privacy', icon: 'settings-outline', href: '/settings' },
 ];

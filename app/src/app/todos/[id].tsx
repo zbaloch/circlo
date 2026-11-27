@@ -48,7 +48,7 @@ export default function TodoScreen() {
     return (
       <Screen>
         {loaded ? (
-          <EmptyState icon="checkbox-outline" title="Not here any more" body="This to-do was ticked or deleted." />
+          <EmptyState icon="list-todo" title="Not here any more" body="This to-do was ticked or deleted." />
         ) : (
           <Spinner className="flex-1 py-10" />
         )}
