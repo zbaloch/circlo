@@ -7,6 +7,7 @@
 import { api, ok } from '@/api/client';
 import type { components } from '@/api/schema';
 import { describeError } from '@/lib/account';
+import type { Episode } from '@/lib/podcast-player';
 import { relativeTime } from '@/lib/time';
 
 export type Source = components['schemas']['ReadingSource'];
@@ -100,6 +101,27 @@ export function openOnSiteLabel(url: string): string {
   const site = siteName(url);
   if (site === 'youtube.com' || site === 'm.youtube.com' || site === 'youtu.be') return 'Watch on YouTube';
   return site ? `Read on ${site}` : 'Open the original';
+}
+
+/** What the button to the original says: an episode's page is opened, not read. Pure. */
+export function originalLabel(article: Pick<Article, 'url' | 'audio'>): string {
+  if (!article.audio) return openOnSiteLabel(article.url);
+  const site = siteName(article.url);
+  return site ? `Open on ${site}` : 'Open the original';
+}
+
+/** A podcast episode to play, with its artwork's full address (its own, else its show's logo); null for articles. Pure. */
+export function episodeOf(article: Article, apiUrl: string): Episode | null {
+  if (!article.audio) return null;
+  const art = article.image ?? article.sourceIcon;
+  return {
+    articleId: article.articleId,
+    title: article.title,
+    sourceTitle: article.sourceTitle,
+    audioUrl: article.audio.url,
+    durationSeconds: article.audio.durationSeconds,
+    artwork: art ? imageUri(art, apiUrl) : null,
+  };
 }
 
 /** An article image's signed Circlo path as a full address on this API. Pure. */

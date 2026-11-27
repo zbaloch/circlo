@@ -60,7 +60,7 @@ a link to your account) and your reports lose their link to you.
   the app (the kinds of things waiting, never who, what or how many), and security emails straight away (a new
   sign-in, a password change, another device signed out from your Devices list, naming only the kind of device: never where from).
 - **The sites you follow in Feeds** (YouTube included) see one Circlo server fetching their feed, their logo and the pictures in
-  their articles, never who follows or reads them. When you tap through to the original you're on their site, so they see your IP address and their own cookies apply, as with any link. Links
+  their articles, never who follows or reads them. When you tap through to the original you're on their site, so they see your IP address and their own cookies apply, as with any link. When you play a podcast episode, your phone streams it from the podcast's own server, which sees your IP address as with any podcast app (so creators' download counts stay right). Where you stopped in each episode is kept only on your phone and forgotten when you sign out. Links
   lose their tracking parameters first.
 - **The hosting provider and the storage (S3) provider** see IP addresses of connections at the network level, and
   hold the stored data. Our code doesn't record IPs, but their logs might (see the deployment rules below).

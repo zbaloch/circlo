@@ -91,19 +91,23 @@ public class ReadingStore {
 
     /**
      * A feed's articles: new ones are added; ones it has already keep their id, time and read marks, and take the
-     * feed's latest title, summary, link and content (publishers fix typos).
+     * feed's latest title, summary, link, content, audio and artwork (publishers fix typos).
      */
     public void storeItems(UUID source, List<FeedParser.Item> items) {
         Instant now = Instant.now();
         for (FeedParser.Item i : items) {
             String content = i.content().isEmpty() ? null : JSON.writeValueAsString(i.content());
+            FeedParser.Audio audio = i.audio();
             jdbc.update("""
-                    INSERT INTO reading_articles (id, source_id, guid_hash, url, title, summary, author, published_at, created_at, content, has_content)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    INSERT INTO reading_articles (id, source_id, guid_hash, url, title, summary, author, published_at, created_at, content, has_content,
+                      audio_url, audio_type, duration_seconds, image_url)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     ON DUPLICATE KEY UPDATE url = VALUE(url), title = VALUE(title), summary = VALUE(summary), author = VALUE(author),
-                      content = VALUE(content), has_content = VALUE(has_content)""", Ids.bytes(Ids.newId()), Ids.bytes(source),
+                      content = VALUE(content), has_content = VALUE(has_content), audio_url = VALUE(audio_url), audio_type = VALUE(audio_type),
+                      duration_seconds = VALUE(duration_seconds), image_url = VALUE(image_url)""", Ids.bytes(Ids.newId()), Ids.bytes(source),
                     sha256(i.guid()), i.url(), i.title(), i.summary(), i.author(), Timestamp.from(i.published()), Timestamp.from(now), content,
-                    i.hasContent());
+                    i.hasContent(), audio == null ? null : audio.url(), audio == null ? null : audio.type(), audio == null ? null : audio.seconds(),
+                    i.image());
         }
     }
 

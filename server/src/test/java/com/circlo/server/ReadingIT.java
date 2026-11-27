@@ -533,6 +533,34 @@ class ReadingIT extends IntegrationTest {
     }
 
     @Test
+    @SuppressWarnings("unchecked")
+    void podcastEpisodesPlayFromTheirOwnServerWithArtworkThroughCirclo() {
+        serve("/pod/feed.xml", "<?xml version=\"1.0\"?><rss version=\"2.0\" xmlns:itunes=\"http://www.itunes.com/dtds/podcast-1.0.dtd\">"
+                + "<channel><title>TED Health</title><link>" + base + "/pod</link>"
+                + "<item><title>Lost at work</title><guid isPermaLink=\"false\">ep1</guid><link>" + base + "/pod</link>"
+                + "<pubDate>Tue, 24 Nov 2026 05:00:00 GMT</pubDate><itunes:duration>36:52</itunes:duration>"
+                + "<enclosure url=\"https://cdn.podcast.example/ep1/media.mp3\" length=\"88486336\" type=\"audio/mpeg\"/>"
+                + "<itunes:image href=\"https://img.podcast.example/ep1.jpeg\"/><description><![CDATA[<p>Show notes.</p>]]></description></item>"
+                + "</channel></rss>", "application/rss+xml");
+        TestUser a = user("read_pod");
+        follow(a, base + "/pod/feed.xml");
+
+        Map<String, Object> ep = articles(a, "").get(0);
+        assertThat(ep).containsEntry("title", "Lost at work").containsEntry("hasContent", true);
+        // The phone plays the podcast's own file (creators' download counts stay right); the artwork comes through Circlo.
+        assertThat((Map<String, Object>) ep.get("audio")).containsEntry("url", "https://cdn.podcast.example/ep1/media.mp3")
+                .containsEntry("type", "audio/mpeg").containsEntry("durationSeconds", 2212);
+        assertThat((String) ep.get("image")).startsWith("/v1/reading/image?");
+
+        Map<String, Object> detail = a.call("GET", "/v1/reading/articles/" + ep.get("articleId"), null).getBody();
+        assertThat((Map<String, Object>) ((Map<String, Object>) detail.get("article")).get("audio")).containsEntry("durationSeconds", 2212);
+
+        // An ordinary article has neither.
+        String plain = follow(a, blog("notpod"));
+        assertThat(articles(a, "?source=" + plain)).allSatisfy(x -> assertThat(x).containsEntry("audio", null).containsEntry("image", null));
+    }
+
+    @Test
     void needsASession() {
         assertThat(call("GET", "/v1/reading/sources", null, null).getStatusCode().value()).isEqualTo(401);
         assertThat(call("POST", "/v1/reading/sources/find", Map.of("url", base), null).getStatusCode().value()).isEqualTo(401);

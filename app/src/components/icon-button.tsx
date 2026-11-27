@@ -8,14 +8,17 @@ type Props = {
   children: ReactNode;
   className?: string;
   testID?: string;
+  disabled?: boolean;
 };
 
-export function IconButton({ accessibilityLabel, onPress, children, className = '', testID }: Props) {
+export function IconButton({ accessibilityLabel, onPress, children, className = '', testID, disabled = false }: Props) {
   return (
     <Pressable
       testID={testID}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
+      accessibilityState={disabled ? { disabled } : undefined}
+      disabled={disabled}
       onPress={onPress}
       hitSlop={8}
       className={`items-center justify-center rounded-full p-2 active:opacity-60 ${className}`}>

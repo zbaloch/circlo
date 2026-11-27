@@ -81,6 +81,8 @@ const article = (id: string, title: string, read = false, hasContent = false): A
   read,
   hasContent,
   sourceIcon: null,
+  audio: null,
+  image: null,
 });
 
 let mockSources: Source[] = [];

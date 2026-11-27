@@ -56,6 +56,15 @@ code and the API it's `reading`, because `/v1/feed` and `feed-store` are the Hom
   Manage sources). Add a source
   takes a plain site address and shows the feed's name and latest articles before Follow. Manage sources lists each
   source with "Updated 2h ago" or "Couldn't update since Monday", Unfollow, and OPML import/export.
+- **Podcasts play in Circlo** (owner decision 2026-11-27, option 1): the server keeps each episode's audio (the first
+  audio enclosure: address, type, itunes:duration) and its artwork (itunes:image, through the image proxy); V38. An
+  episode always opens on its screen: artwork, a position bar, back 15 s, play/pause, forward 30 s, speed (1×, 1.25×,
+  1.5×, 2×), then its show notes and "Open on <site> ↗". One player for the app (`lib/podcast-player`, expo-audio):
+  it keeps playing in the background with lock-screen controls, a bar at the bottom of Feeds returns to it, and where
+  you stopped is kept on the phone (the last 30 episodes; cleared at sign-out). The phone plays the file from the
+  podcast's own server, so its host sees the listener's IP, as with any podcast app, and creators' download counts
+  stay right; streaming through Circlo was turned down (it would count every Circlo listener as one, and cost
+  bandwidth). Rows show an episode's length. Needs a native build (expo-audio).
 - **Reading in Circlo** (owner decision 2026-11-27): the server also keeps each item's fullest text (content:encoded,
   Atom content, else the description) as simple blocks (`FeedContent`: paragraphs with bold/italic/code/links,
   headings, lists, quotes, code, images, rules; scripts, frames, forms and tracking pixels dropped). An article with

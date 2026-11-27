@@ -7,6 +7,7 @@ import { FlatList, Pressable, RefreshControl, View } from 'react-native';
 import { ActionSheet, type SheetAction } from '@/components/action-sheet';
 import { EmptyState } from '@/components/empty-state';
 import { IconButton } from '@/components/icon-button';
+import { MiniPlayer } from '@/components/podcast-player';
 import { ArticleRow, ChipBar } from '@/components/reading-ui';
 import { Screen } from '@/components/screen';
 import { SendToChatSheet } from '@/components/send-to-chat-sheet';
@@ -274,6 +275,7 @@ export default function ReadingScreen() {
         </View>
       ) : null}
 
+      <MiniPlayer />
       <ActionSheet title={sheet?.title} actions={sheet?.actions ?? null} onClose={() => setSheet(null)} />
       {account ? <SendToChatSheet account={account} text={sending} onClose={() => setSending(null)} /> : null}
     </Screen>

@@ -9,6 +9,7 @@ import { ContentText } from '@/components/content-text';
 import { IconButton } from '@/components/icon-button';
 import { Icon } from '@/components/ui/icon';
 import { Text } from '@/components/ui/text';
+import { lengthLabel } from '@/lib/podcast-player';
 import { imageUri, type Article } from '@/lib/reading';
 import { relativeTime } from '@/lib/time';
 import { usePalette } from '@/theme/use-palette';
@@ -56,7 +57,7 @@ export function ArticleRow({ article, now, onOpen, onMore }: { article: Article;
     <Pressable
       accessibilityRole="link"
       accessibilityLabel={`${article.title}, ${article.sourceTitle}, ${time}${article.read ? '' : ', unread'}`}
-      accessibilityHint={article.hasContent ? 'Opens the article' : 'Opens the article on its own site'}
+      accessibilityHint={article.audio ? 'Opens the episode' : article.hasContent ? 'Opens the article' : 'Opens the article on its own site'}
       onPress={onOpen}
       onLongPress={onMore}
       className="flex-row gap-3 border-b border-border px-4 py-3 active:bg-surface-raised dark:border-border-dark dark:active:bg-surface-raised-dark">
@@ -65,6 +66,7 @@ export function ArticleRow({ article, now, onOpen, onMore }: { article: Article;
         <View className="flex-row items-center gap-1">
           <Text numberOfLines={1} className="shrink text-[15px] text-muted dark:text-muted-dark">
             {article.sourceTitle} · {time}
+            {article.audio?.durationSeconds ? ` · ${lengthLabel(article.audio.durationSeconds)}` : ''}
           </Text>
           <View className="flex-1" />
           <IconButton accessibilityLabel="More" onPress={onMore} className="-my-2 -mr-2">

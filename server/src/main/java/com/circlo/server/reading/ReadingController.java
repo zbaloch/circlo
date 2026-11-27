@@ -82,7 +82,21 @@ public class ReadingController {
 
     /** {@code hasContent}: there's more to read in Circlo (GET /v1/reading/articles/{id}); otherwise it opens on its site. */
     public record Article(UUID articleId, UUID sourceId, String sourceTitle, String title, String summary, String url, String author,
-            Instant publishedAt, boolean read, boolean hasContent, String sourceIcon) {}
+            Instant publishedAt, boolean read, boolean hasContent, String sourceIcon, Audio audio, String image) {}
+
+    /**
+     * A podcast episode's audio. {@code url} is the podcast's own file: the phone plays it from there (owner decision
+     * 2026-11-27, like tapping through to a site), so creators' download counts stay right.
+     */
+    public record Audio(String url, String type, Integer durationSeconds) {}
+
+    private Article article(java.sql.ResultSet rs, int iconAt) throws java.sql.SQLException {
+        String audioUrl = rs.getString(iconAt + 1);
+        Audio audio = audioUrl == null ? null : new Audio(audioUrl, rs.getString(iconAt + 2), (Integer) rs.getObject(iconAt + 3, Integer.class));
+        return new Article(Ids.uuid(rs.getBytes(1)), Ids.uuid(rs.getBytes(2)), rs.getString(3), rs.getString(4), rs.getString(5), rs.getString(6),
+                rs.getString(7), rs.getTimestamp(8).toInstant(), rs.getBoolean(9), rs.getBoolean(10), icon(rs.getString(iconAt)), audio,
+                icon(rs.getString(iconAt + 4)));
+    }
 
     /** An article with its content as blocks (FeedContent); images are signed Circlo links (ReadingImages). */
     public record ArticleDetail(Article article, List<Map<String, Object>> content) {}
@@ -211,7 +225,7 @@ public class ReadingController {
         int n = Math.max(1, Math.min(limit, 100));
         StringBuilder sql = new StringBuilder("""
                 SELECT a.id, a.source_id, s.title, a.title, a.summary, a.url, a.author, a.published_at, r.article_id IS NOT NULL, a.has_content,
-                  s.icon_url
+                  s.icon_url, a.audio_url, a.audio_type, a.duration_seconds, a.image_url
                 FROM reading_follows f
                 JOIN reading_articles a ON a.source_id = f.source_id
                 JOIN reading_sources s ON s.id = a.source_id
@@ -233,9 +247,7 @@ public class ReadingController {
             args.add(Ids.bytes(c.id()));
         }
         sql.append(" ORDER BY a.published_at DESC, a.id DESC LIMIT ").append(n + 1);
-        List<Article> rows = jdbc.query(sql.toString(), (rs, i) -> new Article(Ids.uuid(rs.getBytes(1)), Ids.uuid(rs.getBytes(2)),
-                rs.getString(3), rs.getString(4), rs.getString(5), rs.getString(6), rs.getString(7), rs.getTimestamp(8).toInstant(),
-                rs.getBoolean(9), rs.getBoolean(10), icon(rs.getString(11))), args.toArray());
+        List<Article> rows = jdbc.query(sql.toString(), (rs, i) -> article(rs, 11), args.toArray());
         if (rows.size() <= n) {
             return new Articles(rows, null);
         }
@@ -268,14 +280,12 @@ public class ReadingController {
         byte[] me = me(jwt);
         List<ArticleDetail> found = jdbc.query("""
                 SELECT a.id, a.source_id, s.title, a.title, a.summary, a.url, a.author, a.published_at, r.article_id IS NOT NULL, a.has_content,
-                  a.content, s.icon_url
+                  a.content, s.icon_url, a.audio_url, a.audio_type, a.duration_seconds, a.image_url
                 FROM reading_articles a
                 JOIN reading_follows f ON f.source_id = a.source_id AND f.user_id = ?
                 JOIN reading_sources s ON s.id = a.source_id
                 LEFT JOIN reading_read r ON r.user_id = f.user_id AND r.article_id = a.id
-                WHERE a.id = ?""", (rs, i) -> new ArticleDetail(new Article(Ids.uuid(rs.getBytes(1)), Ids.uuid(rs.getBytes(2)), rs.getString(3),
-                rs.getString(4), rs.getString(5), rs.getString(6), rs.getString(7), rs.getTimestamp(8).toInstant(), rs.getBoolean(9),
-                rs.getBoolean(10), icon(rs.getString(12))), withSignedImages(ReadingStore.blocks(rs.getString(11)))), me, Ids.bytes(id));
+                WHERE a.id = ?""", (rs, i) -> new ArticleDetail(article(rs, 12), withSignedImages(ReadingStore.blocks(rs.getString(11)))), me, Ids.bytes(id));
         if (found.isEmpty()) {
             throw ApiException.notFound();
         }

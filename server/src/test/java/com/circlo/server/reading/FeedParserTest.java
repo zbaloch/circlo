@@ -61,6 +61,33 @@ class FeedParserTest {
     }
 
     @Test
+    void podcastEpisodesHaveTheirAudioLengthAndArtwork() throws Exception {
+        FeedParser.Feed f = parse("""
+                <?xml version="1.0"?><rss version="2.0" xmlns:itunes="http://www.itunes.com/dtds/podcast-1.0.dtd"><channel><title>TED Health</title>
+                <item><title>Lost at work</title><guid isPermaLink="false">e1</guid><link>https://pod.example/</link>
+                <pubDate>Tue, 24 Nov 2026 05:00:00 GMT</pubDate><itunes:duration>36:52</itunes:duration>
+                <enclosure url="https://cdn.example/e1/media.mp3" length="88486336" type="audio/mpeg"/>
+                <itunes:image href="https://img.example/e1.jpeg"/><description>Short.</description></item>
+                <item><title>Untyped</title><guid>e2</guid><link>https://pod.example/2</link><pubDate>Mon, 23 Nov 2026 05:00:00 GMT</pubDate>
+                <itunes:duration>1:02:03</itunes:duration><enclosure url="/files/e2.m4a"/></item>
+                <item><title>A video</title><guid>e3</guid><link>https://pod.example/3</link><pubDate>Sun, 22 Nov 2026 05:00:00 GMT</pubDate>
+                <enclosure url="https://cdn.example/e3.mp4" type="video/mp4"/></item>
+                </channel></rss>""");
+        assertThat(f.items()).hasSize(3);
+        FeedParser.Item e1 = f.items().get(0);
+        assertThat(e1.audio()).isEqualTo(new FeedParser.Audio("https://cdn.example/e1/media.mp3", "audio/mpeg", 36 * 60 + 52));
+        assertThat(e1.image()).isEqualTo("https://img.example/e1.jpeg");
+        // An episode always opens in Circlo, to play it there, even with a one-line description.
+        assertThat(e1.hasContent()).isTrue();
+        assertThat(f.items().get(1).audio()).isEqualTo(new FeedParser.Audio("https://blog.example/files/e2.m4a", null, 3723));
+        assertThat(f.items().get(2).audio()).isNull();
+        assertThat(f.items().get(2).hasContent()).isFalse();
+        assertThat(FeedParser.seconds("3723.5")).isEqualTo(3723);
+        assertThat(FeedParser.seconds("soon")).isNull();
+        assertThat(FeedParser.seconds("0")).isNull();
+    }
+
+    @Test
     void readsTheFeedsOwnLogo() throws Exception {
         assertThat(parse("""
                 <?xml version="1.0"?><rss version="2.0"><channel><title>DD</title><link>https://dd.example</link>

@@ -3267,7 +3267,7 @@ export interface paths {
             };
         };
         put?: never;
-        /** Follow the feed at an address (find's feedUrl, or a site). Following one I already follow is fine. Errors: invalid_url (400), too_many_sources (409, 200 at most), no_feed (422), rate_limited (429) */
+        /** Follow the feed at an address (find's feedUrl, or a site). Following one I already follow is fine. Errors: invalid_url (400), too_many_sources (409, 200 at most), no_feed (422: it answered, but no feed there), unreachable (422: the site didn't answer at all), rate_limited (429) */
         post: {
             parameters: {
                 query?: never;
@@ -3770,6 +3770,15 @@ export interface components {
             hasContent: boolean;
             /** @description Signed Circlo link to the source's logo (GET /v1/reading/image), relative to the API; null: draw its initial */
             sourceIcon: string | null;
+            /** @description A podcast episode's audio, played from the podcast's own server (its download counts stay right); null for articles */
+            audio: null | {
+                url: string;
+                /** @description e.g. audio/mpeg */
+                type: string | null;
+                durationSeconds: number | null;
+            };
+            /** @description An episode's own artwork: a signed Circlo link (GET /v1/reading/image), relative to the API */
+            image: string | null;
         };
         ContentRun: {
             text: string;

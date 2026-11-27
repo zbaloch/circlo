@@ -4,12 +4,15 @@ import { useLocalSearchParams, useNavigation } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { ScrollView, View } from 'react-native';
 
+import { API_URL } from '@/api/client';
+
 import { ActionSheet, type SheetAction } from '@/components/action-sheet';
 import { ArticleContent } from '@/components/article-content';
 import { ContentText } from '@/components/content-text';
 import { EmptyState } from '@/components/empty-state';
 import { Button } from '@/components/form';
 import { IconButton } from '@/components/icon-button';
+import { EpisodePlayer, MiniPlayer } from '@/components/podcast-player';
 import { SourceTile } from '@/components/reading-ui';
 import { SendToChatSheet } from '@/components/send-to-chat-sheet';
 import { Icon } from '@/components/ui/icon';
@@ -17,7 +20,7 @@ import { Spinner } from '@/components/ui/spinner';
 import { Text } from '@/components/ui/text';
 import { CHAT_ENABLED } from '@/lib/features';
 import { openArticle } from '@/lib/open-article';
-import { loadArticle, openOnSiteLabel, setRead, type ArticleDetail } from '@/lib/reading';
+import { episodeOf, loadArticle, originalLabel, setRead, type ArticleDetail } from '@/lib/reading';
 import { useSession } from '@/lib/session';
 import { fullTime } from '@/lib/time';
 import { showToast } from '@/lib/toast';
@@ -25,7 +28,8 @@ import { usePalette } from '@/theme/use-palette';
 
 /**
  * An article from Feeds, read in Circlo (owner decision 2026-11-27): the feed's own text and pictures, then a button to
- * the original on its site. Pictures come through Circlo, so the publisher only sees someone who taps through.
+ * the original on its site. Pictures come through Circlo, so the publisher only sees someone who taps through. A podcast
+ * episode has its player first (played from the podcast's own server), then its show notes.
  */
 export default function ArticleScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -94,7 +98,8 @@ export default function ArticleScreen() {
   }
   if (!detail || !article) return <Spinner className="flex-1 bg-surface py-10 dark:bg-surface-dark" />;
 
-  const label = openOnSiteLabel(article.url);
+  const label = originalLabel(article);
+  const episode = episodeOf(article, API_URL);
   return (
     <View className="flex-1 bg-surface dark:bg-surface-dark">
       <ScrollView contentContainerClassName="gap-5 px-5 pb-12 pt-4">
@@ -111,6 +116,7 @@ export default function ArticleScreen() {
           </View>
         </View>
         <ContentText text={article.title} links={false} className="text-2xl font-extrabold leading-8 text-ink dark:text-ink-dark" />
+        {episode ? <EpisodePlayer episode={episode} /> : null}
         {detail.content.length > 0 ? (
           <ArticleContent blocks={detail.content} onLink={open} />
         ) : article.summary ? (
@@ -121,6 +127,7 @@ export default function ArticleScreen() {
           <Text className="text-center text-sm text-muted dark:text-muted-dark">Opens on its own site, where its usual cookies and ads apply.</Text>
         </View>
       </ScrollView>
+      <MiniPlayer hideFor={article.articleId} />
       <ActionSheet actions={sheet} onClose={() => setSheet(null)} />
       {account ? <SendToChatSheet account={account} text={sending} onClose={() => setSending(null)} /> : null}
     </View>

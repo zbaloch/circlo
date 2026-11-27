@@ -1552,7 +1552,7 @@ components:
         icon: { type: [string, "null"], description: "Signed Circlo link to the source's logo (GET /v1/reading/image), relative to the API; null: draw its initial" }
     ReadingArticle:
       type: object
-      required: [articleId, sourceId, sourceTitle, title, summary, url, author, publishedAt, read, hasContent, sourceIcon]
+      required: [articleId, sourceId, sourceTitle, title, summary, url, author, publishedAt, read, hasContent, sourceIcon, audio, image]
       properties:
         articleId: { $ref: "#/components/schemas/Id" }
         sourceId: { $ref: "#/components/schemas/Id" }
@@ -1565,6 +1565,17 @@ components:
         read: { type: boolean }
         hasContent: { type: boolean, description: "There's more to read in Circlo (GET /v1/reading/articles/{id}); otherwise it opens on its site" }
         sourceIcon: { type: [string, "null"], description: "Signed Circlo link to the source's logo (GET /v1/reading/image), relative to the API; null: draw its initial" }
+        audio:
+          description: A podcast episode's audio, played from the podcast's own server (its download counts stay right); null for articles
+          oneOf:
+            - type: "null"
+            - type: object
+              required: [url, type, durationSeconds]
+              properties:
+                url: { type: string }
+                type: { type: [string, "null"], description: e.g. audio/mpeg }
+                durationSeconds: { type: [integer, "null"] }
+        image: { type: [string, "null"], description: "An episode's own artwork: a signed Circlo link (GET /v1/reading/image), relative to the API" }
     ContentRun:
       type: object
       required: [text]

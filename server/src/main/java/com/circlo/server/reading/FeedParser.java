@@ -1,6 +1,7 @@
 package com.circlo.server.reading;
 
 import com.rometools.rome.feed.synd.SyndContent;
+import com.rometools.rome.feed.synd.SyndEnclosure;
 import com.rometools.rome.feed.synd.SyndEntry;
 import com.rometools.rome.feed.synd.SyndFeed;
 import com.rometools.rome.feed.synd.SyndLink;
@@ -49,16 +50,22 @@ public final class FeedParser {
 
     /**
      * One article: {@code guid} identifies it within its feed. {@code content} is its full text as blocks (FeedContent);
-     * {@code hasContent} says whether that's worth opening in Circlo, rather than a title and a line.
+     * {@code hasContent} says whether that's worth opening in Circlo, rather than a title and a line. A podcast
+     * episode has its {@code audio} (always opened in Circlo, to play it there) and may have its own artwork.
      */
     public record Item(String guid, String url, String title, String summary, String author, Instant published,
-            List<java.util.Map<String, Object>> content, boolean hasContent) {
+            List<java.util.Map<String, Object>> content, boolean hasContent, Audio audio, String image) {
 
         /** Without content (tests and callers that only need the headline). */
         public Item(String guid, String url, String title, String summary, String author, Instant published) {
-            this(guid, url, title, summary, author, published, List.of(), false);
+            this(guid, url, title, summary, author, published, List.of(), false, null, null);
         }
     }
+
+    /** A podcast episode's audio file (the feed's enclosure), its type and length in seconds, as far as the feed says. */
+    public record Audio(String url, String type, Integer seconds) {}
+
+    private static final java.util.regex.Pattern AUDIO_FILE = java.util.regex.Pattern.compile("(?i).*\\.(mp3|m4a|aac|ogg|oga|opus|wav|flac)$");
 
     /** Not a feed Circlo can read (HTML, broken XML, a doctype). */
     public static final class NotAFeed extends Exception {
@@ -158,9 +165,62 @@ public final class FeedParser {
         Date date = e.getPublishedDate() != null ? e.getPublishedDate() : e.getUpdatedDate();
         Instant published = date == null || date.toInstant().isAfter(now) ? now : date.toInstant();
         FeedContent.Result content = FeedContent.convert(fullest, URI.create(url));
-        // Worth opening in Circlo when it says clearly more than the summary, or has pictures.
-        boolean hasContent = !content.blocks().isEmpty() && (content.textLength() > summary.length() + 150 || content.images() > 0);
-        return new Item(guid, url, title, summary, author(e.getAuthor()), published, content.blocks(), hasContent);
+        Audio audio = audio(e, base);
+        // Worth opening in Circlo when it says clearly more than the summary, or has pictures, or can be played.
+        boolean hasContent = audio != null
+                || !content.blocks().isEmpty() && (content.textLength() > summary.length() + 150 || content.images() > 0);
+        return new Item(guid, url, title, summary, author(e.getAuthor()), published, content.blocks(), hasContent, audio, itunesImage(e, base));
+    }
+
+    /** The first enclosure that's audio (by its type, or by its file name when the feed gives no type). Video is left out. */
+    private static Audio audio(SyndEntry e, URI base) {
+        for (SyndEnclosure enc : e.getEnclosures()) {
+            String url = absolute(base, enc.getUrl());
+            if (url == null) {
+                continue;
+            }
+            String type = enc.getType() == null ? "" : enc.getType().strip().toLowerCase(Locale.ROOT);
+            String path = URI.create(url).getPath();
+            if (type.startsWith("audio/") || type.isEmpty() && path != null && AUDIO_FILE.matcher(path).matches()) {
+                return new Audio(url, type.isEmpty() || type.length() > 100 ? null : type, duration(e));
+            }
+        }
+        return null;
+    }
+
+    /** itunes:duration: "1:02:03", "42:10", "3723" or "3723.5" seconds; null if missing or odd. */
+    static Integer duration(SyndEntry e) {
+        for (org.jdom2.Element el : e.getForeignMarkup()) {
+            if ("duration".equals(el.getName())) {
+                return seconds(el.getTextTrim());
+            }
+        }
+        return null;
+    }
+
+    static Integer seconds(String s) {
+        if (s == null || s.isEmpty()) {
+            return null;
+        }
+        try {
+            long total = 0;
+            for (String part : s.split(":", -1)) {
+                total = total * 60 + (long) Double.parseDouble(part);
+            }
+            return total > 0 && total < 7L * 24 * 3600 ? (int) total : null;
+        } catch (NumberFormatException ex) {
+            return null;
+        }
+    }
+
+    /** An episode's own artwork (itunes:image). */
+    private static String itunesImage(SyndEntry e, URI base) {
+        for (org.jdom2.Element el : e.getForeignMarkup()) {
+            if ("image".equals(el.getName()) && el.getAttributeValue("href") != null) {
+                return absolute(base, el.getAttributeValue("href"));
+            }
+        }
+        return null;
     }
 
     private static boolean blank(String s) {

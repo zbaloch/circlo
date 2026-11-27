@@ -104,6 +104,12 @@
 11. **Opening an article or video shows the reader to its site** (Feeds, 2.0). The publisher sees the reader's IP address and
     can use its own cookies and trackers, as with any link. Mitigations: Circlo fetches feeds itself, so sites see a
     reader only when they open an article, and links lose their tracking parameters first.
+12. **Playing a podcast episode shows the listener to the podcast's host** (Feeds, 2.0; owner decision 2026-11-27). The
+    phone streams the episode from the podcast's own server (and any measurement prefix in its address), which sees
+    its IP address, as in every podcast app; streaming through Circlo would hide it, but every Circlo listener would
+    count as one download (creators' ad income) and the bandwidth would grow with listening. Mitigations: nothing is
+    fetched from the host until Play is pressed (artwork comes through Circlo), the screen says "Plays from the
+    podcast's own server", no cookies are sent by the player, and where you stopped stays on the phone.
 
 ## Out of scope
 
