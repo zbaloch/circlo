@@ -89,7 +89,8 @@ export default function SourcesScreen() {
             onPress={() =>
               setSheet([
                 { label: 'Import from another reader (OPML)', onPress: () => void doImport() },
-                { label: 'Export your sources (OPML)', onPress: () => void doExport() },
+                // Export only once there's something to export.
+                ...(sources?.length ? [{ label: 'Export your sources (OPML)', onPress: () => void doExport() }] : []),
               ])
             }>
             <Icon name="ellipsis-horizontal" size={22} color={palette.ink} />
@@ -97,7 +98,7 @@ export default function SourcesScreen() {
         </View>
       ),
     });
-  }, [navigation, palette.ink, doImport, doExport]);
+  }, [navigation, palette.ink, doImport, doExport, sources?.length]);
 
   const unfollow = (s: Source) =>
     showAlert(`Unfollow ${s.title}?`, 'Its articles leave Feeds. You can follow it again any time.', [

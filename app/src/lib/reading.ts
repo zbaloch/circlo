@@ -113,6 +113,19 @@ export function filterKey(f: ReadingFilter): string {
   return f.kind === 'source' ? f.sourceId : f.kind;
 }
 
+/** How many unread articles a filter covers, from the sources' counts (kept current as I read). Pure. */
+export function unreadIn(sources: Pick<Source, 'sourceId' | 'unread'>[], filter: ReadingFilter): number {
+  const scope = filter.kind === 'source' ? sources.filter((s) => s.sourceId === filter.sourceId) : sources;
+  return scope.reduce((n, s) => n + s.unread, 0);
+}
+
+/** A source's unread count after marking articles read (negative) or unread (positive); all of them with `null`. Pure. */
+export function withUnread<T extends Pick<Source, 'sourceId' | 'unread'>>(sources: T[], sourceId: string | null, delta: number | 'none'): T[] {
+  return sources.map((s) =>
+    sourceId === null || s.sourceId === sourceId ? { ...s, unread: delta === 'none' ? 0 : Math.max(0, s.unread + delta) } : s,
+  );
+}
+
 /** Merges a further page in, newest first, without repeats. Pure. */
 export function mergeArticles(existing: Article[], page: Article[]): Article[] {
   const seen = new Set(existing.map((a) => a.articleId));

@@ -7,11 +7,13 @@ type Props = {
   onPress?: () => void;
   children: ReactNode;
   className?: string;
+  testID?: string;
 };
 
-export function IconButton({ accessibilityLabel, onPress, children, className = '' }: Props) {
+export function IconButton({ accessibilityLabel, onPress, children, className = '', testID }: Props) {
   return (
     <Pressable
+      testID={testID}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
       onPress={onPress}

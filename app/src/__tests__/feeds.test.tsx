@@ -1,4 +1,6 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { useSyncExternalStore, type ReactElement, type ReactNode } from 'react';
+import { View } from 'react-native';
 
 import AddSourceScreen from '@/app/feeds/add';
 import ReadingScreen from '@/app/feeds/index';
@@ -12,7 +14,9 @@ import {
   READING_ABOUT,
   siteName,
   sourceStatus,
+  unreadIn,
   withRead,
+  withUnread,
   type Article,
   type FoundSource,
   type Source,
@@ -21,12 +25,19 @@ import {
 jest.setTimeout(20_000);
 
 const mockPush = jest.fn();
+const mockSetOptions = jest.fn();
 const mockBack = jest.fn();
 let mockParams: Record<string, string> = {};
 jest.mock('expo-router', () => ({
   router: { push: (p: unknown) => mockPush(p), back: () => mockBack(), navigate: jest.fn() },
   useLocalSearchParams: () => mockParams,
-  useNavigation: () => ({ setOptions: jest.fn() }),
+  useNavigation: () => ({
+    setOptions: (o: { headerRight?: () => ReactElement }) => {
+      mockSetOptions(o);
+      mockLatestOptions = o;
+      mockListeners.forEach((l) => l());
+    },
+  }),
   useFocusEffect: (fn: () => void) => jest.requireActual('react').useEffect(fn, [fn]),
 }));
 const mockSession = { status: 'signedIn', account: { userId: 'me', handle: 'me' } };
@@ -81,8 +92,30 @@ jest.mock('@/lib/reading', () => ({
   markReadingSeen: () => mockSeen(),
 }));
 
+/** Draws the header's right side next to the screen, as the stack would, so its buttons act on the live screen. */
+type Options = { headerRight?: () => ReactElement };
+let mockLatestOptions: Options = {};
+const mockListeners = new Set<() => void>();
+function WithHeader({ children }: { children: ReactNode }) {
+  const options = useSyncExternalStore(
+    (onChange) => {
+      mockListeners.add(onChange);
+      return () => mockListeners.delete(onChange);
+    },
+    () => mockLatestOptions,
+  );
+  const right = options.headerRight?.();
+  return (
+    <>
+      {children}
+      {right ? <View testID="header">{right}</View> : null}
+    </>
+  );
+}
+
 beforeEach(() => {
   jest.clearAllMocks();
+  mockLatestOptions = {};
   mockParams = {};
 });
 
@@ -110,6 +143,17 @@ describe('Feeds logic', () => {
     const b = article('2', 'Two');
     expect(mergeArticles([a, b], [b, article('3', 'Three')]).map((x) => x.articleId)).toEqual(['1', '2', '3']);
     expect(withRead([a, b], '2', true).map((x) => x.read)).toEqual([false, true]);
+  });
+
+  it('counts unread per filter, and keeps the counts current as I read', () => {
+    const list = [source('a', 'Ars', { unread: 2 }), source('b', 'Bits', { unread: 3 })];
+    expect(unreadIn(list, { kind: 'all' })).toBe(5);
+    expect(unreadIn(list, { kind: 'unread' })).toBe(5);
+    expect(unreadIn(list, { kind: 'source', sourceId: 'b' })).toBe(3);
+    expect(unreadIn(withUnread(list, 'a', -1), { kind: 'all' })).toBe(4);
+    expect(unreadIn(withUnread(list, 'a', -5), { kind: 'source', sourceId: 'a' })).toBe(0);
+    expect(unreadIn(withUnread(list, 'b', 'none'), { kind: 'all' })).toBe(2);
+    expect(unreadIn(withUnread(list, null, 'none'), { kind: 'all' })).toBe(0);
   });
 
   it('explains errors in plain words', () => {
@@ -162,6 +206,35 @@ describe('Feeds screen', () => {
     expect(screen.getByText('Copy link')).toBeTruthy();
     await fireEvent.press(screen.getByText('Mark as unread'));
     expect(mockSetRead).toHaveBeenCalledWith('a2', false);
+  });
+
+  it('has no ⋯ menu until something is followed', async () => {
+    mockSources = [];
+    mockArticles = [];
+    await render(<WithHeader><ReadingScreen /></WithHeader>);
+    await screen.findByText(READING_ABOUT);
+    expect(screen.getAllByRole('button', { name: 'Add a source' }).length).toBeGreaterThan(0);
+    expect(screen.queryByRole('button', { name: 'More' })).toBeNull();
+  });
+
+  it('offers Mark all as read only while something is unread', async () => {
+    mockSources = [source('s1', 'Stratechery', { unread: 1 })];
+    mockArticles = [article('a1', 'The AI Unbundling')];
+    await render(<WithHeader><ReadingScreen /></WithHeader>);
+    await screen.findByText('The AI Unbundling');
+    await fireEvent.press(screen.getByTestId('header-more'));
+    expect(screen.getByText('Mark all as read')).toBeTruthy();
+    expect(screen.getByText('Manage sources')).toBeTruthy();
+  });
+
+  it('leaves Mark all as read out once everything is read', async () => {
+    mockSources = [source('s1', 'Stratechery', { unread: 0 })];
+    mockArticles = [article('a1', 'The AI Unbundling', true)];
+    await render(<WithHeader><ReadingScreen /></WithHeader>);
+    await screen.findByText('The AI Unbundling');
+    await fireEvent.press(screen.getByTestId('header-more'));
+    expect(screen.getByText('Manage sources')).toBeTruthy();
+    expect(screen.queryByText('Mark all as read')).toBeNull();
   });
 
   it('says when everything is read', async () => {

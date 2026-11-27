@@ -47,7 +47,8 @@ code and the API it's `reading`, because `/v1/feed` and `feed-store` are the Hom
   What someone follows is returned only to them, is in their data export and goes with their account.
 - **App**: Feeds at `/feeds` (chips All · Unread · each source; article rows with a letter tile, source · time, bold title while
   unread, two-line summary; tap opens the in-app browser and marks it read; ⋯ has Mark as unread, Send in a chat,
-  Copy link, Open in browser; "New articles" pill; ＋ Add a source; ⋯ Mark all as read, Manage sources). Add a source
+  Copy link, Open in browser; "New articles" pill; ＋ Add a source; ⋯ only once something is followed, with Mark all as read only while something is unread, and
+  Manage sources). Add a source
   takes a plain site address and shows the feed's name and latest articles before Follow. Manage sources lists each
   source with "Updated 2h ago" or "Couldn't update since Monday", Unfollow, and OPML import/export.
 - **Not in 2.0**: a reader view inside Circlo (Readability4J could add "Read here" later without schema changes),

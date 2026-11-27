@@ -27,6 +27,8 @@ import {
   withRead,
   type Article,
   type ReadingFilter,
+  unreadIn,
+  withUnread,
   type Source,
 } from '@/lib/reading';
 import { useSession } from '@/lib/session';
@@ -126,7 +128,11 @@ export default function ReadingScreen() {
 
   const mark = (a: Article, read: boolean) => {
     setArticles((list) => withRead(list, a.articleId, read));
-    setRead(a.articleId, read).catch(() => setArticles((list) => withRead(list, a.articleId, !read)));
+    setSources((s) => s && withUnread(s, a.sourceId, read ? -1 : 1));
+    setRead(a.articleId, read).catch(() => {
+      setArticles((list) => withRead(list, a.articleId, !read));
+      setSources((s) => s && withUnread(s, a.sourceId, read ? 1 : -1));
+    });
   };
 
   const open = (a: Article) => {
@@ -155,12 +161,16 @@ export default function ReadingScreen() {
     try {
       await markAllRead(filter.kind === 'source' ? filter.sourceId : undefined);
       setArticles((list) => list.map((a) => ({ ...a, read: true })));
+      setSources((s) => s && withUnread(s, filter.kind === 'source' ? filter.sourceId : null, 'none'));
       if (filter.kind === 'unread') setArticles([]);
     } catch {
       showToast('Couldn’t mark them read. Try again.');
     }
   }, [filter]);
 
+  // ⋯ only once there's something to manage, and "Mark all as read" only while something is unread.
+  const following = (sources?.length ?? 0) > 0;
+  const unread = sources ? unreadIn(sources, filter) : 0;
   useEffect(() => {
     navigation.setOptions({
       headerRight: () => (
@@ -168,22 +178,27 @@ export default function ReadingScreen() {
           <IconButton accessibilityLabel="Add a source" onPress={() => router.push('/feeds/add')}>
             <Icon name="add" size={24} color={palette.ink} />
           </IconButton>
-          <IconButton
-            accessibilityLabel="More"
-            onPress={() =>
-              setSheet({
-                actions: [
-                  { label: source ? `Mark all from ${source.title} as read` : 'Mark all as read', onPress: () => void readAll() },
-                  { label: 'Manage sources', onPress: () => router.push('/feeds/sources') },
-                ],
-              })
-            }>
-            <Icon name="ellipsis-horizontal" size={22} color={palette.ink} />
-          </IconButton>
+          {following ? (
+            <IconButton
+              accessibilityLabel="More"
+              testID="header-more"
+              onPress={() =>
+                setSheet({
+                  actions: [
+                    ...(unread > 0
+                      ? [{ label: source ? `Mark all from ${source.title} as read` : 'Mark all as read', onPress: () => void readAll() }]
+                      : []),
+                    { label: 'Manage sources', onPress: () => router.push('/feeds/sources') },
+                  ],
+                })
+              }>
+              <Icon name="ellipsis-horizontal" size={22} color={palette.ink} />
+            </IconButton>
+          ) : null}
         </View>
       ),
     });
-  }, [navigation, palette.ink, readAll, source]);
+  }, [navigation, palette.ink, readAll, source, following, unread]);
 
   if (sources === null) return <Spinner className="flex-1 bg-surface py-10 dark:bg-surface-dark" />;
 
