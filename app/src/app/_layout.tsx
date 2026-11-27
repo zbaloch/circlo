@@ -114,6 +114,10 @@ function Navigator() {
         <Stack.Screen name="security-alert" options={own} />
         <Stack.Screen name="intro" options={own} />
         <Stack.Screen name="change-password" options={page('Change password')} />
+        <Stack.Screen name="feeds/index" options={page('Feeds')} />
+        <Stack.Screen name="feeds/add" options={page('Add a source')} />
+        <Stack.Screen name="feeds/sources" options={page('Sources')} />
+        <Stack.Screen name="feeds/[id]" options={page('Feeds')} />
       </Stack.Protected>
     </Stack>
   );

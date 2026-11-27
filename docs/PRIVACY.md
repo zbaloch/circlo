@@ -38,6 +38,7 @@ lose) and makes the web app possible.
 | Posts, replies, likes | Text, times, who wrote or liked them; each post's audience (for circle posts, which of your circles) | Show posts to the people you chose. The audience is shown only to you |
 | Photos and videos | Files with random names in a private bucket, served through links that expire after an hour | Media in posts, chats and profile photos |
 | Chats | Members, messages, and how far each member has read | Deliver messages, show unread counts on every device |
+| Feeds (2.0) | The web feeds you follow (blogs, newsletters, YouTube channels, podcasts) and when you followed them; which articles you've opened or marked read; when you last opened Feeds (for the drawer's dot). Feeds themselves (address, name, the address of its logo, the latest articles' titles, summaries, links and the text and picture addresses the feed carries; articles older than 60 days are let go beyond each source's newest 100) are stored once for everyone who follows them; pictures are fetched by Circlo when shown and kept in memory for an hour, never stored | Show you what's new from the sites you follow. What you follow is shown only to you, is in your data export, and goes with your account |
 | Reports | What was reported (a copy of the text as it was), the reason and note, who reported it | Moderation, required by the app stores |
 
 Deleting an account removes all of it: every row, and every file in the bucket. Reports about you are kept (without
@@ -58,6 +59,9 @@ a link to your account) and your reports lose their link to you.
 - **The email provider** sees your email address and what Circlo emails you: codes, the daily note if you don't have
   the app (the kinds of things waiting, never who, what or how many), and security emails straight away (a new
   sign-in, a password change, another device signed out from your Devices list, naming only the kind of device: never where from).
+- **The sites you follow in Feeds** (YouTube included) see one Circlo server fetching their feed, their logo and the pictures in
+  their articles, never who follows or reads them. When you tap through to the original you're on their site, so they see your IP address and their own cookies apply, as with any link. When you play a podcast episode, your phone streams it from the podcast's own server, which sees your IP address as with any podcast app (so creators' download counts stay right). Where you stopped in each episode is kept only on your phone and forgotten when you sign out. Links
+  lose their tracking parameters first.
 - **The hosting provider and the storage (S3) provider** see IP addresses of connections at the network level, and
   hold the stored data. Our code doesn't record IPs, but their logs might (see the deployment rules below).
 

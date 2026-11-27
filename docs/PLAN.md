@@ -23,6 +23,70 @@ Sections 1–3 and the crypto parts of the phases below describe the original en
 kept as history and are **superseded** where they conflict with this table. Section 2A (UI) and the repo rules
 (0A, 0B) still apply, minus the crypto rows.
 
+## Version 2.0 (owner decision 2026-11-27): Feeds, Todos, Logged
+
+Three features, built one at a time, shipped together as app version 2.0.
+
+**Older apps keep working.** The server is deployed before store apps update, and 1.x apps can't be made to
+upgrade, so every 2.0 server change is additive: new endpoints (`/v1/reading/*` and so on) and new optional fields
+only; nothing an older app calls is removed or changes meaning; new activity kinds and pushes are sent only to apps
+that ask for them (as `?replies=all` does). An older app that receives an unknown push type opens Notifications.
+
+### Feeds (built 2026-11-27)
+
+Follow blogs, newsletters, YouTube channels and podcasts with web feeds (RSS, Atom); see what's new in Circlo and open
+anything on its own site. Named Feeds (owner decision 2026-11-27: prosumers know the word; first called Reading); in
+code and the API it's `reading`, because `/v1/feed` and `feed-store` are the Home timeline. In the side drawer between Profile and Settings and privacy, with a quiet dot when something new arrived
+(no counts, no pushes).
+
+- **Server** (`reading` package): ROME parses feeds, jsoup turns summaries into plain text and finds the feed a page
+  names. Each feed is fetched once for everyone who follows it, every 30 minutes, with conditional requests; failing
+  feeds back off to 12 hours and say so quietly. Links lose tracking parameters. Only public http(s) addresses are
+  fetched, re-checked on every redirect (`UrlGuard`); up to 25 MB, as podcast feeds carry their archive. YouTube
+  video descriptions come from Media RSS. Everything a feed carries is kept (publishers cap their feeds; Circlo reads at most 100 items), so quiet blogs show their posts; articles older than 60 days go only beyond each source's newest 100. Feeds nobody follows are dropped.
+  What someone follows is returned only to them, is in their data export and goes with their account.
+  **Logos** (`SourceIcons`, V36): a source's tile shows the feed's own logo (Atom icon or logo, RSS image, iTunes
+  cover), else the one its site names (apple-touch-icon, the largest icon, never SVG; a YouTube channel's picture),
+  else /favicon.ico; each candidate is fetched to make sure it's really an image. Looked for right after the first
+  follow, then on a full fetch at most weekly. Served through the same signed image links as article images, so
+  sites never see who follows them; the app falls back to the coloured initial if there's none or it fails.
+- **App**: Feeds at `/feeds` (above the list a source picker, "All ▾" opening a scrolling list of sources with their logos and unread counts, and an Unread toggle; the two combine (owner 2026-11-27); article rows with the source's logo tile, source · time, bold title while
+  unread, two-line summary; tap opens the in-app browser and marks it read; ⋯ has Mark as unread, Send in a chat,
+  Copy link, Open in browser; "New articles" pill; ＋ Add a source; ⋯ only once something is followed, with Mark all as read only while something is unread, and
+  Manage sources). Add a source
+  takes a plain site address and shows the feed's name and latest articles before Follow. Manage sources lists each
+  source with "Updated 2h ago" or "Couldn't update since Monday", Unfollow, and OPML import/export.
+- **JSON Feed** (owner decision 2026-11-27): feeds in JSON Feed 1 and 1.1 (jsonfeed.org; micro.blog, some blogs) read
+  into the same items as RSS and Atom (`JsonFeed`, sharing `FeedParser.item`): HTML or plain-text content, summary,
+  authors, dates, image, and an audio attachment as a podcast episode. Pages naming `application/feed+json` are found.
+- **YouTube videos show their thumbnail** (owner decision 2026-11-27): items keep their own picture (itunes:image,
+  else the largest Media RSS thumbnail, else a media:content image; V39), sent as `image` through the image proxy. A
+  YouTube video's row shows it 16:9 with a play mark, as does its screen (tapping opens YouTube). Videos still open
+  on YouTube; Shorts filtering and playing in Circlo wait until the owner has used it a while.
+- **Podcasts play in Circlo** (owner decision 2026-11-27, option 1): the server keeps each episode's audio (the first
+  audio enclosure: address, type, itunes:duration) and its artwork (itunes:image, through the image proxy); V38. An
+  episode always opens on its screen: artwork, a position bar, back 15 s, play/pause, forward 30 s, speed (1×, 1.25×,
+  1.5×, 2×), then its show notes and "Open on <site> ↗". One player for the app (`lib/podcast-player`, expo-audio):
+  it keeps playing in the background with lock-screen controls, a bar at the bottom of Feeds returns to it, and where
+  you stopped is kept on the phone (the last 30 episodes; cleared at sign-out). The phone plays the file from the
+  podcast's own server, so its host sees the listener's IP, as with any podcast app, and creators' download counts
+  stay right; streaming through Circlo was turned down (it would count every Circlo listener as one, and cost
+  bandwidth). Rows show an episode's length. Needs a native build (expo-audio).
+- **Reading in Circlo** (owner decision 2026-11-27): the server also keeps each item's fullest text (content:encoded,
+  Atom content, else the description) as simple blocks (`FeedContent`: paragraphs with bold/italic/code/links,
+  headings, lists, quotes, code, images, rules; scripts, frames, forms and tracking pixels dropped). An article with
+  clearly more than its summary, or pictures, opens on its own screen (`/feeds/<id>`) drawn with Circlo's text
+  styles, then "Read on <site> ↗" (or "Watch on YouTube"); a headline-only one opens on its site as before.
+  **Images go through Circlo** (owner: keep the no-tracking promise): signed, expiring links
+  (`/v1/reading/image`, key derived from CIRCLO_JWT_KEY), JPEG/PNG/GIF/WebP/AVIF only, cached an hour on the server
+  and a day on the phone, so publishers never see readers.
+- **Not in 2.0**: Readability-style extraction of pages whose feed has only a summary, thumbnails in the list,
+  email-only newsletters, a podcast player, sharing an article as a post.
+
+### Todos, Logged
+
+To be planned before each is built (Todos: Basecamp-style to-do lists; Logged: name and scope still open).
+
 ---
 
 # Original plan (2026-10-25)

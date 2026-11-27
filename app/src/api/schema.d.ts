@@ -695,7 +695,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** A copy of my data (profile, circles, friends, posts, replies, chats) as JSON */
+        /** A copy of my data (profile, circles, friends, posts, replies, chats, reading sources) as JSON */
         get: {
             parameters: {
                 query?: never;
@@ -3199,12 +3199,610 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/reading/sources/find": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** What's at an address (a site or its feed): the feed's name and its three latest articles, before following it. Follows nothing. Finding and following fetch other sites, so they're limited to 60 an hour per person */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: components["requestBodies"]["SourceUrl"];
+            responses: {
+                /** @description The feed found there */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["FoundSource"];
+                    };
+                };
+                400: components["responses"]["Error"];
+                422: components["responses"]["Error"];
+                429: components["responses"]["Error"];
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/reading/sources": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The feeds I follow, by name. Only ever my own */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description My sources */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ReadingSource"][];
+                    };
+                };
+            };
+        };
+        put?: never;
+        /** Follow the feed at an address (find's feedUrl, or a site). Following one I already follow is fine. Errors: invalid_url (400), too_many_sources (409, 200 at most), no_feed (422: it answered, but no feed there), unreachable (422: the site didn't answer at all), rate_limited (429) */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: components["requestBodies"]["SourceUrl"];
+            responses: {
+                /** @description The source */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ReadingSource"];
+                    };
+                };
+                400: components["responses"]["Error"];
+                409: components["responses"]["Error"];
+                422: components["responses"]["Error"];
+                429: components["responses"]["Error"];
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/reading/sources/{sourceId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Stop following a source */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    sourceId: components["schemas"]["Id"];
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Unfollowed */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                404: components["responses"]["Error"];
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/reading/articles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Articles from the feeds I follow (or one of them), newest first. Page with `before` set to the last page's `next` */
+        get: {
+            parameters: {
+                query?: {
+                    source?: components["schemas"]["Id"];
+                    unread?: boolean;
+                    before?: string;
+                    limit?: components["parameters"]["Limit"];
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description A page of articles */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            articles: components["schemas"]["ReadingArticle"][];
+                            next: string | null;
+                        };
+                    };
+                };
+                400: components["responses"]["Error"];
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/reading/articles/{articleId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One article with its content as blocks, for reading in Circlo (when hasContent). Images are signed Circlo links (relative paths; put the API address in front), so the publisher never sees the reader. 404 unless I follow its source */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    articleId: components["schemas"]["Id"];
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The article and its content */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            article: components["schemas"]["ReadingArticle"];
+                            content: components["schemas"]["ContentBlock"][];
+                        };
+                    };
+                };
+                404: components["responses"]["Error"];
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/reading/image": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** An article image, fetched by Circlo. Signed-out (an <img> can't send a token): the signed link from an article is the permission. JPEG, PNG, GIF, WebP or AVIF only; 404 for anything else, a wrong or expired signature, or a failed fetch */
+        get: {
+            parameters: {
+                query: {
+                    u: string;
+                    e: string;
+                    s: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The image */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "image/*": string;
+                    };
+                };
+                404: components["responses"]["Error"];
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/reading/articles/{articleId}/read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Mark an article read */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    articleId: components["schemas"]["Id"];
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Read */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                404: components["responses"]["Error"];
+            };
+        };
+        post?: never;
+        /** Mark an article unread */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    articleId: components["schemas"]["Id"];
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Unread */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                404: components["responses"]["Error"];
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/reading/read-all": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Mark every article read, or every article of one source */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": {
+                        sourceId?: components["schemas"]["Id"];
+                    };
+                };
+            };
+            responses: {
+                /** @description Read */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/reading/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Whether there's something new since I last opened Reading (the drawer's dot) */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Status */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            hasNew: boolean;
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/reading/seen": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** I opened Reading; the dot goes until something new arrives */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Seen */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/reading/import": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Follow the feeds in an OPML file from another reader (up to 200 sources in all). They're read by the next check; one that doesn't work shows as failing */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        opml: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description How many were added, and how many couldn't be */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            added: number;
+                            skipped: number;
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/reading/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** What I follow, as an OPML file another reader can import */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OPML */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/x-opml": string;
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
         /** Format: uuid */
         Id: string;
+        FoundSource: {
+            feedUrl: string;
+            title: string;
+            siteUrl: string | null;
+            /** @description Whether I follow it already */
+            following: boolean;
+            articles: {
+                title: string;
+                /** Format: date-time */
+                publishedAt: string;
+            }[];
+            /** @description Signed Circlo link to the source's logo (GET /v1/reading/image), relative to the API; null: draw its initial */
+            icon: string | null;
+        };
+        ReadingSource: {
+            sourceId: components["schemas"]["Id"];
+            title: string;
+            feedUrl: string;
+            siteUrl: string | null;
+            /**
+             * Format: date-time
+             * @description Last time Circlo read it
+             */
+            updatedAt: string | null;
+            /**
+             * Format: date-time
+             * @description Set while it can't be read
+             */
+            failingSince: string | null;
+            unread: number;
+            /** @description Signed Circlo link to the source's logo (GET /v1/reading/image), relative to the API; null: draw its initial */
+            icon: string | null;
+        };
+        ReadingArticle: {
+            articleId: components["schemas"]["Id"];
+            sourceId: components["schemas"]["Id"];
+            sourceTitle: string;
+            title: string;
+            /** @description Plain text */
+            summary: string;
+            /** @description The article on its own site */
+            url: string;
+            author: string | null;
+            /** Format: date-time */
+            publishedAt: string;
+            read: boolean;
+            /** @description There's more to read in Circlo (GET /v1/reading/articles/{id}); otherwise it opens on its site */
+            hasContent: boolean;
+            /** @description Signed Circlo link to the source's logo (GET /v1/reading/image), relative to the API; null: draw its initial */
+            sourceIcon: string | null;
+            /** @description A podcast episode's audio, played from the podcast's own server (its download counts stay right); null for articles */
+            audio: null | {
+                url: string;
+                /** @description e.g. audio/mpeg */
+                type: string | null;
+                durationSeconds: number | null;
+            };
+            /** @description The item's own picture (an episode's artwork, a video's thumbnail): a signed Circlo link (GET /v1/reading/image), relative to the API */
+            image: string | null;
+        };
+        ContentRun: {
+            text: string;
+            /** @description Bold */
+            b?: boolean;
+            /** @description Italic */
+            i?: boolean;
+            code?: boolean;
+            /** @description An http(s) link */
+            href?: string;
+        };
+        /** @description One block of an article: p, h (heading) and quote have runs; list has ordered and items (each a list of runs); code has text; img has src (a signed Circlo path), alt, and w and h when known; hr has nothing else */
+        ContentBlock: {
+            /** @enum {string} */
+            type: "p" | "h" | "quote" | "list" | "code" | "img" | "hr";
+            runs?: components["schemas"]["ContentRun"][];
+            ordered?: boolean;
+            items?: components["schemas"]["ContentRun"][][];
+            text?: string;
+            src?: string;
+            alt?: string;
+            w?: number;
+            h?: number;
+        };
         ObjectKey: string;
         Me: {
             userId: components["schemas"]["Id"];
@@ -3419,6 +4017,14 @@ export interface components {
         ChatId: components["schemas"]["Id"];
     };
     requestBodies: {
+        SourceUrl: {
+            content: {
+                "application/json": {
+                    /** @description A site or feed address; https:// is added if missing */
+                    url: string;
+                };
+            };
+        };
         Email: {
             content: {
                 "application/json": {

@@ -24,3 +24,7 @@ circlo:
     daily-scheduled: false
   s3:
     bucket: circlo-media-test
+  reading:
+    # Tests check feeds themselves (ReadingRefresher.refreshDue) and serve them from localhost, which production refuses.
+    scheduled: false
+    allow-private-hosts: true

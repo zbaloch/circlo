@@ -69,6 +69,9 @@
 | Push tokens aren't readable from a DB copy | Sealed per device with AES-256-GCM (key derived from CIRCLO_JWT_KEY, bound to the device row); cleared on sign-out, revoke, or when Apple reports the token gone | `EngagementFlowIT` |
 | Live updates leak nothing | `GET /v1/events` returns only a version number for the caller; the app then fetches through the usual access-checked endpoints | `EngagementFlowIT` |
 | No personal data in logs | No access log; errors are fixed codes; nothing from requests is logged | `NoPayloadLoggingIT` |
+| What I follow stays mine (Feeds, 2.0) | Every Feeds query (`/v1/reading/*`) starts from the caller's own follows, so another person's sources, articles and read marks are simply not there (404). Each feed is fetched once for all its followers with a generic user agent, so publishers see one Circlo fetcher, never who follows them; articles are opened on their own site only when the reader taps one. Summaries are plain text; an article's own text reaches the app only as simple blocks drawn natively (no publisher HTML, styles or scripts, no web view), with tracking pixels dropped and tracking parameters removed from links | `ReadingIT`, `FeedParserTest`, `FeedContentTest` |
+| Article images and source logos don't reveal readers (Feeds) | Images in articles, and each source's logo (`SourceIcons`), are served by `GET /v1/reading/image` from signed, expiring links (HMAC key derived from CIRCLO_JWT_KEY) that Circlo hands out only inside articles of sources the caller follows, so it isn't an open proxy; fetched through the same address checks as feeds, 10 MB cap, JPEG/PNG/GIF/WebP/AVIF and ICO only (never SVG), sent with `nosniff` and `default-src 'none'`, publisher headers and cookies dropped; kept in memory an hour | `ReadingImagesTest`, `SourceIconsTest`, `ReadingIT` |
+| Feeds can't be used to reach Circlo's network | Feeds and pages are fetched only over http(s), with no user:password, and only when every address the host resolves to is public (no loopback, private, link-local/cloud metadata, shared, multicast or reserved ranges, including IPv4-mapped IPv6); redirects are followed by hand and each hop is checked again; the connection goes only to the addresses that were checked (no DNS rebinding); 10-second timeouts for headers and 15 for the body, 25 MB cap (podcast archives), big feeds parsed one at a time; feeds with a doctype are refused (no XML entities); finding and following are limited to 60 an hour per person | `UrlGuardTest`, `FeedHttpTest`, `FeedParserTest`, `ReadingIT` |
 | Browsers can't be abused cross-site | Bearer tokens in a header (no cookies, so no CSRF); CORS allows only the web app's origin | `AuthFlowIT` |
 
 ## Known and accepted risks
@@ -93,6 +96,20 @@
 7. **Social graph and metadata**: the server knows who is connected, who messages whom, and when.
 8. **Account lockout can be triggered by others** who know your username; resetting the password by email lifts it.
 9. **Screenshots and re-sharing**: anyone who can see a post can copy it. No reposts are offered.
+10. **(Closed 2026-11-28) DNS rebinding against the Feeds address check.** It used to be possible for a hostile DNS
+    server to answer with a public address for the check and a private one for the connection. Feeds now fetch with
+    Apache HttpClient 5 and a resolver (`FeedHttp.PublicOnlyDns`) that hands out a host's addresses only if all are
+    public, and the connection is made to exactly those (`FeedHttpTest`). Still worth doing in production: block the
+    server's outbound traffic to private ranges and the cloud metadata address at the firewall (HARDENING.md).
+11. **Opening an article or video shows the reader to its site** (Feeds, 2.0). The publisher sees the reader's IP address and
+    can use its own cookies and trackers, as with any link. Mitigations: Circlo fetches feeds itself, so sites see a
+    reader only when they open an article, and links lose their tracking parameters first.
+12. **Playing a podcast episode shows the listener to the podcast's host** (Feeds, 2.0; owner decision 2026-11-27). The
+    phone streams the episode from the podcast's own server (and any measurement prefix in its address), which sees
+    its IP address, as in every podcast app; streaming through Circlo would hide it, but every Circlo listener would
+    count as one download (creators' ad income) and the bandwidth would grow with listening. Mitigations: nothing is
+    fetched from the host until Play is pressed (artwork comes through Circlo), the screen says "Plays from the
+    podcast's own server", no cookies are sent by the player, and where you stopped stays on the phone.
 
 ## Out of scope
 

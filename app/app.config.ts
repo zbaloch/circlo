@@ -103,6 +103,9 @@ const config: ExpoConfig = {
       },
     ],
     ['expo-video', { supportsPictureInPicture: false, supportsBackgroundPlayback: false }],
+    // Podcast episodes in Feeds keep playing with the screen locked, with lock-screen controls (iOS background audio,
+    // Android's media playback service). Nothing is recorded, so no microphone permission.
+    ['expo-audio', { microphonePermission: false, recordAudioAndroid: false, enableBackgroundPlayback: true }],
     // Content-free remote push on both platforms (lib/background-check). iPhone: TestFlight and App Store builds use
     // Apple's production service, development builds the sandbox. Android: FCM when built with google-services.json.
     [
