@@ -2,10 +2,9 @@ package com.circlo.server.reading;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.InetAddress;
 import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
+import java.net.UnknownHostException;
 import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
@@ -13,12 +12,28 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import jakarta.annotation.PreDestroy;
+import org.apache.hc.client5.http.DnsResolver;
+import org.apache.hc.client5.http.SystemDefaultDnsResolver;
+import org.apache.hc.client5.http.classic.methods.HttpGet;
+import org.apache.hc.client5.http.config.ConnectionConfig;
+import org.apache.hc.client5.http.config.RequestConfig;
+import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
+import org.apache.hc.client5.http.impl.classic.HttpClients;
+import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManager;
+import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManagerBuilder;
+import org.apache.hc.core5.http.ClassicHttpResponse;
+import org.apache.hc.core5.http.Header;
+import org.apache.hc.core5.http.HttpEntity;
+import org.apache.hc.core5.io.CloseMode;
+import org.apache.hc.core5.util.Timeout;
 import org.springframework.stereotype.Component;
 
 /**
- * Fetches feeds and pages for Reading: a generic user agent (nothing about who asked), short timeouts, at most
- * {@link #MAX_BYTES} (25 MB), and redirects followed by hand so each hop passes {@link UrlGuard} first. Sends conditional
- * headers so an unchanged feed costs a 304.
+ * Fetches feeds, pages and images for Feeds: a generic user agent (nothing about who asked), short timeouts, at most
+ * {@link #MAX_BYTES} (25 MB), and redirects followed by hand so each hop passes {@link UrlGuard} first. Connections go
+ * only to the addresses {@link PublicOnlyDns} handed out, all public, so DNS can't be used to point a fetch inside.
+ * Sends conditional headers so an unchanged feed costs a 304.
  */
 @Component
 public class FeedHttp {
@@ -38,7 +53,6 @@ public class FeedHttp {
         }
     }
 
-    /** The fetch failed: refused address, network error, too big, or an error status. No detail is kept. */
     /**
      * A fetch that didn't work. {@code reached}: the site answered (an error status, a redirect loop, too big);
      * otherwise Circlo couldn't get an answer at all (no such host, refused, a certificate it can't trust, a timeout).
@@ -60,14 +74,61 @@ public class FeedHttp {
         }
     }
 
-    private final HttpClient client = HttpClient.newBuilder()
-            .followRedirects(HttpClient.Redirect.NEVER)
-            .connectTimeout(Duration.ofSeconds(5))
-            .build();
+    /**
+     * Looks a host up and hands out its addresses only if every one is public. The connection is then made to exactly
+     * these addresses, so a site can't answer "public" to the check and "private" to the connection (DNS rebinding):
+     * UrlGuard checks first for a clear refusal, and this is what actually holds.
+     */
+    static final class PublicOnlyDns implements DnsResolver {
+        private final boolean allowPrivate;
+
+        PublicOnlyDns(boolean allowPrivate) {
+            this.allowPrivate = allowPrivate;
+        }
+
+        @Override
+        public InetAddress[] resolve(String host) throws UnknownHostException {
+            InetAddress[] all = SystemDefaultDnsResolver.INSTANCE.resolve(host);
+            if (!allowPrivate) {
+                for (InetAddress a : all) {
+                    if (!UrlGuard.isPublic(a)) {
+                        throw new UnknownHostException("not a public address");
+                    }
+                }
+            }
+            return all;
+        }
+
+        @Override
+        public String resolveCanonicalHostname(String host) throws UnknownHostException {
+            return SystemDefaultDnsResolver.INSTANCE.resolveCanonicalHostname(host);
+        }
+    }
+
+    private final CloseableHttpClient client;
     private final boolean allowPrivate;
 
     public FeedHttp(ReadingProperties props) {
         this.allowPrivate = props.allowPrivateHosts();
+        PoolingHttpClientConnectionManager connections = PoolingHttpClientConnectionManagerBuilder.create()
+                .setDnsResolver(new PublicOnlyDns(allowPrivate))
+                .setDefaultConnectionConfig(ConnectionConfig.custom().setConnectTimeout(Timeout.ofSeconds(5)).setSocketTimeout(Timeout.ofSeconds(10)).build())
+                .setMaxConnTotal(64)
+                .setMaxConnPerRoute(4)
+                .build();
+        // No proxy, no cookies, no retries; redirects are followed by hand (each hop checked).
+        this.client = HttpClients.custom()
+                .setConnectionManager(connections)
+                .disableRedirectHandling()
+                .disableCookieManagement()
+                .disableAutomaticRetries()
+                .setDefaultRequestConfig(RequestConfig.custom().setResponseTimeout(Timeout.ofSeconds(10)).build())
+                .build();
+    }
+
+    @PreDestroy
+    void close() {
+        client.close(CloseMode.IMMEDIATE);
     }
 
     private static final String FEED_ACCEPT =
@@ -90,40 +151,52 @@ public class FeedHttp {
         try {
             for (int hop = 0; hop <= MAX_REDIRECTS; hop++) {
                 UrlGuard.check(at, allowPrivate);
-                HttpRequest.Builder req = HttpRequest.newBuilder(at)
-                        .timeout(Duration.ofSeconds(10))
-                        .header("User-Agent", USER_AGENT)
-                        .header("Accept", accept)
-                        .GET();
+                HttpGet get = new HttpGet(at);
+                get.setHeader("User-Agent", USER_AGENT);
+                get.setHeader("Accept", accept);
                 if (hop == 0 && etag != null) {
-                    req.header("If-None-Match", etag);
+                    get.setHeader("If-None-Match", etag);
                 }
                 if (hop == 0 && modified != null) {
-                    req.header("If-Modified-Since", modified);
+                    get.setHeader("If-Modified-Since", modified);
                 }
-                HttpResponse<InputStream> res = client.send(req.build(), HttpResponse.BodyHandlers.ofInputStream());
-                int status = res.statusCode();
-                if (status >= 300 && status < 400 && status != 304) {
-                    res.body().close();
-                    String location = res.headers().firstValue("Location").orElseThrow(Failed::new);
-                    at = at.resolve(location.strip());
-                    continue;
+                ClassicHttpResponse res = client.executeOpen(null, get, null);
+                // Anything not read to the end (a redirect, a 304, an error, too big, too slow) drops its connection.
+                boolean used = false;
+                try {
+                    int status = res.getCode();
+                    if (status >= 300 && status < 400 && status != 304) {
+                        Header location = res.getFirstHeader("Location");
+                        if (location == null) {
+                            throw new Failed();
+                        }
+                        at = at.resolve(location.getValue().strip());
+                        continue;
+                    }
+                    if (status == 304) {
+                        return new Response(304, at, null, new byte[0], etag, modified);
+                    }
+                    if (status != 200) {
+                        throw new Failed();
+                    }
+                    HttpEntity entity = res.getEntity();
+                    byte[] body = entity == null ? new byte[0] : readBody(entity.getContent(), maxBytes, get::cancel);
+                    if (body.length > maxBytes) {
+                        throw new Failed();
+                    }
+                    used = true;
+                    return new Response(200, at, header(res, "Content-Type", 1000, ""), body, header(res, "ETag", 512, null),
+                            header(res, "Last-Modified", 100, null));
+                } finally {
+                    if (!used) {
+                        get.cancel();
+                    }
+                    try {
+                        res.close();
+                    } catch (IOException e) {
+                        // already dropped
+                    }
                 }
-                if (status == 304) {
-                    res.body().close();
-                    return new Response(304, at, null, new byte[0], etag, modified);
-                }
-                if (status != 200) {
-                    res.body().close();
-                    throw new Failed();
-                }
-                byte[] body = readBody(res.body(), maxBytes);
-                if (body.length > maxBytes) {
-                    throw new Failed();
-                }
-                return new Response(200, at, res.headers().firstValue("Content-Type").orElse(""), body,
-                        res.headers().firstValue("ETag").filter(v -> v.length() <= 512).orElse(null),
-                        res.headers().firstValue("Last-Modified").filter(v -> v.length() <= 100).orElse(null));
             }
             throw new Failed();
         } catch (UrlGuard.Refused | IOException | IllegalArgumentException e) {
@@ -134,7 +207,13 @@ public class FeedHttp {
         }
     }
 
-    private static byte[] readBody(InputStream in, int maxBytes) throws Failed, InterruptedException {
+    private static String header(ClassicHttpResponse res, String name, int max, String otherwise) {
+        Header h = res.getFirstHeader(name);
+        return h == null || h.getValue().length() > max ? otherwise : h.getValue();
+    }
+
+    /** Reads at most {@code maxBytes + 1}; past the time limit, {@code abort} drops the connection mid-read. */
+    private static byte[] readBody(InputStream in, int maxBytes, Runnable abort) throws Failed, InterruptedException {
         CompletableFuture<byte[]> read = CompletableFuture.supplyAsync(() -> {
             try (in) {
                 return in.readNBytes(maxBytes + 1);
@@ -145,11 +224,7 @@ public class FeedHttp {
         try {
             return read.get(BODY_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS);
         } catch (TimeoutException | ExecutionException e) {
-            try {
-                in.close();
-            } catch (IOException ignored) {
-                // closing aborts the read
-            }
+            abort.run();
             read.cancel(true);
             throw new Failed(false);
         }
