@@ -150,7 +150,6 @@ export function FilterBar({ sourceLabel, unread, onPickSource, onToggleUnread }:
         accessibilityState={{ checked: unread }}
         onPress={onToggleUnread}
         className={`${CHIP} ${unread ? CHIP_ON : CHIP_OFF}`}>
-        {unread ? <Icon name="checkmark" size={16} color={palette.onPrimary} /> : null}
         <Text className={unread ? 'font-semibold text-on-primary dark:text-on-primary-dark' : 'text-ink dark:text-ink-dark'}>Unread</Text>
       </Pressable>
     </View>
