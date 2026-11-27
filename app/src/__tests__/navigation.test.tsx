@@ -78,8 +78,8 @@ describe('app shell', () => {
     }
   });
 
-  it('drawer has Profile and Settings and privacy (circles live with your people, in the People tab)', () => {
-    expect(DRAWER_ITEMS.map((i) => i.label)).toEqual(['Profile', 'Settings and privacy']);
+  it('drawer has Profile, Reading and Settings and privacy (circles live with your people, in the People tab)', () => {
+    expect(DRAWER_ITEMS.map((i) => i.label)).toEqual(['Profile', 'Reading', 'Settings and privacy']);
   });
 
   it('Home shows the empty state and a labelled compose button', async () => {

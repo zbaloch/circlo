@@ -72,6 +72,9 @@ circlo:
     # The web app (linked from the emails) and this server's public address (for their unsubscribe link).
     web-base: ${CIRCLO_WEB_BASE:https://app.hellocirclo.com}
     api-base: ${CIRCLO_API_BASE:https://api.hellocirclo.com}
+  # Reading (web feeds): each followed feed is checked this often, once for everyone who follows it.
+  reading:
+    check-every: ${CIRCLO_READING_CHECK_EVERY:30m}
   s3:
     bucket: ${CIRCLO_S3_BUCKET:circlo-media}
     public-endpoint: ${CIRCLO_S3_PUBLIC_ENDPOINT}

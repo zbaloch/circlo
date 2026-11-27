@@ -266,6 +266,9 @@ public class AccountController {
                     WHERE m.chat_id = ? ORDER BY m.seq""", (Object) chat));
             return c;
         }, (Object) me));
+        out.put("reading", jdbc.queryForList("""
+                SELECT s.title, s.feed_url AS feedUrl, s.site_url AS siteUrl, f.created_at AS followedAt FROM reading_follows f
+                JOIN reading_sources s ON s.id = f.source_id WHERE f.user_id = ? ORDER BY s.title""", (Object) me));
         return out;
     }
 

@@ -23,6 +23,39 @@ Sections 1–3 and the crypto parts of the phases below describe the original en
 kept as history and are **superseded** where they conflict with this table. Section 2A (UI) and the repo rules
 (0A, 0B) still apply, minus the crypto rows.
 
+## Version 2.0 (owner decision 2026-11-27): Reading, Todos, Logged
+
+Three features, built one at a time, shipped together as app version 2.0.
+
+**Older apps keep working.** The server is deployed before store apps update, and 1.x apps can't be made to
+upgrade, so every 2.0 server change is additive: new endpoints (`/v1/reading/*` and so on) and new optional fields
+only; nothing an older app calls is removed or changes meaning; new activity kinds and pushes are sent only to apps
+that ask for them (as `?replies=all` does). An older app that receives an unknown push type opens Notifications.
+
+### Reading (built 2026-11-27)
+
+Follow blogs, newsletters and podcasts with web feeds (RSS, Atom); see what's new in Circlo and open anything on its
+own site. In the side drawer between Profile and Settings and privacy, with a quiet dot when something new arrived
+(no counts, no pushes).
+
+- **Server** (`reading` package): ROME parses feeds, jsoup turns summaries into plain text and finds the feed a page
+  names. Each feed is fetched once for everyone who follows it, every 30 minutes, with conditional requests; failing
+  feeds back off to 12 hours and say so quietly. Links lose tracking parameters. Only public http(s) addresses are
+  fetched, re-checked on every redirect (`UrlGuard`). Articles are kept 60 days; feeds nobody follows are dropped.
+  What someone follows is returned only to them, is in their data export and goes with their account.
+- **App**: Reading (chips All · Unread · each source; article rows with a letter tile, source · time, bold title while
+  unread, two-line summary; tap opens the in-app browser and marks it read; ⋯ has Mark as unread, Send in a chat,
+  Copy link, Open in browser; "New articles" pill; ＋ Add a source; ⋯ Mark all as read, Manage sources). Add a source
+  takes a plain site address and shows the feed's name and latest articles before Follow. Manage sources lists each
+  source with "Updated 2h ago" or "Couldn't update since Monday", Unfollow, and OPML import/export.
+- **Not in 2.0**: a reader view inside Circlo (Readability4J could add "Read here" later without schema changes),
+  thumbnails (would need proxying through Circlo so publishers don't see readers), email-only newsletters, a podcast
+  player, sharing an article as a post.
+
+### Todos, Logged
+
+To be planned before each is built (Todos: Basecamp-style to-do lists; Logged: name and scope still open).
+
 ---
 
 # Original plan (2026-10-25)

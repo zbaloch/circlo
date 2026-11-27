@@ -1,21 +1,24 @@
 import { Icon, type IconName } from '@/components/ui/icon';
 import type { DrawerContentComponentProps } from 'expo-router/drawer';
 import { router, type Href } from 'expo-router';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { refreshMe, useMe } from '@/lib/me';
+import { readingHasNew } from '@/lib/reading';
 import { useSession } from '@/lib/session';
 import { usePalette } from '@/theme/use-palette';
 
 import { Avatar } from './avatar';
 import { Text } from '@/components/ui/text';
 
-type Item = { label: string; icon: IconName; href: Href };
+type Item = { label: string; icon: IconName; href: Href; dot?: 'reading' };
 
 export const DRAWER_ITEMS: Item[] = [
   { label: 'Profile', icon: 'person-outline', href: '/profile' },
+  // Reading (2.0): web feeds. A quiet dot when something arrived since I last looked; no counts, no pushes.
+  { label: 'Reading', icon: 'book-outline', href: '/reading', dot: 'reading' },
   // Devices is the first link inside Settings and privacy.
   { label: 'Settings and privacy', icon: 'settings-outline', href: '/settings' },
 ];
@@ -28,8 +31,11 @@ export function AppDrawer({ navigation, state }: DrawerContentComponentProps) {
   const handle = account?.handle ?? '';
   const open = !!state.history?.some((h) => h.type === 'drawer');
   const me = useMe();
+  const [readingNew, setReadingNew] = useState(false);
   useEffect(() => {
-    if (account && open) refreshMe().catch(() => {});
+    if (!account || !open) return;
+    refreshMe().catch(() => {});
+    readingHasNew().then(setReadingNew, () => {});
   }, [account, open]);
   const displayName = me?.name || handle;
   const go = (href: Href) => {
@@ -49,10 +55,12 @@ export function AppDrawer({ navigation, state }: DrawerContentComponentProps) {
         <Pressable
           key={item.label}
           accessibilityRole="button"
+          accessibilityLabel={item.dot === 'reading' && readingNew ? `${item.label}, something new` : item.label}
           onPress={() => go(item.href)}
           className="flex-row items-center gap-4 py-4 active:opacity-60">
           <Icon name={item.icon} size={24} color={palette.ink} />
           <Text className="text-xl font-bold text-ink dark:text-ink-dark">{item.label}</Text>
+          {item.dot === 'reading' && readingNew ? <View testID="reading-dot" className="h-2 w-2 rounded-full bg-primary dark:bg-primary-dark" /> : null}
         </Pressable>
       ))}
     </ScrollView>

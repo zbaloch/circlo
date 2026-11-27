@@ -274,7 +274,7 @@ paths:
         "200": { $ref: "#/components/responses/Me" }
   /v1/me/export:
     get:
-      summary: A copy of my data (profile, circles, friends, posts, replies, chats) as JSON
+      summary: A copy of my data (profile, circles, friends, posts, replies, chats, reading sources) as JSON
       responses:
         "200":
           description: My data
@@ -1285,6 +1285,140 @@ paths:
       responses:
         "200": { $ref: "#/components/responses/Status" }
 
+  # ---------------- reading (2.0) ----------------
+  # Web feeds I follow. Circlo fetches each feed once for everyone who follows it and keeps titles, plain-text
+  # summaries and links; articles are read on their own site. What I follow is returned only to me.
+  /v1/reading/sources/find:
+    post:
+      summary: >-
+        What's at an address (a site or its feed): the feed's name and its three latest articles, before following it.
+        Follows nothing. Finding and following fetch other sites, so they're limited to 60 an hour per person
+      requestBody: { $ref: "#/components/requestBodies/SourceUrl" }
+      responses:
+        "200":
+          description: The feed found there
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/FoundSource" }
+        "400": { $ref: "#/components/responses/Error" }
+        "422": { $ref: "#/components/responses/Error" }
+        "429": { $ref: "#/components/responses/Error" }
+  /v1/reading/sources:
+    get:
+      summary: The feeds I follow, by name. Only ever my own
+      responses:
+        "200":
+          description: My sources
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: "#/components/schemas/ReadingSource" } }
+    post:
+      summary: >-
+        Follow the feed at an address (find's feedUrl, or a site). Following one I already follow is fine. Errors:
+        invalid_url (400), too_many_sources (409, 200 at most), no_feed (422), rate_limited (429)
+      requestBody: { $ref: "#/components/requestBodies/SourceUrl" }
+      responses:
+        "201":
+          description: The source
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ReadingSource" }
+        "400": { $ref: "#/components/responses/Error" }
+        "409": { $ref: "#/components/responses/Error" }
+        "422": { $ref: "#/components/responses/Error" }
+        "429": { $ref: "#/components/responses/Error" }
+  /v1/reading/sources/{sourceId}:
+    delete:
+      summary: Stop following a source
+      parameters:
+        - { name: sourceId, in: path, required: true, schema: { $ref: "#/components/schemas/Id" } }
+      responses:
+        "204": { description: Unfollowed }
+        "404": { $ref: "#/components/responses/Error" }
+  /v1/reading/articles:
+    get:
+      summary: Articles from the feeds I follow (or one of them), newest first. Page with `before` set to the last page's `next`
+      parameters:
+        - { name: source, in: query, required: false, schema: { $ref: "#/components/schemas/Id" } }
+        - { name: unread, in: query, required: false, schema: { type: boolean } }
+        - { name: before, in: query, required: false, schema: { type: string } }
+        - { $ref: "#/components/parameters/Limit" }
+      responses:
+        "200":
+          description: A page of articles
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [articles, next]
+                properties:
+                  articles: { type: array, items: { $ref: "#/components/schemas/ReadingArticle" } }
+                  next: { type: [string, "null"] }
+        "400": { $ref: "#/components/responses/Error" }
+  /v1/reading/articles/{articleId}/read:
+    put:
+      summary: Mark an article read
+      parameters:
+        - { name: articleId, in: path, required: true, schema: { $ref: "#/components/schemas/Id" } }
+      responses:
+        "204": { description: Read }
+        "404": { $ref: "#/components/responses/Error" }
+    delete:
+      summary: Mark an article unread
+      parameters:
+        - { name: articleId, in: path, required: true, schema: { $ref: "#/components/schemas/Id" } }
+      responses:
+        "204": { description: Unread }
+        "404": { $ref: "#/components/responses/Error" }
+  /v1/reading/read-all:
+    post:
+      summary: Mark every article read, or every article of one source
+      requestBody:
+        content:
+          application/json:
+            schema: { type: object, properties: { sourceId: { $ref: "#/components/schemas/Id" } } }
+      responses:
+        "204": { description: Read }
+  /v1/reading/status:
+    get:
+      summary: Whether there's something new since I last opened Reading (the drawer's dot)
+      responses:
+        "200":
+          description: Status
+          content:
+            application/json:
+              schema: { type: object, required: [hasNew], properties: { hasNew: { type: boolean } } }
+  /v1/reading/seen:
+    put:
+      summary: I opened Reading; the dot goes until something new arrives
+      responses:
+        "204": { description: Seen }
+  /v1/reading/import:
+    post:
+      summary: >-
+        Follow the feeds in an OPML file from another reader (up to 200 sources in all). They're read by the next check;
+        one that doesn't work shows as failing
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [opml], properties: { opml: { type: string, maxLength: 1000000 } } }
+      responses:
+        "200":
+          description: How many were added, and how many couldn't be
+          content:
+            application/json:
+              schema: { type: object, required: [added, skipped], properties: { added: { type: integer }, skipped: { type: integer } } }
+  /v1/reading/export:
+    get:
+      summary: What I follow, as an OPML file another reader can import
+      responses:
+        "200":
+          description: OPML
+          content:
+            text/x-opml:
+              schema: { type: string }
+
 components:
   securitySchemes:
     bearer: { type: http, scheme: bearer, bearerFormat: JWT }
@@ -1294,6 +1428,11 @@ components:
     PostId: { name: postId, in: path, required: true, schema: { $ref: "#/components/schemas/Id" } }
     ChatId: { name: chatId, in: path, required: true, schema: { $ref: "#/components/schemas/Id" } }
   requestBodies:
+    SourceUrl:
+      required: true
+      content:
+        application/json:
+          schema: { type: object, required: [url], properties: { url: { type: string, maxLength: 2048, description: "A site or feed address; https:// is added if missing" } } }
     Email:
       required: true
       content:
@@ -1348,6 +1487,44 @@ components:
           schema: { type: array, items: { $ref: "#/components/schemas/Post" } }
   schemas:
     Id: { type: string, format: uuid }
+    FoundSource:
+      type: object
+      required: [feedUrl, title, siteUrl, following, articles]
+      properties:
+        feedUrl: { type: string }
+        title: { type: string }
+        siteUrl: { type: [string, "null"] }
+        following: { type: boolean, description: Whether I follow it already }
+        articles:
+          type: array
+          items:
+            type: object
+            required: [title, publishedAt]
+            properties: { title: { type: string }, publishedAt: { type: string, format: date-time } }
+    ReadingSource:
+      type: object
+      required: [sourceId, title, feedUrl, siteUrl, updatedAt, failingSince, unread]
+      properties:
+        sourceId: { $ref: "#/components/schemas/Id" }
+        title: { type: string }
+        feedUrl: { type: string }
+        siteUrl: { type: [string, "null"] }
+        updatedAt: { type: [string, "null"], format: date-time, description: Last time Circlo read it }
+        failingSince: { type: [string, "null"], format: date-time, description: Set while it can't be read }
+        unread: { type: integer }
+    ReadingArticle:
+      type: object
+      required: [articleId, sourceId, sourceTitle, title, summary, url, author, publishedAt, read]
+      properties:
+        articleId: { $ref: "#/components/schemas/Id" }
+        sourceId: { $ref: "#/components/schemas/Id" }
+        sourceTitle: { type: string }
+        title: { type: string }
+        summary: { type: string, description: Plain text, up to about 300 characters }
+        url: { type: string, description: The article on its own site, without tracking parameters }
+        author: { type: [string, "null"] }
+        publishedAt: { type: string, format: date-time }
+        read: { type: boolean }
     ObjectKey: { type: string, pattern: "^[0-9a-f]{64}$" }
     Me:
       type: object

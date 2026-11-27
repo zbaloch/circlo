@@ -89,3 +89,17 @@ salted hashes and are dropped once idle, so no IP-derived data is ever stored (P
 - **With more than one server instance**, each enforces its own limits. Put the shared per-IP limit at the edge
   (nginx `limit_req`, the load balancer or the CDN/WAF) for `/v1/auth/*`. Login guessing stays slow regardless: the
   account lock is in the database (shared by every instance), and every check costs the server an Argon2id hash.
+
+## Outbound traffic (Reading)
+
+Reading (2.0) makes the server fetch web feeds at addresses people type. The code refuses private, loopback,
+link-local and reserved addresses and checks each redirect (`reading.UrlGuard`), but a DNS answer that changes between
+the check and the connection can slip past it (THREAT_MODEL.md, accepted risk 10). In production, also block the
+server's outbound connections to:
+
+- `127.0.0.0/8`, `10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`, `100.64.0.0/10`, `169.254.0.0/16` (cloud metadata),
+  `::1/128`, `fc00::/7`, `fe80::/10`;
+- except the database, the S3 endpoint, SMTP and the push services the server really needs.
+
+Feeds are checked every `CIRCLO_READING_CHECK_EVERY` (30 minutes by default), once for all followers, with
+conditional requests; failing feeds back off to 12 hours.
