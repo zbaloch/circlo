@@ -121,7 +121,7 @@ const CHIP_ON = 'border-primary bg-primary dark:border-primary-dark dark:bg-prim
 const CHIP_OFF = 'border-border active:bg-surface-raised dark:border-border-dark dark:active:bg-surface-raised-dark';
 
 /**
- * What Feeds shows: which source (All feeds, or one, picked from a list) and an Unread toggle, which work together
+ * What Feeds shows: which source (All, or one, picked from a list) and an Unread toggle, which work together
  * ("Veritasium, unread only").
  */
 export function FilterBar({ sourceLabel, unread, onPickSource, onToggleUnread }: {
@@ -157,7 +157,7 @@ export function FilterBar({ sourceLabel, unread, onPickSource, onToggleUnread }:
 }
 
 /**
- * The list of sources to show articles from, with All feeds first: each with its logo and how many are unread, and
+ * The list of sources to show articles from, with All first: each with its logo and how many are unread, and
  * a check on the one shown. Scrolls, as people can follow up to 200.
  */
 export function SourcePicker({ visible, sources, selected, onSelect, onClose }: {
@@ -203,7 +203,7 @@ export function SourcePicker({ visible, sources, selected, onSelect, onClose }: 
           {row(
             'all',
             null,
-            'All feeds',
+            'All',
             total,
             <View className={`items-center justify-center bg-surface-raised dark:bg-surface-raised-dark ${TILE.md}`}>
               <Icon name="rss-outline" size={20} color={palette.ink} />

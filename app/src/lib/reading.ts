@@ -156,10 +156,10 @@ export function sourceStatus(s: Pick<Source, 'updatedAt' | 'failingSince'>, now 
 }
 
 /** The chips above the list: All, Unread, then each source by name. Pure. */
-/** The source picker's label: "All feeds", or the source's name. Pure. */
+/** The source picker's label: "All", or the source's name. Pure. */
 export function filterLabel(sources: Pick<Source, 'sourceId' | 'title'>[], filter: ReadingFilter): string {
-  if (!filter.sourceId) return 'All feeds';
-  return sources.find((s) => s.sourceId === filter.sourceId)?.title ?? 'All feeds';
+  if (!filter.sourceId) return 'All';
+  return sources.find((s) => s.sourceId === filter.sourceId)?.title ?? 'All';
 }
 
 /** How many unread articles a filter covers, from the sources' counts (kept current as I read). Pure. */

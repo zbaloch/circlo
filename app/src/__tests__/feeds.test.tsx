@@ -154,11 +154,11 @@ describe('Feeds logic', () => {
     expect(sourceStatus({ updatedAt: null, failingSince: '2026-11-23T11:00:00Z' }, now)).toBe('Couldn’t update since Monday');
   });
 
-  it('the source picker says All feeds or the source’s name', () => {
+  it('the source picker says All or the source’s name', () => {
     const list = [source('a', 'Ars'), source('b', 'Bits')];
-    expect(filterLabel(list, { sourceId: null, unread: true })).toBe('All feeds');
+    expect(filterLabel(list, { sourceId: null, unread: true })).toBe('All');
     expect(filterLabel(list, { sourceId: 'b', unread: false })).toBe('Bits');
-    expect(filterLabel(list, { sourceId: 'gone', unread: false })).toBe('All feeds');
+    expect(filterLabel(list, { sourceId: 'gone', unread: false })).toBe('All');
   });
 
   it('pages merge without repeats, and read marks one article', () => {
@@ -220,7 +220,7 @@ describe('Feeds screen', () => {
     await render(<ReadingScreen />);
     expect(await screen.findByText('The AI Unbundling')).toBeTruthy();
     expect(screen.getByText('About The AI Unbundling')).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Showing All feeds' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Showing All' })).toBeTruthy();
     expect(screen.getByRole('switch', { name: 'Unread only' }).props.accessibilityState).toEqual({ checked: false });
 
     await fireEvent.press(screen.getByRole('link', { name: /The AI Unbundling, Stratechery, 1h, unread/ }));
@@ -284,9 +284,9 @@ describe('Feeds screen', () => {
     await screen.findByText('The AI Unbundling');
     expect(mockLoadedWith.at(-1)).toEqual({ sourceId: null, unread: false });
 
-    // The picker lists All feeds then each source, with what's unread, and a check on the one shown.
-    await fireEvent.press(screen.getByRole('button', { name: 'Showing All feeds' }));
-    expect(screen.getByRole('button', { name: 'All feeds, 2 unread' }).props.accessibilityState).toEqual({ selected: true });
+    // The picker lists All then each source, with what's unread, and a check on the one shown.
+    await fireEvent.press(screen.getByRole('button', { name: 'Showing All' }));
+    expect(screen.getByRole('button', { name: 'All, 2 unread' }).props.accessibilityState).toEqual({ selected: true });
     expect(screen.getByRole('button', { name: 'Stratechery, 2 unread' })).toBeTruthy();
     await fireEvent.press(screen.getByRole('button', { name: 'Veritasium' }));
     await waitFor(() => expect(mockLoadedWith.at(-1)).toEqual({ sourceId: 's2', unread: false }));
@@ -297,7 +297,7 @@ describe('Feeds screen', () => {
     await waitFor(() => expect(mockLoadedWith.at(-1)).toEqual({ sourceId: 's2', unread: true }));
     expect(screen.getByRole('switch', { name: 'Unread only' }).props.accessibilityState).toEqual({ checked: true });
     await fireEvent.press(screen.getByRole('button', { name: 'Showing Veritasium' }));
-    await fireEvent.press(screen.getByRole('button', { name: 'All feeds, 2 unread' }));
+    await fireEvent.press(screen.getByRole('button', { name: 'All, 2 unread' }));
     await waitFor(() => expect(mockLoadedWith.at(-1)).toEqual({ sourceId: null, unread: true }));
   });
 

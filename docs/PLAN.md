@@ -50,7 +50,7 @@ code and the API it's `reading`, because `/v1/feed` and `feed-store` are the Hom
   else /favicon.ico; each candidate is fetched to make sure it's really an image. Looked for right after the first
   follow, then on a full fetch at most weekly. Served through the same signed image links as article images, so
   sites never see who follows them; the app falls back to the coloured initial if there's none or it fails.
-- **App**: Feeds at `/feeds` (above the list a source picker, "All feeds ▾" opening a scrolling list of sources with their logos and unread counts, and an Unread toggle; the two combine (owner 2026-11-27); article rows with the source's logo tile, source · time, bold title while
+- **App**: Feeds at `/feeds` (above the list a source picker, "All ▾" opening a scrolling list of sources with their logos and unread counts, and an Unread toggle; the two combine (owner 2026-11-27); article rows with the source's logo tile, source · time, bold title while
   unread, two-line summary; tap opens the in-app browser and marks it read; ⋯ has Mark as unread, Send in a chat,
   Copy link, Open in browser; "New articles" pill; ＋ Add a source; ⋯ only once something is followed, with Mark all as read only while something is unread, and
   Manage sources). Add a source

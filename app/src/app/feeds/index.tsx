@@ -40,7 +40,7 @@ import { usePalette } from '@/theme/use-palette';
 
 /**
  * Feeds (2.0, from the drawer; "reading" in code): the newest articles from the sources I follow, timeline style. Above
- * the list: which source (All feeds, or one picked from a list) and an Unread toggle, together; tapping an article marks it read and opens it in Circlo when the feed carries its text
+ * the list: which source (All, or one picked from a list) and an Unread toggle, together; tapping an article marks it read and opens it in Circlo when the feed carries its text
  * (app/feeds/[id]), otherwise on its own site in the in-app browser.
  * No pushes and no counts; a "New articles" pill when more arrive while I'm here.
  */
