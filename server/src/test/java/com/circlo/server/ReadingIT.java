@@ -158,6 +158,20 @@ class ReadingIT extends IntegrationTest {
 
         assertThat(a.call("POST", "/v1/reading/sources/find", Map.of("url", base + "/plain")).getBody()).containsEntry("error", "no_feed");
         assertThat(a.call("POST", "/v1/reading/sources/find", Map.of("url", base + "/missing")).getBody()).containsEntry("error", "no_feed");
+        // Nothing answers at all (refused, no such host, an untrusted certificate, a timeout): said differently, at once.
+        int closed;
+        try (java.net.ServerSocket s = new java.net.ServerSocket(0)) {
+            closed = s.getLocalPort();
+        } catch (java.io.IOException e) {
+            throw new IllegalStateException(e);
+        }
+        long started = System.nanoTime();
+        ResponseEntity<Map<String, Object>> down = a.call("POST", "/v1/reading/sources/find", Map.of("url", "http://127.0.0.1:" + closed + "/rss"));
+        assertThat(down.getStatusCode().value()).isEqualTo(422);
+        assertThat(down.getBody()).containsEntry("error", "unreachable");
+        assertThat(Duration.ofNanos(System.nanoTime() - started)).isLessThan(Duration.ofSeconds(8));
+        assertThat(a.call("POST", "/v1/reading/sources", Map.of("url", "http://127.0.0.1:" + closed + "/rss")).getBody())
+                .containsEntry("error", "unreachable");
         for (String bad : List.of("file:///etc/passwd", "ftp://example.com/feed", "javascript:alert(1)", "not a url at all", "")) {
             ResponseEntity<Map<String, Object>> r = a.call("POST", "/v1/reading/sources/find", Map.of("url", bad));
             assertThat(r.getStatusCode().value()).as(bad).isEqualTo(400);

@@ -28,13 +28,20 @@ public class FeedFinder {
         }
     }
 
+    /** The address didn't answer at all (no such host, refused, an untrusted certificate, a timeout). */
+    public static final class Unreachable extends Exception {
+        Unreachable() {
+            super("unreachable", null, false, false);
+        }
+    }
+
     private final FeedHttp http;
 
     public FeedFinder(FeedHttp http) {
         this.http = http;
     }
 
-    public Found find(URI start) throws NoFeed {
+    public Found find(URI start) throws NoFeed, Unreachable {
         long started = System.nanoTime();
         List<URI> candidates = new ArrayList<>();
         URI origin = start;
@@ -50,6 +57,9 @@ public class FeedFinder {
             candidates.addAll(FeedParser.feedLinks(page.body(), page.url()));
             origin = page.url();
         } catch (FeedHttp.Failed e) {
+            if (!e.reached()) {
+                throw new Unreachable();
+            }
             // Some sites refuse automated visits to their pages (403) but serve their feed to anyone: try the usual places.
         }
         if (candidates.isEmpty()) {

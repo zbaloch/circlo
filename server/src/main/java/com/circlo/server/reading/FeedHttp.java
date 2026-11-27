@@ -39,9 +39,24 @@ public class FeedHttp {
     }
 
     /** The fetch failed: refused address, network error, too big, or an error status. No detail is kept. */
+    /**
+     * A fetch that didn't work. {@code reached}: the site answered (an error status, a redirect loop, too big);
+     * otherwise Circlo couldn't get an answer at all (no such host, refused, a certificate it can't trust, a timeout).
+     */
     public static final class Failed extends Exception {
+        private final boolean reached;
+
         Failed() {
+            this(true);
+        }
+
+        Failed(boolean reached) {
             super("failed", null, false, false);
+            this.reached = reached;
+        }
+
+        public boolean reached() {
+            return reached;
         }
     }
 
@@ -112,10 +127,10 @@ public class FeedHttp {
             }
             throw new Failed();
         } catch (UrlGuard.Refused | IOException | IllegalArgumentException e) {
-            throw new Failed();
+            throw new Failed(false);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            throw new Failed();
+            throw new Failed(false);
         }
     }
 
@@ -136,7 +151,7 @@ public class FeedHttp {
                 // closing aborts the read
             }
             read.cancel(true);
-            throw new Failed();
+            throw new Failed(false);
         }
     }
 }

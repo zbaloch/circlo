@@ -108,6 +108,8 @@ public class ReadingController {
             return finder.find(uri);
         } catch (FeedFinder.NoFeed e) {
             throw new ApiException(HttpStatus.UNPROCESSABLE_CONTENT, "no_feed");
+        } catch (FeedFinder.Unreachable e) {
+            throw new ApiException(HttpStatus.UNPROCESSABLE_CONTENT, "unreachable");
         }
     }
 

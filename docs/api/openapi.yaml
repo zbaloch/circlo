@@ -1315,7 +1315,7 @@ paths:
     post:
       summary: >-
         Follow the feed at an address (find's feedUrl, or a site). Following one I already follow is fine. Errors:
-        invalid_url (400), too_many_sources (409, 200 at most), no_feed (422), rate_limited (429)
+        invalid_url (400), too_many_sources (409, 200 at most), no_feed (422: it answered, but no feed there), unreachable (422: the site didn't answer at all), rate_limited (429)
       requestBody: { $ref: "#/components/requestBodies/SourceUrl" }
       responses:
         "201":

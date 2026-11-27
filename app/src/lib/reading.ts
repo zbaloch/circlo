@@ -169,6 +169,8 @@ export function describeReadingError(e: unknown): string {
       return 'That doesn’t look like a web address. Try something like example.com.';
     case 'no_feed':
       return 'We couldn’t find a feed on this site. Try the address of its blog or newsletter, or its RSS link.';
+    case 'unreachable':
+      return 'Circlo couldn’t reach this site right now. Check the address, or try again later.';
     case 'too_many_sources':
       return 'You can follow up to 200 sources. Unfollow one to add another.';
     case 'rate_limited':

@@ -172,6 +172,7 @@ describe('Feeds logic', () => {
 
   it('explains errors in plain words', () => {
     expect(describeReadingError({ code: 'no_feed' })).toMatch(/couldn’t find a feed/);
+    expect(describeReadingError({ code: 'unreachable' })).toBe('Circlo couldn’t reach this site right now. Check the address, or try again later.');
     expect(describeReadingError({ code: 'invalid_url' })).toMatch(/web address/);
     expect(describeReadingError({ code: 'too_many_sources' })).toMatch(/200/);
     expect(importSummary({ added: 3, skipped: 1 })).toBe('3 sources added · 1 couldn’t be read');
