@@ -55,7 +55,22 @@ public class FeedHttp {
         this.allowPrivate = props.allowPrivateHosts();
     }
 
+    private static final String FEED_ACCEPT =
+            "application/rss+xml, application/atom+xml, application/xml;q=0.9, text/xml;q=0.9, text/html;q=0.8, */*;q=0.5";
+    private static final String IMAGE_ACCEPT = "image/avif, image/webp, image/png, image/jpeg, image/gif;q=0.9";
+    /** Article images (ReadingImageController). */
+    static final int MAX_IMAGE_BYTES = 10 * 1024 * 1024;
+
     public Response get(URI url, String etag, String modified) throws Failed {
+        return fetch(url, etag, modified, FEED_ACCEPT, MAX_BYTES);
+    }
+
+    /** An article image: no conditional headers, at most 10 MB. */
+    public Response image(URI url) throws Failed {
+        return fetch(url, null, null, IMAGE_ACCEPT, MAX_IMAGE_BYTES);
+    }
+
+    private Response fetch(URI url, String etag, String modified, String accept, int maxBytes) throws Failed {
         URI at = url;
         try {
             for (int hop = 0; hop <= MAX_REDIRECTS; hop++) {
@@ -63,7 +78,7 @@ public class FeedHttp {
                 HttpRequest.Builder req = HttpRequest.newBuilder(at)
                         .timeout(Duration.ofSeconds(10))
                         .header("User-Agent", USER_AGENT)
-                        .header("Accept", "application/rss+xml, application/atom+xml, application/xml;q=0.9, text/xml;q=0.9, text/html;q=0.8, */*;q=0.5")
+                        .header("Accept", accept)
                         .GET();
                 if (hop == 0 && etag != null) {
                     req.header("If-None-Match", etag);
@@ -87,8 +102,8 @@ public class FeedHttp {
                     res.body().close();
                     throw new Failed();
                 }
-                byte[] body = readBody(res.body());
-                if (body.length > MAX_BYTES) {
+                byte[] body = readBody(res.body(), maxBytes);
+                if (body.length > maxBytes) {
                     throw new Failed();
                 }
                 return new Response(200, at, res.headers().firstValue("Content-Type").orElse(""), body,
@@ -104,10 +119,10 @@ public class FeedHttp {
         }
     }
 
-    private static byte[] readBody(InputStream in) throws Failed, InterruptedException {
+    private static byte[] readBody(InputStream in, int maxBytes) throws Failed, InterruptedException {
         CompletableFuture<byte[]> read = CompletableFuture.supplyAsync(() -> {
             try (in) {
-                return in.readNBytes(MAX_BYTES + 1);
+                return in.readNBytes(maxBytes + 1);
             } catch (IOException e) {
                 throw new java.io.UncheckedIOException(e);
             }

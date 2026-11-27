@@ -39,7 +39,8 @@ import { usePalette } from '@/theme/use-palette';
 
 /**
  * Feeds (2.0, from the drawer; "reading" in code): the newest articles from the sources I follow, timeline style. Chips filter by
- * All, Unread or one source; tapping an article opens it on its own site in the in-app browser and marks it read.
+ * All, Unread or one source; tapping an article marks it read and opens it in Circlo when the feed carries its text
+ * (app/feeds/[id]), otherwise on its own site in the in-app browser.
  * No pushes and no counts; a "New articles" pill when more arrive while I'm here.
  */
 export default function ReadingScreen() {
@@ -135,9 +136,12 @@ export default function ReadingScreen() {
     });
   };
 
+  // With more to read than its summary, an article opens in Circlo (its own text, then a button to the site);
+  // otherwise straight on its site.
   const open = (a: Article) => {
     if (!a.read) mark(a, true);
-    void openArticle(a.url, palette);
+    if (a.hasContent) router.push({ pathname: '/feeds/[id]', params: { id: a.articleId } });
+    else void openArticle(a.url, palette);
   };
 
   const articleMenu = (a: Article) =>

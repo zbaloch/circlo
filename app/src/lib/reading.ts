@@ -13,6 +13,9 @@ export type Source = components['schemas']['ReadingSource'];
 export type Article = components['schemas']['ReadingArticle'];
 export type FoundSource = components['schemas']['FoundSource'];
 export type ArticlePage = { articles: Article[]; next: string | null };
+export type ContentBlock = components['schemas']['ContentBlock'];
+export type ContentRun = components['schemas']['ContentRun'];
+export type ArticleDetail = { article: Article; content: ContentBlock[] };
 
 /** The words on the Feeds empty screen and in About: what it is, in plain words. */
 export const READING_ABOUT =
@@ -33,6 +36,11 @@ export async function loadArticles(filter: ReadingFilter, before?: string | null
     limit: 30,
   };
   return ok(await api.GET('/v1/reading/articles', { params: { query } }));
+}
+
+/** One article with its content as blocks, for reading in Circlo. */
+export async function loadArticle(articleId: string): Promise<ArticleDetail> {
+  return ok(await api.GET('/v1/reading/articles/{articleId}', { params: { path: { articleId } } }));
 }
 
 export async function findSource(url: string): Promise<FoundSource> {
@@ -85,6 +93,23 @@ export function siteName(url: string | null | undefined): string {
   if (!url) return '';
   const m = /^[a-z][a-z0-9+.-]*:\/\/([^/?#:]+)/i.exec(url);
   return (m?.[1] ?? '').replace(/^www\./i, '').toLowerCase();
+}
+
+/** The button at the end of an article: where it goes, in words. Pure. */
+export function openOnSiteLabel(url: string): string {
+  const site = siteName(url);
+  if (site === 'youtube.com' || site === 'm.youtube.com' || site === 'youtu.be') return 'Watch on YouTube';
+  return site ? `Read on ${site}` : 'Open the original';
+}
+
+/** An article image's signed Circlo path as a full address on this API. Pure. */
+export function imageUri(src: string, apiUrl: string): string {
+  return /^https?:\/\//i.test(src) ? src : `${apiUrl.replace(/\/$/, '')}${src}`;
+}
+
+/** A block's plain text (for its reading direction and font). Pure. */
+export function blockText(runs: ContentRun[] | undefined): string {
+  return (runs ?? []).map((r) => r.text).join('');
 }
 
 /** The quiet line under a source in Manage sources. Pure. */

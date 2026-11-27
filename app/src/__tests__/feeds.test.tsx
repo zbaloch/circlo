@@ -2,12 +2,16 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react-nativ
 import { useSyncExternalStore, type ReactElement, type ReactNode } from 'react';
 import { View } from 'react-native';
 
+import ArticleScreen from '@/app/feeds/[id]';
 import AddSourceScreen from '@/app/feeds/add';
 import ReadingScreen from '@/app/feeds/index';
 import SourcesScreen from '@/app/feeds/sources';
 import { DRAWER_ITEMS } from '@/components/app-drawer';
 import {
+  blockText,
   describeReadingError,
+  imageUri,
+  openOnSiteLabel,
   filterChips,
   importSummary,
   mergeArticles,
@@ -18,6 +22,7 @@ import {
   withRead,
   withUnread,
   type Article,
+  type ArticleDetail,
   type FoundSource,
   type Source,
 } from '@/lib/reading';
@@ -42,13 +47,14 @@ jest.mock('expo-router', () => ({
 }));
 const mockSession = { status: 'signedIn', account: { userId: 'me', handle: 'me' } };
 jest.mock('@/lib/session', () => ({ useSession: () => mockSession }));
-jest.mock('@/api/client', () => ({}));
+jest.mock('@/api/client', () => ({ API_URL: 'http://api.test' }));
 const mockToast = jest.fn();
 jest.mock('@/lib/toast', () => ({ showToast: (m: string) => mockToast(m) }));
 const mockOpen = jest.fn(async (_url: string, _opts?: unknown) => ({ type: 'opened' }));
 jest.mock('expo-web-browser', () => ({ openBrowserAsync: (url: string, opts: unknown) => mockOpen(url, opts) }));
 jest.mock('expo-linking', () => ({ openURL: jest.fn() }));
 jest.mock('expo-clipboard', () => ({ setStringAsync: jest.fn() }));
+jest.mock('expo-image', () => ({ Image: (p: { accessibilityLabel?: string }) => jest.requireActual('react').createElement('Image', { testID: 'article-image', ...p }) }));
 jest.mock('@/components/send-to-chat-sheet', () => ({ SendToChatSheet: () => null }));
 jest.mock('@/lib/opml-file', () => ({ pickOpmlText: jest.fn(), shareOpml: jest.fn() }));
 
@@ -62,7 +68,7 @@ const source = (id: string, title: string, extra: Partial<Source> = {}): Source 
   unread: 1,
   ...extra,
 });
-const article = (id: string, title: string, read = false): Article => ({
+const article = (id: string, title: string, read = false, hasContent = false): Article => ({
   articleId: id,
   sourceId: 's1',
   sourceTitle: 'Stratechery',
@@ -72,6 +78,7 @@ const article = (id: string, title: string, read = false): Article => ({
   author: null,
   publishedAt: new Date(Date.now() - 3600_000).toISOString(),
   read,
+  hasContent,
 });
 
 let mockSources: Source[] = [];
@@ -82,6 +89,7 @@ const mockFind = jest.fn(async (_url: string): Promise<FoundSource> => {
 });
 const mockFollow = jest.fn(async (_url: string) => source('s9', 'Ars Technica'));
 const mockSeen = jest.fn(async () => {});
+let mockDetail: ArticleDetail | null = null;
 jest.mock('@/lib/reading', () => ({
   ...jest.requireActual('@/lib/reading'),
   loadSources: async () => mockSources,
@@ -90,6 +98,10 @@ jest.mock('@/lib/reading', () => ({
   findSource: (url: string) => mockFind(url),
   followSource: (url: string) => mockFollow(url),
   markReadingSeen: () => mockSeen(),
+  loadArticle: async () => {
+    if (!mockDetail) throw Object.assign(new Error('not_found'), { code: 'not_found' });
+    return mockDetail;
+  },
 }));
 
 /** Draws the header's right side next to the screen, as the stack would, so its buttons act on the live screen. */
@@ -164,6 +176,15 @@ describe('Feeds logic', () => {
     expect(importSummary({ added: 0, skipped: 0 })).toBe('Nothing new to add');
   });
 
+  it('names where the original opens, and puts images on Circlo’s own address', () => {
+    expect(openOnSiteLabel('https://www.densediscovery.com/issues/416')).toBe('Read on densediscovery.com');
+    expect(openOnSiteLabel('https://www.youtube.com/watch?v=abc')).toBe('Watch on YouTube');
+    expect(openOnSiteLabel('https://youtu.be/abc')).toBe('Watch on YouTube');
+    expect(imageUri('/v1/reading/image?u=x&e=1&s=y', 'http://192.168.1.2:8091/')).toBe('http://192.168.1.2:8091/v1/reading/image?u=x&e=1&s=y');
+    expect(blockText([{ text: 'Hello ' }, { text: 'world', b: true }])).toBe('Hello world');
+    expect(blockText(undefined)).toBe('');
+  });
+
   it('sits in the drawer between Profile and Settings', () => {
     expect(DRAWER_ITEMS.map((i) => i.label)).toEqual(['Profile', 'Feeds', 'Settings and privacy']);
   });
@@ -194,6 +215,18 @@ describe('Feeds screen', () => {
     // Already read: opening doesn't mark it again.
     await fireEvent.press(screen.getByRole('link', { name: /Old news/ }));
     expect(mockSetRead).toHaveBeenCalledTimes(1);
+  });
+
+  it('an article with more to read opens in Circlo; a headline only opens on its site', async () => {
+    mockSources = [source('s1', 'Stratechery')];
+    mockArticles = [article('a1', 'Long read', false, true), article('a2', 'Just a link')];
+    await render(<ReadingScreen />);
+    await fireEvent.press(await screen.findByRole('link', { name: /Long read/ }));
+    expect(mockPush).toHaveBeenCalledWith({ pathname: '/feeds/[id]', params: { id: 'a1' } });
+    expect(mockOpen).not.toHaveBeenCalled();
+    expect(mockSetRead).toHaveBeenCalledWith('a1', true);
+    await fireEvent.press(screen.getByRole('link', { name: /Just a link/ }));
+    expect(mockOpen).toHaveBeenCalledWith('https://stratechery.example/a2', expect.anything());
   });
 
   it('the article menu can mark it unread', async () => {
@@ -242,6 +275,44 @@ describe('Feeds screen', () => {
     mockArticles = [];
     await render(<ReadingScreen />);
     expect(await screen.findByText('Nothing yet')).toBeTruthy();
+  });
+});
+
+describe('Reading an article in Circlo', () => {
+  it('shows the feed’s text with its formatting and pictures, then a button to the original', async () => {
+    mockParams = { id: 'a1' };
+    mockDetail = {
+      article: { ...article('a1', 'DD416 / Adrift in a world of options', false, true), url: 'https://www.densediscovery.com/issues/416', sourceTitle: 'Dense Discovery' },
+      content: [
+        { type: 'p', runs: [{ text: 'I left ' }, { text: 'Germany', b: true }, { text: ' at 20. See ' }, { text: 'a person of place', href: 'https://www.densediscovery.com/issues/352' }, { text: '.' }] },
+        { type: 'h', runs: [{ text: 'Reading list' }] },
+        { type: 'list', ordered: false, items: [[{ text: 'One' }], [{ text: 'Two' }]] },
+        { type: 'quote', runs: [{ text: 'Quoted words.' }] },
+        { type: 'img', src: '/v1/reading/image?u=x&e=1&s=y', alt: 'A photo', w: 800, h: 600 },
+        { type: 'p', runs: [{ text: 'سندھی ٻولي' }] },
+      ],
+    };
+    await render(<ArticleScreen />);
+    expect(await screen.findByText('DD416 / Adrift in a world of options')).toBeTruthy();
+    expect(screen.getByText('Germany')).toBeTruthy();
+    expect(screen.getByText('Reading list')).toBeTruthy();
+    expect(screen.getByText('Two')).toBeTruthy();
+    expect(screen.getByText('Quoted words.')).toBeTruthy();
+    expect(screen.getByTestId('article-image').props.source).toEqual({ uri: expect.stringMatching(/\/v1\/reading\/image\?u=x&e=1&s=y$/) });
+    // Opening it reads it.
+    expect(mockSetRead).toHaveBeenCalledWith('a1', true);
+
+    await fireEvent.press(screen.getByRole('link', { name: 'a person of place' }));
+    expect(mockOpen).toHaveBeenCalledWith('https://www.densediscovery.com/issues/352', expect.anything());
+    await fireEvent.press(screen.getByRole('button', { name: 'Read on densediscovery.com ↗' }));
+    expect(mockOpen).toHaveBeenLastCalledWith('https://www.densediscovery.com/issues/416', expect.anything());
+  });
+
+  it('says so when the article has gone', async () => {
+    mockParams = { id: 'gone' };
+    mockDetail = null;
+    await render(<ArticleScreen />);
+    expect(await screen.findByText('Not here any more')).toBeTruthy();
   });
 });
 

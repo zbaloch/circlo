@@ -51,13 +51,16 @@ public class ReadingController {
     private final ReadingStore store;
     private final RateLimiter limiter;
     private final ReadingProperties props;
+    private final ReadingImages images;
 
-    public ReadingController(JdbcTemplate jdbc, FeedFinder finder, ReadingStore store, RateLimiter limiter, ReadingProperties props) {
+    public ReadingController(JdbcTemplate jdbc, FeedFinder finder, ReadingStore store, RateLimiter limiter, ReadingProperties props,
+            ReadingImages images) {
         this.jdbc = jdbc;
         this.finder = finder;
         this.store = store;
         this.limiter = limiter;
         this.props = props;
+        this.images = images;
     }
 
     private static byte[] me(Jwt jwt) {
@@ -72,8 +75,12 @@ public class ReadingController {
 
     public record Source(UUID sourceId, String title, String feedUrl, String siteUrl, Instant updatedAt, Instant failingSince, int unread) {}
 
+    /** {@code hasContent}: there's more to read in Circlo (GET /v1/reading/articles/{id}); otherwise it opens on its site. */
     public record Article(UUID articleId, UUID sourceId, String sourceTitle, String title, String summary, String url, String author,
-            Instant publishedAt, boolean read) {}
+            Instant publishedAt, boolean read, boolean hasContent) {}
+
+    /** An article with its content as blocks (FeedContent); images are signed Circlo links (ReadingImages). */
+    public record ArticleDetail(Article article, List<Map<String, Object>> content) {}
 
     public record Articles(List<Article> articles, String next) {}
 
@@ -179,7 +186,7 @@ public class ReadingController {
             @RequestParam(name = "limit", required = false, defaultValue = "30") int limit) {
         int n = Math.max(1, Math.min(limit, 100));
         StringBuilder sql = new StringBuilder("""
-                SELECT a.id, a.source_id, s.title, a.title, a.summary, a.url, a.author, a.published_at, r.article_id IS NOT NULL
+                SELECT a.id, a.source_id, s.title, a.title, a.summary, a.url, a.author, a.published_at, r.article_id IS NOT NULL, a.has_content
                 FROM reading_follows f
                 JOIN reading_articles a ON a.source_id = f.source_id
                 JOIN reading_sources s ON s.id = a.source_id
@@ -203,7 +210,7 @@ public class ReadingController {
         sql.append(" ORDER BY a.published_at DESC, a.id DESC LIMIT ").append(n + 1);
         List<Article> rows = jdbc.query(sql.toString(), (rs, i) -> new Article(Ids.uuid(rs.getBytes(1)), Ids.uuid(rs.getBytes(2)),
                 rs.getString(3), rs.getString(4), rs.getString(5), rs.getString(6), rs.getString(7), rs.getTimestamp(8).toInstant(),
-                rs.getBoolean(9)), args.toArray());
+                rs.getBoolean(9), rs.getBoolean(10)), args.toArray());
         if (rows.size() <= n) {
             return new Articles(rows, null);
         }
@@ -228,6 +235,37 @@ public class ReadingController {
         public String toString() {
             return (at.getEpochSecond() * 1_000_000L + at.getNano() / 1000) + "." + id;
         }
+    }
+
+    /** One article with its content, for reading in Circlo. Only for people who follow its source (404 otherwise). */
+    @GetMapping("/v1/reading/articles/{id}")
+    public ArticleDetail article(@AuthenticationPrincipal Jwt jwt, @PathVariable("id") UUID id) {
+        byte[] me = me(jwt);
+        List<ArticleDetail> found = jdbc.query("""
+                SELECT a.id, a.source_id, s.title, a.title, a.summary, a.url, a.author, a.published_at, r.article_id IS NOT NULL, a.has_content,
+                  a.content
+                FROM reading_articles a
+                JOIN reading_follows f ON f.source_id = a.source_id AND f.user_id = ?
+                JOIN reading_sources s ON s.id = a.source_id
+                LEFT JOIN reading_read r ON r.user_id = f.user_id AND r.article_id = a.id
+                WHERE a.id = ?""", (rs, i) -> new ArticleDetail(new Article(Ids.uuid(rs.getBytes(1)), Ids.uuid(rs.getBytes(2)), rs.getString(3),
+                rs.getString(4), rs.getString(5), rs.getString(6), rs.getString(7), rs.getTimestamp(8).toInstant(), rs.getBoolean(9),
+                rs.getBoolean(10)), withSignedImages(ReadingStore.blocks(rs.getString(11)))), me, Ids.bytes(id));
+        if (found.isEmpty()) {
+            throw ApiException.notFound();
+        }
+        return found.get(0);
+    }
+
+    /** The publisher's image addresses swapped for signed Circlo links. */
+    private List<Map<String, Object>> withSignedImages(List<Map<String, Object>> blocks) {
+        Instant now = Instant.now();
+        for (Map<String, Object> b : blocks) {
+            if ("img".equals(b.get("type")) && b.get("src") instanceof String src) {
+                b.put("src", images.path(src, now));
+            }
+        }
+        return blocks;
     }
 
     private void requireMine(byte[] me, UUID article) {

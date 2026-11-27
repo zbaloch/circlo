@@ -65,6 +65,8 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/v1/email/unsubscribe").permitAll()
                         // An invite link's preview (name and photo only), for the website's /i/<token> page.
                         .requestMatchers(HttpMethod.GET, "/v1/invites/*/card").permitAll()
+                        // Feeds' article images: an <img> can't send a token; the signed link is the permission (ReadingImages).
+                        .requestMatchers(HttpMethod.GET, "/v1/reading/image").permitAll()
                         .requestMatchers("/dev/**").permitAll() // only exists in profile 'local'
                         .requestMatchers("/error").permitAll()
                         .anyRequest().authenticated())

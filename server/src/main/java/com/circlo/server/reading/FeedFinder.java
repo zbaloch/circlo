@@ -36,24 +36,24 @@ public class FeedFinder {
 
     public Found find(URI start) throws NoFeed {
         long started = System.nanoTime();
-        FeedHttp.Response page;
+        List<URI> candidates = new ArrayList<>();
+        URI origin = start;
         try {
-            page = http.get(start, null, null);
-        } catch (FeedHttp.Failed e) {
-            throw new NoFeed();
-        }
-        Found direct = read(page);
-        if (direct != null) {
-            return direct;
-        }
-        if (!looksLikeHtml(page)) {
-            throw new NoFeed();
-        }
-        List<URI> candidates = new ArrayList<>(FeedParser.feedLinks(page.body(), page.url()));
-        if (candidates.isEmpty()) {
-            for (String path : USUAL) {
-                candidates.add(page.url().resolve(path));
+            FeedHttp.Response page = http.get(start, null, null);
+            Found direct = read(page);
+            if (direct != null) {
+                return direct;
             }
+            if (!looksLikeHtml(page)) {
+                throw new NoFeed();
+            }
+            candidates.addAll(FeedParser.feedLinks(page.body(), page.url()));
+            origin = page.url();
+        } catch (FeedHttp.Failed e) {
+            // Some sites refuse automated visits to their pages (403) but serve their feed to anyone: try the usual places.
+        }
+        if (candidates.isEmpty()) {
+            candidates.addAll(usualPlaces(origin));
         }
         for (URI candidate : candidates) {
             if (System.nanoTime() - started > DEADLINE_NANOS) {
@@ -69,6 +69,18 @@ public class FeedFinder {
             }
         }
         throw new NoFeed();
+    }
+
+    /** /feed, /rss, ... in the page's own folder (a blog under /blog/), then at the site's root. */
+    static List<URI> usualPlaces(URI page) {
+        java.util.LinkedHashSet<URI> out = new java.util.LinkedHashSet<>();
+        for (String path : USUAL) {
+            out.add(page.resolve(path.substring(1)));
+        }
+        for (String path : USUAL) {
+            out.add(page.resolve(path));
+        }
+        return new ArrayList<>(out);
     }
 
     /** Reads a feed fetched before (refreshes and imports). */

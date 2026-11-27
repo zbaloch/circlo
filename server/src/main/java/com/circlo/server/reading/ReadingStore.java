@@ -13,6 +13,8 @@ import java.util.Optional;
 import java.util.UUID;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.json.JsonMapper;
 
 /**
  * Reading's feeds and articles. One row per feed, shared by everyone who follows it; articles older than
@@ -22,6 +24,8 @@ import org.springframework.stereotype.Component;
 public class ReadingStore {
 
     static final Duration KEEP = Duration.ofDays(60);
+    private static final JsonMapper JSON = JsonMapper.builder().build();
+    private static final TypeReference<List<java.util.Map<String, Object>>> BLOCKS = new TypeReference<>() {};
 
     private final JdbcTemplate jdbc;
 
@@ -77,7 +81,10 @@ public class ReadingStore {
         return sourceAt(feedUrl).orElseThrow();
     }
 
-    /** New articles of a feed (ones it has already are kept as they are). */
+    /**
+     * A feed's articles: new ones are added; ones it has already keep their id, time and read marks, and take the
+     * feed's latest title, summary, link and content (publishers fix typos).
+     */
     public void storeItems(UUID source, List<FeedParser.Item> items) {
         Instant now = Instant.now();
         Instant oldest = now.minus(KEEP);
@@ -85,11 +92,20 @@ public class ReadingStore {
             if (i.published().isBefore(oldest)) {
                 continue;
             }
+            String content = i.content().isEmpty() ? null : JSON.writeValueAsString(i.content());
             jdbc.update("""
-                    INSERT IGNORE INTO reading_articles (id, source_id, guid_hash, url, title, summary, author, published_at, created_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""", Ids.bytes(Ids.newId()), Ids.bytes(source), sha256(i.guid()), i.url(), i.title(),
-                    i.summary(), i.author(), Timestamp.from(i.published()), Timestamp.from(now));
+                    INSERT INTO reading_articles (id, source_id, guid_hash, url, title, summary, author, published_at, created_at, content, has_content)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ON DUPLICATE KEY UPDATE url = VALUE(url), title = VALUE(title), summary = VALUE(summary), author = VALUE(author),
+                      content = VALUE(content), has_content = VALUE(has_content)""", Ids.bytes(Ids.newId()), Ids.bytes(source),
+                    sha256(i.guid()), i.url(), i.title(), i.summary(), i.author(), Timestamp.from(i.published()), Timestamp.from(now), content,
+                    i.hasContent());
         }
+    }
+
+    /** An article's content blocks, as stored (image addresses are the publisher's). */
+    static List<java.util.Map<String, Object>> blocks(String json) {
+        return json == null ? List.of() : JSON.readValue(json, BLOCKS);
     }
 
     /** A check that worked: its title and site may have changed. */

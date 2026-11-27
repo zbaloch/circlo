@@ -1355,6 +1355,42 @@ paths:
                   articles: { type: array, items: { $ref: "#/components/schemas/ReadingArticle" } }
                   next: { type: [string, "null"] }
         "400": { $ref: "#/components/responses/Error" }
+  /v1/reading/articles/{articleId}:
+    get:
+      summary: >-
+        One article with its content as blocks, for reading in Circlo (when hasContent). Images are signed Circlo links
+        (relative paths; put the API address in front), so the publisher never sees the reader. 404 unless I follow its source
+      parameters:
+        - { name: articleId, in: path, required: true, schema: { $ref: "#/components/schemas/Id" } }
+      responses:
+        "200":
+          description: The article and its content
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [article, content]
+                properties:
+                  article: { $ref: "#/components/schemas/ReadingArticle" }
+                  content: { type: array, items: { $ref: "#/components/schemas/ContentBlock" } }
+        "404": { $ref: "#/components/responses/Error" }
+  /v1/reading/image:
+    get:
+      summary: >-
+        An article image, fetched by Circlo. Signed-out (an <img> can't send a token): the signed link from an article is
+        the permission. JPEG, PNG, GIF, WebP or AVIF only; 404 for anything else, a wrong or expired signature, or a failed fetch
+      security: []
+      parameters:
+        - { name: u, in: query, required: true, schema: { type: string } }
+        - { name: e, in: query, required: true, schema: { type: string } }
+        - { name: s, in: query, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: The image
+          content:
+            image/*:
+              schema: { type: string, format: binary }
+        "404": { $ref: "#/components/responses/Error" }
   /v1/reading/articles/{articleId}/read:
     put:
       summary: Mark an article read
@@ -1514,7 +1550,7 @@ components:
         unread: { type: integer }
     ReadingArticle:
       type: object
-      required: [articleId, sourceId, sourceTitle, title, summary, url, author, publishedAt, read]
+      required: [articleId, sourceId, sourceTitle, title, summary, url, author, publishedAt, read, hasContent]
       properties:
         articleId: { $ref: "#/components/schemas/Id" }
         sourceId: { $ref: "#/components/schemas/Id" }
@@ -1525,6 +1561,32 @@ components:
         author: { type: [string, "null"] }
         publishedAt: { type: string, format: date-time }
         read: { type: boolean }
+        hasContent: { type: boolean, description: "There's more to read in Circlo (GET /v1/reading/articles/{id}); otherwise it opens on its site" }
+    ContentRun:
+      type: object
+      required: [text]
+      properties:
+        text: { type: string }
+        b: { type: boolean, description: Bold }
+        i: { type: boolean, description: Italic }
+        code: { type: boolean }
+        href: { type: string, description: An http(s) link, without tracking parameters }
+    ContentBlock:
+      type: object
+      description: >-
+        One block of an article: p, h (heading) and quote have runs; list has ordered and items (each a list of runs);
+        code has text; img has src (a signed Circlo path), alt, and w and h when known; hr has nothing else
+      required: [type]
+      properties:
+        type: { type: string, enum: [p, h, quote, list, code, img, hr] }
+        runs: { type: array, items: { $ref: "#/components/schemas/ContentRun" } }
+        ordered: { type: boolean }
+        items: { type: array, items: { type: array, items: { $ref: "#/components/schemas/ContentRun" } } }
+        text: { type: string }
+        src: { type: string }
+        alt: { type: string }
+        w: { type: integer }
+        h: { type: integer }
     ObjectKey: { type: string, pattern: "^[0-9a-f]{64}$" }
     Me:
       type: object

@@ -139,6 +139,19 @@ class ReadingIT extends IntegrationTest {
     }
 
     @Test
+    void findsTheFeedOfASiteThatRefusesToShowItsPage() {
+        site.createContext("/guarded/home", ex -> {
+            ex.sendResponseHeaders(403, -1);
+            ex.close();
+        });
+        serve("/guarded/feed", rss("Guarded", base + "/guarded", item("g1", "Hello", base + "/guarded/1", "Hi", "Mon, 23 Nov 2026 10:00:00 GMT")),
+                "application/rss+xml");
+        TestUser a = user("read_guarded");
+        assertThat(a.call("POST", "/v1/reading/sources/find", Map.of("url", base + "/guarded/home")).getBody())
+                .containsEntry("feedUrl", base + "/guarded/feed").containsEntry("title", "Guarded");
+    }
+
+    @Test
     void saysWhenThereIsNoFeedOrTheAddressIsWrong() {
         serve("/plain", "<html><head><title>No feed</title></head><body>Nothing</body></html>", "text/html");
         TestUser a = user("read_nofeed");
@@ -334,6 +347,74 @@ class ReadingIT extends IntegrationTest {
         byte[] id = com.circlo.server.web.Ids.bytes(a.userId);
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM reading_follows WHERE user_id = ?", Integer.class, (Object) id)).isZero();
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM reading_read WHERE user_id = ?", Integer.class, (Object) id)).isZero();
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void articlesWithContentOpenInCircloAndTheirImagesComeThroughIt() throws Exception {
+        byte[] png = java.util.Base64.getDecoder().decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==");
+        site.createContext("/content/photo.png", ex -> {
+            hits.computeIfAbsent("/content/photo.png", k -> new AtomicInteger()).incrementAndGet();
+            ex.getResponseHeaders().set("Content-Type", "image/png");
+            ex.getResponseHeaders().set("Set-Cookie", "tracker=1");
+            ex.sendResponseHeaders(200, png.length);
+            ex.getResponseBody().write(png);
+            ex.close();
+        });
+        serve("/content/page.html", "<html><body>not an image</body></html>", "text/html");
+        String essay = "<p>I left <b>Germany</b> at 20 and never quite stopped leaving. " + "A year of travelling. ".repeat(20)
+                + "See <a href=\"/content/352?utm_source=rss\">a person of place</a>.</p>"
+                + "<p><img src=\"/content/photo.png\" alt=\"Photo\" width=\"800\" height=\"600\"></p>"
+                + "<img src=\"/content/page.html\" width=\"640\" height=\"480\">"
+                + "<img src=\"https://pixel.wp.com/g.gif\"><script>steal()</script>";
+        serve("/content/feed.xml", "<?xml version=\"1.0\"?><rss version=\"2.0\" xmlns:content=\"http://purl.org/rss/1.0/modules/content/\">"
+                + "<channel><title>Dense</title><link>" + base + "/content</link>"
+                + "<item><guid>c1</guid><title>DD416 / Adrift</title><link>" + base + "/content/416</link>"
+                + "<description>Issue 416: Adrift. Read the full issue in the archive.</description>"
+                + "<content:encoded><![CDATA[" + essay + "]]></content:encoded><pubDate>Mon, 23 Nov 2026 10:00:00 GMT</pubDate></item>"
+                + "<item><guid>c2</guid><title>Short</title><link>" + base + "/content/short</link>"
+                + "<description>Just a line.</description><pubDate>Sun, 22 Nov 2026 10:00:00 GMT</pubDate></item>"
+                + "</channel></rss>", "application/rss+xml");
+        TestUser a = user("read_content");
+        TestUser b = user("read_content_b");
+        follow(a, base + "/content/feed.xml");
+
+        List<Map<String, Object>> list = articles(a, "");
+        assertThat(list.get(0)).containsEntry("title", "DD416 / Adrift").containsEntry("hasContent", true)
+                .containsEntry("summary", "Issue 416: Adrift. Read the full issue in the archive.");
+        // A title and a line: nothing more to show in Circlo, so it opens on its site.
+        assertThat(list.get(1)).containsEntry("title", "Short").containsEntry("hasContent", false);
+
+        String id = (String) list.get(0).get("articleId");
+        Map<String, Object> detail = a.call("GET", "/v1/reading/articles/" + id, null).getBody();
+        assertThat((Map<String, Object>) detail.get("article")).containsEntry("articleId", id).containsEntry("url", base + "/content/416");
+        List<Map<String, Object>> content = (List<Map<String, Object>>) detail.get("content");
+        assertThat(content).extracting(x -> x.get("type")).containsExactly("p", "img", "img");
+        assertThat((List<Map<String, Object>>) content.get(0).get("runs")).anySatisfy(r -> assertThat(r)
+                .containsEntry("text", "a person of place").containsEntry("href", base + "/content/352"));
+        String src = (String) content.get(1).get("src");
+        assertThat(src).startsWith("/v1/reading/image?");
+        assertThat(content.get(1)).containsEntry("alt", "Photo").containsEntry("w", 800).containsEntry("h", 600);
+
+        // The image comes from Circlo, signed-out like an <img> tag; the publisher's cookie isn't passed on.
+        var image = http().get().uri(java.net.URI.create("http://localhost:" + port + src)).retrieve().toEntity(byte[].class);
+        assertThat(image.getStatusCode().value()).isEqualTo(200);
+        assertThat(image.getHeaders().getContentType()).hasToString("image/png");
+        assertThat(image.getHeaders().getFirst("Set-Cookie")).isNull();
+        assertThat(image.getHeaders().getFirst("X-Content-Type-Options")).isEqualTo("nosniff");
+        assertThat(image.getBody()).isEqualTo(png);
+        // Kept for a while: a second view doesn't go back to the publisher.
+        int fetched = hits.get("/content/photo.png").get();
+        http().get().uri(java.net.URI.create("http://localhost:" + port + src)).retrieve().toEntity(byte[].class);
+        assertThat(hits.get("/content/photo.png").get()).isEqualTo(fetched);
+
+        // Something that isn't an image isn't served, and a link that wasn't signed by Circlo opens nothing.
+        String notImage = (String) content.get(2).get("src");
+        assertThat(call("GET", notImage.replace("/v1", "/v1"), null, null).getStatusCode().value()).isEqualTo(404);
+        assertThat(call("GET", src.replaceAll("s=[^&]+", "s=AAAAAAAAAAAAAAAAAAAAAA"), null, null).getStatusCode().value()).isEqualTo(404);
+
+        // Only people who follow the source can open the article.
+        assertThat(b.call("GET", "/v1/reading/articles/" + id, null).getStatusCode().value()).isEqualTo(404);
     }
 
     @Test

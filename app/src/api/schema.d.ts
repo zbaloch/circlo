@@ -3380,6 +3380,89 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/reading/articles/{articleId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One article with its content as blocks, for reading in Circlo (when hasContent). Images are signed Circlo links (relative paths; put the API address in front), so the publisher never sees the reader. 404 unless I follow its source */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    articleId: components["schemas"]["Id"];
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The article and its content */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            article: components["schemas"]["ReadingArticle"];
+                            content: components["schemas"]["ContentBlock"][];
+                        };
+                    };
+                };
+                404: components["responses"]["Error"];
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/reading/image": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** An article image, fetched by Circlo. Signed-out (an <img> can't send a token): the signed link from an article is the permission. JPEG, PNG, GIF, WebP or AVIF only; 404 for anything else, a wrong or expired signature, or a failed fetch */
+        get: {
+            parameters: {
+                query: {
+                    u: string;
+                    e: string;
+                    s: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The image */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "image/*": string;
+                    };
+                };
+                404: components["responses"]["Error"];
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/reading/articles/{articleId}/read": {
         parameters: {
             query?: never;
@@ -3679,6 +3762,31 @@ export interface components {
             /** Format: date-time */
             publishedAt: string;
             read: boolean;
+            /** @description There's more to read in Circlo (GET /v1/reading/articles/{id}); otherwise it opens on its site */
+            hasContent: boolean;
+        };
+        ContentRun: {
+            text: string;
+            /** @description Bold */
+            b?: boolean;
+            /** @description Italic */
+            i?: boolean;
+            code?: boolean;
+            /** @description An http(s) link */
+            href?: string;
+        };
+        /** @description One block of an article: p, h (heading) and quote have runs; list has ordered and items (each a list of runs); code has text; img has src (a signed Circlo path), alt, and w and h when known; hr has nothing else */
+        ContentBlock: {
+            /** @enum {string} */
+            type: "p" | "h" | "quote" | "list" | "code" | "img" | "hr";
+            runs?: components["schemas"]["ContentRun"][];
+            ordered?: boolean;
+            items?: components["schemas"]["ContentRun"][][];
+            text?: string;
+            src?: string;
+            alt?: string;
+            w?: number;
+            h?: number;
         };
         ObjectKey: string;
         Me: {

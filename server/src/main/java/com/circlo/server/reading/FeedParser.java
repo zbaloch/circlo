@@ -44,8 +44,18 @@ public final class FeedParser {
     /** A feed. {@code siteUrl} is the site it belongs to, if it says. */
     public record Feed(String title, String siteUrl, List<Item> items) {}
 
-    /** One article: {@code guid} identifies it within its feed. */
-    public record Item(String guid, String url, String title, String summary, String author, Instant published) {}
+    /**
+     * One article: {@code guid} identifies it within its feed. {@code content} is its full text as blocks (FeedContent);
+     * {@code hasContent} says whether that's worth opening in Circlo, rather than a title and a line.
+     */
+    public record Item(String guid, String url, String title, String summary, String author, Instant published,
+            List<java.util.Map<String, Object>> content, boolean hasContent) {
+
+        /** Without content (tests and callers that only need the headline). */
+        public Item(String guid, String url, String title, String summary, String author, Instant published) {
+            this(guid, url, title, summary, author, published, List.of(), false);
+        }
+    }
 
     /** Not a feed Circlo can read (HTML, broken XML, a doctype). */
     public static final class NotAFeed extends Exception {
@@ -109,13 +119,13 @@ public final class FeedParser {
             return null;
         }
         url = cleanLink(url);
-        String body = e.getDescription() != null ? e.getDescription().getValue() : null;
-        if ((body == null || body.isBlank()) && !e.getContents().isEmpty()) {
-            body = ((SyndContent) e.getContents().get(0)).getValue();
-        }
-        if (body == null || body.isBlank()) {
-            body = mediaDescription(e);
-        }
+        String description = e.getDescription() != null ? e.getDescription().getValue() : null;
+        String full = e.getContents().isEmpty() ? null : ((SyndContent) e.getContents().get(0)).getValue();
+        String media = mediaDescription(e);
+        // The summary is the description; the content is the fullest text the feed carries (content:encoded, Atom
+        // content), else the description, else YouTube's media:description.
+        String body = !blank(description) ? description : !blank(full) ? full : media;
+        String fullest = !blank(full) ? full : !blank(description) ? description : media;
         String summary = cut(text(body), SUMMARY_MAX);
         String title = cut(text(e.getTitle()), TITLE_MAX);
         if (title.isEmpty()) {
@@ -127,7 +137,14 @@ public final class FeedParser {
         String guid = e.getUri() != null && !e.getUri().isBlank() ? e.getUri().strip() : url;
         Date date = e.getPublishedDate() != null ? e.getPublishedDate() : e.getUpdatedDate();
         Instant published = date == null || date.toInstant().isAfter(now) ? now : date.toInstant();
-        return new Item(guid, url, title, summary, author(e.getAuthor()), published);
+        FeedContent.Result content = FeedContent.convert(fullest, URI.create(url));
+        // Worth opening in Circlo when it says clearly more than the summary, or has pictures.
+        boolean hasContent = !content.blocks().isEmpty() && (content.textLength() > summary.length() + 150 || content.images() > 0);
+        return new Item(guid, url, title, summary, author(e.getAuthor()), published, content.blocks(), hasContent);
+    }
+
+    private static boolean blank(String s) {
+        return s == null || s.isBlank();
     }
 
     /** YouTube (and other Media RSS feeds) put the description in media:group/media:description. */
@@ -179,6 +196,10 @@ public final class FeedParser {
     }
 
     /** An absolute http(s) address, or null. */
+    static String absoluteUrl(URI base, String link) {
+        return absolute(base, link);
+    }
+
     private static String absolute(URI base, String link) {
         if (link == null || link.isBlank()) {
             return null;

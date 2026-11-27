@@ -51,9 +51,16 @@ code and the API it's `reading`, because `/v1/feed` and `feed-store` are the Hom
   Manage sources). Add a source
   takes a plain site address and shows the feed's name and latest articles before Follow. Manage sources lists each
   source with "Updated 2h ago" or "Couldn't update since Monday", Unfollow, and OPML import/export.
-- **Not in 2.0**: a reader view inside Circlo (Readability4J could add "Read here" later without schema changes),
-  thumbnails (would need proxying through Circlo so publishers don't see readers), email-only newsletters, a podcast
-  player, sharing an article as a post.
+- **Reading in Circlo** (owner decision 2026-11-27): the server also keeps each item's fullest text (content:encoded,
+  Atom content, else the description) as simple blocks (`FeedContent`: paragraphs with bold/italic/code/links,
+  headings, lists, quotes, code, images, rules; scripts, frames, forms and tracking pixels dropped). An article with
+  clearly more than its summary, or pictures, opens on its own screen (`/feeds/<id>`) drawn with Circlo's text
+  styles, then "Read on <site> ↗" (or "Watch on YouTube"); a headline-only one opens on its site as before.
+  **Images go through Circlo** (owner: keep the no-tracking promise): signed, expiring links
+  (`/v1/reading/image`, key derived from CIRCLO_JWT_KEY), JPEG/PNG/GIF/WebP/AVIF only, cached an hour on the server
+  and a day on the phone, so publishers never see readers.
+- **Not in 2.0**: Readability-style extraction of pages whose feed has only a summary, thumbnails in the list,
+  email-only newsletters, a podcast player, sharing an article as a post.
 
 ### Todos, Logged
 

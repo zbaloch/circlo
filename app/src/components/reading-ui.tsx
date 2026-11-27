@@ -36,7 +36,7 @@ export function ArticleRow({ article, now, onOpen, onMore }: { article: Article;
     <Pressable
       accessibilityRole="link"
       accessibilityLabel={`${article.title}, ${article.sourceTitle}, ${time}${article.read ? '' : ', unread'}`}
-      accessibilityHint="Opens the article on its own site"
+      accessibilityHint={article.hasContent ? 'Opens the article' : 'Opens the article on its own site'}
       onPress={onOpen}
       onLongPress={onMore}
       className="flex-row gap-3 border-b border-border px-4 py-3 active:bg-surface-raised dark:border-border-dark dark:active:bg-surface-raised-dark">
