@@ -295,14 +295,36 @@ class ReadingIT extends IntegrationTest {
     }
 
     @Test
-    void oldArticlesAndUnfollowedFeedsAreLetGo() {
+    void quietBlogsKeepTheirPostsAndBusyFeedsLetOldOnesGo() {
+        // A blog that last posted months ago: everything its feed carries shows straight away.
+        serve("/quiet/feed.xml", rss("Quiet", base + "/quiet",
+                item("q1", "Spring post", base + "/quiet/1", "One", "Fri, 20 Mar 2026 10:00:00 GMT"),
+                item("q2", "Summer post", base + "/quiet/2", "Two", "Fri, 28 Aug 2026 10:00:00 GMT")), "application/rss+xml");
+        TestUser q = user("read_quiet");
+        follow(q, base + "/quiet/feed.xml");
+        assertThat(titles(articles(q, ""))).containsExactly("Summer post", "Spring post");
+        refresher.sweep(Instant.now());
+        assertThat(titles(articles(q, ""))).containsExactly("Summer post", "Spring post");
+
+        // A busy one: articles older than 60 days go once the source has 100 newer ones.
         String feed = blog("old");
         TestUser a = user("read_old");
         String source = follow(a, feed);
         jdbc.update("UPDATE reading_articles SET published_at = ? WHERE title = 'First & oldest'",
                 Timestamp.from(Instant.now().minus(Duration.ofDays(61))));
         refresher.sweep(Instant.now());
-        assertThat(titles(articles(a, ""))).containsExactly("Third", "Second");
+        assertThat(titles(articles(a, ""))).contains("First & oldest");
+        byte[] sourceId = com.circlo.server.web.Ids.bytes(java.util.UUID.fromString(source));
+        Timestamp recent = Timestamp.from(Instant.now().minus(Duration.ofDays(1)));
+        jdbc.batchUpdate("INSERT INTO reading_articles (id, source_id, guid_hash, url, title, summary, published_at, created_at) VALUES (?, ?, ?, ?, ?, '', ?, ?)",
+                java.util.stream.IntStream.range(0, com.circlo.server.reading.ReadingStore.KEEP_NEWEST).mapToObj(n -> new Object[] {
+                        com.circlo.server.web.Ids.bytes(java.util.UUID.randomUUID()), sourceId, java.util.UUID.randomUUID().toString().replace("-", "").getBytes(StandardCharsets.US_ASCII),
+                        base + "/old/n" + n, "Busy " + n, recent, recent}).toList());
+        refresher.sweep(Instant.now());
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM reading_articles WHERE source_id = ?", Integer.class, (Object) sourceId))
+                .isEqualTo(com.circlo.server.reading.ReadingStore.KEEP_NEWEST + 2);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM reading_articles WHERE title = 'First & oldest' AND source_id = ?", Integer.class,
+                (Object) sourceId)).isZero();
 
         a.call("DELETE", "/v1/reading/sources/" + source, null);
         refresher.sweep(Instant.now().plus(Duration.ofDays(2)));

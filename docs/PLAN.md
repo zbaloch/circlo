@@ -43,7 +43,7 @@ code and the API it's `reading`, because `/v1/feed` and `feed-store` are the Hom
   names. Each feed is fetched once for everyone who follows it, every 30 minutes, with conditional requests; failing
   feeds back off to 12 hours and say so quietly. Links lose tracking parameters. Only public http(s) addresses are
   fetched, re-checked on every redirect (`UrlGuard`); up to 25 MB, as podcast feeds carry their archive. YouTube
-  video descriptions come from Media RSS. Articles are kept 60 days; feeds nobody follows are dropped.
+  video descriptions come from Media RSS. Everything a feed carries is kept (publishers cap their feeds; Circlo reads at most 100 items), so quiet blogs show their posts; articles older than 60 days go only beyond each source's newest 100. Feeds nobody follows are dropped.
   What someone follows is returned only to them, is in their data export and goes with their account.
   **Logos** (`SourceIcons`, V36): a source's tile shows the feed's own logo (Atom icon or logo, RSS image, iTunes
   cover), else the one its site names (apple-touch-icon, the largest icon, never SVG; a YouTube channel's picture),

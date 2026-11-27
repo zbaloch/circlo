@@ -136,9 +136,17 @@ public class ReadingRefresher {
         }
     }
 
-    /** Lets go of articles older than 60 days and of feeds nobody has followed for a day. */
+    /**
+     * Lets go of articles older than 60 days beyond each source's newest 100 (so busy feeds don't pile up and quiet
+     * blogs keep their posts), and of feeds nobody has followed for a day.
+     */
     public void sweep(Instant now) {
-        jdbc.update("DELETE FROM reading_articles WHERE published_at < ?", Timestamp.from(now.minus(ReadingStore.KEEP)));
+        jdbc.update("""
+                DELETE FROM reading_articles WHERE id IN (
+                  SELECT id FROM (
+                    SELECT id, published_at, ROW_NUMBER() OVER (PARTITION BY source_id ORDER BY published_at DESC, id DESC) AS n
+                    FROM reading_articles) ranked
+                  WHERE ranked.n > ? AND ranked.published_at < ?)""", ReadingStore.KEEP_NEWEST, Timestamp.from(now.minus(ReadingStore.KEEP)));
         jdbc.update("""
                 DELETE FROM reading_sources WHERE created_at < ? AND NOT EXISTS (SELECT 1 FROM reading_follows f WHERE f.source_id = reading_sources.id)""",
                 Timestamp.from(now.minus(Duration.ofDays(1))));

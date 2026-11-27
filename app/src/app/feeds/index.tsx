@@ -220,7 +220,7 @@ export default function ReadingScreen() {
     filter.kind === 'unread'
       ? { title: 'You’re all caught up', body: 'New articles from your sources will show here.' }
       : filter.kind === 'source'
-        ? { title: 'Nothing new here', body: `Nothing from ${source?.title ?? 'this source'} in the last 60 days.` }
+        ? { title: 'Nothing here yet', body: `${source?.title ?? 'This source'}’s feed is empty for now. Circlo checks it every half hour.` }
         : { title: 'Nothing yet', body: 'New articles from your sources will show here. Circlo checks them every half hour.' };
 
   return (

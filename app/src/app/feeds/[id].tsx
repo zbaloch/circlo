@@ -88,7 +88,7 @@ export default function ArticleScreen() {
   if (missing) {
     return (
       <View className="flex-1 bg-surface dark:bg-surface-dark">
-        <EmptyState icon="rss-outline" title="Not here any more" body="This article is no longer in your feeds. Articles are kept for 60 days." />
+        <EmptyState icon="rss-outline" title="Not here any more" body="This article is no longer in your feeds. Older articles are let go after a while." />
       </View>
     );
   }

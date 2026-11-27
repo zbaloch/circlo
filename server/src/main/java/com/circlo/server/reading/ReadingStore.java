@@ -17,13 +17,15 @@ import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * Reading's feeds and articles. One row per feed, shared by everyone who follows it; articles older than
- * {@link #KEEP} are let go and never stored again.
+ * Reading's feeds and articles. One row per feed, shared by everyone who follows it. Everything a feed carries is kept
+ * (publishers cap their feeds, and Circlo reads at most 100 items), so a blog that posts twice a year still shows its
+ * posts. Articles older than {@link #KEEP} go only beyond each source's newest {@link #KEEP_NEWEST} (ReadingRefresher.sweep).
  */
 @Component
 public class ReadingStore {
 
     static final Duration KEEP = Duration.ofDays(60);
+    public static final int KEEP_NEWEST = 100;
     private static final JsonMapper JSON = JsonMapper.builder().build();
     private static final TypeReference<List<java.util.Map<String, Object>>> BLOCKS = new TypeReference<>() {};
 
@@ -93,11 +95,7 @@ public class ReadingStore {
      */
     public void storeItems(UUID source, List<FeedParser.Item> items) {
         Instant now = Instant.now();
-        Instant oldest = now.minus(KEEP);
         for (FeedParser.Item i : items) {
-            if (i.published().isBefore(oldest)) {
-                continue;
-            }
             String content = i.content().isEmpty() ? null : JSON.writeValueAsString(i.content());
             jdbc.update("""
                     INSERT INTO reading_articles (id, source_id, guid_hash, url, title, summary, author, published_at, created_at, content, has_content)
