@@ -83,9 +83,36 @@ code and the API it's `reading`, because `/v1/feed` and `feed-store` are the Hom
 - **Not in 2.0**: Readability-style extraction of pages whose feed has only a summary, thumbnails in the list,
   email-only newsletters, a podcast player, sharing an article as a post.
 
-### Todos, Logged
+### Todos (owner decision 2026-11-27)
 
-To be planned before each is built (Todos: Basecamp-style to-do lists; Logged: name and scope still open).
+**Personal only**: nobody else ever sees my to-dos (no sharing, assigning or circles). Things' calm design (no badges,
+counts or dots; a satisfying tick) with Todoist's quick add for dates.
+
+- **Lists.** Every to-do is in a list. **General** is the first list, made for me, can be renamed but not deleted, and
+  is where quick add puts things by default. Lists can be added, renamed, reordered and deleted (with their to-dos).
+- **Quick add** at the bottom: "Call mum tomorrow", "Pay rent every month", "Dentist next Fri", "Taxes in 2 weeks",
+  "Dec 5". The date (and repeat) is read from the words as I type and shown as a chip under the field, which I can tap
+  away to keep the words as they are. Adding in Today with no date makes it due today; adding in a list puts it there.
+- **A to-do**: its title, **notes** (plain text, links tappable), a due **date** (no times), a **repeat** (daily,
+  weekly or monthly, from its date), and its list. Tapping one opens it to edit; dates can be typed in the same words
+  or picked from Today / Tomorrow / Next week / No date.
+- **Views instead of a filter menu.** A picker at the top, like Feeds': **Today** (overdue first, in soft red, then
+  today's), **Upcoming** (grouped by day: Tomorrow, Friday, Next week...), **No date**, then each list. Within a list
+  the order is mine (drag to reorder); Today and Upcoming sort by date themselves, so there's no sort button.
+- **Ticking**: a check, a light haptic, and a moment later it slides away (tapping again in that moment undoes it).
+  A repeating to-do then comes back with its next date (moved past today if it was overdue). Each list has a folded
+  **Completed** section, to find and untick things; completed to-dos are let go after 30 days.
+- **Not in the first version** (on purpose): times and reminder notifications, subtasks, priorities, tags, search,
+  widgets.
+- **Server** (`todos` package, V40): `todo_lists`, `todos` (title, notes, due_date as a calendar date, repeat_rule,
+  position, completed_at). Every read and write is the owner's own; anything else is 404. The app sends its own
+  "today" when completing, so repeats follow the phone's calendar and the server needs no time zone. Limits: 100
+  lists, 5,000 open to-dos. In the data export; deleted with the account. Nothing is logged.
+- **App**: "Todos" in the drawer, after Feeds (no dot). `/todos` (picker + list + quick add) and `/todos/[id]` (edit).
+
+### Logged
+
+To be planned before it's built (name and scope still open).
 
 ---
 

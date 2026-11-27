@@ -118,6 +118,8 @@ function Navigator() {
         <Stack.Screen name="feeds/add" options={page('Add a source')} />
         <Stack.Screen name="feeds/sources" options={page('Sources')} />
         <Stack.Screen name="feeds/[id]" options={page('Feeds')} />
+        <Stack.Screen name="todos/index" options={page('Todos')} />
+        <Stack.Screen name="todos/[id]" options={page('To-do')} />
       </Stack.Protected>
     </Stack>
   );

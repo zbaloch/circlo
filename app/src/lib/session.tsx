@@ -13,6 +13,7 @@ import { clearMediaCache } from './media';
 import { clearMessaging } from './messaging';
 import { clearOutbox } from './outbox';
 import { stopPodcast } from './podcast-player';
+import { clearTodos } from './todos-store';
 import { forgetSignIns } from './security-events';
 import { forgetConnections } from './use-connections';
 import { digestHourUtc } from './time';
@@ -41,6 +42,7 @@ async function wipeDevice() {
   clearMessaging();
   // A playing episode stops, and where I stopped in each one is forgotten.
   await stopPodcast().catch(() => undefined);
+  clearTodos();
   await stopBackgroundChecks();
   if (current) {
     await forgetConnections(current.userId).catch(() => {});
