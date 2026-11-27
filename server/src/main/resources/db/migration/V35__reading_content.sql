@@ -4,5 +4,5 @@
 ALTER TABLE reading_articles ADD COLUMN content MEDIUMTEXT NULL;
 ALTER TABLE reading_articles ADD COLUMN has_content BOOLEAN NOT NULL DEFAULT FALSE;
 
--- Fetch every feed again in full on its next check, so articles already kept get their content.
-UPDATE reading_sources SET etag = NULL, modified = NULL;
+-- Fetch every feed again in full straight away, so articles already kept get their content.
+UPDATE reading_sources SET etag = NULL, modified = NULL, next_check_at = NOW(6);
