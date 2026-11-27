@@ -77,6 +77,9 @@ public final class FeedParser {
     private FeedParser() {}
 
     public static Feed parse(byte[] body, URI base, Instant now) throws NotAFeed {
+        if (JsonFeed.looksLikeJson(body)) {
+            return JsonFeed.parse(body, base, now);
+        }
         SyndFeed feed;
         boolean big = body.length > BIG;
         try {
@@ -141,11 +144,6 @@ public final class FeedParser {
             link = e.getLinks().stream().filter(l -> l.getRel() == null || "alternate".equals(l.getRel())).map(SyndLink::getHref)
                     .findFirst().orElse(null);
         }
-        String url = absolute(base, link);
-        if (url == null) {
-            return null;
-        }
-        url = cleanLink(url);
         String description = e.getDescription() != null ? e.getDescription().getValue() : null;
         String full = e.getContents().isEmpty() ? null : ((SyndContent) e.getContents().get(0)).getValue();
         String media = mediaDescription(e);
@@ -153,23 +151,36 @@ public final class FeedParser {
         // content), else the description, else YouTube's media:description.
         String body = !blank(description) ? description : !blank(full) ? full : media;
         String fullest = !blank(full) ? full : !blank(description) ? description : media;
-        String summary = cut(text(body), SUMMARY_MAX);
-        String title = cut(text(e.getTitle()), TITLE_MAX);
-        if (title.isEmpty()) {
-            title = cut(summary, 100);
-        }
-        if (title.isEmpty()) {
+        Date date = e.getPublishedDate() != null ? e.getPublishedDate() : e.getUpdatedDate();
+        return item(e.getUri(), absolute(base, link), e.getTitle(), body, fullest, author(e.getAuthor()), date == null ? null : date.toInstant(),
+                audio(e, base), itemImage(e, base), now);
+    }
+
+    /**
+     * One item, whatever the format (RSS, Atom, JSON Feed): {@code url} is absolute (or null: left out); {@code title},
+     * {@code summary} and {@code content} are HTML as the feed has them. Null when it has no link or nothing to call it.
+     */
+    static Item item(String id, String url, String title, String summary, String content, String author, Instant date, Audio audio,
+            String image, Instant now) {
+        if (url == null) {
             return null;
         }
-        String guid = e.getUri() != null && !e.getUri().isBlank() ? e.getUri().strip() : url;
-        Date date = e.getPublishedDate() != null ? e.getPublishedDate() : e.getUpdatedDate();
-        Instant published = date == null || date.toInstant().isAfter(now) ? now : date.toInstant();
-        FeedContent.Result content = FeedContent.convert(fullest, URI.create(url));
-        Audio audio = audio(e, base);
+        url = cleanLink(url);
+        String plain = cut(text(summary), SUMMARY_MAX);
+        String name = cut(text(title), TITLE_MAX);
+        if (name.isEmpty()) {
+            name = cut(plain, 100);
+        }
+        if (name.isEmpty()) {
+            return null;
+        }
+        String guid = id != null && !id.isBlank() ? id.strip() : url;
+        Instant published = date == null || date.isAfter(now) ? now : date;
+        FeedContent.Result blocks = FeedContent.convert(content, URI.create(url));
         // Worth opening in Circlo when it says clearly more than the summary, or has pictures, or can be played.
         boolean hasContent = audio != null
-                || !content.blocks().isEmpty() && (content.textLength() > summary.length() + 150 || content.images() > 0);
-        return new Item(guid, url, title, summary, author(e.getAuthor()), published, content.blocks(), hasContent, audio, itemImage(e, base));
+                || !blocks.blocks().isEmpty() && (blocks.textLength() > plain.length() + 150 || blocks.images() > 0);
+        return new Item(guid, url, name, plain, author, published, blocks.blocks(), hasContent, audio, image);
     }
 
     /** The first enclosure that's audio (by its type, or by its file name when the feed gives no type). Video is left out. */
@@ -179,11 +190,20 @@ public final class FeedParser {
             if (url == null) {
                 continue;
             }
-            String type = enc.getType() == null ? "" : enc.getType().strip().toLowerCase(Locale.ROOT);
-            String path = URI.create(url).getPath();
-            if (type.startsWith("audio/") || type.isEmpty() && path != null && AUDIO_FILE.matcher(path).matches()) {
-                return new Audio(url, type.isEmpty() || type.length() > 100 ? null : type, duration(e));
+            Audio audio = audio(url, enc.getType(), duration(e));
+            if (audio != null) {
+                return audio;
             }
+        }
+        return null;
+    }
+
+    /** An attachment as audio, if it is (by its type, or by its file name when there's no type); video is left out. */
+    static Audio audio(String url, String rawType, Integer seconds) {
+        String type = rawType == null ? "" : rawType.strip().toLowerCase(Locale.ROOT);
+        String path = URI.create(url).getPath();
+        if (type.startsWith("audio/") || type.isEmpty() && path != null && AUDIO_FILE.matcher(path).matches()) {
+            return new Audio(url, type.isEmpty() || type.length() > 100 ? null : type, seconds);
         }
         return null;
     }
@@ -306,6 +326,11 @@ public final class FeedParser {
         return doc.text().replace(' ', ' ').replaceAll("\\s+", " ").strip();
     }
 
+    /** Plain text made safe to treat as HTML (JSON Feed's titles and summaries are plain text): "<" stays "<". */
+    static String escape(String plain) {
+        return plain == null ? "" : org.jsoup.nodes.Entities.escape(plain);
+    }
+
     /** At most {@code max} characters, cut at a word with "…". */
     static String cut(String s, int max) {
         if (s.length() <= max) {
@@ -358,12 +383,12 @@ public final class FeedParser {
         return rest.substring(0, q) + (kept.isEmpty() ? "" : "?" + String.join("&", kept)) + fragment;
     }
 
-    /** The feeds a web page names in its head (RSS and Atom), as absolute addresses. */
+    /** The feeds a web page names in its head (RSS, Atom and JSON Feed), as absolute addresses. */
     public static List<URI> feedLinks(byte[] html, URI page) {
         try {
             Document doc = Jsoup.parse(new ByteArrayInputStream(html), null, page.toString());
             List<URI> out = new ArrayList<>();
-            for (Element l : doc.select("link[rel~=(?i)\\balternate\\b][type~=(?i)^application/(rss|atom)\\+xml$][href]")) {
+            for (Element l : doc.select("link[rel~=(?i)\\balternate\\b][type~=(?i)^application/((rss|atom)\\+xml|feed\\+json|json)$][href]")) {
                 String abs = absolute(page, l.attr("href"));
                 if (abs != null && out.size() < 3) {
                     URI u = URI.create(abs);

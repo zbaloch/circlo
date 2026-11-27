@@ -56,6 +56,9 @@ code and the API it's `reading`, because `/v1/feed` and `feed-store` are the Hom
   Manage sources). Add a source
   takes a plain site address and shows the feed's name and latest articles before Follow. Manage sources lists each
   source with "Updated 2h ago" or "Couldn't update since Monday", Unfollow, and OPML import/export.
+- **JSON Feed** (owner decision 2026-11-27): feeds in JSON Feed 1 and 1.1 (jsonfeed.org; micro.blog, some blogs) read
+  into the same items as RSS and Atom (`JsonFeed`, sharing `FeedParser.item`): HTML or plain-text content, summary,
+  authors, dates, image, and an audio attachment as a podcast episode. Pages naming `application/feed+json` are found.
 - **YouTube videos show their thumbnail** (owner decision 2026-11-27): items keep their own picture (itunes:image,
   else the largest Media RSS thumbnail, else a media:content image; V39), sent as `image` through the image proxy. A
   YouTube video's row shows it 16:9 with a play mark, as does its screen (tapping opens YouTube). Videos still open

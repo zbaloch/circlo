@@ -561,6 +561,32 @@ class ReadingIT extends IntegrationTest {
     }
 
     @Test
+    void sitesWithOnlyAJsonFeedCanBeFollowed() {
+        serve("/micro", "<html><head><link rel=\"alternate\" type=\"application/feed+json\" href=\"/micro/feed.json\"></head></html>",
+                "text/html; charset=utf-8");
+        serve("/micro/feed.json", """
+                {"version": "https://jsonfeed.org/version/1.1", "title": "Micro", "home_page_url": "%1$s/micro",
+                 "items": [{"id": "m1", "url": "%1$s/micro/1", "content_text": "Just a short note.", "date_published": "2026-11-26T09:00:00Z"},
+                           {"id": "m2", "url": "%1$s/micro/2", "title": "A post", "content_html": "<p>Hello</p>", "date_published": "2026-11-25T09:00:00Z"}]}
+                """.formatted(base), "application/feed+json");
+        TestUser a = user("read_json");
+
+        Map<String, Object> found = a.call("POST", "/v1/reading/sources/find", Map.of("url", base + "/micro")).getBody();
+        assertThat(found).containsEntry("feedUrl", base + "/micro/feed.json").containsEntry("title", "Micro");
+        follow(a, base + "/micro");
+        assertThat(titles(articles(a, ""))).containsExactly("Just a short note.", "A post");
+
+        // Checked like any other feed: a new item arrives on the next check.
+        serve("/micro/feed.json", """
+                {"version": "https://jsonfeed.org/version/1.1", "title": "Micro",
+                 "items": [{"id": "m3", "url": "%1$s/micro/3", "title": "Newer", "date_published": "2026-11-27T09:00:00Z"}]}
+                """.formatted(base), "application/feed+json");
+        jdbc.update("UPDATE reading_sources SET next_check_at = ? WHERE feed_url = ?", Timestamp.from(Instant.now()), base + "/micro/feed.json");
+        refresher.refreshDue(Instant.now());
+        assertThat(titles(articles(a, ""))).containsExactly("Newer", "Just a short note.", "A post");
+    }
+
+    @Test
     void needsASession() {
         assertThat(call("GET", "/v1/reading/sources", null, null).getStatusCode().value()).isEqualTo(401);
         assertThat(call("POST", "/v1/reading/sources/find", Map.of("url", base), null).getStatusCode().value()).isEqualTo(401);
