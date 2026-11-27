@@ -1455,6 +1455,138 @@ paths:
             text/x-opml:
               schema: { type: string }
 
+  /v1/todos:
+    get:
+      summary: My to-do lists (in my order; General is made on first use) and my open to-dos (by list, then my order)
+      responses:
+        "200":
+          description: Lists and open to-dos
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [lists, todos]
+                properties:
+                  lists: { type: array, items: { $ref: "#/components/schemas/TodoList" } }
+                  todos: { type: array, items: { $ref: "#/components/schemas/Todo" } }
+    post:
+      summary: Add a to-do (to General when listId is left out), at the end of its list. Errors invalid_title, invalid_date, repeat_needs_date (400), too_many_todos (409, 5,000 open)
+      requestBody: { $ref: "#/components/requestBodies/TodoBody" }
+      responses:
+        "201": { description: Added, content: { application/json: { schema: { $ref: "#/components/schemas/Todo" } } } }
+        "400": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+        "409": { $ref: "#/components/responses/Error" }
+  /v1/todos/{todoId}:
+    put:
+      summary: Replace a to-do's title, notes, date, repeat and list (what's left out is cleared; a new list puts it at that list's end)
+      parameters:
+        - { name: todoId, in: path, required: true, schema: { $ref: "#/components/schemas/Id" } }
+      requestBody: { $ref: "#/components/requestBodies/TodoBody" }
+      responses:
+        "200": { description: Saved, content: { application/json: { schema: { $ref: "#/components/schemas/Todo" } } } }
+        "400": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+    delete:
+      summary: Delete a to-do
+      parameters:
+        - { name: todoId, in: path, required: true, schema: { $ref: "#/components/schemas/Id" } }
+      responses:
+        "204": { description: Deleted }
+        "404": { $ref: "#/components/responses/Error" }
+  /v1/todos/{todoId}/complete:
+    post:
+      summary: >-
+        Tick a to-do. A repeating one becomes a one-off in Completed and its next one (the next date after `today`, the
+        phone's date) is returned as `next`
+      parameters:
+        - { name: todoId, in: path, required: true, schema: { $ref: "#/components/schemas/Id" } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [today], properties: { today: { type: string, format: date } } }
+      responses:
+        "200":
+          description: Ticked
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [completed, next]
+                properties:
+                  completed: { $ref: "#/components/schemas/Todo" }
+                  next: { oneOf: [{ type: "null" }, { $ref: "#/components/schemas/Todo" }] }
+        "404": { $ref: "#/components/responses/Error" }
+  /v1/todos/{todoId}/reopen:
+    post:
+      summary: Untick a to-do (back to the end of its list)
+      parameters:
+        - { name: todoId, in: path, required: true, schema: { $ref: "#/components/schemas/Id" } }
+      responses:
+        "200": { description: Open again, content: { application/json: { schema: { $ref: "#/components/schemas/Todo" } } } }
+        "404": { $ref: "#/components/responses/Error" }
+  /v1/todos/lists:
+    post:
+      summary: Add a list (at the end). Errors invalid_name (400), too_many_lists (409, 100)
+      requestBody: { $ref: "#/components/requestBodies/ListName" }
+      responses:
+        "201": { description: Added, content: { application/json: { schema: { $ref: "#/components/schemas/TodoList" } } } }
+        "400": { $ref: "#/components/responses/Error" }
+        "409": { $ref: "#/components/responses/Error" }
+  /v1/todos/lists/order:
+    put:
+      summary: My lists in this order
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [listIds], properties: { listIds: { type: array, items: { $ref: "#/components/schemas/Id" } } } }
+      responses:
+        "204": { description: Ordered }
+  /v1/todos/lists/{listId}:
+    put:
+      summary: Rename a list (General too)
+      parameters:
+        - { name: listId, in: path, required: true, schema: { $ref: "#/components/schemas/Id" } }
+      requestBody: { $ref: "#/components/requestBodies/ListName" }
+      responses:
+        "200": { description: Renamed, content: { application/json: { schema: { $ref: "#/components/schemas/TodoList" } } } }
+        "400": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+    delete:
+      summary: Delete a list and its to-dos. General can't be deleted (409 general_list)
+      parameters:
+        - { name: listId, in: path, required: true, schema: { $ref: "#/components/schemas/Id" } }
+      responses:
+        "204": { description: Deleted }
+        "404": { $ref: "#/components/responses/Error" }
+        "409": { $ref: "#/components/responses/Error" }
+  /v1/todos/lists/{listId}/order:
+    put:
+      summary: The open to-dos in a list, in this order
+      parameters:
+        - { name: listId, in: path, required: true, schema: { $ref: "#/components/schemas/Id" } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [todoIds], properties: { todoIds: { type: array, items: { $ref: "#/components/schemas/Id" } } } }
+      responses:
+        "204": { description: Ordered }
+        "404": { $ref: "#/components/responses/Error" }
+  /v1/todos/lists/{listId}/completed:
+    get:
+      summary: A list's completed to-dos, newest first (kept 30 days)
+      parameters:
+        - { name: listId, in: path, required: true, schema: { $ref: "#/components/schemas/Id" } }
+      responses:
+        "200":
+          description: Completed to-dos
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: "#/components/schemas/Todo" } }
+        "404": { $ref: "#/components/responses/Error" }
 components:
   securitySchemes:
     bearer: { type: http, scheme: bearer, bearerFormat: JWT }
@@ -1464,6 +1596,24 @@ components:
     PostId: { name: postId, in: path, required: true, schema: { $ref: "#/components/schemas/Id" } }
     ChatId: { name: chatId, in: path, required: true, schema: { $ref: "#/components/schemas/Id" } }
   requestBodies:
+    TodoBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [title]
+            properties:
+              title: { type: string, maxLength: 500 }
+              notes: { type: [string, "null"], maxLength: 10000 }
+              dueDate: { type: [string, "null"], format: date }
+              repeat: { type: [string, "null"], enum: [daily, weekly, monthly, null], description: Needs a dueDate }
+              listId: { oneOf: [{ type: "null" }, { $ref: "#/components/schemas/Id" }], description: "Left out or null: General (or, when editing, where it is)" }
+    ListName:
+      required: true
+      content:
+        application/json:
+          schema: { type: object, required: [name], properties: { name: { type: string, maxLength: 100 } } }
     SourceUrl:
       required: true
       content:
@@ -1523,6 +1673,25 @@ components:
           schema: { type: array, items: { $ref: "#/components/schemas/Post" } }
   schemas:
     Id: { type: string, format: uuid }
+    TodoList:
+      type: object
+      required: [listId, name, general]
+      properties:
+        listId: { $ref: "#/components/schemas/Id" }
+        name: { type: string }
+        general: { type: boolean, description: General is where quick add puts things; it can be renamed but not deleted }
+    Todo:
+      type: object
+      required: [todoId, listId, title, notes, dueDate, repeat, completedAt, createdAt]
+      properties:
+        todoId: { $ref: "#/components/schemas/Id" }
+        listId: { $ref: "#/components/schemas/Id" }
+        title: { type: string }
+        notes: { type: [string, "null"] }
+        dueDate: { type: [string, "null"], format: date, description: A calendar date (no time or zone) }
+        repeat: { type: [string, "null"], enum: [daily, weekly, monthly, null] }
+        completedAt: { type: [string, "null"], format: date-time }
+        createdAt: { type: string, format: date-time }
     FoundSource:
       type: object
       required: [feedUrl, title, siteUrl, following, articles, icon]
