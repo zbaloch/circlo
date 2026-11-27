@@ -1575,7 +1575,7 @@ components:
                 url: { type: string }
                 type: { type: [string, "null"], description: e.g. audio/mpeg }
                 durationSeconds: { type: [integer, "null"] }
-        image: { type: [string, "null"], description: "An episode's own artwork: a signed Circlo link (GET /v1/reading/image), relative to the API" }
+        image: { type: [string, "null"], description: "The item's own picture (an episode's artwork, a video's thumbnail): a signed Circlo link (GET /v1/reading/image), relative to the API" }
     ContentRun:
       type: object
       required: [text]

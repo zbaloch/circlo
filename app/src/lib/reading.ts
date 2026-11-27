@@ -96,10 +96,16 @@ export function siteName(url: string | null | undefined): string {
   return (m?.[1] ?? '').replace(/^www\./i, '').toLowerCase();
 }
 
+/** Whether an item is a video on YouTube (its row shows the thumbnail with a play mark). Pure. */
+export function isVideo(url: string): boolean {
+  const site = siteName(url);
+  return site === 'youtube.com' || site === 'm.youtube.com' || site === 'youtu.be';
+}
+
 /** The button at the end of an article: where it goes, in words. Pure. */
 export function openOnSiteLabel(url: string): string {
+  if (isVideo(url)) return 'Watch on YouTube';
   const site = siteName(url);
-  if (site === 'youtube.com' || site === 'm.youtube.com' || site === 'youtu.be') return 'Watch on YouTube';
   return site ? `Read on ${site}` : 'Open the original';
 }
 

@@ -120,7 +120,24 @@ class FeedParserTest {
             assertThat(i.title()).isEqualTo("Scientists Said This Wave Was Impossible");
             assertThat(i.summary()).isEqualTo("A wave that shouldn't exist.");
             assertThat(i.url()).isEqualTo("https://www.youtube.com/watch?v=abc");
+            assertThat(i.image()).isEqualTo("https://i1.ytimg.com/vi/abc/hqdefault.jpg");
+            assertThat(i.audio()).isNull();
         });
+    }
+
+    @Test
+    void newsItemsKeepTheirLargestThumbnail() throws Exception {
+        FeedParser.Feed f = parse("""
+                <?xml version="1.0"?><rss version="2.0" xmlns:media="http://search.yahoo.com/mrss/"><channel><title>BBC</title>
+                <item><title>Story</title><link>https://bbc.example/1</link><pubDate>Wed, 25 Nov 2026 10:00:00 GMT</pubDate>
+                <media:thumbnail width="240" height="135" url="https://ichef.example/240/a.jpg"/>
+                <media:thumbnail width="976" height="549" url="https://ichef.example/976/a.jpg"/></item>
+                <item><title>Pictured</title><link>https://bbc.example/2</link><pubDate>Tue, 24 Nov 2026 10:00:00 GMT</pubDate>
+                <media:content medium="image" url="/img/b.jpg"/></item>
+                <item><title>Plain</title><link>https://bbc.example/3</link><pubDate>Mon, 23 Nov 2026 10:00:00 GMT</pubDate></item>
+                </channel></rss>""");
+        assertThat(f.items()).extracting(FeedParser.Item::image)
+                .containsExactly("https://ichef.example/976/a.jpg", "https://blog.example/img/b.jpg", null);
     }
 
     @Test

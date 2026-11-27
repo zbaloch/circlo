@@ -169,7 +169,7 @@ public final class FeedParser {
         // Worth opening in Circlo when it says clearly more than the summary, or has pictures, or can be played.
         boolean hasContent = audio != null
                 || !content.blocks().isEmpty() && (content.textLength() > summary.length() + 150 || content.images() > 0);
-        return new Item(guid, url, title, summary, author(e.getAuthor()), published, content.blocks(), hasContent, audio, itunesImage(e, base));
+        return new Item(guid, url, title, summary, author(e.getAuthor()), published, content.blocks(), hasContent, audio, itemImage(e, base));
     }
 
     /** The first enclosure that's audio (by its type, or by its file name when the feed gives no type). Video is left out. */
@@ -213,14 +213,57 @@ public final class FeedParser {
         }
     }
 
-    /** An episode's own artwork (itunes:image). */
-    private static String itunesImage(SyndEntry e, URI base) {
+    /**
+     * An item's own picture: a podcast episode's artwork (itunes:image), else the largest Media RSS thumbnail (YouTube
+     * puts it in media:group; BBC and others on the item), else a media:content that's an image.
+     */
+    private static String itemImage(SyndEntry e, URI base) {
+        List<org.jdom2.Element> media = new ArrayList<>();
         for (org.jdom2.Element el : e.getForeignMarkup()) {
             if ("image".equals(el.getName()) && el.getAttributeValue("href") != null) {
-                return absolute(base, el.getAttributeValue("href"));
+                String art = absolute(base, el.getAttributeValue("href"));
+                if (art != null) {
+                    return art;
+                }
+            }
+            media.add(el);
+            if ("group".equals(el.getName())) {
+                media.addAll(el.getChildren());
+            }
+        }
+        String best = null;
+        int bestWidth = -1;
+        for (org.jdom2.Element el : media) {
+            if ("thumbnail".equals(el.getName())) {
+                String url = absolute(base, el.getAttributeValue("url"));
+                int width = number(el.getAttributeValue("width"));
+                if (url != null && width > bestWidth) {
+                    best = url;
+                    bestWidth = width;
+                }
+            }
+        }
+        if (best != null) {
+            return best;
+        }
+        for (org.jdom2.Element el : media) {
+            String type = el.getAttributeValue("type", "");
+            if ("content".equals(el.getName()) && ("image".equals(el.getAttributeValue("medium")) || type.startsWith("image/"))) {
+                String url = absolute(base, el.getAttributeValue("url"));
+                if (url != null) {
+                    return url;
+                }
             }
         }
         return null;
+    }
+
+    private static int number(String s) {
+        try {
+            return s == null ? 0 : Integer.parseInt(s.strip());
+        } catch (NumberFormatException e) {
+            return 0;
+        }
     }
 
     private static boolean blank(String s) {

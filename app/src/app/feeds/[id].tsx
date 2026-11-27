@@ -2,7 +2,7 @@ import * as Clipboard from 'expo-clipboard';
 import * as Linking from 'expo-linking';
 import { useLocalSearchParams, useNavigation } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { ScrollView, View } from 'react-native';
+import { Pressable, ScrollView, View } from 'react-native';
 
 import { API_URL } from '@/api/client';
 
@@ -13,14 +13,14 @@ import { EmptyState } from '@/components/empty-state';
 import { Button } from '@/components/form';
 import { IconButton } from '@/components/icon-button';
 import { EpisodePlayer, MiniPlayer } from '@/components/podcast-player';
-import { SourceTile } from '@/components/reading-ui';
+import { SourceTile, VideoThumbnail } from '@/components/reading-ui';
 import { SendToChatSheet } from '@/components/send-to-chat-sheet';
 import { Icon } from '@/components/ui/icon';
 import { Spinner } from '@/components/ui/spinner';
 import { Text } from '@/components/ui/text';
 import { CHAT_ENABLED } from '@/lib/features';
 import { openArticle } from '@/lib/open-article';
-import { episodeOf, loadArticle, originalLabel, setRead, type ArticleDetail } from '@/lib/reading';
+import { episodeOf, isVideo, loadArticle, originalLabel, setRead, type ArticleDetail } from '@/lib/reading';
 import { useSession } from '@/lib/session';
 import { fullTime } from '@/lib/time';
 import { showToast } from '@/lib/toast';
@@ -117,6 +117,11 @@ export default function ArticleScreen() {
         </View>
         <ContentText text={article.title} links={false} className="text-2xl font-extrabold leading-8 text-ink dark:text-ink-dark" />
         {episode ? <EpisodePlayer episode={episode} /> : null}
+        {article.image && !episode && isVideo(article.url) ? (
+          <Pressable accessibilityRole="link" accessibilityLabel={label} onPress={() => open(article.url)}>
+            <VideoThumbnail src={article.image} />
+          </Pressable>
+        ) : null}
         {detail.content.length > 0 ? (
           <ArticleContent blocks={detail.content} onLink={open} />
         ) : article.summary ? (

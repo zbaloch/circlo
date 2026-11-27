@@ -56,6 +56,10 @@ code and the API it's `reading`, because `/v1/feed` and `feed-store` are the Hom
   Manage sources). Add a source
   takes a plain site address and shows the feed's name and latest articles before Follow. Manage sources lists each
   source with "Updated 2h ago" or "Couldn't update since Monday", Unfollow, and OPML import/export.
+- **YouTube videos show their thumbnail** (owner decision 2026-11-27): items keep their own picture (itunes:image,
+  else the largest Media RSS thumbnail, else a media:content image; V39), sent as `image` through the image proxy. A
+  YouTube video's row shows it 16:9 with a play mark, as does its screen (tapping opens YouTube). Videos still open
+  on YouTube; Shorts filtering and playing in Circlo wait until the owner has used it a while.
 - **Podcasts play in Circlo** (owner decision 2026-11-27, option 1): the server keeps each episode's audio (the first
   audio enclosure: address, type, itunes:duration) and its artwork (itunes:image, through the image proxy); V38. An
   episode always opens on its screen: artwork, a position bar, back 15 s, play/pause, forward 30 s, speed (1×, 1.25×,

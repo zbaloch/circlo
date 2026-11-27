@@ -3777,7 +3777,7 @@ export interface components {
                 type: string | null;
                 durationSeconds: number | null;
             };
-            /** @description An episode's own artwork: a signed Circlo link (GET /v1/reading/image), relative to the API */
+            /** @description The item's own picture (an episode's artwork, a video's thumbnail): a signed Circlo link (GET /v1/reading/image), relative to the API */
             image: string | null;
         };
         ContentRun: {

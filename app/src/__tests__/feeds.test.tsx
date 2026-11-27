@@ -251,6 +251,22 @@ describe('Feeds screen', () => {
     expect(screen.getByText('S')).toBeTruthy();
   });
 
+  it('YouTube videos show their thumbnail with a play mark; other articles don’t', async () => {
+    mockSources = [source('s1', 'Veritasium')];
+    mockArticles = [
+      { ...article('v1', 'Scientists Said This Wave Was Impossible'), sourceTitle: 'Veritasium', url: 'https://www.youtube.com/watch?v=abc', image: '/v1/reading/image?u=thumb&e=1&s=t' },
+      { ...article('a2', 'A news story'), image: '/v1/reading/image?u=news&e=1&s=n' },
+    ];
+    await render(<ReadingScreen />);
+    await screen.findByText('Scientists Said This Wave Was Impossible');
+    const thumbs = screen.getAllByTestId('video-thumbnail');
+    expect(thumbs).toHaveLength(1);
+    expect(thumbs[0].props.source).toEqual({ uri: 'http://api.test/v1/reading/image?u=thumb&e=1&s=t' });
+    expect(screen.getByRole('link', { name: /Scientists Said/ }).props.accessibilityHint).toBe('Opens the video on YouTube');
+    await fireEvent.press(screen.getByRole('link', { name: /Scientists Said/ }));
+    expect(mockOpen).toHaveBeenCalledWith('https://www.youtube.com/watch?v=abc', expect.anything());
+  });
+
   it('the article menu can mark it unread', async () => {
     mockSources = [source('s1', 'Stratechery')];
     mockArticles = [article('a2', 'Old news', true)];
@@ -328,6 +344,20 @@ describe('Reading an article in Circlo', () => {
     expect(mockOpen).toHaveBeenCalledWith('https://www.densediscovery.com/issues/352', expect.anything());
     await fireEvent.press(screen.getByRole('button', { name: 'Read on densediscovery.com ↗' }));
     expect(mockOpen).toHaveBeenLastCalledWith('https://www.densediscovery.com/issues/416', expect.anything());
+  });
+
+  it('a video with a description shows its thumbnail, which opens it on YouTube', async () => {
+    mockParams = { id: 'v1' };
+    mockDetail = {
+      article: { ...article('v1', 'Scientists Said This Wave Was Impossible', false, true), url: 'https://www.youtube.com/watch?v=abc', image: '/v1/reading/image?u=thumb&e=1&s=t' },
+      content: [{ type: 'p', runs: [{ text: 'A wave that shouldn’t exist.' }] }],
+    };
+    await render(<ArticleScreen />);
+    expect(await screen.findByText('A wave that shouldn’t exist.')).toBeTruthy();
+    expect(screen.getByTestId('video-thumbnail')).toBeTruthy();
+    await fireEvent.press(screen.getByRole('link', { name: 'Watch on YouTube' }));
+    expect(mockOpen).toHaveBeenCalledWith('https://www.youtube.com/watch?v=abc', expect.anything());
+    expect(screen.getByRole('button', { name: 'Watch on YouTube ↗' })).toBeTruthy();
   });
 
   it('says so when the article has gone', async () => {

@@ -10,7 +10,7 @@ import { IconButton } from '@/components/icon-button';
 import { Icon } from '@/components/ui/icon';
 import { Text } from '@/components/ui/text';
 import { lengthLabel } from '@/lib/podcast-player';
-import { imageUri, type Article } from '@/lib/reading';
+import { imageUri, isVideo, type Article } from '@/lib/reading';
 import { relativeTime } from '@/lib/time';
 import { usePalette } from '@/theme/use-palette';
 
@@ -47,6 +47,32 @@ export function SourceTile({ id, title, icon, size = 'md' }: { id: string; title
 }
 
 /**
+ * A video's thumbnail (through Circlo), 16:9 with a play mark, so YouTube videos look like videos. Gone if it fails.
+ */
+export function VideoThumbnail({ src }: { src: string }) {
+  const palette = usePalette();
+  const [failed, setFailed] = useState(false);
+  if (failed) return null;
+  return (
+    <View className="mt-2 overflow-hidden rounded-2xl border border-border dark:border-border-dark">
+      <Image
+        testID="video-thumbnail"
+        source={{ uri: imageUri(src, API_URL) }}
+        accessibilityIgnoresInvertColors
+        contentFit="cover"
+        onError={() => setFailed(true)}
+        className="aspect-video w-full bg-surface-raised dark:bg-surface-raised-dark"
+      />
+      <View pointerEvents="none" className="absolute inset-0 items-center justify-center">
+        <View className="h-12 w-12 items-center justify-center rounded-full bg-primary/90 dark:bg-primary-dark/90">
+          <Icon name="play" size={22} color={palette.onPrimary} />
+        </View>
+      </View>
+    </View>
+  );
+}
+
+/**
  * One article, timeline style: tile, source · time, the title (bold while unread) and two lines of summary. Tapping
  * opens it on its own site; ⋯ (or a long press) has the rest.
  */
@@ -57,7 +83,9 @@ export function ArticleRow({ article, now, onOpen, onMore }: { article: Article;
     <Pressable
       accessibilityRole="link"
       accessibilityLabel={`${article.title}, ${article.sourceTitle}, ${time}${article.read ? '' : ', unread'}`}
-      accessibilityHint={article.audio ? 'Opens the episode' : article.hasContent ? 'Opens the article' : 'Opens the article on its own site'}
+      accessibilityHint={
+        article.audio ? 'Opens the episode' : article.hasContent ? 'Opens the article' : isVideo(article.url) ? 'Opens the video on YouTube' : 'Opens the article on its own site'
+      }
       onPress={onOpen}
       onLongPress={onMore}
       className="flex-row gap-3 border-b border-border px-4 py-3 active:bg-surface-raised dark:border-border-dark dark:active:bg-surface-raised-dark">
@@ -82,6 +110,7 @@ export function ArticleRow({ article, now, onOpen, onMore }: { article: Article;
         {article.summary ? (
           <ContentText text={article.summary} links={false} numberOfLines={2} className="text-[15px] leading-snug text-muted dark:text-muted-dark" />
         ) : null}
+        {article.image && !article.audio && isVideo(article.url) ? <VideoThumbnail src={article.image} /> : null}
       </View>
     </Pressable>
   );
