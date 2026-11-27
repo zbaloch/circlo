@@ -16,6 +16,7 @@ import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
+import java.util.concurrent.Semaphore;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
@@ -30,6 +31,9 @@ public final class FeedParser {
     static final int SUMMARY_MAX = 300;
     private static final int TITLE_MAX = 300;
     private static final int MAX_ITEMS = 100;
+    /** Feeds bigger than this (podcast archives) are parsed one at a time, as the whole document is held in memory. */
+    private static final int BIG = 5 * 1024 * 1024;
+    private static final Semaphore BIG_AT_ONCE = new Semaphore(1);
     private static final Set<String> TRACKING = Set.of("fbclid", "gclid", "dclid", "gbraid", "wbraid", "msclkid", "yclid", "twclid",
             "igshid", "mc_cid", "mc_eid", "mkt_tok", "_hsenc", "_hsmi", "__hssc", "__hstc", "__hsfp", "hsctatracking", "oly_anon_id",
             "oly_enc_id", "rb_clickid", "s_cid", "vero_conv", "vero_id", "wickedid", "ck_subscriber_id", "ss_source", "ss_campaign_id",
@@ -54,13 +58,24 @@ public final class FeedParser {
 
     public static Feed parse(byte[] body, URI base, Instant now) throws NotAFeed {
         SyndFeed feed;
+        boolean big = body.length > BIG;
         try {
+            if (big) {
+                BIG_AT_ONCE.acquire();
+            }
             SyndFeedInput input = new SyndFeedInput(false, Locale.ROOT);
             input.setAllowDoctypes(false);
             input.setXmlHealerOn(true);
             feed = input.build(new XmlReader(new ByteArrayInputStream(body), true));
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new NotAFeed();
         } catch (Exception e) {
             throw new NotAFeed();
+        } finally {
+            if (big) {
+                BIG_AT_ONCE.release();
+            }
         }
         // Atom names the site as the "alternate" link (ROME's getLink() can be the feed's own "self").
         String site = absolute(base, feed.getLinks().stream().filter(l -> "alternate".equals(l.getRel())).map(SyndLink::getHref)
@@ -98,6 +113,9 @@ public final class FeedParser {
         if ((body == null || body.isBlank()) && !e.getContents().isEmpty()) {
             body = ((SyndContent) e.getContents().get(0)).getValue();
         }
+        if (body == null || body.isBlank()) {
+            body = mediaDescription(e);
+        }
         String summary = cut(text(body), SUMMARY_MAX);
         String title = cut(text(e.getTitle()), TITLE_MAX);
         if (title.isEmpty()) {
@@ -110,6 +128,21 @@ public final class FeedParser {
         Date date = e.getPublishedDate() != null ? e.getPublishedDate() : e.getUpdatedDate();
         Instant published = date == null || date.toInstant().isAfter(now) ? now : date.toInstant();
         return new Item(guid, url, title, summary, author(e.getAuthor()), published);
+    }
+
+    /** YouTube (and other Media RSS feeds) put the description in media:group/media:description. */
+    private static String mediaDescription(SyndEntry e) {
+        for (org.jdom2.Element el : e.getForeignMarkup()) {
+            if ("description".equals(el.getName())) {
+                return el.getText();
+            }
+            for (org.jdom2.Element child : el.getChildren()) {
+                if ("description".equals(child.getName())) {
+                    return child.getText();
+                }
+            }
+        }
+        return null;
     }
 
     /** "ana@site (Ana)" → "Ana"; a bare email address is left out. */

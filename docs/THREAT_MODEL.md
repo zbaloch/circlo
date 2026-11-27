@@ -69,8 +69,8 @@
 | Push tokens aren't readable from a DB copy | Sealed per device with AES-256-GCM (key derived from CIRCLO_JWT_KEY, bound to the device row); cleared on sign-out, revoke, or when Apple reports the token gone | `EngagementFlowIT` |
 | Live updates leak nothing | `GET /v1/events` returns only a version number for the caller; the app then fetches through the usual access-checked endpoints | `EngagementFlowIT` |
 | No personal data in logs | No access log; errors are fixed codes; nothing from requests is logged | `NoPayloadLoggingIT` |
-| What I read stays mine (Reading, 2.0) | Every Reading query starts from the caller's own follows, so another person's sources, articles and read marks are simply not there (404). Each feed is fetched once for all its followers with a generic user agent, so publishers see one Circlo fetcher, never who follows them; articles are opened on their own site only when the reader taps one. Summaries are plain text (no publisher HTML, images or scripts reach the app) and tracking parameters are removed from links | `ReadingIT`, `FeedParserTest` |
-| Reading can't be used to reach Circlo's network | Feeds and pages are fetched only over http(s), with no user:password, and only when every address the host resolves to is public (no loopback, private, link-local/cloud metadata, shared, multicast or reserved ranges, including IPv4-mapped IPv6); redirects are followed by hand and each hop is checked again; 10-second timeouts, 5 MB cap; feeds with a doctype are refused (no XML entities); finding and following are limited to 60 an hour per person | `UrlGuardTest`, `FeedParserTest`, `ReadingIT` |
+| What I follow stays mine (Feeds, 2.0) | Every Feeds query (`/v1/reading/*`) starts from the caller's own follows, so another person's sources, articles and read marks are simply not there (404). Each feed is fetched once for all its followers with a generic user agent, so publishers see one Circlo fetcher, never who follows them; articles are opened on their own site only when the reader taps one. Summaries are plain text (no publisher HTML, images or scripts reach the app) and tracking parameters are removed from links | `ReadingIT`, `FeedParserTest` |
+| Feeds can't be used to reach Circlo's network | Feeds and pages are fetched only over http(s), with no user:password, and only when every address the host resolves to is public (no loopback, private, link-local/cloud metadata, shared, multicast or reserved ranges, including IPv4-mapped IPv6); redirects are followed by hand and each hop is checked again; 10-second timeouts for headers and 15 for the body, 25 MB cap (podcast archives), big feeds parsed one at a time; feeds with a doctype are refused (no XML entities); finding and following are limited to 60 an hour per person | `UrlGuardTest`, `FeedParserTest`, `ReadingIT` |
 | Browsers can't be abused cross-site | Bearer tokens in a header (no cookies, so no CSRF); CORS allows only the web app's origin | `AuthFlowIT` |
 
 ## Known and accepted risks
@@ -95,12 +95,12 @@
 7. **Social graph and metadata**: the server knows who is connected, who messages whom, and when.
 8. **Account lockout can be triggered by others** who know your username; resetting the password by email lifts it.
 9. **Screenshots and re-sharing**: anyone who can see a post can copy it. No reposts are offered.
-10. **Reading's address check can be raced by DNS rebinding.** The server checks the addresses a feed's host resolves
+10. **The Feeds address check can be raced by DNS rebinding.** The server checks the addresses a feed's host resolves
     to, but the HTTP client resolves the host again when it connects, so a hostile DNS server could answer with a
     public address for the check and a private one for the connection. Mitigations: only a GET with a fixed user agent
     is sent and only feeds are parsed (nothing else from the response is returned); production should also block the
     server's outbound traffic to private ranges and the cloud metadata address at the firewall (HARDENING.md).
-11. **Opening an article shows the reader to its site** (Reading, 2.0). The publisher sees the reader's IP address and
+11. **Opening an article or video shows the reader to its site** (Feeds, 2.0). The publisher sees the reader's IP address and
     can use its own cookies and trackers, as with any link. Mitigations: Circlo fetches feeds itself, so sites see a
     reader only when they open an article, and links lose their tracking parameters first.
 

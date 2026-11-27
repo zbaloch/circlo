@@ -1,7 +1,7 @@
 /** The web app's OPML import and export: the browser's file picker, and a download. Same exports as opml-file.ts. */
 import * as DocumentPicker from 'expo-document-picker';
 
-export const OPML_NAME = 'circlo-reading.opml';
+export const OPML_NAME = 'circlo-feeds.opml';
 
 export async function pickOpmlText(): Promise<string | null> {
   const picked = await DocumentPicker.getDocumentAsync({ type: ['.opml', '.xml', 'text/x-opml', 'text/xml', 'application/xml'] });

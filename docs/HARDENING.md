@@ -90,9 +90,9 @@ salted hashes and are dropped once idle, so no IP-derived data is ever stored (P
   (nginx `limit_req`, the load balancer or the CDN/WAF) for `/v1/auth/*`. Login guessing stays slow regardless: the
   account lock is in the database (shared by every instance), and every check costs the server an Argon2id hash.
 
-## Outbound traffic (Reading)
+## Outbound traffic (Feeds)
 
-Reading (2.0) makes the server fetch web feeds at addresses people type. The code refuses private, loopback,
+Feeds (2.0, `reading` in code) makes the server fetch web feeds at addresses people type. The code refuses private, loopback,
 link-local and reserved addresses and checks each redirect (`reading.UrlGuard`), but a DNS answer that changes between
 the check and the connection can slip past it (THREAT_MODEL.md, accepted risk 10). In production, also block the
 server's outbound connections to:

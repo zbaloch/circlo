@@ -331,7 +331,7 @@ public class ReadingController {
     @GetMapping("/v1/reading/export")
     public ResponseEntity<String> exportOpml(@AuthenticationPrincipal Jwt jwt) {
         StringBuilder out = new StringBuilder("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<opml version=\"2.0\">\n"
-                + "  <head><title>Reading on Circlo</title></head>\n  <body>\n");
+                + "  <head><title>Feeds on Circlo</title></head>\n  <body>\n");
         for (Source s : sources(jwt)) {
             out.append("    <outline type=\"rss\" text=\"").append(xml(s.title())).append("\" title=\"").append(xml(s.title()))
                     .append("\" xmlUrl=\"").append(xml(s.feedUrl())).append('"');
@@ -343,7 +343,7 @@ public class ReadingController {
         out.append("  </body>\n</opml>\n");
         return ResponseEntity.ok()
                 .contentType(MediaType.parseMediaType("text/x-opml;charset=UTF-8"))
-                .header("Content-Disposition", "attachment; filename=\"circlo-reading.opml\"")
+                .header("Content-Disposition", "attachment; filename=\"circlo-feeds.opml\"")
                 .body(out.toString());
     }
 

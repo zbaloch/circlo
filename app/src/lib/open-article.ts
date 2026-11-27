@@ -1,5 +1,5 @@
 /**
- * Opens a Reading article on its own site: in the in-app browser on phones (Safari View Controller / Chrome Custom
+ * Opens an article from Feeds on its own site: in the in-app browser on phones (Safari View Controller / Chrome Custom
  * Tabs, which send no referrer), falling back to the system browser. The web app has its own (open-article.web.ts).
  */
 import * as Linking from 'expo-linking';

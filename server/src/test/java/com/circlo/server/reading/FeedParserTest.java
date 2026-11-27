@@ -61,6 +61,25 @@ class FeedParserTest {
     }
 
     @Test
+    void readsYouTubeChannelFeeds() throws Exception {
+        FeedParser.Feed f = parse("""
+                <?xml version="1.0" encoding="UTF-8"?>
+                <feed xmlns:yt="http://www.youtube.com/xml/schemas/2015" xmlns:media="http://search.yahoo.com/mrss/" xmlns="http://www.w3.org/2005/Atom">
+                <title>Veritasium</title><link rel="alternate" href="https://www.youtube.com/channel/UC1"/>
+                <entry><id>yt:video:abc</id><yt:videoId>abc</yt:videoId><title>Scientists Said This Wave Was Impossible</title>
+                <link rel="alternate" href="https://www.youtube.com/watch?v=abc"/><published>2026-11-25T14:00:52+00:00</published>
+                <media:group><media:title>Scientists Said This Wave Was Impossible</media:title>
+                <media:thumbnail url="https://i1.ytimg.com/vi/abc/hqdefault.jpg" width="480" height="360"/>
+                <media:description>A wave that shouldn't exist.</media:description></media:group></entry>
+                </feed>""");
+        assertThat(f.items()).singleElement().satisfies(i -> {
+            assertThat(i.title()).isEqualTo("Scientists Said This Wave Was Impossible");
+            assertThat(i.summary()).isEqualTo("A wave that shouldn't exist.");
+            assertThat(i.url()).isEqualTo("https://www.youtube.com/watch?v=abc");
+        });
+    }
+
+    @Test
     void longSummariesAreCutAtAWord() throws Exception {
         String words = "word ".repeat(200);
         FeedParser.Feed f = parse("<rss version=\"2.0\"><channel><title>T</title><item><title>X</title><link>https://b.example/x</link>"

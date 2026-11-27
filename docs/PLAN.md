@@ -23,7 +23,7 @@ Sections 1–3 and the crypto parts of the phases below describe the original en
 kept as history and are **superseded** where they conflict with this table. Section 2A (UI) and the repo rules
 (0A, 0B) still apply, minus the crypto rows.
 
-## Version 2.0 (owner decision 2026-11-27): Reading, Todos, Logged
+## Version 2.0 (owner decision 2026-11-27): Feeds, Todos, Logged
 
 Three features, built one at a time, shipped together as app version 2.0.
 
@@ -32,18 +32,20 @@ upgrade, so every 2.0 server change is additive: new endpoints (`/v1/reading/*` 
 only; nothing an older app calls is removed or changes meaning; new activity kinds and pushes are sent only to apps
 that ask for them (as `?replies=all` does). An older app that receives an unknown push type opens Notifications.
 
-### Reading (built 2026-11-27)
+### Feeds (built 2026-11-27)
 
-Follow blogs, newsletters and podcasts with web feeds (RSS, Atom); see what's new in Circlo and open anything on its
-own site. In the side drawer between Profile and Settings and privacy, with a quiet dot when something new arrived
+Follow blogs, newsletters, YouTube channels and podcasts with web feeds (RSS, Atom); see what's new in Circlo and open
+anything on its own site. Named Feeds (owner decision 2026-11-27: prosumers know the word; first called Reading); in
+code and the API it's `reading`, because `/v1/feed` and `feed-store` are the Home timeline. In the side drawer between Profile and Settings and privacy, with a quiet dot when something new arrived
 (no counts, no pushes).
 
 - **Server** (`reading` package): ROME parses feeds, jsoup turns summaries into plain text and finds the feed a page
   names. Each feed is fetched once for everyone who follows it, every 30 minutes, with conditional requests; failing
   feeds back off to 12 hours and say so quietly. Links lose tracking parameters. Only public http(s) addresses are
-  fetched, re-checked on every redirect (`UrlGuard`). Articles are kept 60 days; feeds nobody follows are dropped.
+  fetched, re-checked on every redirect (`UrlGuard`); up to 25 MB, as podcast feeds carry their archive. YouTube
+  video descriptions come from Media RSS. Articles are kept 60 days; feeds nobody follows are dropped.
   What someone follows is returned only to them, is in their data export and goes with their account.
-- **App**: Reading (chips All · Unread · each source; article rows with a letter tile, source · time, bold title while
+- **App**: Feeds at `/feeds` (chips All · Unread · each source; article rows with a letter tile, source · time, bold title while
   unread, two-line summary; tap opens the in-app browser and marks it read; ⋯ has Mark as unread, Send in a chat,
   Copy link, Open in browser; "New articles" pill; ＋ Add a source; ⋯ Mark all as read, Manage sources). Add a source
   takes a plain site address and shows the feed's name and latest articles before Follow. Manage sources lists each

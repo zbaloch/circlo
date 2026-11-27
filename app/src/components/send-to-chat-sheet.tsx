@@ -11,7 +11,7 @@ import { showToast } from '@/lib/toast';
 import { chatTitle } from '@/lib/view-logic';
 
 /**
- * Sends a link to one of my chats (Reading's "Send in a chat"): the chats I'm in, newest first. The message is the
+ * Sends a link to one of my chats (Feeds' "Send in a chat"): the chats I'm in, newest first. The message is the
  * link, as if I'd pasted it, so the people in the chat see exactly what I picked and nothing about what I follow.
  */
 export function SendToChatSheet({ account, text, onClose }: { account: StoredAccount; text: string | null; onClose: () => void }) {

@@ -1,8 +1,8 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 
-import AddSourceScreen from '@/app/reading/add';
-import ReadingScreen from '@/app/reading/index';
-import SourcesScreen from '@/app/reading/sources';
+import AddSourceScreen from '@/app/feeds/add';
+import ReadingScreen from '@/app/feeds/index';
+import SourcesScreen from '@/app/feeds/sources';
 import { DRAWER_ITEMS } from '@/components/app-drawer';
 import {
   describeReadingError,
@@ -86,7 +86,7 @@ beforeEach(() => {
   mockParams = {};
 });
 
-describe('Reading logic', () => {
+describe('Feeds logic', () => {
   it('names sites without www', () => {
     expect(siteName('https://www.Stratechery.com/feed?x=1')).toBe('stratechery.com');
     expect(siteName('http://blog.example:8080/')).toBe('blog.example');
@@ -121,18 +121,18 @@ describe('Reading logic', () => {
   });
 
   it('sits in the drawer between Profile and Settings', () => {
-    expect(DRAWER_ITEMS.map((i) => i.label)).toEqual(['Profile', 'Reading', 'Settings and privacy']);
+    expect(DRAWER_ITEMS.map((i) => i.label)).toEqual(['Profile', 'Feeds', 'Settings and privacy']);
   });
 });
 
-describe('Reading screen', () => {
-  it('explains Reading and offers to add a source when nothing is followed', async () => {
+describe('Feeds screen', () => {
+  it('explains Feeds and offers to add a source when nothing is followed', async () => {
     mockSources = [];
     mockArticles = [];
     await render(<ReadingScreen />);
     expect(await screen.findByText(READING_ABOUT)).toBeTruthy();
     await fireEvent.press(screen.getByRole('button', { name: 'Add a source' }));
-    expect(mockPush).toHaveBeenCalledWith('/reading/add');
+    expect(mockPush).toHaveBeenCalledWith('/feeds/add');
     expect(mockSeen).toHaveBeenCalled();
   });
 

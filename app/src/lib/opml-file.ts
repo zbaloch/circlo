@@ -6,7 +6,7 @@ import * as DocumentPicker from 'expo-document-picker';
 import { File, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 
-export const OPML_NAME = 'circlo-reading.opml';
+export const OPML_NAME = 'circlo-feeds.opml';
 
 /** The picked file's text, or null if nothing was picked. */
 export async function pickOpmlText(): Promise<string | null> {

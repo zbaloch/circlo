@@ -81,7 +81,7 @@ export default function SourcesScreen() {
     navigation.setOptions({
       headerRight: () => (
         <View className="flex-row items-center pr-2">
-          <IconButton accessibilityLabel="Add a source" onPress={() => router.push('/reading/add')}>
+          <IconButton accessibilityLabel="Add a source" onPress={() => router.push('/feeds/add')}>
             <Icon name="add" size={24} color={palette.ink} />
           </IconButton>
           <IconButton
@@ -100,7 +100,7 @@ export default function SourcesScreen() {
   }, [navigation, palette.ink, doImport, doExport]);
 
   const unfollow = (s: Source) =>
-    showAlert(`Unfollow ${s.title}?`, 'Its articles leave Reading. You can follow it again any time.', [
+    showAlert(`Unfollow ${s.title}?`, 'Its articles leave Feeds. You can follow it again any time.', [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Unfollow',
@@ -122,7 +122,7 @@ export default function SourcesScreen() {
   return (
     <View className="flex-1 bg-surface dark:bg-surface-dark">
       {sources.length === 0 ? (
-        <EmptyState icon="book-outline" title="No sources yet" body={READING_ABOUT} actionLabel="Add a source" onAction={() => router.push('/reading/add')} />
+        <EmptyState icon="rss-outline" title="No sources yet" body={READING_ABOUT} actionLabel="Add a source" onAction={() => router.push('/feeds/add')} />
       ) : (
         <ScrollView contentContainerClassName="pb-10">
           {error ? <Text className="px-4 py-2 text-center text-sm text-danger dark:text-danger-dark">{error}</Text> : null}
@@ -131,7 +131,7 @@ export default function SourcesScreen() {
               key={s.sourceId}
               accessibilityRole="button"
               accessibilityHint="Shows its articles"
-              onPress={() => router.navigate({ pathname: '/reading', params: { source: s.sourceId } })}
+              onPress={() => router.navigate({ pathname: '/feeds', params: { source: s.sourceId } })}
               className="flex-row items-center gap-3 border-b border-border px-4 py-3 active:bg-surface-raised dark:border-border-dark dark:active:bg-surface-raised-dark">
               <SourceTile id={s.sourceId} title={s.title} />
               <View className="flex-1">

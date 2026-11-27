@@ -1,7 +1,8 @@
 /**
- * Reading (2.0): web feeds (RSS) people follow. Circlo's server fetches each feed once for everyone who follows it
- * and sends titles, plain-text summaries and links; the article is read on its own site, in the in-app browser. Only
- * I can see what I follow. Nothing here is pushed: a quiet dot in the drawer says something new arrived.
+ * Feeds (2.0; called "reading" in code and the API, since /v1/feed is the Home timeline): web feeds (RSS, Atom) people
+ * follow, blogs, newsletters, YouTube channels and podcasts alike. Circlo's server fetches each feed once for everyone
+ * who follows it and sends titles, plain-text summaries and links; each item opens on its own site, in the in-app
+ * browser. Only I can see what I follow. Nothing here is pushed: a quiet dot in the drawer says something new arrived.
  */
 import { api, ok } from '@/api/client';
 import type { components } from '@/api/schema';
@@ -13,9 +14,9 @@ export type Article = components['schemas']['ReadingArticle'];
 export type FoundSource = components['schemas']['FoundSource'];
 export type ArticlePage = { articles: Article[]; next: string | null };
 
-/** The words on Reading's empty screen and in About: what it is, in plain words. */
+/** The words on the Feeds empty screen and in About: what it is, in plain words. */
 export const READING_ABOUT =
-  'Follow blogs, newsletters and podcasts with web feeds (RSS). See what’s new here, and open anything to read it on its own site.';
+  'Follow blogs, newsletters, YouTube channels and podcasts with web feeds (RSS). See what’s new here, and open anything on its own site.';
 
 /** Which articles the list shows: all, only unread, or one source's. */
 export type ReadingFilter = { kind: 'all' } | { kind: 'unread' } | { kind: 'source'; sourceId: string };
@@ -58,12 +59,12 @@ export async function markAllRead(sourceId?: string): Promise<void> {
   if (!res.response.ok) ok(res);
 }
 
-/** Whether the drawer shows its dot: something arrived since I last opened Reading. */
+/** Whether the drawer shows its dot: something arrived since I last opened Feeds. */
 export async function readingHasNew(): Promise<boolean> {
   return ok(await api.GET('/v1/reading/status')).hasNew;
 }
 
-/** I opened Reading: the dot goes until something new arrives. */
+/** I opened Feeds: the dot goes until something new arrives. */
 export async function markReadingSeen(): Promise<void> {
   await api.PUT('/v1/reading/seen');
 }

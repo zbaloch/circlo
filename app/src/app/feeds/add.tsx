@@ -76,7 +76,7 @@ export default function AddSourceScreen() {
             </View>
           </View>
           {found.articles.length === 0 ? (
-            <Text className="text-muted dark:text-muted-dark">No articles yet. New ones will show in Reading.</Text>
+            <Text className="text-muted dark:text-muted-dark">No articles yet. New ones will show in Feeds.</Text>
           ) : (
             found.articles.map((a, i) => (
               <View key={i} className="flex-row gap-2">

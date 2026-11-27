@@ -17,8 +17,8 @@ type Item = { label: string; icon: IconName; href: Href; dot?: 'reading' };
 
 export const DRAWER_ITEMS: Item[] = [
   { label: 'Profile', icon: 'person-outline', href: '/profile' },
-  // Reading (2.0): web feeds. A quiet dot when something arrived since I last looked; no counts, no pushes.
-  { label: 'Reading', icon: 'book-outline', href: '/reading', dot: 'reading' },
+  // Feeds (2.0; "reading" in code and the API, as /v1/feed is the timeline): web feeds. A quiet dot when something arrived since I last looked; no counts, no pushes.
+  { label: 'Feeds', icon: 'rss-outline', href: '/feeds', dot: 'reading' },
   // Devices is the first link inside Settings and privacy.
   { label: 'Settings and privacy', icon: 'settings-outline', href: '/settings' },
 ];

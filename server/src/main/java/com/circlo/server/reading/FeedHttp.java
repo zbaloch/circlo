@@ -17,13 +17,14 @@ import org.springframework.stereotype.Component;
 
 /**
  * Fetches feeds and pages for Reading: a generic user agent (nothing about who asked), short timeouts, at most
- * {@link #MAX_BYTES}, and redirects followed by hand so each hop passes {@link UrlGuard} first. Sends conditional
+ * {@link #MAX_BYTES} (25 MB), and redirects followed by hand so each hop passes {@link UrlGuard} first. Sends conditional
  * headers so an unchanged feed costs a 304.
  */
 @Component
 public class FeedHttp {
 
-    static final int MAX_BYTES = 5 * 1024 * 1024;
+    /** Podcast feeds carry their whole archive: 20 MB isn't unusual. FeedParser reads big ones one at a time. */
+    static final int MAX_BYTES = 25 * 1024 * 1024;
     /** The whole body must arrive within this, so a site that trickles bytes can't hold a fetch open. */
     private static final Duration BODY_TIMEOUT = Duration.ofSeconds(15);
     private static final ExecutorService READERS = Executors.newVirtualThreadPerTaskExecutor();

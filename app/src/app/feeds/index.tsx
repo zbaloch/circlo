@@ -36,7 +36,7 @@ import { useNow } from '@/lib/use-now';
 import { usePalette } from '@/theme/use-palette';
 
 /**
- * Reading (2.0, from the drawer): the newest articles from the sources I follow, timeline style. Chips filter by
+ * Feeds (2.0, from the drawer; "reading" in code): the newest articles from the sources I follow, timeline style. Chips filter by
  * All, Unread or one source; tapping an article opens it on its own site in the in-app browser and marks it read.
  * No pushes and no counts; a "New articles" pill when more arrive while I'm here.
  */
@@ -76,7 +76,7 @@ export default function ReadingScreen() {
       setError(undefined);
     } catch {
       setSources((s) => s ?? []);
-      setError('Couldn’t load Reading. Pull to try again.');
+      setError('Couldn’t load your feeds. Pull to try again.');
     }
   }, [filter]);
 
@@ -165,7 +165,7 @@ export default function ReadingScreen() {
     navigation.setOptions({
       headerRight: () => (
         <View className="flex-row items-center pr-2">
-          <IconButton accessibilityLabel="Add a source" onPress={() => router.push('/reading/add')}>
+          <IconButton accessibilityLabel="Add a source" onPress={() => router.push('/feeds/add')}>
             <Icon name="add" size={24} color={palette.ink} />
           </IconButton>
           <IconButton
@@ -174,7 +174,7 @@ export default function ReadingScreen() {
               setSheet({
                 actions: [
                   { label: source ? `Mark all from ${source.title} as read` : 'Mark all as read', onPress: () => void readAll() },
-                  { label: 'Manage sources', onPress: () => router.push('/reading/sources') },
+                  { label: 'Manage sources', onPress: () => router.push('/feeds/sources') },
                 ],
               })
             }>
@@ -190,7 +190,7 @@ export default function ReadingScreen() {
   if (sources.length === 0) {
     return (
       <Screen>
-        <EmptyState icon="book-outline" title="Reading" body={READING_ABOUT} actionLabel="Add a source" onAction={() => router.push('/reading/add')} />
+        <EmptyState icon="rss-outline" title="Feeds" body={READING_ABOUT} actionLabel="Add a source" onAction={() => router.push('/feeds/add')} />
         {error ? <Text className="px-5 pb-6 text-center text-sm text-danger dark:text-danger-dark">{error}</Text> : null}
       </Screen>
     );
@@ -230,7 +230,7 @@ export default function ReadingScreen() {
         }
         ListEmptyComponent={
           <View className="h-[480px]">
-            <EmptyState icon="book-outline" title={empty.title} body={empty.body} />
+            <EmptyState icon="rss-outline" title={empty.title} body={empty.body} />
           </View>
         }
         ListFooterComponent={loadingMore ? <Spinner className="py-6" /> : undefined}
