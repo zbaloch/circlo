@@ -134,7 +134,7 @@ export default function SourcesScreen() {
               accessibilityHint="Shows its articles"
               onPress={() => router.navigate({ pathname: '/feeds', params: { source: s.sourceId } })}
               className="flex-row items-center gap-3 border-b border-border px-4 py-3 active:bg-surface-raised dark:border-border-dark dark:active:bg-surface-raised-dark">
-              <SourceTile id={s.sourceId} title={s.title} />
+              <SourceTile id={s.sourceId} title={s.title} icon={s.icon} />
               <View className="flex-1">
                 <ContentText text={s.title} links={false} numberOfLines={1} className="text-base font-bold text-ink dark:text-ink-dark" />
                 <Text numberOfLines={1} className="text-sm text-muted dark:text-muted-dark">

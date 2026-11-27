@@ -3731,6 +3731,8 @@ export interface components {
                 /** Format: date-time */
                 publishedAt: string;
             }[];
+            /** @description Signed Circlo link to the source's logo (GET /v1/reading/image), relative to the API; null: draw its initial */
+            icon: string | null;
         };
         ReadingSource: {
             sourceId: components["schemas"]["Id"];
@@ -3748,6 +3750,8 @@ export interface components {
              */
             failingSince: string | null;
             unread: number;
+            /** @description Signed Circlo link to the source's logo (GET /v1/reading/image), relative to the API; null: draw its initial */
+            icon: string | null;
         };
         ReadingArticle: {
             articleId: components["schemas"]["Id"];
@@ -3764,6 +3768,8 @@ export interface components {
             read: boolean;
             /** @description There's more to read in Circlo (GET /v1/reading/articles/{id}); otherwise it opens on its site */
             hasContent: boolean;
+            /** @description Signed Circlo link to the source's logo (GET /v1/reading/image), relative to the API; null: draw its initial */
+            sourceIcon: string | null;
         };
         ContentRun: {
             text: string;

@@ -417,6 +417,85 @@ class ReadingIT extends IntegrationTest {
         assertThat(b.call("GET", "/v1/reading/articles/" + id, null).getStatusCode().value()).isEqualTo(404);
     }
 
+    private void image(String path, String type, byte[] bytes) {
+        site.createContext(path, ex -> {
+            hits.computeIfAbsent(path, k -> new AtomicInteger()).incrementAndGet();
+            ex.getResponseHeaders().set("Content-Type", type);
+            ex.sendResponseHeaders(200, bytes.length);
+            ex.getResponseBody().write(bytes);
+            ex.close();
+        });
+    }
+
+    /** My sources by title, once Circlo has found their logos (that happens just after following, off the request). */
+    private Map<String, Map<String, Object>> sourcesWithIcons(TestUser u, int expected) throws InterruptedException {
+        for (int i = 0; i < 200; i++) {
+            Integer found = jdbc.queryForObject("SELECT COUNT(*) FROM reading_sources WHERE icon_url IS NOT NULL AND feed_url LIKE ?",
+                    Integer.class, base + "/logo%");
+            if (found != null && found >= expected) {
+                break;
+            }
+            Thread.sleep(50);
+        }
+        Map<String, Map<String, Object>> byTitle = new java.util.HashMap<>();
+        u.list("GET", "/v1/reading/sources", null).getBody().forEach(s -> byTitle.put((String) s.get("title"), s));
+        return byTitle;
+    }
+
+    @Test
+    void sourcesShowTheirOwnLogoOrTheirSitesIconThroughCirclo() throws Exception {
+        byte[] png = java.util.Base64.getDecoder().decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==");
+        byte[] ico = {0, 0, 1, 0, 1, 0, 1, 1};
+        image("/logo-own/logo.png", "image/png", png);
+        image("/logo-site/touch.png", "image/png", png);
+        image("/favicon.ico", "image/x-icon", ico);
+        // The feed names its own logo (RSS <image>).
+        serve("/logo-own/feed.xml", "<?xml version=\"1.0\"?><rss version=\"2.0\"><channel><title>Own logo</title><link>" + base
+                + "/logo-own</link><image><url>" + base + "/logo-own/logo.png</url><title>Own</title><link>" + base + "/logo-own</link></image>"
+                + item("o1", "One", base + "/logo-own/1", "One", "Mon, 23 Nov 2026 10:00:00 GMT") + "</channel></rss>", "application/rss+xml");
+        // No logo in the feed: the site's page names an apple-touch-icon (and a broken icon and an SVG, which are passed over).
+        serve("/logo-site/feed.xml", rss("Site icon", base + "/logo-site", item("s1", "One", base + "/logo-site/1", "One",
+                "Mon, 23 Nov 2026 10:00:00 GMT")), "application/rss+xml");
+        serve("/logo-site", "<html><head><link rel=\"icon\" type=\"image/svg+xml\" href=\"/logo-site/icon.svg\">"
+                + "<link rel=\"icon\" sizes=\"512x512\" href=\"/logo-site/gone.png\"><link rel=\"apple-touch-icon\" href=\"/logo-site/touch.png\">"
+                + "</head></html>", "text/html; charset=utf-8");
+        // Neither: the site's /favicon.ico.
+        serve("/logo-fav/feed.xml", rss("Favicon", base + "/logo-fav", item("f1", "One", base + "/logo-fav/1", "One",
+                "Mon, 23 Nov 2026 10:00:00 GMT")), "application/rss+xml");
+        serve("/logo-fav", "<html><head><title>No icons</title></head></html>", "text/html");
+        TestUser a = user("read_logos");
+        follow(a, base + "/logo-own/feed.xml");
+        follow(a, base + "/logo-site/feed.xml");
+        follow(a, base + "/logo-fav/feed.xml");
+
+        Map<String, Map<String, Object>> sources = sourcesWithIcons(a, 3);
+        assertThat(jdbc.queryForList("SELECT icon_url FROM reading_sources WHERE feed_url LIKE ? ORDER BY feed_url", String.class, base + "/logo%"))
+                .containsExactly(base + "/favicon.ico", base + "/logo-own/logo.png", base + "/logo-site/touch.png");
+        String own = (String) sources.get("Own logo").get("icon");
+        assertThat(own).startsWith("/v1/reading/image?");
+        assertThat((String) sources.get("Site icon").get("icon")).startsWith("/v1/reading/image?");
+
+        // Phones get it from Circlo, not the site; the icon type is served too.
+        var logo = http().get().uri(java.net.URI.create("http://localhost:" + port + own)).retrieve().toEntity(byte[].class);
+        assertThat(logo.getHeaders().getContentType()).hasToString("image/png");
+        assertThat(logo.getBody()).isEqualTo(png);
+        var fav = http().get().uri(java.net.URI.create("http://localhost:" + port + sources.get("Favicon").get("icon"))).retrieve()
+                .toEntity(byte[].class);
+        assertThat(fav.getHeaders().getContentType()).hasToString("image/x-icon");
+
+        // Articles carry their source's logo, for their tiles.
+        assertThat(articles(a, "")).allSatisfy(x -> assertThat((String) x.get("sourceIcon")).startsWith("/v1/reading/image?"));
+
+        // Looked for once a week, not on every check.
+        int fetched = hits.get("/logo-own/logo.png").get();
+        jdbc.update("UPDATE reading_sources SET next_check_at = ?, etag = NULL WHERE feed_url LIKE ?", Timestamp.from(Instant.now()), base + "/logo%");
+        refresher.refreshDue(Instant.now());
+        assertThat(hits.get("/logo-own/logo.png").get()).isEqualTo(fetched);
+        jdbc.update("UPDATE reading_sources SET etag = NULL WHERE feed_url LIKE ?", base + "/logo%"); // the feeds changed
+        refresher.refreshDue(Instant.now().plus(Duration.ofDays(8)));
+        assertThat(hits.get("/logo-own/logo.png").get()).isGreaterThan(fetched);
+    }
+
     @Test
     void needsASession() {
         assertThat(call("GET", "/v1/reading/sources", null, null).getStatusCode().value()).isEqualTo(401);

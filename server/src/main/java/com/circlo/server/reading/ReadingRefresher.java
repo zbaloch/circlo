@@ -38,13 +38,16 @@ public class ReadingRefresher {
     private final FeedFinder finder;
     private final ReadingStore store;
     private final ReadingProperties props;
+    private final SourceIcons icons;
 
-    public ReadingRefresher(JdbcTemplate jdbc, FeedHttp http, FeedFinder finder, ReadingStore store, ReadingProperties props) {
+    public ReadingRefresher(JdbcTemplate jdbc, FeedHttp http, FeedFinder finder, ReadingStore store, ReadingProperties props,
+            SourceIcons icons) {
         this.jdbc = jdbc;
         this.http = http;
         this.finder = finder;
         this.store = store;
         this.props = props;
+        this.icons = icons;
     }
 
     @Scheduled(fixedDelay = 60_000, initialDelay = 90_000)
@@ -127,6 +130,7 @@ public class ReadingRefresher {
                 return;
             }
             store.checked(source, found, next);
+            icons.refreshIfDue(source, found, now);
         } catch (FeedHttp.Failed e) {
             store.failed(source, now, props.checkEvery());
         }

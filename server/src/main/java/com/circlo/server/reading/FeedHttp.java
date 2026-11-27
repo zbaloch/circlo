@@ -57,7 +57,7 @@ public class FeedHttp {
 
     private static final String FEED_ACCEPT =
             "application/rss+xml, application/atom+xml, application/xml;q=0.9, text/xml;q=0.9, text/html;q=0.8, */*;q=0.5";
-    private static final String IMAGE_ACCEPT = "image/avif, image/webp, image/png, image/jpeg, image/gif;q=0.9";
+    private static final String IMAGE_ACCEPT = "image/avif, image/webp, image/png, image/jpeg, image/gif;q=0.9, image/x-icon;q=0.8";
     /** Article images (ReadingImageController). */
     static final int MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 
@@ -65,7 +65,7 @@ public class FeedHttp {
         return fetch(url, etag, modified, FEED_ACCEPT, MAX_BYTES);
     }
 
-    /** An article image: no conditional headers, at most 10 MB. */
+    /** An article image or a source's logo: no conditional headers, at most 10 MB. */
     public Response image(URI url) throws Failed {
         return fetch(url, null, null, IMAGE_ACCEPT, MAX_IMAGE_BYTES);
     }

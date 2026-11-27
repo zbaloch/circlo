@@ -1525,7 +1525,7 @@ components:
     Id: { type: string, format: uuid }
     FoundSource:
       type: object
-      required: [feedUrl, title, siteUrl, following, articles]
+      required: [feedUrl, title, siteUrl, following, articles, icon]
       properties:
         feedUrl: { type: string }
         title: { type: string }
@@ -1537,9 +1537,10 @@ components:
             type: object
             required: [title, publishedAt]
             properties: { title: { type: string }, publishedAt: { type: string, format: date-time } }
+        icon: { type: [string, "null"], description: "Signed Circlo link to the source's logo (GET /v1/reading/image), relative to the API; null: draw its initial" }
     ReadingSource:
       type: object
-      required: [sourceId, title, feedUrl, siteUrl, updatedAt, failingSince, unread]
+      required: [sourceId, title, feedUrl, siteUrl, updatedAt, failingSince, unread, icon]
       properties:
         sourceId: { $ref: "#/components/schemas/Id" }
         title: { type: string }
@@ -1548,9 +1549,10 @@ components:
         updatedAt: { type: [string, "null"], format: date-time, description: Last time Circlo read it }
         failingSince: { type: [string, "null"], format: date-time, description: Set while it can't be read }
         unread: { type: integer }
+        icon: { type: [string, "null"], description: "Signed Circlo link to the source's logo (GET /v1/reading/image), relative to the API; null: draw its initial" }
     ReadingArticle:
       type: object
-      required: [articleId, sourceId, sourceTitle, title, summary, url, author, publishedAt, read, hasContent]
+      required: [articleId, sourceId, sourceTitle, title, summary, url, author, publishedAt, read, hasContent, sourceIcon]
       properties:
         articleId: { $ref: "#/components/schemas/Id" }
         sourceId: { $ref: "#/components/schemas/Id" }
@@ -1562,6 +1564,7 @@ components:
         publishedAt: { type: string, format: date-time }
         read: { type: boolean }
         hasContent: { type: boolean, description: "There's more to read in Circlo (GET /v1/reading/articles/{id}); otherwise it opens on its site" }
+        sourceIcon: { type: [string, "null"], description: "Signed Circlo link to the source's logo (GET /v1/reading/image), relative to the API; null: draw its initial" }
     ContentRun:
       type: object
       required: [text]

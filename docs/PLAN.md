@@ -45,7 +45,12 @@ code and the API it's `reading`, because `/v1/feed` and `feed-store` are the Hom
   fetched, re-checked on every redirect (`UrlGuard`); up to 25 MB, as podcast feeds carry their archive. YouTube
   video descriptions come from Media RSS. Articles are kept 60 days; feeds nobody follows are dropped.
   What someone follows is returned only to them, is in their data export and goes with their account.
-- **App**: Feeds at `/feeds` (chips All · Unread · each source; article rows with a letter tile, source · time, bold title while
+  **Logos** (`SourceIcons`, V36): a source's tile shows the feed's own logo (Atom icon or logo, RSS image, iTunes
+  cover), else the one its site names (apple-touch-icon, the largest icon, never SVG; a YouTube channel's picture),
+  else /favicon.ico; each candidate is fetched to make sure it's really an image. Looked for right after the first
+  follow, then on a full fetch at most weekly. Served through the same signed image links as article images, so
+  sites never see who follows them; the app falls back to the coloured initial if there's none or it fails.
+- **App**: Feeds at `/feeds` (chips All · Unread · each source; article rows with the source's logo tile, source · time, bold title while
   unread, two-line summary; tap opens the in-app browser and marks it read; ⋯ has Mark as unread, Send in a chat,
   Copy link, Open in browser; "New articles" pill; ＋ Add a source; ⋯ only once something is followed, with Mark all as read only while something is unread, and
   Manage sources). Add a source

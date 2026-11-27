@@ -61,6 +61,23 @@ class FeedParserTest {
     }
 
     @Test
+    void readsTheFeedsOwnLogo() throws Exception {
+        assertThat(parse("""
+                <?xml version="1.0"?><rss version="2.0"><channel><title>DD</title><link>https://dd.example</link>
+                <image><url>/img/logo.png</url><title>DD</title><link>https://dd.example</link></image></channel></rss>""").image())
+                .isEqualTo("https://blog.example/img/logo.png");
+        assertThat(parse("""
+                <?xml version="1.0"?><feed xmlns="http://www.w3.org/2005/Atom"><title>A</title>
+                <icon>https://atom.example/icon.png</icon><logo>https://atom.example/wide.png</logo></feed>""").image())
+                .isEqualTo("https://atom.example/icon.png");
+        assertThat(parse("""
+                <?xml version="1.0"?><rss version="2.0" xmlns:itunes="http://www.itunes.com/dtds/podcast-1.0.dtd"><channel><title>Pod</title>
+                <itunes:image href="https://pod.example/cover.jpg"/></channel></rss>""").image()).isEqualTo("https://pod.example/cover.jpg");
+        assertThat(parse("""
+                <?xml version="1.0"?><rss version="2.0"><channel><title>Plain</title></channel></rss>""").image()).isNull();
+    }
+
+    @Test
     void readsYouTubeChannelFeeds() throws Exception {
         FeedParser.Feed f = parse("""
                 <?xml version="1.0" encoding="UTF-8"?>

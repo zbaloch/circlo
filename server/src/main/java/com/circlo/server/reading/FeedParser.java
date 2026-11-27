@@ -41,8 +41,11 @@ public final class FeedParser {
             "at_medium", "at_campaign", "at_custom1", "at_custom2", "at_custom3", "at_custom4", "at_ptr_name", "at_link_origin",
             "at_link_type", "at_link_id", "at_format", "at_bbc_team");
 
-    /** A feed. {@code siteUrl} is the site it belongs to, if it says. */
-    public record Feed(String title, String siteUrl, List<Item> items) {}
+    /**
+     * A feed. {@code siteUrl} is the site it belongs to, if it says; {@code image} its own logo or cover art, if it
+     * names one (Atom icon or logo, RSS image, iTunes cover).
+     */
+    public record Feed(String title, String siteUrl, String image, List<Item> items) {}
 
     /**
      * One article: {@code guid} identifies it within its feed. {@code content} is its full text as blocks (FeedContent);
@@ -105,7 +108,24 @@ public final class FeedParser {
         if (title.isEmpty()) {
             title = site != null ? URI.create(site).getHost() : base.getHost();
         }
-        return new Feed(title, site, items);
+        return new Feed(title, site, image(feed, base), items);
+    }
+
+    /** The feed's own logo: Atom's icon (small and square), else RSS's image or Atom's logo, else a podcast's cover. */
+    private static String image(SyndFeed feed, URI base) {
+        List<String> candidates = new ArrayList<>();
+        if (feed.getIcon() != null) {
+            candidates.add(feed.getIcon().getUrl());
+        }
+        if (feed.getImage() != null) {
+            candidates.add(feed.getImage().getUrl());
+        }
+        for (org.jdom2.Element el : feed.getForeignMarkup()) {
+            if ("image".equals(el.getName()) && el.getAttributeValue("href") != null) {
+                candidates.add(el.getAttributeValue("href"));
+            }
+        }
+        return candidates.stream().map(c -> absolute(base, c)).filter(java.util.Objects::nonNull).findFirst().orElse(null);
     }
 
     private static Item item(SyndEntry e, URI base, Instant now) {

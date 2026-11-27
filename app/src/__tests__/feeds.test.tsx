@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import { useSyncExternalStore, type ReactElement, type ReactNode } from 'react';
 import { View } from 'react-native';
 
@@ -66,6 +66,7 @@ const source = (id: string, title: string, extra: Partial<Source> = {}): Source 
   updatedAt: new Date(Date.now() - 2 * 3600_000).toISOString(),
   failingSince: null,
   unread: 1,
+  icon: null,
   ...extra,
 });
 const article = (id: string, title: string, read = false, hasContent = false): Article => ({
@@ -79,6 +80,7 @@ const article = (id: string, title: string, read = false, hasContent = false): A
   publishedAt: new Date(Date.now() - 3600_000).toISOString(),
   read,
   hasContent,
+  sourceIcon: null,
 });
 
 let mockSources: Source[] = [];
@@ -229,6 +231,23 @@ describe('Feeds screen', () => {
     expect(mockOpen).toHaveBeenCalledWith('https://stratechery.example/a2', expect.anything());
   });
 
+  it('shows each source’s logo through Circlo, and its initial when it has none or the logo fails', async () => {
+    mockSources = [source('s1', 'Stratechery')];
+    mockArticles = [
+      { ...article('a1', 'With a logo'), sourceIcon: '/v1/reading/image?u=abc&e=1&s=sig' },
+      { ...article('a2', 'Without one'), sourceTitle: 'Dense Discovery' },
+    ];
+    await render(<ReadingScreen />);
+    await screen.findByText('With a logo');
+    const logo = screen.getByTestId('source-logo');
+    expect(logo.props.source).toEqual({ uri: 'http://api.test/v1/reading/image?u=abc&e=1&s=sig' });
+    expect(screen.getByText('D')).toBeTruthy();
+    expect(screen.queryByText('S')).toBeNull();
+    await act(async () => logo.props.onError());
+    expect(screen.queryByTestId('source-logo')).toBeNull();
+    expect(screen.getByText('S')).toBeTruthy();
+  });
+
   it('the article menu can mark it unread', async () => {
     mockSources = [source('s1', 'Stratechery')];
     mockArticles = [article('a2', 'Old news', true)];
@@ -332,6 +351,7 @@ describe('Add a source', () => {
       siteUrl: 'https://arstechnica.example/',
       following: false,
       articles: [{ title: 'Inside the new chip', publishedAt: new Date().toISOString() }],
+      icon: null,
     });
     await render(<AddSourceScreen />);
     expect(screen.getByText('Only you can see what you follow. Circlo checks your sources for you, so the sites don’t see you until you open an article.')).toBeTruthy();

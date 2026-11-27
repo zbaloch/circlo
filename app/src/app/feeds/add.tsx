@@ -69,7 +69,7 @@ export default function AddSourceScreen() {
       {found ? (
         <View className="gap-3 rounded-2xl border border-border p-4 dark:border-border-dark">
           <View className="flex-row items-center gap-3">
-            <SourceTile id={found.feedUrl} title={found.title} size="lg" />
+            <SourceTile id={found.feedUrl} title={found.title} icon={found.icon} size="lg" />
             <View className="flex-1">
               <ContentText text={found.title} links={false} numberOfLines={2} className="text-lg font-bold text-ink dark:text-ink-dark" />
               <Text className="text-muted dark:text-muted-dark">{siteName(found.siteUrl ?? found.feedUrl)}</Text>

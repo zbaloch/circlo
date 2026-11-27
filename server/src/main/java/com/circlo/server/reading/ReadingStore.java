@@ -47,6 +47,12 @@ public class ReadingStore {
                 .stream().findFirst().map(Ids::uuid);
     }
 
+    /** The address of a source's logo, if Circlo found one (SourceIcons). */
+    public Optional<String> icon(UUID source) {
+        return jdbc.queryForList("SELECT icon_url FROM reading_sources WHERE id = ? AND icon_url IS NOT NULL", String.class, (Object) Ids.bytes(source))
+                .stream().findFirst();
+    }
+
     /** Adds a feed that was just read, with its articles. Returns its id (an existing one if it was added meanwhile). */
     public UUID add(FeedFinder.Found found, Duration checkEvery) {
         Optional<UUID> existing = sourceAt(found.url());

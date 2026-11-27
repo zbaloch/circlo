@@ -13,6 +13,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
@@ -52,15 +53,17 @@ public class ReadingController {
     private final RateLimiter limiter;
     private final ReadingProperties props;
     private final ReadingImages images;
+    private final SourceIcons icons;
 
     public ReadingController(JdbcTemplate jdbc, FeedFinder finder, ReadingStore store, RateLimiter limiter, ReadingProperties props,
-            ReadingImages images) {
+            ReadingImages images, SourceIcons icons) {
         this.jdbc = jdbc;
         this.finder = finder;
         this.store = store;
         this.limiter = limiter;
         this.props = props;
         this.images = images;
+        this.icons = icons;
     }
 
     private static byte[] me(Jwt jwt) {
@@ -71,13 +74,15 @@ public class ReadingController {
 
     public record Latest(String title, Instant publishedAt) {}
 
-    public record Found(String feedUrl, String title, String siteUrl, boolean following, List<Latest> articles) {}
+    /** {@code icon}: a signed Circlo link to the source's logo (ReadingImages), if it has one; else the app draws its initial. */
+    public record Found(String feedUrl, String title, String siteUrl, boolean following, List<Latest> articles, String icon) {}
 
-    public record Source(UUID sourceId, String title, String feedUrl, String siteUrl, Instant updatedAt, Instant failingSince, int unread) {}
+    public record Source(UUID sourceId, String title, String feedUrl, String siteUrl, Instant updatedAt, Instant failingSince, int unread,
+            String icon) {}
 
     /** {@code hasContent}: there's more to read in Circlo (GET /v1/reading/articles/{id}); otherwise it opens on its site. */
     public record Article(UUID articleId, UUID sourceId, String sourceTitle, String title, String summary, String url, String author,
-            Instant publishedAt, boolean read, boolean hasContent) {}
+            Instant publishedAt, boolean read, boolean hasContent, String sourceIcon) {}
 
     /** An article with its content as blocks (FeedContent); images are signed Circlo links (ReadingImages). */
     public record ArticleDetail(Article article, List<Map<String, Object>> content) {}
@@ -118,9 +123,11 @@ public class ReadingController {
         URI uri = input(r.url());
         limit(me);
         FeedFinder.Found f = find(uri);
-        boolean following = store.sourceAt(f.url()).map(id -> follows(me, id)).orElse(false);
+        Optional<UUID> known = store.sourceAt(f.url());
+        boolean following = known.map(id -> follows(me, id)).orElse(false);
+        String logo = known.flatMap(store::icon).orElse(f.feed().image());
         return new Found(f.url().toString(), f.feed().title(), f.feed().siteUrl(), following,
-                f.feed().items().stream().limit(3).map(i -> new Latest(i.title(), i.published())).toList());
+                f.feed().items().stream().limit(3).map(i -> new Latest(i.title(), i.published())).toList(), icon(logo));
     }
 
     /** Follows the feed at an address (the one find answered with, or a site). Following one I follow already is fine. */
@@ -134,6 +141,15 @@ public class ReadingController {
             limit(me);
             FeedFinder.Found f = find(uri);
             source = store.add(f, props.checkEvery());
+            // Its logo, off this request (it can take a few fetches); the list shows it once it's there.
+            UUID added = source;
+            Thread.ofVirtual().start(() -> {
+                try {
+                    icons.refreshIfDue(added, f, Instant.now());
+                } catch (RuntimeException e) {
+                    // The next check looks again.
+                }
+            });
         }
         if (!follows(me, source)) {
             Integer count = jdbc.queryForObject("SELECT COUNT(*) FROM reading_follows WHERE user_id = ?", Integer.class, (Object) me);
@@ -153,10 +169,16 @@ public class ReadingController {
         return jdbc.query("""
                 SELECT s.id, s.title, s.feed_url, s.site_url, s.updated_at, s.failing_since,
                   (SELECT COUNT(*) FROM reading_articles a WHERE a.source_id = s.id
-                     AND NOT EXISTS (SELECT 1 FROM reading_read r WHERE r.user_id = f.user_id AND r.article_id = a.id)) AS unread
+                     AND NOT EXISTS (SELECT 1 FROM reading_read r WHERE r.user_id = f.user_id AND r.article_id = a.id)) AS unread,
+                  s.icon_url
                 FROM reading_follows f JOIN reading_sources s ON s.id = f.source_id
                 WHERE f.user_id = ? ORDER BY s.title, s.id""", (rs, i) -> new Source(Ids.uuid(rs.getBytes(1)), rs.getString(2), rs.getString(3),
-                rs.getString(4), instant(rs.getTimestamp(5)), instant(rs.getTimestamp(6)), rs.getInt(7)), (Object) me);
+                rs.getString(4), instant(rs.getTimestamp(5)), instant(rs.getTimestamp(6)), rs.getInt(7), icon(rs.getString(8))), (Object) me);
+    }
+
+    /** A signed Circlo link to a source's logo, or null. */
+    private String icon(String url) {
+        return url == null ? null : images.path(url, Instant.now());
     }
 
     private static Instant instant(Timestamp t) {
@@ -186,7 +208,8 @@ public class ReadingController {
             @RequestParam(name = "limit", required = false, defaultValue = "30") int limit) {
         int n = Math.max(1, Math.min(limit, 100));
         StringBuilder sql = new StringBuilder("""
-                SELECT a.id, a.source_id, s.title, a.title, a.summary, a.url, a.author, a.published_at, r.article_id IS NOT NULL, a.has_content
+                SELECT a.id, a.source_id, s.title, a.title, a.summary, a.url, a.author, a.published_at, r.article_id IS NOT NULL, a.has_content,
+                  s.icon_url
                 FROM reading_follows f
                 JOIN reading_articles a ON a.source_id = f.source_id
                 JOIN reading_sources s ON s.id = a.source_id
@@ -210,7 +233,7 @@ public class ReadingController {
         sql.append(" ORDER BY a.published_at DESC, a.id DESC LIMIT ").append(n + 1);
         List<Article> rows = jdbc.query(sql.toString(), (rs, i) -> new Article(Ids.uuid(rs.getBytes(1)), Ids.uuid(rs.getBytes(2)),
                 rs.getString(3), rs.getString(4), rs.getString(5), rs.getString(6), rs.getString(7), rs.getTimestamp(8).toInstant(),
-                rs.getBoolean(9), rs.getBoolean(10)), args.toArray());
+                rs.getBoolean(9), rs.getBoolean(10), icon(rs.getString(11))), args.toArray());
         if (rows.size() <= n) {
             return new Articles(rows, null);
         }
@@ -243,14 +266,14 @@ public class ReadingController {
         byte[] me = me(jwt);
         List<ArticleDetail> found = jdbc.query("""
                 SELECT a.id, a.source_id, s.title, a.title, a.summary, a.url, a.author, a.published_at, r.article_id IS NOT NULL, a.has_content,
-                  a.content
+                  a.content, s.icon_url
                 FROM reading_articles a
                 JOIN reading_follows f ON f.source_id = a.source_id AND f.user_id = ?
                 JOIN reading_sources s ON s.id = a.source_id
                 LEFT JOIN reading_read r ON r.user_id = f.user_id AND r.article_id = a.id
                 WHERE a.id = ?""", (rs, i) -> new ArticleDetail(new Article(Ids.uuid(rs.getBytes(1)), Ids.uuid(rs.getBytes(2)), rs.getString(3),
                 rs.getString(4), rs.getString(5), rs.getString(6), rs.getString(7), rs.getTimestamp(8).toInstant(), rs.getBoolean(9),
-                rs.getBoolean(10)), withSignedImages(ReadingStore.blocks(rs.getString(11)))), me, Ids.bytes(id));
+                rs.getBoolean(10), icon(rs.getString(12))), withSignedImages(ReadingStore.blocks(rs.getString(11)))), me, Ids.bytes(id));
         if (found.isEmpty()) {
             throw ApiException.notFound();
         }

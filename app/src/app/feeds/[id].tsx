@@ -99,7 +99,7 @@ export default function ArticleScreen() {
     <View className="flex-1 bg-surface dark:bg-surface-dark">
       <ScrollView contentContainerClassName="gap-5 px-5 pb-12 pt-4">
         <View className="flex-row items-center gap-3">
-          <SourceTile id={article.sourceId} title={article.sourceTitle} />
+          <SourceTile id={article.sourceId} title={article.sourceTitle} icon={article.sourceIcon} />
           <View className="flex-1">
             <Text numberOfLines={1} className="text-[15px] font-semibold text-ink dark:text-ink-dark">
               {article.sourceTitle}

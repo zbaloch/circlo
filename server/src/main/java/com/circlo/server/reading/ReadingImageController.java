@@ -25,7 +25,9 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 public class ReadingImageController {
 
-    private static final Set<String> TYPES = Set.of("image/jpeg", "image/png", "image/gif", "image/webp", "image/avif");
+    /** Raster types phones and browsers draw safely (icons too, for sources' logos); never SVG. */
+    static final Set<String> TYPES = Set.of("image/jpeg", "image/png", "image/gif", "image/webp", "image/avif", "image/x-icon",
+            "image/vnd.microsoft.icon");
 
     private record Image(String type, byte[] bytes) {}
 
@@ -59,11 +61,17 @@ public class ReadingImageController {
                 .body(img.bytes());
     }
 
+    /** The response's image type, if it's one Circlo serves and has something in it; else null. */
+    static String type(FeedHttp.Response res) {
+        String type = res.contentType() == null ? "" : res.contentType().split(";")[0].strip().toLowerCase(Locale.ROOT);
+        return TYPES.contains(type) && res.body().length > 0 ? type : null;
+    }
+
     private Image fetch(String url) {
         try {
             FeedHttp.Response res = http.image(URI.create(url));
-            String type = res.contentType().split(";")[0].strip().toLowerCase(Locale.ROOT);
-            if (!TYPES.contains(type) || res.body().length == 0) {
+            String type = type(res);
+            if (type == null) {
                 throw ApiException.notFound();
             }
             return new Image(type, res.body());

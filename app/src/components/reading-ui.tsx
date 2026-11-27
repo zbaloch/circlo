@@ -1,23 +1,43 @@
+import { Image } from 'expo-image';
+import { useState } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
+
+import { API_URL } from '@/api/client';
 
 import { avatarColor } from '@/components/avatar';
 import { ContentText } from '@/components/content-text';
 import { IconButton } from '@/components/icon-button';
 import { Icon } from '@/components/ui/icon';
 import { Text } from '@/components/ui/text';
-import type { Article } from '@/lib/reading';
+import { imageUri, type Article } from '@/lib/reading';
 import { relativeTime } from '@/lib/time';
 import { usePalette } from '@/theme/use-palette';
 
 const TILE = { md: 'h-10 w-10 rounded-lg', lg: 'h-12 w-12 rounded-xl' };
 
 /**
- * A source's letter tile. Its colour comes from the source id, as a person's does from theirs; Circlo never loads a
- * site's own icon, which would tell the site who is browsing. Square-ish, so sources don't look like people.
+ * A source's tile: its logo when Circlo found one (the feed's own, else its site's icon), fetched through Circlo so
+ * the site never sees who's reading; otherwise its initial, coloured from the source id as a person's is from theirs.
+ * Square-ish, so sources don't look like people. Logos sit on white, as most are drawn for a light page.
  */
-export function SourceTile({ id, title, size = 'md' }: { id: string; title: string; size?: keyof typeof TILE }) {
+export function SourceTile({ id, title, icon, size = 'md' }: { id: string; title: string; icon?: string | null; size?: keyof typeof TILE }) {
+  const [failed, setFailed] = useState<string | null>(null);
   const color = avatarColor(id);
   const initial = [...title.trim()][0]?.toUpperCase() ?? '?';
+  if (icon && failed !== icon) {
+    return (
+      <View className={`overflow-hidden border border-border bg-white dark:border-border-dark ${TILE[size]}`}>
+        <Image
+          testID="source-logo"
+          source={{ uri: imageUri(icon, API_URL) }}
+          accessibilityIgnoresInvertColors
+          contentFit="contain"
+          onError={() => setFailed(icon)}
+          className="h-full w-full"
+        />
+      </View>
+    );
+  }
   return (
     <View className={`items-center justify-center ${TILE[size]} ${color.bg}`}>
       <Text className={`font-bold ${color.text} ${size === 'lg' ? 'text-xl' : 'text-base'}`}>{initial}</Text>
@@ -40,7 +60,7 @@ export function ArticleRow({ article, now, onOpen, onMore }: { article: Article;
       onPress={onOpen}
       onLongPress={onMore}
       className="flex-row gap-3 border-b border-border px-4 py-3 active:bg-surface-raised dark:border-border-dark dark:active:bg-surface-raised-dark">
-      <SourceTile id={article.sourceId} title={article.sourceTitle} />
+      <SourceTile id={article.sourceId} title={article.sourceTitle} icon={article.sourceIcon} />
       <View className="flex-1 gap-0.5">
         <View className="flex-row items-center gap-1">
           <Text numberOfLines={1} className="shrink text-[15px] text-muted dark:text-muted-dark">
