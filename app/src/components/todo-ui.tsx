@@ -2,6 +2,7 @@ import { useState, type ReactNode } from 'react';
 import { Modal, Pressable, ScrollView, View } from 'react-native';
 
 import { Button } from '@/components/form';
+import { KeyboardSpacer } from '@/components/keyboard-spacer';
 import { Icon } from '@/components/ui/icon';
 import { Text, TextInput } from '@/components/ui/text';
 import { dayLabel, parseQuickAdd, quickAddLabel, WHEN, type QuickAdd as Parsed, type Todo, type TodoList, type When } from '@/lib/todos';
@@ -128,7 +129,10 @@ export function QuickAdd({ placeholder, today, onAdd }: { placeholder: string; t
   );
 }
 
-/** A bottom sheet, the app's look: a handle, a title, its rows. Scrolls when long. */
+/**
+ * A bottom sheet, the app's look: a handle, a title, its rows. Scrolls when long. It rises with the keyboard, so a
+ * field in it (a list's name) stays above it: keyboard-controller follows the keyboard inside modals too.
+ */
 function Sheet({ visible, title, onClose, children }: { visible: boolean; title: string; onClose: () => void; children: ReactNode }) {
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
@@ -139,6 +143,7 @@ function Sheet({ visible, title, onClose, children }: { visible: boolean; title:
         </View>
         <Text className="px-5 pb-2 text-base font-bold text-ink dark:text-ink-dark">{title}</Text>
         {children}
+        <KeyboardSpacer />
       </View>
     </Modal>
   );
