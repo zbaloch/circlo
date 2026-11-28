@@ -1,9 +1,10 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import type { ReactElement } from 'react';
 
-import PersonScreen from '@/app/people/[id]';
+import PersonScreen from '@/app/rolodex/[id]';
+import RolodexScreen from '@/app/rolodex/index';
+import { DRAWER_ITEMS } from '@/components/app-drawer';
 import { PeopleList } from '@/components/people-ui';
-import type { Connection } from '@/lib/friends';
 import type { Contact, ContactFields, ContactNote } from '@/lib/people';
 import { clearPeople, refreshPeople } from '@/lib/people-store';
 import { pushRoute } from '@/lib/push-route';
@@ -16,6 +17,7 @@ const mockSetParams = jest.fn();
 let mockParams: Record<string, string> = {};
 let mockHeaderRight: (() => ReactElement | null) | undefined;
 jest.mock('expo-router', () => ({
+  useFocusEffect: (fn: () => void) => jest.requireActual('react').useEffect(fn, [fn]),
   router: { push: (p: unknown) => mockPush(p), back: () => mockBack(), setParams: (p: unknown) => mockSetParams(p) },
   useLocalSearchParams: () => mockParams,
   useNavigation: () => ({ setOptions: (o: { headerRight?: () => ReactElement | null }) => (mockHeaderRight = o.headerRight) }),
@@ -69,7 +71,6 @@ const inDays = (n: number) => {
   const d = new Date(today.getFullYear(), today.getMonth(), today.getDate() + n);
   return { month: d.getMonth() + 1, day: d.getDate() };
 };
-const ana: Connection = { userId: 'a', status: 'accepted', profile: { displayName: 'Ana', handle: 'ana', bio: '' } } as unknown as Connection;
 
 beforeEach(async () => {
   jest.clearAllMocks();
@@ -78,29 +79,41 @@ beforeEach(async () => {
   await clearPeople();
 });
 
-describe('People: my connections and the people I add, in one list', () => {
+describe('The Rolodex: my connections and the people I add, in one list of its own', () => {
   const grandma = entry({ contactId: 'g1', name: 'Grandma', keepInTouchDays: 7, keepSince: new Date(today.getTime() - 30 * 86_400_000).toISOString() });
   const anaRow = entry({ contactId: null, name: 'Ana', person: { userId: 'a', name: 'Ana', username: 'ana' }, dates: [{ label: 'Birthday', ...inDays(1), year: null }] });
 
-  it('shows Coming up, then everyone; a connection opens their profile, anyone else their page', async () => {
-    await render(<PeopleList people={[anaRow, grandma]} friends={[ana]} book={null} today={today} />);
+  it('is in the side menu, apart from the People tab', () => {
+    expect(DRAWER_ITEMS.find((i) => i.label === 'Rolodex')?.href).toBe('/rolodex');
+  });
+
+  it('shows Coming up, then everyone, each opening their page', async () => {
+    await render(<PeopleList people={[anaRow, grandma]} today={today} />);
     expect(screen.getByText('Coming up')).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Grandma, Time to catch up (every week)' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Ana, Birthday tomorrow' })).toBeTruthy();
 
     await fireEvent.press(screen.getByRole('button', { name: /^Ana, @ana, Birthday tomorrow/ }));
-    expect(mockPush).toHaveBeenLastCalledWith({ pathname: '/friend/[id]', params: { id: 'a' } });
+    expect(mockPush).toHaveBeenLastCalledWith({ pathname: '/rolodex/[id]', params: { id: 'u-a' } });
     await fireEvent.press(screen.getByRole('button', { name: 'Grandma, Time to catch up' }));
-    expect(mockPush).toHaveBeenLastCalledWith({ pathname: '/people/[id]', params: { id: 'g1' } });
+    expect(mockPush).toHaveBeenLastCalledWith({ pathname: '/rolodex/[id]', params: { id: 'g1' } });
   });
 
   it('adds someone who isn’t on Circlo by name, then opens their page', async () => {
-    await render(<PeopleList people={[]} friends={[]} book={null} today={today} />);
+    await render(<PeopleList people={[]} today={today} />);
     await fireEvent.press(screen.getByRole('button', { name: 'Add someone' }));
     await fireEvent.changeText(await screen.findByLabelText('Name'), '  Nan ');
     await fireEvent.press(screen.getByRole('button', { name: 'Save' }));
     await waitFor(() => expect(mockAddPerson).toHaveBeenCalledWith('Nan', undefined));
-    expect(mockPush).toHaveBeenLastCalledWith({ pathname: '/people/[id]', params: { id: 'new-Nan' } });
+    expect(mockPush).toHaveBeenLastCalledWith({ pathname: '/rolodex/[id]', params: { id: 'new-Nan' } });
+  });
+});
+
+describe('The Rolodex page', () => {
+  it('loads everyone when it opens', async () => {
+    mockPeople = [entry({ contactId: 'g1', name: 'Grandma' })];
+    await render(<RolodexScreen />);
+    expect(await screen.findByText('Grandma')).toBeTruthy();
   });
 });
 
@@ -161,7 +174,7 @@ describe('A person’s page', () => {
 
   it('opens from a reminder', () => {
     const id = '01a22196-efe3-75af-adfa-e4c5b8e18986';
-    expect(pushRoute({ type: 'people', contactId: id })).toEqual({ pathname: '/people/[id]', params: { id } });
+    expect(pushRoute({ type: 'people', contactId: id })).toEqual({ pathname: '/rolodex/[id]', params: { id } });
     expect(pushRoute({ type: 'people', contactId: '../x' })).toBe('/notifications');
   });
 

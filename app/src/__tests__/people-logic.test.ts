@@ -95,7 +95,7 @@ describe('reminders on the phone', () => {
       ['kit:mum:date:0', day(2026, 12, 1, 9).toString(), 'Mum’s birthday', 'Today'],
       ['kit:ali:due', day(2026, 12, 20, 9).toString(), 'Catch up with Ali', 'It’s been a month'],
     ]);
-    expect(list[0].url).toBe('/people/mum');
+    expect(list[0].url).toBe('/rolodex/mum');
   });
 
   it('skip today’s once 9 o’clock has passed, and keep to the soonest 50', () => {

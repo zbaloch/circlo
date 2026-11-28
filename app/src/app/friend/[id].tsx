@@ -58,7 +58,7 @@ export default function FriendScreen() {
     loadBook();
   }, [loadBook]);
   useFocusEffect(reloadBook);
-  // My private notes about them (People): only I see the card.
+  // What my Rolodex keeps about them: only I see the card.
   const { people, loaded: peopleLoaded } = usePeople();
   useEffect(() => {
     if (!peopleLoaded) refreshPeople().catch(() => undefined);

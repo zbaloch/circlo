@@ -12,8 +12,6 @@ jest.mock('expo-router', () => ({
 jest.mock('@/api/client', () => ({}));
 jest.mock('react-native-qrcode-svg', () => () => null);
 jest.mock('expo-clipboard', () => ({ setStringAsync: jest.fn() }));
-// The sheets rise with the keyboard through Reanimated, which doesn't run under jest.
-jest.mock('@/components/keyboard-spacer', () => ({ KeyboardSpacer: () => null }));
 const account = { userId: 'me', handle: 'me' };
 const ana = { userId: 'a', status: 'accepted', profile: { displayName: 'Ana', handle: 'ana', bio: '' } };
 let mockConnections: unknown[] = [ana];

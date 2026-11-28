@@ -1615,7 +1615,7 @@ paths:
             application/json:
               schema: { type: array, items: { $ref: "#/components/schemas/Todo" } }
         "404": { $ref: "#/components/responses/Error" }
-  # ---------------- people: a personal CRM (contacts in code) ----------------
+  # ---------------- rolodex: a personal CRM (contacts in code) ----------------
   /v1/contacts:
     get:
       summary: Everyone, sorted by name - my entries, then the connections I haven't written about (contactId null)
@@ -1856,7 +1856,7 @@ components:
         createdAt: { type: string, format: date-time, description: When it was added }
     Contact:
       description: >-
-        One person in People (my personal CRM), seen only by me. contactId is null for a connection I haven't written about;
+        One person in my Rolodex (personal CRM), seen only by me. contactId is null for a connection I haven't written about;
         person is there only while they're my connection
       type: object
       required: [contactId, name, person, dates, keepInTouchDays, keepSince, lastCaughtUp, noteCount]

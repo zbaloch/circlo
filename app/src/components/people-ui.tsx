@@ -1,41 +1,35 @@
 import { router } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { Pressable, View } from 'react-native';
 
 import { Avatar } from '@/components/avatar';
-import { circlesLine } from '@/components/circle-choice';
 import { Button } from '@/components/form';
 import { PersonRow } from '@/components/person-row';
 import { ChoiceChips, Sheet } from '@/components/sheet';
 import { Icon } from '@/components/ui/icon';
 import { Text, TextInput } from '@/components/ui/text';
-import { circlesOf } from '@/lib/circles';
-import type { AddressBook } from '@/lib/addressbook';
-import type { Connection } from '@/lib/friends';
-import { comingUp, personKey, rhythmLabel, rowLine, type Contact, type ContactDate } from '@/lib/people';
+import { comingUp, personKey, rhythmLabel, ROLODEX, rowLine, type Contact, type ContactDate } from '@/lib/people';
 import { addPersonNow } from '@/lib/people-store';
 import { showToast } from '@/lib/toast';
-import { displayName } from '@/lib/use-connections';
 import { usePalette } from '@/theme/use-palette';
 
 const FIELD = 'rounded-lg border border-border px-4 py-3 text-[15px] text-ink focus:border-primary dark:border-border-dark dark:text-ink-dark';
 
-/** Opens a person's page: their entry, or (a connection I haven't written about) by account. */
+/** Opens a person's page in the Rolodex: their entry, or (a connection I haven't written about) by account. */
 export function openPerson(c: Contact) {
-  router.push({ pathname: '/people/[id]', params: { id: personKey(c) } });
+  router.push({ pathname: '/rolodex/[id]', params: { id: personKey(c) } });
 }
 
 /**
- * People in the People tab (owner 2026-11-28): Coming up (catch-ups due, then dates in the next two weeks), then
- * everyone A–Z, my connections and the people I added who aren't on Circlo. A connection opens their profile (with
- * my private card on it); anyone else opens their page. Under each, one line only I see: a date soon, a catch-up
- * due, or (for a connection) the circles I put them in.
+ * The Rolodex (owner 2026-11-28: its own page in the side menu, apart from the People tab's circles and invites):
+ * Coming up (catch-ups due, then dates in the next two weeks), then everyone A–Z, my connections and the people I
+ * added who aren't on Circlo, each opening their page. Under each, one line only I see: a date soon, a catch-up due,
+ * or when we last caught up.
  */
-export function PeopleList({ people, friends, book, today }: { people: Contact[]; friends: Connection[]; book: AddressBook | null; today: Date }) {
+export function PeopleList({ people, today }: { people: Contact[]; today: Date }) {
   const palette = usePalette();
   const [adding, setAdding] = useState(false);
   const [query, setQuery] = useState('');
-  const byUser = useMemo(() => new Map(friends.map((f) => [f.userId, f])), [friends]);
   const soon = comingUp(people, today);
   const q = query.trim().toLowerCase();
   const shown = q ? people.filter((c) => c.name.toLowerCase().includes(q) || (c.person?.username ?? '').toLowerCase().includes(q)) : people;
@@ -74,7 +68,7 @@ export function PeopleList({ people, friends, book, today }: { people: Contact[]
             className="flex-1 rounded-full bg-surface-raised px-4 py-2 text-[15px] text-ink dark:bg-surface-raised-dark dark:text-ink-dark"
           />
         ) : (
-          <Text className="flex-1 text-muted dark:text-muted-dark">Add people who aren’t on Circlo too. Only you see this.</Text>
+          <Text className="flex-1 text-muted dark:text-muted-dark">Everyone you’re connected to is here. Add people who aren’t on Circlo too. Only you see this.</Text>
         )}
         <Pressable
           accessibilityRole="button"
@@ -87,26 +81,17 @@ export function PeopleList({ people, friends, book, today }: { people: Contact[]
       </View>
 
       <View>
-        {shown.map((c) => {
-          const f = c.person ? byUser.get(c.person.userId) : undefined;
-          const mine = rowLine(c, today);
-          if (c.person) {
-            const circles = book && f ? circlesLine(book, circlesOf(book, book.contacts[f.userId])) : '';
-            return (
-              <PersonRow
-                key={personKey(c)}
-                id={c.person.userId}
-                name={f ? displayName(f) : c.person.name}
-                handle={f?.profile.handle ?? c.person.username}
-                bio={f?.profile.bio}
-                note={[mine, circles].filter(Boolean).join(' · ') || undefined}
-                avatarUrl={f?.profile.avatarUrl ?? c.person.avatarUrl}
-                onPress={() => router.push({ pathname: '/friend/[id]', params: { id: c.person!.userId } })}
-              />
-            );
-          }
-          return <PersonRow key={personKey(c)} id={c.contactId ?? c.name} name={c.name} note={mine || 'Not on Circlo'} onPress={() => openPerson(c)} />;
-        })}
+        {shown.map((c) => (
+          <PersonRow
+            key={personKey(c)}
+            id={c.person?.userId ?? c.contactId ?? c.name}
+            name={c.name}
+            handle={c.person?.username}
+            note={rowLine(c, today) || (c.person ? undefined : 'Not on Circlo')}
+            avatarUrl={c.person?.avatarUrl}
+            onPress={() => openPerson(c)}
+          />
+        ))}
         {q && shown.length === 0 ? <Text className="py-3 text-muted dark:text-muted-dark">No one called that.</Text> : null}
       </View>
 
@@ -313,7 +298,8 @@ export function LinkSheet({ visible, people, onPick, onClose }: { visible: boole
 }
 
 /**
- * On a connection's profile, only for me: what I keep about them (a date soon, the rhythm, notes), opening their page.
+ * On a connection's profile, only for me: what my Rolodex keeps about them (a date soon, the rhythm, notes), opening
+ * their page.
  */
 export function KeepInTouchCard({ entry, today }: { entry: Contact; today: Date }) {
   const palette = usePalette();
@@ -327,12 +313,12 @@ export function KeepInTouchCard({ entry, today }: { entry: Contact; today: Date 
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`Your notes about ${entry.name}: ${line}. Only you see this`}
+      accessibilityLabel={`In your ${ROLODEX}: ${line}. Only you see this`}
       onPress={() => openPerson(entry)}
       className="flex-row items-center gap-3 rounded-2xl border border-border px-4 py-3 active:bg-surface-raised dark:border-border-dark dark:active:bg-surface-raised-dark">
       <Icon name="lock-closed-outline" size={18} color={palette.muted} />
       <View className="flex-1">
-        <Text className="font-semibold text-ink dark:text-ink-dark">Your notes</Text>
+        <Text className="font-semibold text-ink dark:text-ink-dark">In your {ROLODEX}</Text>
         <Text numberOfLines={2} className="text-muted dark:text-muted-dark">{line}</Text>
       </View>
       <Icon name="chevron-forward" size={18} color={palette.muted} />

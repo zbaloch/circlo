@@ -44,7 +44,7 @@ async function wipeDevice() {
   // A playing episode stops, and where I stopped in each one is forgotten.
   await stopPodcast().catch(() => undefined);
   clearTodos();
-  // People's reminders are scheduled on the phone: they go too.
+  // The Rolodex's reminders are scheduled on the phone: they go too.
   await clearPeople();
   await stopBackgroundChecks();
   if (current) {

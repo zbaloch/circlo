@@ -18,7 +18,7 @@ import {
 import { cancelPeopleReminders, schedulePeopleReminders } from './people-reminders';
 
 /**
- * Everyone in People, shared by the People tab, a person's screen and a friend's profile. Saves show straight away
+ * Everyone in the Rolodex, shared by its page, a person's screen and a friend's profile. Saves show straight away
  * and go to the server behind them; if it says no, the change is undone and the caller hears about it. Every change
  * reschedules the phone's reminders.
  */

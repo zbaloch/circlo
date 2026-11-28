@@ -42,8 +42,8 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * People, my personal CRM (owner decisions 2026-11-28; shown in the People tab): my private entries about the people in my life, on Circlo
- * or not, with days to remember, a catch-up rhythm and a dated log of notes. Everyone I'm connected to is listed
+ * The Rolodex, my personal CRM (owner decisions 2026-11-28; its own page in the app's side menu): my private entries
+ * about the people in my life, on Circlo or not, with days to remember, a catch-up rhythm and a dated log of notes. Everyone I'm connected to is listed
  * without my adding them; writing about one makes an entry linked to them. Every statement is scoped to the caller's
  * own user id, so someone else's entry or note is simply not found (404), and a linked person's name and photo are
  * shown only while we're connected. Reminders are scheduled by the app on the phone, so the server keeps no times or

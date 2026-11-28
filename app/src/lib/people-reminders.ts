@@ -1,5 +1,5 @@
 /**
- * People's reminders, scheduled as local notifications on this phone (owner 2026-11-28): birthdays and other dates at
+ * The Rolodex's reminders, scheduled as local notifications on this phone (owner 2026-11-28): birthdays and other dates at
  * 9 in the morning, and when someone becomes due a catch-up. The server keeps no reminder times or time zone; each
  * time People loads or changes, Circlo's reminders are replaced with the soonest 50 (iOS keeps 64 per app). They
  * follow the phone's notification permission (never asked for here) and can be turned off for this phone in

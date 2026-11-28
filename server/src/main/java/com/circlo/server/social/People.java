@@ -95,7 +95,7 @@ public class People {
 
     /**
      * Ends any connection between two people: the friendship and each other's circle memberships (so access to all
-     * posts), and the link from each one's People entry (personal CRM) about the other. Used by unfriend, decline and block.
+     * posts), and the link from each one's Rolodex entry (personal CRM) about the other. Used by unfriend, decline and block.
      */
     public void disconnect(byte[] a, byte[] b) {
         ContactLinks.disconnect(jdbc, a, b);

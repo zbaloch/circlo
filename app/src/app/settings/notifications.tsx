@@ -11,6 +11,7 @@ import { CHAT_ENABLED } from '@/lib/features';
 import { type NotificationSettings, refreshMe, setNotificationSettings, useMe } from '@/lib/me';
 import { peopleRemindersOn, schedulePeopleReminders, setPeopleRemindersOn } from '@/lib/people-reminders';
 import { getPeople } from '@/lib/people-store';
+import { ROLODEX } from '@/lib/people';
 
 type Kind = keyof Omit<NotificationSettings, 'email'>;
 
@@ -24,7 +25,7 @@ export default function NotificationSettingsScreen() {
   const me = useMe();
   // This phone: on, off, or off because notifications are blocked in the phone's settings.
   const [phone, setPhone] = useState<'on' | 'off' | 'blocked' | null>(null);
-  // People's birthday and catch-up reminders, scheduled on this phone (its own switch, kept on the phone).
+  // The Rolodex's birthday and catch-up reminders, scheduled on this phone (its own switch, kept on the phone).
   const [reminders, setReminders] = useState<boolean | null>(null);
   const loadPhone = useCallback(async () => {
     setReminders(await peopleRemindersOn());
@@ -72,7 +73,7 @@ export default function NotificationSettingsScreen() {
                   try {
                     if (on) await enableBackgroundChecks();
                     else await disableBackgroundChecks();
-                    // With permission now given, People's reminders can be scheduled.
+                    // With permission now given, the Rolodex's reminders can be scheduled.
                     if (on && getPeople().loaded) await schedulePeopleReminders(getPeople().people);
                   } catch (e) {
                     setError(describeError(e));
@@ -95,7 +96,7 @@ export default function NotificationSettingsScreen() {
         </>
       ) : null}
       {native && phone === 'on' && reminders !== null ? (
-        <Section title="People">
+        <Section title={ROLODEX}>
           <Row title="Birthdays and catch-ups" subtitle="At 9 in the morning on the day, and when it’s time to catch up with someone. Set on this phone; Circlo’s server doesn’t send them.">
             <Toggle
               accessibilityLabel="Birthdays and catch-ups"

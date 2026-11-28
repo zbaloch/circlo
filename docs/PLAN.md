@@ -23,7 +23,7 @@ Sections 1–3 and the crypto parts of the phases below describe the original en
 kept as history and are **superseded** where they conflict with this table. Section 2A (UI) and the repo rules
 (0A, 0B) still apply, minus the crypto rows.
 
-## Version 2.0 (owner decision 2026-11-27): Feeds, Todos, People (personal CRM)
+## Version 2.0 (owner decision 2026-11-27): Feeds, Todos, Rolodex (personal CRM)
 
 Three features, built one at a time, shipped together as app version 2.0.
 
@@ -110,20 +110,21 @@ were built, then dropped as confusing).
 - **App**: "Todos" in the drawer, after Feeds (no dot). `/todos` (picker, Completed, list, quick add) and
   `/todos/[id]` (title, list, notes).
 
-### People: a personal CRM (owner decisions 2026-11-28)
+### Rolodex: a personal CRM (owner decisions 2026-11-28)
 
 The third personal tool (after Feeds and Todos), towards a paid plan: the people in my life, on Circlo or not, to
-remember birthdays and keep catching up. Replaces the "Logged" placeholder. It lives in the **People tab's People
-section** (owner: "use People there"), which already listed my connections; "Connections" was considered and dropped
-("connect" already means a Circlo friendship). `contacts` in the server and API, `lib/people*` in the app.
+remember birthdays and keep catching up. Replaces the "Logged" placeholder. **Its own page in the side menu**, after
+Todos (`/rolodex`, book-user icon), apart from the People tab, which is about circles and invites (owner). **Named
+Rolodex** (owner: a trademark, used only as the feature's name; the name lives in one constant, `ROLODEX` in
+`lib/people`, so it can be renamed in one place). "People" and "Connections" were considered and dropped. `contacts`
+in the server and API, `lib/people*` in the app's code.
 
-- **Everyone in one place**: requests and sent requests as before, then **Coming up** (who's due a catch-up, most
-  overdue first, then dates in the next two weeks), then everyone A–Z: my connections (as before, with the circles I
-  put them in) and the people I add by name with **Add** (anyone, on Circlo or not); a search field once there are
-  more than eight. Each row has one quiet line only I see: a date soon, "Time to catch up", or "Caught up 2 weeks ago".
-  A connection opens their profile, which shows a **Your notes** card (only to me) opening their page; anyone else
-  opens their page. A connection gets an entry of its own with the first thing I write about them.
-- **A person's page** (`/people/[id]`, an entry's id or `u-<userId>`): name and photo ("@handle · on Circlo" with View
+- **The Rolodex page**: **Coming up** (who's due a catch-up, most overdue first, then dates in the next two weeks),
+  then everyone A–Z: my connections and the people I add by name with **Add** (anyone, on Circlo or not); a search
+  field once there are more than eight. Each row has one quiet line only I see: a date soon, "Time to catch up", or
+  "Caught up 2 weeks ago". Everyone opens their page. A connection's profile also shows an **In your Rolodex** card
+  (only to me) opening their page. A connection gets an entry of its own with the first thing I write about them.
+- **A person's page** (`/rolodex/[id]`, an entry's id or `u-<userId>`): name and photo ("@handle · on Circlo" with View
   profile and Message, or "Not on Circlo" with Link to a connection), **Keep in touch** (Off, Week, 2 weeks, Month,
   3 months, 6 months, Year; "Last caught up 2 weeks ago · next in 16 days"; **Caught up**, today or a day before, with
   optional words), **Dates** (Birthday, Anniversary or my own words; day and month, the year if known, shown as an
@@ -133,16 +134,16 @@ section** (owner: "use People there"), which already listed my connections; "Con
 - **Linking to Circlo**: an entry about a connection is linked to them; one made before someone joined can be linked
   once we're connected; each connection is linked to at most one entry. When we stop being connected (unfriend,
   decline, block, account deleted) the link drops and my entry stays with my notes; an entry with nothing written in
-  it goes. The person never knows they're in anyone's People.
+  it goes. The person never knows they're in anyone's Rolodex.
 - **Reminders are scheduled on the phone** (`lib/people-reminders`, local notifications): a date at 9 am on the day,
   and when someone becomes due, the soonest 50 (iOS keeps 64 per app), replaced whenever People loads or changes,
   cancelled at sign-out. They follow the phone's notification permission (never asked for by People) and have their
-  own switch in Settings → Notifications ("Birthdays and catch-ups"). Tapping one opens that person. The server keeps
+  own switch in Settings → Notifications (Rolodex: "Birthdays and catch-ups"). Tapping one opens that person. The server keeps
   no reminder times or time zones; the web app has Coming up instead.
 - **Server** (`contacts` package, V42): `contacts` (name, linked_user_id, keep_days, keep_since), `contact_dates`,
   `contact_notes` (body, caught_up, noted_at). Every read and write is the owner's own; anything else is 404; a linked
   person's name and photo are sent only while we're connected. Limits: 5,000 people, 20 dates and 500 notes each,
-  20,000 notes in all, 300 writes an hour. In the data export (`people`); deleted with the account. Nothing is logged.
+  20,000 notes in all, 300 writes an hour. In the data export (`rolodex`); deleted with the account. Nothing is logged.
 - **Not now**: phone/email/address details, importing from the phone's contacts, Invite to Circlo from an entry
   (linking when they join), photos for people not on Circlo.
 

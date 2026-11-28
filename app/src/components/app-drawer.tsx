@@ -6,6 +6,7 @@ import { Pressable, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { refreshMe, useMe } from '@/lib/me';
+import { ROLODEX } from '@/lib/people';
 import { readingHasNew } from '@/lib/reading';
 import { useSession } from '@/lib/session';
 import { usePalette } from '@/theme/use-palette';
@@ -21,6 +22,8 @@ export const DRAWER_ITEMS: Item[] = [
   { label: 'Feeds', icon: 'rss-outline', href: '/feeds', dot: 'reading' },
   // Todos (2.0): my own to-do lists. Things-calm: no dot, no count.
   { label: 'Todos', icon: 'list-todo', href: '/todos' },
+  // Rolodex (2.0): my personal CRM, people on Circlo and not, birthdays and catch-ups. No dot (reminders come on the phone).
+  { label: ROLODEX, icon: 'book-user', href: '/rolodex' },
   // Devices is the first link inside Settings and privacy.
   { label: 'Settings and privacy', icon: 'settings-outline', href: '/settings' },
 ];

@@ -199,7 +199,7 @@ describe('Feeds logic', () => {
   });
 
   it('sits in the drawer between Profile and Settings', () => {
-    expect(DRAWER_ITEMS.map((i) => i.label)).toEqual(['Profile', 'Feeds', 'Todos', 'Settings and privacy']);
+    expect(DRAWER_ITEMS.map((i) => i.label)).toEqual(['Profile', 'Feeds', 'Todos', 'Rolodex', 'Settings and privacy']);
   });
 });
 

@@ -26,6 +26,7 @@ import {
   loadPersonNotes,
   noteDay,
   RHYTHMS,
+  ROLODEX,
   type Contact,
   type ContactDate,
   type ContactFields,
@@ -50,7 +51,7 @@ import { usePalette } from '@/theme/use-palette';
 const SHORT: Record<number, string> = { 7: 'Week', 14: '2 weeks', 30: 'Month', 90: '3 months', 180: '6 months', 365: 'Year' };
 
 /**
- * One person in People (owner 2026-11-28), seen only by me: their name and photo (View profile and Message while
+ * One person in my Rolodex (owner 2026-11-28), seen only by me: their name and photo (View profile and Message while
  * we're connected; Link to a connection otherwise), how often to catch up and when we last did, days to remember, and
  * a dated log of notes and catch-ups with a field for the next note. For a connection I haven't written about, the
  * entry is made with the first thing I write.
@@ -67,7 +68,7 @@ export default function PersonScreen() {
   if (!entry) {
     return (
       <Screen>
-        {loaded ? <EmptyState icon="people-outline" title="Not here any more" body="This person was deleted from People." /> : <Spinner className="flex-1 py-10" />}
+        {loaded ? <EmptyState icon="book-user" title="Not here any more" body={`This person was deleted from your ${ROLODEX}.`} /> : <Spinner className="flex-1 py-10" />}
       </Screen>
     );
   }

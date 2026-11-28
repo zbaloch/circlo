@@ -1,5 +1,5 @@
 /**
- * People, my personal CRM (owner decisions 2026-11-28; `contacts` in the API): everyone I'm connected to plus anyone I
+ * The Rolodex, my personal CRM (owner decisions 2026-11-28; `contacts` in the API, `people` in the app's code): everyone I'm connected to plus anyone I
  * add, on Circlo or not, with days to remember, a keep-in-touch rhythm and a dated log of notes and catch-ups. Only I
  * ever see it (the server answers anyone else with 404, and the person is never told). Reminders are scheduled on the
  * phone (`people-reminders`), so the server keeps no reminder times or time zones.
@@ -11,6 +11,9 @@ export type Contact = components['schemas']['Contact'];
 export type ContactDate = components['schemas']['ContactDate'];
 export type ContactNote = components['schemas']['ContactNote'];
 export type ContactFields = { name: string; keepInTouchDays: number | null; dates: ContactDate[] };
+
+/** The feature's name, everywhere it's shown (owner 2026-11-28: "Rolodex", a trademark used as a plain noun; one place to rename it). */
+export const ROLODEX = 'Rolodex';
 
 /** The rhythms on offer, in days. */
 export const RHYTHMS = [7, 14, 30, 90, 180, 365] as const;
@@ -216,7 +219,7 @@ export function reminders(people: Contact[], now: Date): Reminder[] {
   const out: Reminder[] = [];
   for (const c of people) {
     if (!c.contactId) continue;
-    const url = `/people/${c.contactId}`;
+    const url = `/rolodex/${c.contactId}`;
     c.dates.forEach((d, i) => {
       const date = at9(nextOccurrence(d, now));
       const years = d.year ? date.getFullYear() - d.year : null;
