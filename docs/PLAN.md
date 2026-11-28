@@ -86,16 +86,16 @@ code and the API it's `reading`, because `/v1/feed` and `feed-store` are the Hom
 ### Todos (owner decision 2026-11-27)
 
 **Personal only**: nobody else ever sees my to-dos (no sharing, assigning or circles). Things' calm design (no badges,
-counts or dots; a satisfying tick) with Todoist's quick add for dates.
+counts or dots; a satisfying tick) with a quick add at the bottom.
 
 - **Lists.** Every to-do is in a list. **General** is the first list, made for me, can be renamed but not deleted, and
   is where quick add puts things by default. Lists can be added, renamed, reordered and deleted (with their to-dos).
-- **Quick add** at the bottom: "Call mum tomorrow", "Pay rent every month", "Dentist next Fri", "Taxes in 2 weeks",
-  "Dec 5". The date (and repeat) is read from the words as I type and shown as a chip under the field, which I can tap
-  away to keep the words as they are. Adding in Today with no date makes it due today; adding in a list puts it there.
+- **Quick add** at the bottom: a title, and a calendar button beside it for a date (Today, Tomorrow, Next week, or a
+  day on a month calendar), shown as a chip that can be tapped off. Owner 2026-11-28: no dates read from words ("next
+  Fri" was confusing). Adding in Today with no date makes it due today, in Upcoming tomorrow; in a list, it goes there.
 - **A to-do**: its title, **notes** (plain text, links tappable), a due **date** (no times), a **repeat** (daily,
-  weekly or monthly, from its date), and its list. Tapping one opens it to edit; dates can be typed in the same words
-  or picked from Today / Tomorrow / Next week / No date.
+  weekly or monthly, from its date), and its list. Tapping one opens it to edit; dates are picked from Today /
+  Tomorrow / Next week / No date or a month calendar.
 - **What I see** (owner 2026-11-28, like Feeds' source picker and Unread): a list picker, **All** to start or one
   list, and beside it one of **Today** (overdue first, in soft red, then today's), **Upcoming** (grouped by day:
   Tomorrow, Friday... then by month), **No date** or **Completed**; tapping it again shows everything. All with

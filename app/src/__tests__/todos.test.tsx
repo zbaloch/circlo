@@ -155,29 +155,41 @@ describe('Todos', () => {
     expect(screen.getAllByRole('checkbox').map((c) => c.props.accessibilityLabel)).toEqual(['Renew insurance', 'Quarterly report']);
   });
 
-  it('quick add reads the date from my words, adds to what I’m looking at, and says when it lands elsewhere', async () => {
+  it('quick add: a title, a date from the calendar button, and the list I’m looking at', async () => {
     await render(<TodosScreen />);
     const field = await screen.findByLabelText('New to-do');
+    // Plain words stay plain: no date is read from them.
     await fireEvent.changeText(field, 'Call mum tomorrow');
-    expect(screen.getByText('Tomorrow')).toBeTruthy();
     await fireEvent.press(screen.getByRole('button', { name: 'Add to-do' }));
-    await waitFor(() => expect(mockAdd).toHaveBeenCalledWith({ title: 'Call mum', notes: null, dueDate: addDays(TODAY, 1), repeat: null, listId: null }));
+    await waitFor(() => expect(mockAdd).toHaveBeenCalledWith({ title: 'Call mum tomorrow', notes: null, dueDate: null, repeat: null, listId: null }));
     expect(mockToast).not.toHaveBeenCalled();
 
-    // In Today with no date it's for today; tapping the chip away keeps "Monday" in the title.
-    await fireEvent.press(screen.getByRole('button', { name: 'Today' }));
-    await fireEvent.changeText(field, 'Read Monday notes');
-    await fireEvent.press(screen.getByRole('button', { name: /Tap to keep the words “Monday”/ }));
+    // The calendar button: Tomorrow, shown as a chip that can be taken off; then a day on the calendar.
+    await fireEvent.press(screen.getByRole('button', { name: 'Pick a date' }));
+    await fireEvent.press(screen.getByRole('button', { name: 'Tomorrow' }));
+    expect(screen.getByRole('button', { name: 'Due Tomorrow. Tap to take the date off' })).toBeTruthy();
+    await fireEvent.press(screen.getByRole('button', { name: 'Date: Tomorrow' }));
+    await fireEvent.press(screen.getByRole('button', { name: 'Next month' }));
+    await fireEvent.press(screen.getByRole('button', { name: 'Saturday 5 December 2026' }));
+    await fireEvent.changeText(field, 'Party');
     await fireEvent(field, 'submitEditing');
-    await waitFor(() => expect(mockAdd).toHaveBeenLastCalledWith({ title: 'Read Monday notes', notes: null, dueDate: TODAY, repeat: null, listId: null }));
-    expect(await screen.findByText('Read Monday notes')).toBeTruthy();
+    await waitFor(() => expect(mockAdd).toHaveBeenLastCalledWith({ title: 'Party', notes: null, dueDate: '2026-12-05', repeat: null, listId: null }));
+
+    // In Today with no date it's for today.
+    await fireEvent.press(screen.getByRole('button', { name: 'Today' }));
+    await fireEvent.changeText(field, 'Send invoice');
+    await fireEvent(field, 'submitEditing');
+    await waitFor(() => expect(mockAdd).toHaveBeenLastCalledWith({ title: 'Send invoice', notes: null, dueDate: TODAY, repeat: null, listId: null }));
+    expect(await screen.findByText('Send invoice')).toBeTruthy();
 
     // In Work + Today, a later date goes to Work and says when.
     await fireEvent.press(screen.getByRole('button', { name: 'Showing All' }));
     await fireEvent.press(screen.getByRole('button', { name: 'Work' }));
-    await fireEvent.changeText(screen.getByPlaceholderText('Add to Work'), 'Book flights next week');
+    await fireEvent.press(screen.getByRole('button', { name: 'Pick a date' }));
+    await fireEvent.press(screen.getByRole('button', { name: 'Next week' }));
+    await fireEvent.changeText(screen.getByPlaceholderText('Add to Work'), 'Book flights');
     await fireEvent.press(screen.getByRole('button', { name: 'Add to-do' }));
-    await waitFor(() => expect(mockAdd).toHaveBeenLastCalledWith(expect.objectContaining({ title: 'Book flights', listId: 'w' })));
+    await waitFor(() => expect(mockAdd).toHaveBeenLastCalledWith(expect.objectContaining({ title: 'Book flights', listId: 'w', dueDate: '2026-11-30' })));
     expect(mockToast).toHaveBeenCalledWith('Added for Monday');
   });
 
@@ -248,16 +260,16 @@ describe('A to-do', () => {
     mockTodos = [todo('t1', 'File taxes', { notes: 'Forms in the blue folder https://gov.example', dueDate: TODAY })];
   });
 
-  it('saves itself a moment after I change it: title, date in words, repeat and list', async () => {
+  it('saves itself a moment after I change it: title, a day on the calendar, repeat and list', async () => {
     await render(<TodoScreen />);
     expect(await screen.findByDisplayValue('File taxes')).toBeTruthy();
     // Notes show with their links until I tap to edit them.
     expect(screen.getByRole('link', { name: 'https://gov.example' })).toBeTruthy();
 
     await fireEvent.changeText(screen.getByLabelText('Title'), 'File the taxes');
-    await fireEvent.changeText(screen.getByLabelText('Type a date'), 'dec 5');
-    expect(screen.getByText('5 Dec — press return to use it')).toBeTruthy();
-    await fireEvent(screen.getByLabelText('Type a date'), 'submitEditing');
+    await fireEvent.press(screen.getByRole('button', { name: 'Next month' }));
+    await fireEvent.press(screen.getByRole('button', { name: 'Saturday 5 December 2026' }));
+    expect(screen.getByText('Date · 5 Dec')).toBeTruthy();
     await fireEvent.press(screen.getByRole('button', { name: 'Every month' }));
     await fireEvent.press(screen.getByRole('button', { name: 'Work' }));
     await waitFor(() =>

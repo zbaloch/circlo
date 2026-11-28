@@ -2,10 +2,25 @@ import { useState, type ReactNode } from 'react';
 import { Modal, Pressable, ScrollView, View } from 'react-native';
 
 import { Button } from '@/components/form';
+import { IconButton } from '@/components/icon-button';
 import { KeyboardSpacer } from '@/components/keyboard-spacer';
 import { Icon } from '@/components/ui/icon';
 import { Text, TextInput } from '@/components/ui/text';
-import { dayLabel, parseQuickAdd, quickAddLabel, WHEN, type QuickAdd as Parsed, type Todo, type TodoList, type When } from '@/lib/todos';
+import {
+  addDays,
+  dayLabel,
+  fullDate,
+  monthOf,
+  monthTitle,
+  monthWeeks,
+  nextWeek,
+  shiftMonth,
+  WEEKDAY_INITIALS,
+  WHEN,
+  type Todo,
+  type TodoList,
+  type When,
+} from '@/lib/todos';
 import { usePalette } from '@/theme/use-palette';
 
 /**
@@ -63,53 +78,57 @@ export function TodoRow({ todo, today, listName, checked, onToggle, onOpen, onLo
 }
 
 /**
- * Quick add, pinned at the bottom: type a to-do with its date in words ("Call mum tomorrow", "Pay rent every month");
- * a chip shows what will be set, and tapping its × keeps the words as they are. Return adds it and leaves the field
- * open for the next one.
+ * Quick add, pinned at the bottom: type a to-do and press return (the field stays open for the next one). The
+ * calendar button beside it gives it a date (Today, Tomorrow, Next week or a day on the calendar); the date shows as a
+ * chip, tapped to take it off. With no date picked, the screen decides (today in Today, tomorrow in Upcoming).
  */
-export function QuickAdd({ placeholder, today, onAdd }: { placeholder: string; today: string; onAdd: (q: Parsed) => Promise<void> }) {
+export function QuickAdd({ placeholder, today, onAdd }: {
+  placeholder: string;
+  today: string;
+  onAdd: (todo: { title: string; dueDate: string | null }) => Promise<void>;
+}) {
   const palette = usePalette();
   const [text, setText] = useState('');
-  const [ignore, setIgnore] = useState<string | null>(null);
+  const [dueDate, setDueDate] = useState<string | null>(null);
+  const [picking, setPicking] = useState(false);
   const [busy, setBusy] = useState(false);
-  const parsed = parseQuickAdd(text, today, ignore);
-  const chip = parsed.phrase ? quickAddLabel(parsed, today) : null;
+  const title = text.trim();
   const add = async () => {
-    if (!parsed.title || busy) return;
+    if (!title || busy) return;
     setBusy(true);
     try {
-      await onAdd(parsed);
+      await onAdd({ title, dueDate });
       setText('');
-      setIgnore(null);
+      setDueDate(null);
     } finally {
       setBusy(false);
     }
   };
   return (
     <View className="gap-2 border-t border-border bg-surface px-3 py-2 dark:border-border-dark dark:bg-surface-dark">
-      {chip ? (
+      {dueDate ? (
         <View className="flex-row">
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel={`${chip}. Tap to keep the words “${parsed.phrase}” in the title instead`}
-            onPress={() => setIgnore(parsed.phrase)}
+            accessibilityLabel={`Due ${dayLabel(dueDate, today)}. Tap to take the date off`}
+            onPress={() => setDueDate(null)}
             className="flex-row items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1 dark:bg-primary-dark/20">
-            <Icon name={parsed.repeat ? 'repeat-outline' : 'time-outline'} size={14} color={palette.primary} />
-            <Text className="text-sm font-semibold text-primary dark:text-primary-dark">{chip}</Text>
+            <Icon name="calendar-outline" size={14} color={palette.primary} />
+            <Text className="text-sm font-semibold text-primary dark:text-primary-dark">{dayLabel(dueDate, today)}</Text>
             <Icon name="close" size={14} color={palette.primary} />
           </Pressable>
         </View>
       ) : null}
       <View className="flex-row items-end gap-2">
+        <IconButton accessibilityLabel={dueDate ? `Date: ${dayLabel(dueDate, today)}` : 'Pick a date'} onPress={() => setPicking(true)}>
+          <Icon name="calendar-outline" size={22} color={dueDate ? palette.primary : palette.muted} />
+        </IconButton>
         <TextInput
           accessibilityLabel="New to-do"
           placeholder={placeholder}
           placeholderTextColor={palette.muted}
           value={text}
-          onChangeText={(t) => {
-            setText(t);
-            if (ignore && !t.toLowerCase().includes(ignore.toLowerCase())) setIgnore(null);
-          }}
+          onChangeText={setText}
           onSubmitEditing={() => void add()}
           submitBehavior="submit"
           returnKeyType="done"
@@ -119,13 +138,122 @@ export function QuickAdd({ placeholder, today, onAdd }: { placeholder: string; t
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Add to-do"
-          disabled={!parsed.title || busy}
+          disabled={!title || busy}
           onPress={() => void add()}
-          className={`h-10 w-10 items-center justify-center rounded-full bg-primary dark:bg-primary-dark ${!parsed.title || busy ? 'opacity-50' : ''}`}>
+          className={`h-10 w-10 items-center justify-center rounded-full bg-primary dark:bg-primary-dark ${!title || busy ? 'opacity-50' : ''}`}>
           <Icon name="arrow-up" size={20} color={palette.onPrimary} />
         </Pressable>
       </View>
+      <DateSheet
+        visible={picking}
+        today={today}
+        value={dueDate}
+        onPick={(d) => {
+          setDueDate(d);
+          setPicking(false);
+        }}
+        onClose={() => setPicking(false)}
+      />
     </View>
+  );
+}
+
+/** Today, Tomorrow, Next week, No date: the usual dates, one tap each. */
+export function DateShortcuts({ today, value, onPick }: { today: string; value: string | null; onPick: (date: string | null) => void }) {
+  const choices: { value: string; label: string; date: string | null }[] = [
+    { value: 'today', label: 'Today', date: today },
+    { value: 'tomorrow', label: 'Tomorrow', date: addDays(today, 1) },
+    { value: 'nextweek', label: 'Next week', date: nextWeek(today) },
+    { value: 'none', label: 'No date', date: null },
+  ];
+  const selected = choices.find((c) => c.date === value)?.value ?? null;
+  return (
+    <ChoiceChips
+      label="Date"
+      selected={selected}
+      onSelect={(v) => onPick(choices.find((c) => c.value === v)!.date)}
+      options={choices.map((c) => ({ value: c.value, label: c.label }))}
+    />
+  );
+}
+
+/**
+ * A month to tap a day in, Monday first: today ringed, the picked day filled. ‹ › move a month; past days can be
+ * picked too (for something already overdue).
+ */
+export function Calendar({ today, value, onPick }: { today: string; value: string | null; onPick: (date: string) => void }) {
+  const palette = usePalette();
+  const [month, setMonth] = useState(monthOf(value ?? today));
+  return (
+    <View className="gap-2">
+      <View className="flex-row items-center justify-between">
+        <IconButton accessibilityLabel="Previous month" onPress={() => setMonth((m) => shiftMonth(m, -1))}>
+          <Icon name="chevron-back" size={20} color={palette.ink} />
+        </IconButton>
+        <Text accessibilityRole="header" className="text-base font-semibold text-ink dark:text-ink-dark">
+          {monthTitle(month, today)}
+        </Text>
+        <IconButton accessibilityLabel="Next month" onPress={() => setMonth((m) => shiftMonth(m, 1))}>
+          <Icon name="chevron-forward" size={20} color={palette.ink} />
+        </IconButton>
+      </View>
+      <View className="flex-row">
+        {WEEKDAY_INITIALS.map((d, i) => (
+          <Text key={i} importantForAccessibility="no" className="flex-1 text-center text-xs font-semibold text-muted dark:text-muted-dark">
+            {d}
+          </Text>
+        ))}
+      </View>
+      {monthWeeks(month).map((week, w) => (
+        <View key={w} className="flex-row">
+          {week.map((day, i) =>
+            day ? (
+              <Pressable
+                key={day}
+                accessibilityRole="button"
+                accessibilityLabel={fullDate(day)}
+                accessibilityState={{ selected: day === value }}
+                onPress={() => onPick(day)}
+                className="flex-1 items-center py-0.5">
+                <View
+                  className={`h-9 w-9 items-center justify-center rounded-full ${
+                    day === value ? 'bg-primary dark:bg-primary-dark' : day === today ? 'border border-primary dark:border-primary-dark' : ''
+                  }`}>
+                  <Text
+                    className={`text-[15px] ${
+                      day === value ? 'font-bold text-on-primary dark:text-on-primary-dark' : day < today ? 'text-muted dark:text-muted-dark' : 'text-ink dark:text-ink-dark'
+                    }`}>
+                    {Number(day.slice(8))}
+                  </Text>
+                </View>
+              </Pressable>
+            ) : (
+              <View key={`${w}-${i}`} className="flex-1" />
+            ),
+          )}
+        </View>
+      ))}
+    </View>
+  );
+}
+
+/** Picking a date for a new to-do: the shortcuts, then the calendar. */
+function DateSheet({ visible, today, value, onPick, onClose }: {
+  visible: boolean;
+  today: string;
+  value: string | null;
+  onPick: (date: string | null) => void;
+  onClose: () => void;
+}) {
+  return (
+    <Sheet visible={visible} title="Date" onClose={onClose}>
+      {visible ? (
+        <ScrollView contentContainerClassName="gap-4 px-5 pt-1">
+          <DateShortcuts today={today} value={value} onPick={onPick} />
+          <Calendar today={today} value={value} onPick={onPick} />
+        </ScrollView>
+      ) : null}
+    </Sheet>
   );
 }
 

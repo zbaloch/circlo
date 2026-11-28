@@ -27,7 +27,6 @@ import {
   todayIso,
   todayTodos,
   upcomingGroups,
-  type QuickAdd as Parsed,
   type Todo,
   type TodoFilter,
   type When,
@@ -62,8 +61,8 @@ function shows(when: When | null, dueDate: string | null, today: string): boolea
 /**
  * Todos (2.0; owner decisions 2026-11-27/28): my own to-do lists, Things-calm (no badges or counts). Above them, a
  * list picker ("All" to start, or one list) and one of Today, Upcoming, No date or Completed, which work together:
- * "All" with nothing picked shows every open to-do under its list's name. Quick add at the bottom reads dates in
- * words. In a list with nothing picked the order is mine (long-press to drag).
+ * "All" with nothing picked shows every open to-do under its list's name. Quick add at the bottom, with a calendar
+ * button for its date. In a list with nothing picked the order is mine (long-press to drag).
  */
 export default function TodosScreen() {
   const navigation = useNavigation();
@@ -186,11 +185,11 @@ export default function TodosScreen() {
 
   const open = (t: Todo) => router.push({ pathname: '/todos/[id]', params: { id: t.todoId } });
 
-  // Added to the list I'm looking at (General under All); dated today in Today, tomorrow in Upcoming, unless I typed one.
-  const add = async (q: Parsed) => {
+  // Added to the list I'm looking at (General under All); dated today in Today, tomorrow in Upcoming, unless I picked one.
+  const add = async (q: { title: string; dueDate: string | null }) => {
     const dueDate = q.dueDate ?? (filter.when === 'today' ? today : filter.when === 'upcoming' ? addDays(today, 1) : null);
     try {
-      await addTodoNow({ title: q.title, notes: null, dueDate, repeat: q.repeat, listId: filter.listId });
+      await addTodoNow({ title: q.title, notes: null, dueDate, repeat: null, listId: filter.listId });
     } catch {
       showToast('Couldn’t add it. Try again.');
       throw new Error('not added');
@@ -239,7 +238,7 @@ export default function TodosScreen() {
             data={todayTodos(scoped, today)}
             keyExtractor={(t) => t.todoId}
             renderItem={({ item }) => row(item, all)}
-            ListEmptyComponent={<Empty title="Nothing for today" body="Add a to-do below. Dates work in words: “Call mum tomorrow”, “Pay rent every month”." />}
+            ListEmptyComponent={<Empty title="Nothing for today" body="Add a to-do below; the calendar button beside it gives it a date." />}
             keyboardShouldPersistTaps="handled"
           />
         ) : filter.when === 'upcoming' ? (
@@ -269,7 +268,7 @@ export default function TodosScreen() {
             renderItem={({ item }) => row(item, false)}
             renderSectionHeader={({ section }) => sectionHeader(section.title)}
             stickySectionHeadersEnabled={false}
-            ListEmptyComponent={<Empty title="Nothing to do" body="Add a to-do below. Dates work in words: “Call mum tomorrow”, “Pay rent every month”." />}
+            ListEmptyComponent={<Empty title="Nothing to do" body="Add a to-do below; the calendar button beside it gives it a date." />}
             keyboardShouldPersistTaps="handled"
           />
         ) : (

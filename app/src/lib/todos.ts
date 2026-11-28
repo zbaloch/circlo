@@ -90,13 +90,6 @@ export function weekday(iso: string): number {
   return new Date(toUtc(iso)).getUTCDay();
 }
 
-function addMonths(iso: string, months: number): string {
-  const [y, m, d] = iso.split('-').map(Number);
-  const target = new Date(Date.UTC(y, m - 1 + months, 1));
-  const last = new Date(Date.UTC(target.getUTCFullYear(), target.getUTCMonth() + 1, 0)).getUTCDate();
-  return fromUtc(Date.UTC(target.getUTCFullYear(), target.getUTCMonth(), Math.min(d, last)));
-}
-
 const WEEKDAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
@@ -176,120 +169,45 @@ export function noDateTodos(todos: Todo[]): Todo[] {
 }
 
 
-// --- quick add: dates and repeats in words ---
+// --- picking a day: shortcuts and a month calendar ---
 
-export type QuickAdd = { title: string; dueDate: string | null; repeat: Repeat | null; phrase: string | null };
-
-const WEEKDAYS: Record<string, number> = {
-  sun: 0, sunday: 0, mon: 1, monday: 1, tue: 2, tues: 2, tuesday: 2, wed: 3, weds: 3, wednesday: 3,
-  thu: 4, thur: 4, thurs: 4, thursday: 4, fri: 5, friday: 5, sat: 6, saturday: 6,
-};
-const MONTHS: Record<string, number> = {
-  jan: 1, january: 1, feb: 2, february: 2, mar: 3, march: 3, apr: 4, april: 4, may: 5, jun: 6, june: 6, jul: 7, july: 7,
-  aug: 8, august: 8, sep: 9, sept: 9, september: 9, oct: 10, october: 10, nov: 11, november: 11, dec: 12, december: 12,
-};
-const NUMBERS: Record<string, number> = { a: 1, an: 1, one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10 };
-const WD = Object.keys(WEEKDAYS).sort((a, b) => b.length - a.length).join('|');
-const MON = Object.keys(MONTHS).sort((a, b) => b.length - a.length).join('|');
-const NUM = `\\d{1,3}|${Object.keys(NUMBERS).join('|')}`;
-const LEAD = '(?:(?:on|by|due)\\s+)?';
-
-/** The weekday on or after today. */
-function onOrAfter(today: string, day: number): string {
-  return addDays(today, (day - weekday(today) + 7) % 7);
+/** Next week: the coming Monday (a week on if today is Monday). Pure. */
+export function nextWeek(today: string): string {
+  return addDays(today, ((8 - weekday(today)) % 7) || 7);
 }
 
-function validDate(y: number, m: number, d: number): boolean {
-  const date = new Date(Date.UTC(y, m - 1, d));
-  return date.getUTCMonth() === m - 1 && date.getUTCDate() === d;
+/** The month a date is in ("2026-11"), and the one {@code by} months on. Pure. */
+export function monthOf(iso: string): string {
+  return iso.slice(0, 7);
 }
 
-/** A month and day: this year's, or next year's once it has passed. */
-function monthDay(today: string, m: number, d: number, year?: number): string | null {
-  const y = year ?? Number(today.slice(0, 4));
-  if (!validDate(y, m, d)) return null;
-  const iso = `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-  if (year === undefined && iso < today) return validDate(y + 1, m, d) ? `${y + 1}${iso.slice(4)}` : null;
-  return iso;
+export function shiftMonth(month: string, by: number): string {
+  const [y, m] = month.split('-').map(Number);
+  return new Date(Date.UTC(y, m - 1 + by, 1)).toISOString().slice(0, 7);
 }
 
-type Found = { start: number; end: number; date?: string; repeat?: Repeat };
-
-function dates(text: string, today: string): Found[] {
-  const out: Found[] = [];
-  const scan = (pattern: string, read: (m: RegExpExecArray) => Omit<Found, 'start' | 'end'> | null) => {
-    const re = new RegExp(`\\b${pattern}\\b`, 'gi');
-    for (let m = re.exec(text); m; m = re.exec(text)) {
-      const r = read(m);
-      if (r) out.push({ start: m.index, end: m.index + m[0].length, ...r });
-    }
-  };
-  // Repeats ("every Monday", "every month", "daily"): from the next such day, or today.
-  scan(`(?:every|each)\\s+(${WD})`, (m) => ({ repeat: 'weekly', date: onOrAfter(today, WEEKDAYS[m[1].toLowerCase()]) }));
-  scan('(?:every|each)\\s+(day|week|month)', (m) => ({ repeat: ({ day: 'daily', week: 'weekly', month: 'monthly' } as const)[m[1].toLowerCase() as 'day'] }));
-  scan('(daily|weekly|monthly)', (m) => ({ repeat: m[1].toLowerCase() as Repeat }));
-  // Dates
-  scan(`${LEAD}(today|tonight)`, () => ({ date: today }));
-  scan(`${LEAD}(tomorrow|tmrw|tmr)`, () => ({ date: addDays(today, 1) }));
-  scan(`${LEAD}next\\s+week`, () => ({ date: addDays(today, ((8 - weekday(today)) % 7) || 7) }));
-  scan(`${LEAD}next\\s+month`, () => ({ date: addMonths(`${today.slice(0, 8)}01`, 1) }));
-  scan(`${LEAD}(?:this\\s+)?weekend`, () => ({ date: onOrAfter(today, 6) }));
-  scan(`${LEAD}(?:(next|this)\\s+)?(${WD})`, (m) => {
-    const day = WEEKDAYS[m[2].toLowerCase()];
-    const date = onOrAfter(today, day);
-    return { date: m[1]?.toLowerCase() === 'next' && date === today ? addDays(today, 7) : date };
-  });
-  scan(`in\\s+(${NUM})\\s+(days?|weeks?|months?)`, (m) => {
-    const n = NUMBERS[m[1].toLowerCase()] ?? Number(m[1]);
-    const unit = m[2].toLowerCase();
-    if (!(n > 0 && n <= 366)) return null;
-    return { date: unit.startsWith('day') ? addDays(today, n) : unit.startsWith('week') ? addDays(today, 7 * n) : addMonths(today, n) };
-  });
-  scan(`${LEAD}(${MON})\\.?\\s+(\\d{1,2})(?:st|nd|rd|th)?(?:,?\\s+(\\d{4}))?`, (m) => {
-    const date = monthDay(today, MONTHS[m[1].toLowerCase()], Number(m[2]), m[3] ? Number(m[3]) : undefined);
-    return date ? { date } : null;
-  });
-  scan(`${LEAD}(\\d{1,2})(?:st|nd|rd|th)?\\s+(${MON})\\.?(?:\\s+(\\d{4}))?`, (m) => {
-    const date = monthDay(today, MONTHS[m[2].toLowerCase()], Number(m[1]), m[3] ? Number(m[3]) : undefined);
-    return date ? { date } : null;
-  });
-  return out;
+/** "December", or "January 2027" outside this year. Pure. */
+export function monthTitle(month: string, today: string): string {
+  const [y, m] = month.split('-').map(Number);
+  return y === Number(today.slice(0, 4)) ? MONTH_NAMES[m - 1] : `${MONTH_NAMES[m - 1]} ${y}`;
 }
 
-/**
- * Reads a date and a repeat from what I typed ("Call mum tomorrow", "Pay rent every month", "Dentist next Fri",
- * "Taxes in 2 weeks", "Party Dec 5") and takes those words out of the title. The last date and repeat win; when
- * nothing would be left of the title, the words stay as they are. {@code ignore}: a phrase I tapped away. Pure.
- */
-export function parseQuickAdd(text: string, today: string, ignore?: string | null): QuickAdd {
-  const all = dates(text, today).filter((f) => text.slice(f.start, f.end).toLowerCase() !== ignore?.toLowerCase());
-  // A longer phrase wins over one inside it ("every Monday" over "Monday"; "next Fri" over "Fri").
-  const found = all.filter((f) => !all.some((g) => g !== f && g.start <= f.start && g.end >= f.end && g.end - g.start > f.end - f.start));
-  const repeatAt = [...found].reverse().find((f) => f.repeat);
-  const dateAt = [...found].reverse().find((f) => f.date && !f.repeat) ?? (repeatAt?.date ? repeatAt : undefined);
-  const used = [repeatAt, dateAt].filter((f, i, a): f is Found => !!f && a.indexOf(f) === i).sort((a, b) => b.start - a.start);
-  if (used.length === 0) return { title: text.trim(), dueDate: null, repeat: null, phrase: null };
-  let title = text;
-  for (const f of used) title = title.slice(0, f.start) + ' ' + title.slice(f.end);
-  title = title.replace(/\s+/g, ' ').trim().replace(/\s+([,.;:!?])/g, '$1').replace(/^[,.;:\s]+|[,;:\s]+$/g, '');
-  if (!title) return { title: text.trim(), dueDate: null, repeat: null, phrase: null };
-  const repeat = repeatAt?.repeat ?? null;
-  const dueDate = dateAt?.date ?? (repeat ? today : null);
-  const phrase = used
-    .sort((a, b) => a.start - b.start)
-    .map((f) => text.slice(f.start, f.end).trim())
-    .join(' ');
-  return { title, dueDate, repeat, phrase };
+export const WEEKDAY_INITIALS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+
+/** A month's days as weeks, Monday first; the days before the 1st and after the last are null. Pure. */
+export function monthWeeks(month: string): (string | null)[][] {
+  const first = `${month}-01`;
+  const days = new Date(Date.UTC(Number(month.slice(0, 4)), Number(month.slice(5, 7)), 0)).getUTCDate();
+  const lead = (weekday(first) + 6) % 7;
+  const cells: (string | null)[] = [...Array(lead).fill(null), ...Array.from({ length: days }, (_, i) => addDays(first, i))];
+  while (cells.length % 7) cells.push(null);
+  const weeks: (string | null)[][] = [];
+  for (let i = 0; i < cells.length; i += 7) weeks.push(cells.slice(i, i + 7));
+  return weeks;
 }
 
-/** What quick add will set, in words for its chip: "Tomorrow", "Friday · Every week". Pure. */
-export function quickAddLabel(q: Pick<QuickAdd, 'dueDate' | 'repeat'>, today: string): string | null {
-  const parts = [q.dueDate ? dayLabel(q.dueDate, today) : null, q.repeat ? repeatLabel(q.repeat) : null].filter(Boolean);
-  return parts.length ? parts.join(' · ') : null;
-}
-
-/** A date (and repeat) typed on its own, in the same words quick add reads ("fri", "dec 5", "in 2 weeks"). Pure. */
-export function parseDateWords(text: string, today: string): { dueDate: string; repeat: Repeat | null } | null {
-  const r = parseQuickAdd(`• ${text}`, today);
-  return r.dueDate && r.title === '•' ? { dueDate: r.dueDate, repeat: r.repeat } : null;
+/** "Friday 5 December 2026", for screen readers. Pure. */
+export function fullDate(iso: string): string {
+  const [y, m, d] = iso.split('-').map(Number);
+  return `${WEEKDAY_NAMES[weekday(iso)]} ${d} ${MONTH_NAMES[m - 1]} ${y}`;
 }

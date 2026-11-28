@@ -1,8 +1,11 @@
 import {
   dayLabel,
   noDateTodos,
-  parseQuickAdd,
-  quickAddLabel,
+  fullDate,
+  monthTitle,
+  monthWeeks,
+  nextWeek,
+  shiftMonth,
   todayIso,
   todayTodos,
   upcomingGroups,
@@ -17,62 +20,26 @@ jest.mock('@/api/client', () => ({ api: {}, ok: jest.fn() }));
 // Friday 27 November 2026.
 const TODAY = '2026-11-27';
 
-const q = (text: string, ignore?: string) => {
-  const r = parseQuickAdd(text, TODAY, ignore);
-  return [r.title, r.dueDate, r.repeat];
-};
-
-describe('Quick add reads dates and repeats from words', () => {
-  it('relative days', () => {
-    expect(q('Call mum tomorrow')).toEqual(['Call mum', '2026-11-28', null]);
-    expect(q('Call mum tmrw')).toEqual(['Call mum', '2026-11-28', null]);
-    expect(q('Send invoice today')).toEqual(['Send invoice', '2026-11-27', null]);
-    expect(q('Taxes in 2 weeks')).toEqual(['Taxes', '2026-12-11', null]);
-    expect(q('Check back in three days')).toEqual(['Check back', '2026-11-30', null]);
-    expect(q('Renew passport in 6 months')).toEqual(['Renew passport', '2027-05-27', null]);
-    expect(q('Plan trip next week')).toEqual(['Plan trip', '2026-11-30', null]);
-    expect(q('Budget next month')).toEqual(['Budget', '2026-12-01', null]);
-    expect(q('Clean garage this weekend')).toEqual(['Clean garage', '2026-11-28', null]);
+describe('Picking a day', () => {
+  it('next week is the coming Monday', () => {
+    expect(nextWeek(TODAY)).toBe('2026-11-30');
+    expect(nextWeek('2026-11-30')).toBe('2026-12-07');
   });
 
-  it('weekdays: the next one, today included; "next" skips today', () => {
-    expect(q('Dentist Fri')).toEqual(['Dentist', '2026-11-27', null]);
-    expect(q('Dentist next Fri')).toEqual(['Dentist', '2026-12-04', null]);
-    expect(q('Submit report by Tuesday')).toEqual(['Submit report', '2026-12-01', null]);
-    expect(q('Lunch with Sara on mon')).toEqual(['Lunch with Sara', '2026-11-30', null]);
+  it('a month as weeks, Monday first, with blanks around it', () => {
+    const weeks = monthWeeks('2026-11');
+    expect(weeks).toHaveLength(6);
+    expect(weeks[0]).toEqual([null, null, null, null, null, null, '2026-11-01']);
+    expect(weeks[5]).toEqual(['2026-11-30', null, null, null, null, null, null]);
+    expect(monthWeeks('2027-02').flat().filter(Boolean)).toHaveLength(28);
   });
 
-  it('calendar dates, either way round, next year once passed', () => {
-    expect(q('Party Dec 5')).toEqual(['Party', '2026-12-05', null]);
-    expect(q('Party 5 December')).toEqual(['Party', '2026-12-05', null]);
-    expect(q('Party on Dec 5th')).toEqual(['Party', '2026-12-05', null]);
-    expect(q('Trip Feb 3')).toEqual(['Trip', '2027-02-03', null]);
-    expect(q('Call Bob on Dec 5, 2027')).toEqual(['Call Bob', '2027-12-05', null]);
-    expect(q('Feb 30 thing')).toEqual(['Feb 30 thing', null, null]);
-  });
-
-  it('repeats, from the next such day or today', () => {
-    expect(q('Pay rent every month')).toEqual(['Pay rent', '2026-11-27', 'monthly']);
-    expect(q('Water plants every Monday')).toEqual(['Water plants', '2026-11-30', 'weekly']);
-    expect(q('Gym daily')).toEqual(['Gym', '2026-11-27', 'daily']);
-    expect(q('Call grandma weekly')).toEqual(['Call grandma', '2026-11-27', 'weekly']);
-    expect(q('Pay rent every month Dec 1')).toEqual(['Pay rent', '2026-12-01', 'monthly']);
-  });
-
-  it('keeps the words when nothing else would be left, or when I tap the chip away', () => {
-    expect(q('Buy milk')).toEqual(['Buy milk', null, null]);
-    expect(q('tomorrow')).toEqual(['tomorrow', null, null]);
-    expect(q('Read Monday notes')).toEqual(['Read notes', '2026-11-30', null]);
-    expect(q('Read Monday notes', 'Monday')).toEqual(['Read Monday notes', null, null]);
-    expect(q('Mayday drill')).toEqual(['Mayday drill', null, null]);
-    expect(q('Tidy, tomorrow')).toEqual(['Tidy', '2026-11-28', null]);
-  });
-
-  it('says what it will set', () => {
-    expect(parseQuickAdd('Dentist next Fri', TODAY).phrase).toBe('next Fri');
-    expect(quickAddLabel(parseQuickAdd('Water plants every Monday', TODAY), TODAY)).toBe('Monday · Every week');
-    expect(quickAddLabel(parseQuickAdd('Call mum tomorrow', TODAY), TODAY)).toBe('Tomorrow');
-    expect(quickAddLabel(parseQuickAdd('Buy milk', TODAY), TODAY)).toBeNull();
+  it('moves a month at a time and names it', () => {
+    expect(shiftMonth('2026-12', 1)).toBe('2027-01');
+    expect(shiftMonth('2026-01', -1)).toBe('2025-12');
+    expect(monthTitle('2026-12', TODAY)).toBe('December');
+    expect(monthTitle('2027-01', TODAY)).toBe('January 2027');
+    expect(fullDate('2026-12-05')).toBe('Saturday 5 December 2026');
   });
 });
 

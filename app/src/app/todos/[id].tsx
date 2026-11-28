@@ -7,13 +7,13 @@ import { EmptyState } from '@/components/empty-state';
 import { IconButton } from '@/components/icon-button';
 import { KeyboardSpacer } from '@/components/keyboard-spacer';
 import { Screen } from '@/components/screen';
-import { ChoiceChips } from '@/components/todo-ui';
+import { Calendar, ChoiceChips, DateShortcuts } from '@/components/todo-ui';
 import { Icon } from '@/components/ui/icon';
 import { Spinner } from '@/components/ui/spinner';
 import { Text, TextInput } from '@/components/ui/text';
 import { showAlert } from '@/lib/dialog';
 import { showToast } from '@/lib/toast';
-import { addDays, dayLabel, parseDateWords, todayIso, weekday, type Repeat, type Todo, type TodoFields } from '@/lib/todos';
+import { dayLabel, todayIso, type Repeat, type Todo, type TodoFields } from '@/lib/todos';
 import { deleteTodoNow, refreshTodos, saveTodoNow, useTodos } from '@/lib/todos-store';
 import { useNow } from '@/lib/use-now';
 import { usePalette } from '@/theme/use-palette';
@@ -32,7 +32,7 @@ function fieldsOf(d: Draft): TodoFields {
 }
 
 /**
- * One to-do, to change: its title, notes (links tappable), date (shortcuts, or typed in words), repeat and list.
+ * One to-do, to change: its title, notes (links tappable), date (shortcuts, or a day on the calendar), repeat and list.
  * There's no Save button: it saves itself a moment after each change, and when I leave.
  */
 export default function TodoScreen() {
@@ -66,7 +66,6 @@ function Editor({ todo }: { todo: Todo }) {
   const { lists } = useTodos();
   const [draft, setDraft] = useState<Draft>(() => draftOf(todo));
   const [editingNotes, setEditingNotes] = useState(!todo.notes);
-  const [dateWords, setDateWords] = useState('');
   const saved = useRef(JSON.stringify(fieldsOf(draftOf(todo))));
   // Once deleted, nothing more is saved (the screen closes after it).
   const deleted = useRef(false);
@@ -119,11 +118,6 @@ function Editor({ todo }: { todo: Todo }) {
   }, [navigation, palette.ink, todo.todoId]);
 
   const change = (patch: Partial<Draft>) => setDraft((d) => ({ ...d, ...patch }));
-  const nextMonday = addDays(today, ((8 - weekday(today)) % 7) || 7);
-  const dateChoice =
-    draft.dueDate === null ? 'none' : draft.dueDate === today ? 'today' : draft.dueDate === addDays(today, 1) ? 'tomorrow' : draft.dueDate === nextMonday ? 'nextweek' : null;
-  const typed = dateWords.trim() ? parseDateWords(dateWords, today) : null;
-
   return (
     <Screen>
       <ScrollView contentContainerClassName="gap-6 px-5 pb-12 pt-4" keyboardShouldPersistTaps="handled">
@@ -168,41 +162,8 @@ function Editor({ todo }: { todo: Todo }) {
           <Text className="text-sm font-semibold text-muted dark:text-muted-dark">
             Date{draft.dueDate ? ` · ${dayLabel(draft.dueDate, today)}` : ''}
           </Text>
-          <ChoiceChips
-            label="Date"
-            selected={dateChoice}
-            onSelect={(v) =>
-              change({
-                dueDate: v === 'today' ? today : v === 'tomorrow' ? addDays(today, 1) : v === 'nextweek' ? nextMonday : null,
-                ...(v === 'none' ? { repeat: null } : {}),
-              })
-            }
-            options={[
-              { value: 'today', label: 'Today' },
-              { value: 'tomorrow', label: 'Tomorrow' },
-              { value: 'nextweek', label: 'Next week' },
-              { value: 'none', label: 'No date' },
-            ]}
-          />
-          <TextInput
-            accessibilityLabel="Type a date"
-            value={dateWords}
-            onChangeText={setDateWords}
-            onSubmitEditing={() => {
-              if (!typed) return;
-              change({ dueDate: typed.dueDate, ...(typed.repeat ? { repeat: typed.repeat } : {}) });
-              setDateWords('');
-            }}
-            returnKeyType="done"
-            placeholder="Or type one: fri, dec 5, in 2 weeks"
-            placeholderTextColor={palette.muted}
-            className="rounded-lg border border-border px-4 py-2.5 text-[15px] text-ink focus:border-primary dark:border-border-dark dark:text-ink-dark"
-          />
-          {dateWords.trim() ? (
-            <Text className="text-sm text-muted dark:text-muted-dark">
-              {typed ? `${dayLabel(typed.dueDate, today)} — press return to use it` : 'Not a date I know yet'}
-            </Text>
-          ) : null}
+          <DateShortcuts today={today} value={draft.dueDate} onPick={(dueDate) => change({ dueDate, ...(dueDate ? {} : { repeat: null }) })} />
+          <Calendar today={today} value={draft.dueDate} onPick={(dueDate) => change({ dueDate })} />
         </View>
 
         <View className="gap-3">
