@@ -63,9 +63,14 @@ describe('Coming up', () => {
   const far = person({ contactId: 'far', name: 'Far', dates: [{ label: 'Birthday', month: 6, day: 1, year: null }] });
   const bea = person({ contactId: null, name: 'Bea', person: { userId: 'u-b', name: 'Bea', username: 'bea' }, keepInTouchDays: null });
 
-  it('lists who is due to catch up first, then dates in the next two weeks', () => {
-    expect(comingUp([far, mum, ali, bea], TODAY).map((i) => `${i.entry.name}: ${i.text}`)).toEqual([
+  // Caught up on Tuesday 24th, every week: due Tuesday 1st, in 3 days. Every month from the 18th: in 20 days.
+  const bo = person({ contactId: 'bo', name: 'Bo', keepInTouchDays: 7, keepSince: day(2026, 1, 1).toISOString(), lastCaughtUp: day(2026, 11, 24).toISOString() });
+  const later = person({ contactId: 'later', name: 'Later', keepInTouchDays: 30, keepSince: day(2026, 11, 18).toISOString() });
+
+  it('lists who is due to catch up first, then catch-ups in the next week and dates in the next two weeks', () => {
+    expect(comingUp([far, mum, ali, bea, bo, later], TODAY).map((i) => `${i.entry.name}: ${i.text}`)).toEqual([
       'Ali: Time to catch up (every week)',
+      'Bo: Catch up Tuesday',
       'Mum: Birthday Tuesday',
     ]);
   });
@@ -73,6 +78,8 @@ describe('Coming up', () => {
   it('gives each row one quiet line', () => {
     expect(rowLine(mum, TODAY)).toBe('Birthday Tuesday');
     expect(rowLine(ali, TODAY)).toBe('Time to catch up');
+    expect(rowLine(bo, TODAY)).toBe('Catch up Tuesday');
+    expect(rowLine(later, TODAY)).toBe('');
     expect(rowLine(person({ keepInTouchDays: 30, keepSince: day(2026, 11, 1).toISOString(), lastCaughtUp: day(2026, 11, 14).toISOString() }), TODAY)).toBe(
       'Caught up 2 weeks ago',
     );

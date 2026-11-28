@@ -119,7 +119,8 @@ Rolodex** (owner: a trademark, used only as the feature's name; the name lives i
 `lib/people`, so it can be renamed in one place). "People" and "Connections" were considered and dropped. `contacts`
 in the server and API, `lib/people*` in the app's code.
 
-- **The Rolodex page**: **Coming up** (who's due a catch-up, most overdue first, then dates in the next two weeks),
+- **The Rolodex page**: **Coming up** (who's due a catch-up, most overdue first, then, soonest first, catch-ups due
+  in the next week ("Catch up Tuesday"; owner 2026-11-28) and dates in the next two weeks),
   then everyone A–Z: my connections and the people I add by name with **Add** (anyone, on Circlo or not); a search
   field once there are more than eight. Each row has one quiet line only I see: a date soon, "Time to catch up", or
   "Caught up 2 weeks ago". Everyone opens their page. A connection's profile also shows an **In your Rolodex** card

@@ -183,26 +183,51 @@ function soonDates(c: Contact, today: Date, within = SOON_DAYS) {
 
 export type ComingUp = { key: string; entry: Contact; text: string };
 
-/** At the top of People: who's due a catch-up (most overdue first), then dates in the next two weeks. */
+/** Catch-ups due within this many days show in Coming up and on a row (owner 2026-11-28). */
+export const CATCH_UP_AHEAD_DAYS = 7;
+
+/** "Catch up Tuesday": a catch-up due in the next week (null when it's further off, overdue, or there's no rhythm). */
+function catchUpSoon(c: Contact, today: Date): { inDays: number; text: string } | null {
+  const due = dueInDays(c, today);
+  if (due === null || due <= 0 || due > CATCH_UP_AHEAD_DAYS) return null;
+  const date = new Date(today.getFullYear(), today.getMonth(), today.getDate() + due);
+  return { inDays: due, text: `Catch up ${when(due, date)}` };
+}
+
+/**
+ * At the top of the Rolodex: who's due a catch-up now (most overdue first), then what's coming, soonest first:
+ * catch-ups due in the next week and dates in the next two weeks.
+ */
 export function comingUp(people: Contact[], today: Date): ComingUp[] {
   const due = people
     .map((c) => ({ c, due: dueInDays(c, today) }))
     .filter((x): x is { c: Contact; due: number } => x.due !== null && x.due <= 0)
     .sort((a, b) => a.due - b.due)
     .map(({ c }) => ({ key: `${personKey(c)}:due`, entry: c, text: `Time to catch up (${rhythmLabel(c.keepInTouchDays!).toLowerCase()})` }));
-  const dates = people
-    .flatMap((c) => soonDates(c, today).map((x, i) => ({ c, ...x, i })))
-    .sort((a, b) => a.inDays - b.inDays || a.c.name.localeCompare(b.c.name))
-    .map(({ c, d, next, inDays, i }) => ({ key: `${personKey(c)}:date:${i}`, entry: c, text: `${d.label} ${when(inDays, next)}` }));
-  return [...due, ...dates];
+  const catchUps = people.flatMap((c) => {
+    const soon = catchUpSoon(c, today);
+    return soon ? [{ inDays: soon.inDays, name: c.name, item: { key: `${personKey(c)}:due`, entry: c, text: soon.text } }] : [];
+  });
+  const dates = people.flatMap((c) =>
+    soonDates(c, today).map((x, i) => ({
+      inDays: x.inDays,
+      name: c.name,
+      item: { key: `${personKey(c)}:date:${i}`, entry: c, text: `${x.d.label} ${when(x.inDays, x.next)}` },
+    })),
+  );
+  // Same day: catch-ups before dates, then by name.
+  const ahead = [...catchUps, ...dates].sort((a, b) => a.inDays - b.inDays || a.name.localeCompare(b.name));
+  return [...due, ...ahead.map((x) => x.item)];
 }
 
-/** One quiet line under a person in the list: a date soon, a catch-up due, or when we last caught up. */
+/** One quiet line under a person in the list: a date soon, a catch-up due now or this week, or when we last caught up. */
 export function rowLine(c: Contact, today: Date): string {
   const soon = soonDates(c, today)[0];
   if (soon) return `${soon.d.label} ${when(soon.inDays, soon.next)}`;
   const due = dueInDays(c, today);
   if (due !== null && due <= 0) return 'Time to catch up';
+  const catchUp = catchUpSoon(c, today);
+  if (catchUp) return catchUp.text;
   if (c.lastCaughtUp) return `Caught up ${agoText(c.lastCaughtUp, today)}`;
   return '';
 }
