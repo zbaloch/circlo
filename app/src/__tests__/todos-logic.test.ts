@@ -6,7 +6,9 @@ import {
   todayIso,
   todayTodos,
   upcomingGroups,
-  viewLabel,
+  inList,
+  listLabel,
+  listSections,
   type Todo,
 } from '@/lib/todos';
 
@@ -111,10 +113,14 @@ describe('Views', () => {
     ]);
   });
 
-  it('No date, and view names', () => {
+  it('No date, one list or All, and All by list', () => {
     expect(noDateTodos(all).map((x) => x.todoId)).toEqual(['none']);
-    const lists = [{ listId: 'g', name: 'General' }];
-    expect(viewLabel({ kind: 'list', listId: 'g' }, lists)).toBe('General');
-    expect(viewLabel({ kind: 'nodate' }, lists)).toBe('No date');
+    const lists = [{ listId: 'g', name: 'General' }, { listId: 'w', name: 'Work' }, { listId: 'e', name: 'Empty' }];
+    expect(listLabel(lists, 'w')).toBe('Work');
+    expect(listLabel(lists, null)).toBe('All');
+    expect(listLabel(lists, 'gone')).toBe('All');
+    expect(inList(all, 'w').map((x) => x.todoId)).toEqual(['today2']);
+    expect(inList(all, null)).toHaveLength(all.length);
+    expect(listSections(all, lists).map((s) => [s.title, s.todos.length])).toEqual([['General', 7], ['Work', 1]]);
   });
 });

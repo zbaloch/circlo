@@ -37,7 +37,9 @@ export async function reopenTodo(todoId: string): Promise<Todo> {
   return ok(await api.POST('/v1/todos/{todoId}/reopen', { params: { path: { todoId } } }));
 }
 
-export async function loadCompleted(listId: string): Promise<Todo[]> {
+/** Completed to-dos (the last 30 days'), newest first: one list's, or all of them. */
+export async function loadCompleted(listId: string | null): Promise<Todo[]> {
+  if (!listId) return ok(await api.GET('/v1/todos/completed'));
   return ok(await api.GET('/v1/todos/lists/{listId}/completed', { params: { path: { listId } } }));
 }
 
@@ -114,21 +116,33 @@ export function repeatLabel(repeat: Repeat): string {
   return { daily: 'Every day', weekly: 'Every week', monthly: 'Every month' }[repeat];
 }
 
-// --- views ---
+// --- what I'm looking at: all lists or one, and optionally only Today, Upcoming, No date or Completed ---
 
-export type TodoView = { kind: 'today' } | { kind: 'upcoming' } | { kind: 'nodate' } | { kind: 'list'; listId: string };
+export type When = 'today' | 'upcoming' | 'nodate' | 'completed';
+export type TodoFilter = { listId: string | null; when: When | null };
 
-export const TODAY: TodoView = { kind: 'today' };
+export const ALL_TODOS: TodoFilter = { listId: null, when: null };
 
-export function viewLabel(view: TodoView, lists: Pick<TodoList, 'listId' | 'name'>[]): string {
-  if (view.kind === 'today') return 'Today';
-  if (view.kind === 'upcoming') return 'Upcoming';
-  if (view.kind === 'nodate') return 'No date';
-  return lists.find((l) => l.listId === view.listId)?.name ?? 'Today';
+export const WHEN: { value: When; label: string }[] = [
+  { value: 'today', label: 'Today' },
+  { value: 'upcoming', label: 'Upcoming' },
+  { value: 'nodate', label: 'No date' },
+  { value: 'completed', label: 'Completed' },
+];
+
+/** The list picker's label: "All", or the list's name. Pure. */
+export function listLabel(lists: Pick<TodoList, 'listId' | 'name'>[], listId: string | null): string {
+  return (listId && lists.find((l) => l.listId === listId)?.name) || 'All';
 }
 
-export function sameView(a: TodoView, b: TodoView): boolean {
-  return a.kind === b.kind && (a.kind !== 'list' || (b.kind === 'list' && a.listId === b.listId));
+/** One list's to-dos, or everyone's (All). Pure. */
+export function inList(todos: Todo[], listId: string | null): Todo[] {
+  return listId ? todos.filter((t) => t.listId === listId) : todos;
+}
+
+/** All, with no "when": each list that has something, in my list order, its to-dos in my order. Pure. */
+export function listSections(todos: Todo[], lists: Pick<TodoList, 'listId' | 'name'>[]): { listId: string; title: string; todos: Todo[] }[] {
+  return lists.map((l) => ({ listId: l.listId, title: l.name, todos: todos.filter((t) => t.listId === l.listId) })).filter((s) => s.todos.length > 0);
 }
 
 /** Today's view: overdue first (oldest first), then today's, each in list order. */
@@ -161,9 +175,6 @@ export function noDateTodos(todos: Todo[]): Todo[] {
   return todos.filter((t) => !t.dueDate);
 }
 
-export function listTodos(todos: Todo[], listId: string): Todo[] {
-  return todos.filter((t) => t.listId === listId);
-}
 
 // --- quick add: dates and repeats in words ---
 

@@ -207,6 +207,13 @@ public class TodosController {
                 (rs, i) -> todo(rs), Ids.bytes(id), me);
     }
 
+    /** All my completed to-dos, across my lists, newest first (the last 30 days'). */
+    @GetMapping("/v1/todos/completed")
+    public List<Todo> allCompleted(@AuthenticationPrincipal Jwt jwt) {
+        return jdbc.query("SELECT " + TODO_COLUMNS + " FROM todos WHERE user_id = ? AND completed_at IS NOT NULL ORDER BY completed_at DESC LIMIT 500",
+                (rs, i) -> todo(rs), (Object) me(jwt));
+    }
+
     // --- to-dos ---
 
     private Todo myTodo(byte[] me, UUID id) {

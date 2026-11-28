@@ -96,12 +96,14 @@ counts or dots; a satisfying tick) with Todoist's quick add for dates.
 - **A to-do**: its title, **notes** (plain text, links tappable), a due **date** (no times), a **repeat** (daily,
   weekly or monthly, from its date), and its list. Tapping one opens it to edit; dates can be typed in the same words
   or picked from Today / Tomorrow / Next week / No date.
-- **Views instead of a filter menu.** A picker at the top, like Feeds': **Today** (overdue first, in soft red, then
-  today's), **Upcoming** (grouped by day: Tomorrow, Friday, Next week...), **No date**, then each list. Within a list
-  the order is mine (drag to reorder); Today and Upcoming sort by date themselves, so there's no sort button.
+- **What I see** (owner 2026-11-28, like Feeds' source picker and Unread): a list picker, **All** to start or one
+  list, and beside it one of **Today** (overdue first, in soft red, then today's), **Upcoming** (grouped by day:
+  Tomorrow, Friday... then by month), **No date** or **Completed**; tapping it again shows everything. All with
+  nothing picked shows every open to-do under its list's name. Within one list the order is mine (drag to reorder);
+  Today and Upcoming sort by date themselves, so there's no sort button.
 - **Ticking**: a check, a light haptic, and a moment later it slides away (tapping again in that moment undoes it).
-  A repeating to-do then comes back with its next date (moved past today if it was overdue). Each list has a folded
-  **Completed** section, to find and untick things; completed to-dos are let go after 30 days.
+  A repeating to-do then comes back with its next date (moved past today if it was overdue). **Completed** (in
+  All or a list) is where to find and untick things; completed to-dos are let go after 30 days.
 - **Not in the first version** (on purpose): times and reminder notifications, subtasks, priorities, tags, search,
   widgets.
 - **Server** (`todos` package, V40): `todo_lists`, `todos` (title, notes, due_date as a calendar date, repeat_rule,

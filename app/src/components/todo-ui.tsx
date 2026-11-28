@@ -4,7 +4,7 @@ import { Modal, Pressable, ScrollView, View } from 'react-native';
 import { Button } from '@/components/form';
 import { Icon } from '@/components/ui/icon';
 import { Text, TextInput } from '@/components/ui/text';
-import { dayLabel, parseQuickAdd, quickAddLabel, sameView, type QuickAdd as Parsed, type Todo, type TodoList, type TodoView } from '@/lib/todos';
+import { dayLabel, parseQuickAdd, quickAddLabel, WHEN, type QuickAdd as Parsed, type Todo, type TodoList, type When } from '@/lib/todos';
 import { usePalette } from '@/theme/use-palette';
 
 /**
@@ -144,18 +144,68 @@ function Sheet({ visible, title, onClose, children }: { visible: boolean; title:
   );
 }
 
-/** Where to look: Today, Upcoming, No date, then each list, and New list. A check on the one shown. */
-export function ViewPicker({ visible, lists, selected, onSelect, onNewList, onClose }: {
+/**
+ * What I'm looking at, above the to-dos: which list ("All ▾", or one, picked from a list) and, beside it, one of
+ * Today, Upcoming, No date or Completed (tap it again for everything). The two work together, as in Feeds.
+ */
+export function TodoFilterBar({ listLabel, when, onPickList, onWhen }: {
+  listLabel: string;
+  when: When | null;
+  onPickList: () => void;
+  onWhen: (when: When | null) => void;
+}) {
+  const palette = usePalette();
+  return (
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      keyboardShouldPersistTaps="handled"
+      className="grow-0 border-b border-border dark:border-border-dark"
+      contentContainerClassName="items-center gap-2 px-4 py-2.5">
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`Showing ${listLabel}`}
+        accessibilityHint="Choose all lists or one"
+        onPress={onPickList}
+        className="flex-row items-center gap-1.5 rounded-full border border-border px-3.5 py-1.5 active:bg-surface-raised dark:border-border-dark dark:active:bg-surface-raised-dark">
+        <Text numberOfLines={1} className="max-w-[160px] font-semibold text-ink dark:text-ink-dark">
+          {listLabel}
+        </Text>
+        <Icon name="chevron-down" size={16} color={palette.ink} />
+      </Pressable>
+      {WHEN.map((w) => {
+        const on = when === w.value;
+        return (
+          <Pressable
+            key={w.value}
+            accessibilityRole="button"
+            accessibilityLabel={w.label}
+            accessibilityState={{ selected: on }}
+            accessibilityHint={on ? 'Shows everything again' : `Shows only ${w.label.toLowerCase()}`}
+            onPress={() => onWhen(on ? null : w.value)}
+            className={`rounded-full border px-3.5 py-1.5 ${
+              on ? 'border-primary bg-primary dark:border-primary-dark dark:bg-primary-dark' : 'border-border active:bg-surface-raised dark:border-border-dark dark:active:bg-surface-raised-dark'
+            }`}>
+            <Text className={on ? 'font-semibold text-on-primary dark:text-on-primary-dark' : 'text-ink dark:text-ink-dark'}>{w.label}</Text>
+          </Pressable>
+        );
+      })}
+    </ScrollView>
+  );
+}
+
+/** All, then each list, and New list; a check on the one shown. */
+export function ListPicker({ visible, lists, selected, onSelect, onNewList, onClose }: {
   visible: boolean;
   lists: TodoList[];
-  selected: TodoView;
-  onSelect: (view: TodoView) => void;
+  selected: string | null;
+  onSelect: (listId: string | null) => void;
   onNewList: () => void;
   onClose: () => void;
 }) {
   const palette = usePalette();
-  const row = (key: string, view: TodoView, label: string, icon: Parameters<typeof Icon>[0]['name']) => {
-    const on = sameView(view, selected);
+  const row = (key: string, listId: string | null, label: string) => {
+    const on = listId === selected;
     return (
       <Pressable
         key={key}
@@ -164,10 +214,10 @@ export function ViewPicker({ visible, lists, selected, onSelect, onNewList, onCl
         accessibilityState={{ selected: on }}
         onPress={() => {
           onClose();
-          onSelect(view);
+          onSelect(listId);
         }}
         className="flex-row items-center gap-3 px-5 py-3 active:bg-surface-raised dark:active:bg-surface-raised-dark">
-        <Icon name={icon} size={20} color={palette.muted} />
+        <Icon name="list-todo" size={20} color={palette.muted} />
         <Text numberOfLines={1} className={`flex-1 text-base ${on ? 'font-bold' : ''} text-ink dark:text-ink-dark`}>
           {label}
         </Text>
@@ -178,11 +228,8 @@ export function ViewPicker({ visible, lists, selected, onSelect, onNewList, onCl
   return (
     <Sheet visible={visible} title="Show" onClose={onClose}>
       <ScrollView>
-        {row('today', { kind: 'today' }, 'Today', 'star')}
-        {row('upcoming', { kind: 'upcoming' }, 'Upcoming', 'time-outline')}
-        {row('nodate', { kind: 'nodate' }, 'No date', 'layers-outline')}
-        <Text className="px-5 pb-1 pt-4 text-sm font-semibold text-muted dark:text-muted-dark">Lists</Text>
-        {lists.map((l) => row(l.listId, { kind: 'list', listId: l.listId }, l.name, 'list-todo'))}
+        {row('all', null, 'All')}
+        {lists.map((l) => row(l.listId, l.listId, l.name))}
         <Pressable
           accessibilityRole="button"
           onPress={() => {

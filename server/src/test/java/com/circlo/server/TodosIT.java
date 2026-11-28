@@ -139,6 +139,13 @@ class TodosIT extends IntegrationTest {
         List<Map<String, Object>> completed = a.list("GET", "/v1/todos/lists/" + general + "/completed", null).getBody();
         assertThat(titles(completed)).containsExactly("Buy cake");
 
+        // Also across all my lists, and only mine.
+        String work = (String) a.call("POST", "/v1/todos/lists", Map.of("name", "Work")).getBody().get("listId");
+        String report = (String) add(a, body("title", "Report", "listId", work)).get("todoId");
+        a.call("POST", "/v1/todos/" + report + "/complete", Map.of("today", "2026-11-27"));
+        assertThat(titles(a.list("GET", "/v1/todos/completed", null).getBody())).containsExactly("Report", "Buy cake");
+        assertThat(user("todo_tick_other").list("GET", "/v1/todos/completed", null).getBody()).isEmpty();
+
         assertThat(a.call("POST", "/v1/todos/" + id + "/reopen", null).getBody()).containsEntry("completedAt", null);
         assertThat(titles(todos(a))).containsExactly("Buy cake");
         assertThat(a.list("GET", "/v1/todos/lists/" + general + "/completed", null).getBody()).isEmpty();
