@@ -95,8 +95,8 @@ were built, then dropped as confusing).
   with the field at the bottom of the to-do's screen and long-press one to delete it. Links in them are tappable. A
   to-do with notes shows a quiet mark in the list.
 - **What I see**: a list picker, **All** to start or one list, and a **Completed** toggle (like Feeds' source picker
-  and Unread). All shows every list's heading with its open to-dos; one list shows just its own. Everywhere, the ≡
-  handle (or a long press) moves a to-do, and in All dropping it under another heading moves it to that list; swiping
+  and Unread). All shows every list's heading with its open to-dos; one list shows just its own. Everywhere, a long
+  press moves a to-do, and in All dropping it under another heading moves it to that list; swiping
   a to-do left shows Delete (asking first when it has notes).
   Completed shows what I ticked in the last 30 days, to untick; completed to-dos are let go after that.
 - **Quick add** at the bottom: type and press return; it goes to the list shown (General under All).

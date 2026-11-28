@@ -13,6 +13,11 @@ export type TodoFields = { title: string; listId: string | null };
 
 // --- the API ---
 
+/** For calls the server answers with 204 No Content: fine when it says so, an ApiError otherwise. */
+function done(res: { data?: unknown; error?: unknown; response: Response }): void {
+  if (!res.response.ok) ok(res);
+}
+
 export async function loadTodos(): Promise<{ lists: TodoList[]; todos: Todo[] }> {
   return ok(await api.GET('/v1/todos'));
 }
@@ -26,7 +31,7 @@ export async function saveTodo(todoId: string, fields: TodoFields): Promise<Todo
 }
 
 export async function deleteTodo(todoId: string): Promise<void> {
-  ok(await api.DELETE('/v1/todos/{todoId}', { params: { path: { todoId } } }));
+  done(await api.DELETE('/v1/todos/{todoId}', { params: { path: { todoId } } }));
 }
 
 export async function completeTodo(todoId: string): Promise<Todo> {
@@ -52,7 +57,7 @@ export async function addNote(todoId: string, body: string): Promise<TodoNote> {
 }
 
 export async function deleteNote(todoId: string, noteId: string): Promise<void> {
-  ok(await api.DELETE('/v1/todos/{todoId}/notes/{noteId}', { params: { path: { todoId, noteId } } }));
+  done(await api.DELETE('/v1/todos/{todoId}/notes/{noteId}', { params: { path: { todoId, noteId } } }));
 }
 
 export async function addList(name: string): Promise<TodoList> {
@@ -64,11 +69,11 @@ export async function renameList(listId: string, name: string): Promise<TodoList
 }
 
 export async function deleteList(listId: string): Promise<void> {
-  ok(await api.DELETE('/v1/todos/lists/{listId}', { params: { path: { listId } } }));
+  done(await api.DELETE('/v1/todos/lists/{listId}', { params: { path: { listId } } }));
 }
 
 export async function orderTodos(listId: string, todoIds: string[]): Promise<void> {
-  ok(await api.PUT('/v1/todos/lists/{listId}/order', { params: { path: { listId } }, body: { todoIds } }));
+  done(await api.PUT('/v1/todos/lists/{listId}/order', { params: { path: { listId } }, body: { todoIds } }));
 }
 
 // --- what I'm looking at: all lists or one, and open or completed ---

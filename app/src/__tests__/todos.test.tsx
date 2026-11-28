@@ -132,7 +132,6 @@ describe('Todos', () => {
     expect(screen.getByRole('button', { name: 'Showing All' })).toBeTruthy();
     expect(screen.getAllByRole('header').map((h) => h.props.children)).toEqual(['General', 'Work']);
     expect(titles()).toEqual(['Send invoice', 'Learn Sindhi', 'Quarterly report']);
-    expect(screen.getByRole('button', { name: 'Move Send invoice' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Send invoice, has notes' })).toBeTruthy();
     expect(screen.queryByText(/^\d+$/)).toBeNull();
     expect(screen.queryByText('Today')).toBeNull();

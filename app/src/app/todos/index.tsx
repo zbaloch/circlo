@@ -38,8 +38,8 @@ type Row = (t: Todo, showList: boolean, drag?: () => void) => ReactElement;
 
 /**
  * Todos (2.0; owner decisions 2026-11-27/28): my own to-do lists, like pen and paper (no dates or badges). Above
- * them, a list picker ("All" to start, or one list) and a Completed toggle. Everywhere, the ≡ handle moves a to-do
- * (in All, dropping it under another list's heading moves it there) and swiping it left deletes it. Quick add at the
+ * them, a list picker ("All" to start, or one list) and a Completed toggle. Everywhere, a long press picks a to-do up
+ * to move it (in All, dropping it under another list's heading moves it there) and swiping it left deletes it. Quick add at the
  * bottom. A to-do's notes are on its own screen.
  */
 export default function TodosScreen() {
@@ -297,7 +297,7 @@ function AllView({ items, empty, row }: { items: AllItem[]; empty: boolean; row:
   );
 }
 
-/** One list: my order (the ≡ handle, or a long press, picks a to-do up). */
+/** One list: my order (a long press picks a to-do up). */
 function ListView({ listId, todos, name, row }: { listId: string; todos: Todo[]; name: string; row: Row }) {
   return (
     <ReorderableList

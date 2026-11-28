@@ -10,9 +10,9 @@ import type { Todo, TodoList } from '@/lib/todos';
 import { usePalette } from '@/theme/use-palette';
 
 /**
- * One to-do, like a line on paper: a round box to tick and the title, crossed through once ticked. Under it, quietly,
- * a mark when it has notes, and its list. Tapping opens it. With {@code onDrag}, the ≡ handle (or a long press) picks
- * it up to move; with {@code onDelete}, swiping it left shows Delete.
+ * One to-do, like a line on paper: a round box to tick and the title, crossed through once ticked, with a quiet mark
+ * beside it when it has notes (and its list under it, in Completed under All). Tapping opens it; with
+ * {@code onDrag}, a long press picks it up to move; with {@code onDelete}, swiping it left shows Delete.
  */
 export function TodoRow({ todo, listName, checked, onToggle, onOpen, onDrag, onDelete }: {
   todo: Todo;
@@ -26,7 +26,7 @@ export function TodoRow({ todo, listName, checked, onToggle, onOpen, onDrag, onD
   const palette = usePalette();
   const notes = todo.noteCount > 0;
   const row = (
-    <View className="flex-row items-start gap-3 bg-surface py-3 pl-4 pr-2 dark:bg-surface-dark">
+    <View className="flex-row items-start gap-3 bg-surface px-4 py-3 dark:bg-surface-dark">
       <Pressable
         accessibilityRole="checkbox"
         accessibilityLabel={todo.title}
@@ -47,26 +47,18 @@ export function TodoRow({ todo, listName, checked, onToggle, onOpen, onDrag, onD
         onLongPress={onDrag}
         delayLongPress={250}
         className="flex-1 gap-0.5">
-        <Text className={`text-[16px] leading-snug ${checked ? 'text-muted line-through dark:text-muted-dark' : 'text-ink dark:text-ink-dark'}`}>{todo.title}</Text>
-        {notes || listName ? (
-          <View className="flex-row items-center gap-2">
-            {notes ? <Icon name="document-text-outline" size={13} color={palette.muted} accessibilityLabel="Has notes" /> : null}
-            {listName ? <Text className="text-sm text-muted dark:text-muted-dark">{listName}</Text> : null}
-          </View>
-        ) : null}
+        <View className="flex-row items-start gap-1.5">
+          <Text className={`shrink text-[16px] leading-snug ${checked ? 'text-muted line-through dark:text-muted-dark' : 'text-ink dark:text-ink-dark'}`}>
+            {todo.title}
+          </Text>
+          {notes ? (
+            <View className="pt-1">
+              <Icon name="document-text-outline" size={14} color={palette.muted} accessibilityLabel="Has notes" />
+            </View>
+          ) : null}
+        </View>
+        {listName ? <Text className="text-sm text-muted dark:text-muted-dark">{listName}</Text> : null}
       </Pressable>
-      {onDrag ? (
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={`Move ${todo.title}`}
-          accessibilityHint="Hold, then drag up or down"
-          onLongPress={onDrag}
-          delayLongPress={120}
-          hitSlop={8}
-          className="px-2 py-0.5">
-          <Icon name="grip" size={20} color={palette.muted} />
-        </Pressable>
-      ) : null}
     </View>
   );
   return onDelete ? <SwipeToDelete label={todo.title} onDelete={onDelete}>{row}</SwipeToDelete> : row;
