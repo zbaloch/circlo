@@ -2,7 +2,7 @@ import { render, renderHook, screen, within } from '@testing-library/react-nativ
 import { AppState } from 'react-native';
 
 import { activityHref } from '@/app/(drawer)/(tabs)/notifications';
-import { AppDrawer } from '@/components/app-drawer';
+import { AppDrawer, DRAWER_ITEMS } from '@/components/app-drawer';
 import type { ActivityItem } from '@/lib/activity';
 import { hasUnreadChats } from '@/lib/blocks';
 import type { Conversation } from '@/lib/messaging';
@@ -69,5 +69,12 @@ describe('drawer', () => {
     expect(within(menu).getByText('Settings and privacy')).toBeTruthy();
     expect(within(menu).queryByText('Log out')).toBeNull();
     expect(screen.getByRole('button', { name: 'Log out' })).toBeTruthy();
+  });
+
+  it('sets the personal tools apart from Profile with a divider', async () => {
+    const props = { navigation: { closeDrawer: jest.fn() }, state: { history: [] } } as unknown as Parameters<typeof AppDrawer>[0];
+    await render(<AppDrawer {...props} />);
+    expect(screen.getAllByTestId('drawer-divider')).toHaveLength(1);
+    expect(DRAWER_ITEMS.filter((i) => i.divider).map((i) => i.label)).toEqual(['Rolodex']);
   });
 });

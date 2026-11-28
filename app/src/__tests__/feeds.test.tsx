@@ -198,8 +198,8 @@ describe('Feeds logic', () => {
     expect(blockText(undefined)).toBe('');
   });
 
-  it('sits in the drawer between Profile and Settings', () => {
-    expect(DRAWER_ITEMS.map((i) => i.label)).toEqual(['Profile', 'Feeds', 'Todos', 'Rolodex', 'Settings and privacy']);
+  it('sits in the drawer last of the personal tools, before Settings', () => {
+    expect(DRAWER_ITEMS.map((i) => i.label)).toEqual(['Profile', 'Rolodex', 'Todos', 'Feeds', 'Settings and privacy']);
   });
 });
 

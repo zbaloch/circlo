@@ -113,8 +113,9 @@ were built, then dropped as confusing).
 ### Rolodex: a personal CRM (owner decisions 2026-11-28)
 
 The third personal tool (after Feeds and Todos), towards a paid plan: the people in my life, on Circlo or not, to
-remember birthdays and keep catching up. Replaces the "Logged" placeholder. **Its own page in the side menu**, after
-Todos (`/rolodex`, book-user icon), apart from the People tab, which is about circles and invites (owner). **Named
+remember birthdays and keep catching up. Replaces the "Logged" placeholder. **Its own page in the side menu**
+(`/rolodex`, book-user icon; menu order Profile, then a divider and the personal tools people first: Rolodex, Todos,
+Feeds, then Settings and privacy; owner 2026-11-28), apart from the People tab, which is about circles and invites (owner). **Named
 Rolodex** (owner: a trademark, used only as the feature's name; the name lives in one constant, `ROLODEX` in
 `lib/people`, so it can be renamed in one place). "People" and "Connections" were considered and dropped. `contacts`
 in the server and API, `lib/people*` in the app's code.

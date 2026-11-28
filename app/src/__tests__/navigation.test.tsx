@@ -78,8 +78,8 @@ describe('app shell', () => {
     }
   });
 
-  it('drawer has Profile, Feeds and Settings and privacy (circles live with your people, in the People tab)', () => {
-    expect(DRAWER_ITEMS.map((i) => i.label)).toEqual(['Profile', 'Feeds', 'Todos', 'Rolodex', 'Settings and privacy']);
+  it('drawer has Profile, then the personal tools (Rolodex, Todos, Feeds), then Settings and privacy', () => {
+    expect(DRAWER_ITEMS.map((i) => i.label)).toEqual(['Profile', 'Rolodex', 'Todos', 'Feeds', 'Settings and privacy']);
   });
 
   it('Home shows the empty state and a labelled compose button', async () => {
