@@ -9,6 +9,9 @@ import { describeError } from '@/lib/account';
 import { backgroundChecksOn, disableBackgroundChecks, enableBackgroundChecks, notificationPermission, usesPush } from '@/lib/background-check';
 import { CHAT_ENABLED } from '@/lib/features';
 import { type NotificationSettings, refreshMe, setNotificationSettings, useMe } from '@/lib/me';
+import { peopleRemindersOn, schedulePeopleReminders, setPeopleRemindersOn } from '@/lib/people-reminders';
+import { getPeople } from '@/lib/people-store';
+import { ROLODEX } from '@/lib/people';
 
 type Kind = keyof Omit<NotificationSettings, 'email'>;
 
@@ -22,7 +25,10 @@ export default function NotificationSettingsScreen() {
   const me = useMe();
   // This phone: on, off, or off because notifications are blocked in the phone's settings.
   const [phone, setPhone] = useState<'on' | 'off' | 'blocked' | null>(null);
+  // The Rolodex's birthday and catch-up reminders, scheduled on this phone (its own switch, kept on the phone).
+  const [reminders, setReminders] = useState<boolean | null>(null);
   const loadPhone = useCallback(async () => {
+    setReminders(await peopleRemindersOn());
     if (await backgroundChecksOn()) return setPhone('on');
     setPhone((await notificationPermission()) === 'blocked' ? 'blocked' : 'off');
   }, []);
@@ -67,6 +73,8 @@ export default function NotificationSettingsScreen() {
                   try {
                     if (on) await enableBackgroundChecks();
                     else await disableBackgroundChecks();
+                    // With permission now given, the Rolodex's reminders can be scheduled.
+                    if (on && getPeople().loaded) await schedulePeopleReminders(getPeople().people);
                   } catch (e) {
                     setError(describeError(e));
                   }
@@ -86,6 +94,20 @@ export default function NotificationSettingsScreen() {
           </Section>
           <Section title="Once a day">{kindRow('pushDaily', 'Daily reminder', DAILY_NOTE)}</Section>
         </>
+      ) : null}
+      {native && phone === 'on' && reminders !== null ? (
+        <Section title={ROLODEX}>
+          <Row title="Birthdays and catch-ups" subtitle="At 9 in the morning on the day, and when it’s time to catch up with someone. Set on this phone; Circlo’s server doesn’t send them.">
+            <Toggle
+              accessibilityLabel="Birthdays and catch-ups"
+              value={reminders}
+              onValueChange={async (on) => {
+                setReminders(on);
+                await setPeopleRemindersOn(on, getPeople().people).catch(() => undefined);
+              }}
+            />
+          </Row>
+        </Section>
       ) : null}
       <Section title="Email">
         <Row title={EMAIL_TITLE} subtitle={EMAIL_NOTE}>

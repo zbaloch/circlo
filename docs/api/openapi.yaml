@@ -1615,6 +1615,138 @@ paths:
             application/json:
               schema: { type: array, items: { $ref: "#/components/schemas/Todo" } }
         "404": { $ref: "#/components/responses/Error" }
+  # ---------------- rolodex: a personal CRM (contacts in code) ----------------
+  /v1/contacts:
+    get:
+      summary: Everyone, sorted by name - my entries, then the connections I haven't written about (contactId null)
+      responses:
+        "200":
+          description: My people
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [people]
+                properties:
+                  people: { type: array, items: { $ref: "#/components/schemas/Contact" } }
+    post:
+      summary: >-
+        Add someone, by name; with userId, an entry about that connection. Errors invalid_name (400), not my connection
+        (404), already_linked (409), too_many_contacts (409, 5,000)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string, maxLength: 200 }
+                userId: { oneOf: [{ type: "null" }, { $ref: "#/components/schemas/Id" }] }
+      responses:
+        "201": { description: Added, content: { application/json: { schema: { $ref: "#/components/schemas/Contact" } } } }
+        "400": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+        "409": { $ref: "#/components/responses/Error" }
+  /v1/contacts/{contactId}:
+    get:
+      summary: One of my entries
+      parameters:
+        - { name: contactId, in: path, required: true, schema: { $ref: "#/components/schemas/Id" } }
+      responses:
+        "200": { description: The entry, content: { application/json: { schema: { $ref: "#/components/schemas/Contact" } } } }
+        "404": { $ref: "#/components/responses/Error" }
+    put:
+      summary: >-
+        Save the whole entry - name, rhythm (null for none) and dates (replacing its dates). Starting a rhythm sets
+        keepSince; changing it keeps it. Errors invalid_name, invalid_rhythm, invalid_date (400)
+      parameters:
+        - { name: contactId, in: path, required: true, schema: { $ref: "#/components/schemas/Id" } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string, maxLength: 200 }
+                keepInTouchDays: { type: [integer, "null"], enum: [7, 14, 30, 90, 180, 365, null] }
+                dates: { type: array, maxItems: 20, items: { $ref: "#/components/schemas/ContactDate" } }
+      responses:
+        "200": { description: Saved, content: { application/json: { schema: { $ref: "#/components/schemas/Contact" } } } }
+        "400": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+    delete:
+      summary: Delete an entry and its notes (a connection is still listed, as one I haven't written about)
+      parameters:
+        - { name: contactId, in: path, required: true, schema: { $ref: "#/components/schemas/Id" } }
+      responses:
+        "204": { description: Deleted }
+        "404": { $ref: "#/components/responses/Error" }
+  /v1/contacts/{contactId}/link:
+    put:
+      summary: Link an entry to a connection. Errors not my connection (404), already_linked (409)
+      parameters:
+        - { name: contactId, in: path, required: true, schema: { $ref: "#/components/schemas/Id" } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [userId], properties: { userId: { $ref: "#/components/schemas/Id" } } }
+      responses:
+        "200": { description: Linked, content: { application/json: { schema: { $ref: "#/components/schemas/Contact" } } } }
+        "404": { $ref: "#/components/responses/Error" }
+        "409": { $ref: "#/components/responses/Error" }
+    delete:
+      summary: Unlink an entry (it stays; the connection is listed by themselves again)
+      parameters:
+        - { name: contactId, in: path, required: true, schema: { $ref: "#/components/schemas/Id" } }
+      responses:
+        "204": { description: Unlinked }
+        "404": { $ref: "#/components/responses/Error" }
+  /v1/contacts/{contactId}/notes:
+    get:
+      summary: An entry's notes and catch-ups, oldest first
+      parameters:
+        - { name: contactId, in: path, required: true, schema: { $ref: "#/components/schemas/Id" } }
+      responses:
+        "200":
+          description: Its log
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: "#/components/schemas/ContactNote" } }
+        "404": { $ref: "#/components/responses/Error" }
+    post:
+      summary: >-
+        Add a note, or a catch-up (caughtUp; words optional; at dates it earlier, never later than tomorrow). Errors
+        invalid_note, invalid_date (400), too_many_notes (409, 500)
+      parameters:
+        - { name: contactId, in: path, required: true, schema: { $ref: "#/components/schemas/Id" } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                body: { type: string, maxLength: 10000 }
+                caughtUp: { type: boolean }
+                at: { type: string, format: date, description: "A catch-up's day, when it wasn't today" }
+      responses:
+        "201": { description: Added, content: { application/json: { schema: { $ref: "#/components/schemas/ContactNote" } } } }
+        "400": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+        "409": { $ref: "#/components/responses/Error" }
+  /v1/contacts/{contactId}/notes/{noteId}:
+    delete:
+      summary: Delete a note or catch-up
+      parameters:
+        - { name: contactId, in: path, required: true, schema: { $ref: "#/components/schemas/Id" } }
+        - { name: noteId, in: path, required: true, schema: { $ref: "#/components/schemas/Id" } }
+      responses:
+        "204": { description: Deleted }
+        "404": { $ref: "#/components/responses/Error" }
 components:
   securitySchemes:
     bearer: { type: http, scheme: bearer, bearerFormat: JWT }
@@ -1722,6 +1854,37 @@ components:
         noteId: { $ref: "#/components/schemas/Id" }
         body: { type: string }
         createdAt: { type: string, format: date-time, description: When it was added }
+    Contact:
+      description: >-
+        One person in my Rolodex (personal CRM), seen only by me. contactId is null for a connection I haven't written about;
+        person is there only while they're my connection
+      type: object
+      required: [contactId, name, person, dates, keepInTouchDays, keepSince, lastCaughtUp, noteCount]
+      properties:
+        contactId: { oneOf: [{ type: "null" }, { $ref: "#/components/schemas/Id" }] }
+        name: { type: string }
+        person: { oneOf: [{ type: "null" }, { $ref: "#/components/schemas/Person" }] }
+        dates: { type: array, items: { $ref: "#/components/schemas/ContactDate" } }
+        keepInTouchDays: { type: [integer, "null"], description: "Catch up every this many days (7, 14, 30, 90, 180, 365)" }
+        keepSince: { type: [string, "null"], format: date-time, description: When the rhythm started }
+        lastCaughtUp: { type: [string, "null"], format: date-time, description: The latest catch-up in the log }
+        noteCount: { type: integer }
+    ContactDate:
+      type: object
+      required: [label, month, day]
+      properties:
+        label: { type: string, maxLength: 40, description: "Birthday, Anniversary, or my own words" }
+        month: { type: integer, minimum: 1, maximum: 12 }
+        day: { type: integer, minimum: 1, maximum: 31 }
+        year: { type: [integer, "null"], description: When it's known (so the app can show an age) }
+    ContactNote:
+      type: object
+      required: [noteId, body, caughtUp, at]
+      properties:
+        noteId: { $ref: "#/components/schemas/Id" }
+        body: { type: string, description: Empty for a catch-up without words }
+        caughtUp: { type: boolean }
+        at: { type: string, format: date-time, description: When it happened }
     FoundSource:
       type: object
       required: [feedUrl, title, siteUrl, following, articles, icon]

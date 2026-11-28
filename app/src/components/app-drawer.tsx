@@ -6,6 +6,7 @@ import { Pressable, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { refreshMe, useMe } from '@/lib/me';
+import { ROLODEX } from '@/lib/people';
 import { readingHasNew } from '@/lib/reading';
 import { useSession } from '@/lib/session';
 import { usePalette } from '@/theme/use-palette';
@@ -17,10 +18,13 @@ type Item = { label: string; icon: IconName; href: Href; dot?: 'reading' };
 
 export const DRAWER_ITEMS: Item[] = [
   { label: 'Profile', icon: 'person-outline', href: '/profile' },
-  // Feeds (2.0; "reading" in code and the API, as /v1/feed is the timeline): web feeds. A quiet dot when something arrived since I last looked; no counts, no pushes.
-  { label: 'Feeds', icon: 'rss-outline', href: '/feeds', dot: 'reading' },
-  // Todos (2.0): my own to-do lists. Things-calm: no dot, no count.
+  // The personal tools (2.0), people first (owner 2026-11-28): Rolodex, Todos, Feeds.
+  // Rolodex: my personal CRM, people on Circlo and not, birthdays and catch-ups. No dot (reminders come on the phone).
+  { label: ROLODEX, icon: 'book-user', href: '/rolodex' },
+  // Todos: my own to-do lists. Things-calm: no dot, no count.
   { label: 'Todos', icon: 'list-todo', href: '/todos' },
+  // Feeds ("reading" in code and the API, as /v1/feed is the timeline): web feeds. A quiet dot when something arrived since I last looked; no counts, no pushes.
+  { label: 'Feeds', icon: 'rss-outline', href: '/feeds', dot: 'reading' },
   // Devices is the first link inside Settings and privacy.
   { label: 'Settings and privacy', icon: 'settings-outline', href: '/settings' },
 ];

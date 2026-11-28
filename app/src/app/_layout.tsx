@@ -27,6 +27,7 @@ import { BackButton, HeaderBar } from '@/components/ui/header';
 import { Spinner } from '@/components/ui/spinner';
 import { ToastHost } from '@/components/ui/toast-host';
 import { SessionProvider, useSession } from '@/lib/session';
+import { ROLODEX } from '@/lib/people';
 import { loadTheme, useDarkTheme, useThemeLoaded } from '@/lib/theme';
 import { neutralVars } from '@/theme/tokens';
 import { usePalette } from '@/theme/use-palette';
@@ -120,6 +121,8 @@ function Navigator() {
         <Stack.Screen name="feeds/[id]" options={page('Feeds')} />
         <Stack.Screen name="todos/index" options={page('Todos')} />
         <Stack.Screen name="todos/[id]" options={page('To-do')} />
+        <Stack.Screen name="rolodex/index" options={page(ROLODEX)} />
+        <Stack.Screen name="rolodex/[id]" options={page(ROLODEX)} />
       </Stack.Protected>
     </Stack>
   );

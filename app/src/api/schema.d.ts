@@ -4281,6 +4281,348 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/contacts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Everyone, sorted by name - my entries, then the connections I haven't written about (contactId null) */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description My people */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            people: components["schemas"]["Contact"][];
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        /** Add someone, by name; with userId, an entry about that connection. Errors invalid_name (400), not my connection (404), already_linked (409), too_many_contacts (409, 5,000) */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        name: string;
+                        userId?: null | components["schemas"]["Id"];
+                    };
+                };
+            };
+            responses: {
+                /** @description Added */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Contact"];
+                    };
+                };
+                400: components["responses"]["Error"];
+                404: components["responses"]["Error"];
+                409: components["responses"]["Error"];
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/contacts/{contactId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One of my entries */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    contactId: components["schemas"]["Id"];
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The entry */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Contact"];
+                    };
+                };
+                404: components["responses"]["Error"];
+            };
+        };
+        /** Save the whole entry - name, rhythm (null for none) and dates (replacing its dates). Starting a rhythm sets keepSince; changing it keeps it. Errors invalid_name, invalid_rhythm, invalid_date (400) */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    contactId: components["schemas"]["Id"];
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        name: string;
+                        /** @enum {integer|null} */
+                        keepInTouchDays?: 7 | 14 | 30 | 90 | 180 | 365 | null;
+                        dates?: components["schemas"]["ContactDate"][];
+                    };
+                };
+            };
+            responses: {
+                /** @description Saved */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Contact"];
+                    };
+                };
+                400: components["responses"]["Error"];
+                404: components["responses"]["Error"];
+            };
+        };
+        post?: never;
+        /** Delete an entry and its notes (a connection is still listed, as one I haven't written about) */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    contactId: components["schemas"]["Id"];
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Deleted */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                404: components["responses"]["Error"];
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/contacts/{contactId}/link": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Link an entry to a connection. Errors not my connection (404), already_linked (409) */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    contactId: components["schemas"]["Id"];
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        userId: components["schemas"]["Id"];
+                    };
+                };
+            };
+            responses: {
+                /** @description Linked */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Contact"];
+                    };
+                };
+                404: components["responses"]["Error"];
+                409: components["responses"]["Error"];
+            };
+        };
+        post?: never;
+        /** Unlink an entry (it stays; the connection is listed by themselves again) */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    contactId: components["schemas"]["Id"];
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Unlinked */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                404: components["responses"]["Error"];
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/contacts/{contactId}/notes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** An entry's notes and catch-ups, oldest first */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    contactId: components["schemas"]["Id"];
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Its log */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ContactNote"][];
+                    };
+                };
+                404: components["responses"]["Error"];
+            };
+        };
+        put?: never;
+        /** Add a note, or a catch-up (caughtUp; words optional; at dates it earlier, never later than tomorrow). Errors invalid_note, invalid_date (400), too_many_notes (409, 500) */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    contactId: components["schemas"]["Id"];
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        body?: string;
+                        caughtUp?: boolean;
+                        /**
+                         * Format: date
+                         * @description A catch-up's day, when it wasn't today
+                         */
+                        at?: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Added */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ContactNote"];
+                    };
+                };
+                400: components["responses"]["Error"];
+                404: components["responses"]["Error"];
+                409: components["responses"]["Error"];
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/contacts/{contactId}/notes/{noteId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete a note or catch-up */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    contactId: components["schemas"]["Id"];
+                    noteId: components["schemas"]["Id"];
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Deleted */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                404: components["responses"]["Error"];
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -4312,6 +4654,45 @@ export interface components {
              * @description When it was added
              */
             createdAt: string;
+        };
+        /** @description One person in my Rolodex (personal CRM), seen only by me. contactId is null for a connection I haven't written about; person is there only while they're my connection */
+        Contact: {
+            contactId: null | components["schemas"]["Id"];
+            name: string;
+            person: null | components["schemas"]["Person"];
+            dates: components["schemas"]["ContactDate"][];
+            /** @description Catch up every this many days (7, 14, 30, 90, 180, 365) */
+            keepInTouchDays: number | null;
+            /**
+             * Format: date-time
+             * @description When the rhythm started
+             */
+            keepSince: string | null;
+            /**
+             * Format: date-time
+             * @description The latest catch-up in the log
+             */
+            lastCaughtUp: string | null;
+            noteCount: number;
+        };
+        ContactDate: {
+            /** @description Birthday, Anniversary, or my own words */
+            label: string;
+            month: number;
+            day: number;
+            /** @description When it's known (so the app can show an age) */
+            year?: number | null;
+        };
+        ContactNote: {
+            noteId: components["schemas"]["Id"];
+            /** @description Empty for a catch-up without words */
+            body: string;
+            caughtUp: boolean;
+            /**
+             * Format: date-time
+             * @description When it happened
+             */
+            at: string;
         };
         FoundSource: {
             feedUrl: string;
