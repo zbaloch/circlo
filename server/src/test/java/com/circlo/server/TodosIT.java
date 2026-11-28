@@ -129,6 +129,30 @@ class TodosIT extends IntegrationTest {
     }
 
     @Test
+    void addingIsLimitedPerHourAndNotesAltogether() {
+        TestUser a = user("todo_limits");
+        String id = (String) add(a, body("title", "One")).get("todoId");
+        // All my notes together are capped (so one account can't fill the disk).
+        byte[] me = com.circlo.server.web.Ids.bytes(a.userId);
+        byte[] todo = com.circlo.server.web.Ids.bytes(java.util.UUID.fromString(id));
+        Timestamp now = Timestamp.from(Instant.now());
+        jdbc.batchUpdate("INSERT INTO todo_notes (id, todo_id, user_id, body, created_at) VALUES (?, ?, ?, 'n', ?)",
+                java.util.stream.IntStream.range(0, 20_000)
+                        .mapToObj(i -> new Object[] {com.circlo.server.web.Ids.bytes(java.util.UUID.randomUUID()), todo, me, now}).toList());
+        assertThat(a.call("POST", "/v1/todos/" + id + "/notes", Map.of("body", "one more")).getBody()).containsEntry("error", "too_many_notes");
+
+        // Adding to-dos, notes and lists: 300 an hour (the refused note counted too).
+        for (int i = 1; i <= 298; i++) {
+            assertThat(a.call("POST", "/v1/todos", body("title", "T" + i)).getStatusCode().value()).as("add %d", i).isEqualTo(201);
+        }
+        ResponseEntity<Map<String, Object>> over = a.call("POST", "/v1/todos/lists", Map.of("name", "One too many"));
+        assertThat(over.getStatusCode().value()).isEqualTo(429);
+        assertThat(over.getBody()).containsEntry("error", "rate_limited");
+        // Someone else isn't affected.
+        assertThat(user("todo_limits_other").call("POST", "/v1/todos", body("title", "Fine")).getStatusCode().value()).isEqualTo(201);
+    }
+
+    @Test
     void myOrderInAListIsKept() {
         TestUser a = user("todo_order");
         String one = (String) add(a, body("title", "One")).get("todoId");

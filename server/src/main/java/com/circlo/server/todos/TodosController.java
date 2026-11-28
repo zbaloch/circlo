@@ -3,6 +3,7 @@ package com.circlo.server.todos;
 import com.circlo.server.auth.TokenService;
 import com.circlo.server.web.ApiException;
 import com.circlo.server.web.Ids;
+import com.circlo.server.web.RateLimiter;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
@@ -38,13 +39,26 @@ public class TodosController {
     static final int MAX_LISTS = 100;
     static final int MAX_OPEN = 5000;
     static final int MAX_NOTES = 500;
+    /** All my notes together, so storage can't be filled by one account. */
+    static final int MAX_NOTES_TOTAL = 20_000;
+    /** Adding to-dos, notes and lists: far more than anyone writes by hand in an hour. */
+    static final int WRITES_PER_HOUR = 300;
     private static final String TODO_COLUMNS =
             "t.id, t.list_id, t.title, t.completed_at, t.created_at, (SELECT COUNT(*) FROM todo_notes n WHERE n.todo_id = t.id) AS notes";
 
     private final JdbcTemplate jdbc;
+    private final RateLimiter limiter;
 
-    public TodosController(JdbcTemplate jdbc) {
+    public TodosController(JdbcTemplate jdbc, RateLimiter limiter) {
         this.jdbc = jdbc;
+        this.limiter = limiter;
+    }
+
+    /** Adding things is limited per person per hour (429 rate_limited). */
+    private void write(byte[] me) {
+        if (!limiter.tryAcquire("todos-write", me, WRITES_PER_HOUR, 3_600_000)) {
+            throw ApiException.rateLimited();
+        }
     }
 
     private static byte[] me(Jwt jwt) {
@@ -136,6 +150,7 @@ public class TodosController {
     public TodoList addList(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody ListName r) {
         byte[] me = me(jwt);
         String name = name(r.name());
+        write(me);
         general(me);
         Integer count = jdbc.queryForObject("SELECT COUNT(*) FROM todo_lists WHERE user_id = ?", Integer.class, (Object) me);
         if (count != null && count >= MAX_LISTS) {
@@ -233,6 +248,7 @@ public class TodosController {
         byte[] me = me(jwt);
         String title = title(r.title());
         UUID list = r.listId() == null ? general(me) : myList(me, r.listId()).listId();
+        write(me);
         Integer open = jdbc.queryForObject("SELECT COUNT(*) FROM todos WHERE user_id = ? AND completed_at IS NULL", Integer.class, (Object) me);
         if (open != null && open >= MAX_OPEN) {
             throw ApiException.conflict("too_many_todos");
@@ -308,8 +324,10 @@ public class TodosController {
         if (body.isEmpty() || body.length() > 10_000) {
             throw ApiException.badRequest("invalid_note");
         }
+        write(me);
         Integer count = jdbc.queryForObject("SELECT COUNT(*) FROM todo_notes WHERE todo_id = ?", Integer.class, (Object) Ids.bytes(id));
-        if (count != null && count >= MAX_NOTES) {
+        Integer total = jdbc.queryForObject("SELECT COUNT(*) FROM todo_notes WHERE user_id = ?", Integer.class, (Object) me);
+        if (count != null && count >= MAX_NOTES || total != null && total >= MAX_NOTES_TOTAL) {
             throw ApiException.conflict("too_many_notes");
         }
         UUID noteId = Ids.newId();
