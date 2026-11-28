@@ -1,3 +1,4 @@
+import * as Haptics from 'expo-haptics';
 import { router, useLocalSearchParams, useNavigation } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { FlatList, Pressable, View } from 'react-native';
@@ -15,15 +16,18 @@ import { showAlert } from '@/lib/dialog';
 import { fullTime } from '@/lib/time';
 import { showToast } from '@/lib/toast';
 import { addNote, deleteNote, loadNotes, type Todo, type TodoNote } from '@/lib/todos';
-import { bumpNotes, deleteTodoNow, refreshTodos, saveTodoNow, useTodos } from '@/lib/todos-store';
+import { bumpNotes, completeTodoNow, deleteTodoNow, refreshTodos, saveTodoNow, useTodos } from '@/lib/todos-store';
 import { usePalette } from '@/theme/use-palette';
 
 /** How long after the last change a to-do's title or list saves itself (and when I leave the screen). */
 export const SAVE_AFTER_MS = 600;
+/** How long the tick shows on a to-do's screen before it goes back to the list. */
+export const TICK_BACK_MS = 600;
 
 /**
- * One to-do: its title and list (saved by themselves as I change them), then its notes, a log of dated entries like
- * comments, oldest first, and a field at the bottom to add the next one. A long press on a note deletes it.
+ * One to-do: a box to tick it off, its title and list (saved by themselves as I change them), then its notes, a log of
+ * dated entries like comments, oldest first, and a field at the bottom to add the next one. A long press on a note
+ * deletes it.
  */
 export default function TodoScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -116,6 +120,19 @@ function Editor({ todo }: { todo: Todo }) {
     });
   }, [navigation, palette.ink, todo.todoId]);
 
+  // Ticking it here: a check and a light tap, then (a moment later, as in the list) back to the list, ticked off.
+  const [done, setDone] = useState(false);
+  const tick = () => {
+    if (done) return;
+    setDone(true);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => undefined);
+    setTimeout(() => {
+      void save.current(latest.current);
+      router.back();
+      completeTodoNow(todo.todoId).catch(() => showToast('Couldn’t tick it. Try again.'));
+    }, TICK_BACK_MS);
+  };
+
   const add = async () => {
     const body = note.trim();
     if (!body || adding) return;
@@ -161,16 +178,30 @@ function Editor({ todo }: { todo: Todo }) {
         contentContainerClassName="pb-6"
         ListHeaderComponent={
           <View className="gap-5 px-5 pb-2 pt-4">
-            <TextInput
-              accessibilityLabel="Title"
-              value={title}
-              onChangeText={setTitle}
-              multiline
-              maxLength={500}
-              placeholder="To-do"
-              placeholderTextColor={palette.muted}
-              className="text-2xl font-bold text-ink dark:text-ink-dark"
-            />
+            <View className="flex-row items-start gap-3">
+              <Pressable
+                accessibilityRole="checkbox"
+                accessibilityLabel="Done"
+                accessibilityHint="Ticks it off and goes back to the list"
+                accessibilityState={{ checked: done }}
+                hitSlop={10}
+                onPress={tick}
+                className={`mt-1.5 h-7 w-7 items-center justify-center rounded-full border-2 ${
+                  done ? 'border-primary bg-primary dark:border-primary-dark dark:bg-primary-dark' : 'border-muted dark:border-muted-dark'
+                }`}>
+                {done ? <Icon name="checkmark" size={17} color={palette.onPrimary} /> : null}
+              </Pressable>
+              <TextInput
+                accessibilityLabel="Title"
+                value={title}
+                onChangeText={setTitle}
+                multiline
+                maxLength={500}
+                placeholder="To-do"
+                placeholderTextColor={palette.muted}
+                className={`flex-1 text-2xl font-bold ${done ? 'text-muted line-through dark:text-muted-dark' : 'text-ink dark:text-ink-dark'}`}
+              />
+            </View>
             {lists.length > 1 ? (
               <View className="gap-3">
                 <Text className="text-sm font-semibold text-muted dark:text-muted-dark">List</Text>

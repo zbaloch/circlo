@@ -91,3 +91,37 @@ export function inList(todos: Todo[], listId: string | null): Todo[] {
 export function listSections(todos: Todo[], lists: Pick<TodoList, 'listId' | 'name'>[]): { listId: string; title: string; todos: Todo[] }[] {
   return lists.map((l) => ({ listId: l.listId, title: l.name, todos: todos.filter((t) => t.listId === l.listId) })).filter((s) => s.todos.length > 0);
 }
+
+// --- All as one list to drag in: each list's heading, then its to-dos ---
+
+export type AllItem = { kind: 'list'; listId: string; title: string } | { kind: 'todo'; todo: Todo };
+
+/** Every list's heading (empty ones too, to drop into), each followed by its to-dos in my order. Pure. */
+export function allItems(todos: Todo[], lists: Pick<TodoList, 'listId' | 'name'>[]): AllItem[] {
+  return lists.flatMap((l) => [
+    { kind: 'list' as const, listId: l.listId, title: l.name },
+    ...todos.filter((t) => t.listId === l.listId).map((todo) => ({ kind: 'todo' as const, todo })),
+  ]);
+}
+
+/**
+ * Where a to-do dragged in All lands: the list whose heading is above it (the first list if dropped above every
+ * heading), and that list's new order. Pure.
+ */
+export function dropInAll(items: AllItem[], from: number, to: number): { todoId: string; listId: string; order: string[] } | null {
+  const moved = items[from];
+  if (!moved || moved.kind !== 'todo') return null;
+  const next = [...items];
+  next.splice(to, 0, ...next.splice(from, 1));
+  const firstList = next.find((i) => i.kind === 'list');
+  if (!firstList || firstList.kind !== 'list') return null;
+  let listId: string = firstList.listId;
+  const lists = new Map<string, string[]>();
+  for (const item of next) {
+    if (item.kind === 'list') listId = item.listId;
+    else lists.set(listId, [...(lists.get(listId) ?? []), item.todo.todoId]);
+  }
+  // (Dropped above every heading, it counts as the first list's, at its top.)
+  const [target, order] = [...lists.entries()].find(([, ids]) => ids.includes(moved.todo.todoId))!;
+  return { todoId: moved.todo.todoId, listId: target, order };
+}

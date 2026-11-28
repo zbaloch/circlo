@@ -2,7 +2,7 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-
 import { useSyncExternalStore, type ReactElement } from 'react';
 import { View } from 'react-native';
 
-import TodoScreen, { SAVE_AFTER_MS } from '@/app/todos/[id]';
+import TodoScreen, { SAVE_AFTER_MS, TICK_BACK_MS } from '@/app/todos/[id]';
 import TodosScreen, { TICK_MS } from '@/app/todos/index';
 import type { Todo, TodoFields, TodoList, TodoNote } from '@/lib/todos';
 import { clearTodos } from '@/lib/todos-store';
@@ -33,18 +33,32 @@ jest.mock('@/lib/toast', () => ({ showToast: (m: string) => mockToast(m) }));
 type Btn = { text: string; style?: string; onPress?: () => void };
 const mockAlert = jest.fn((_t: string, _m?: string, buttons?: Btn[]) => buttons?.find((b) => b.style === 'destructive')?.onPress?.());
 jest.mock('@/lib/dialog', () => ({ showAlert: (t: string, m?: string, b?: Btn[]) => mockAlert(t, m, b) }));
-// The drag-to-reorder list needs Reanimated's native runtime: a plain list stands in.
+// The drag-to-reorder list needs Reanimated's native runtime: a plain list stands in, keeping its onReorder so a test
+// can drop something; the swipeable row shows its Delete button without a swipe.
+let mockReorder: ((e: { from: number; to: number }) => void) | undefined;
 jest.mock('react-native-reorderable-list', () => {
   const { FlatList } = jest.requireActual('react-native');
+  const { createElement } = jest.requireActual('react');
   return {
     __esModule: true,
-    default: FlatList,
+    default: (props: { onReorder: (e: { from: number; to: number }) => void }) => {
+      mockReorder = props.onReorder;
+      return createElement(FlatList, props);
+    },
     reorderItems: <T,>(data: T[], from: number, to: number) => {
       const out = [...data];
       out.splice(to, 0, ...out.splice(from, 1));
       return out;
     },
     useReorderableDrag: () => jest.fn(),
+  };
+});
+jest.mock('react-native-gesture-handler/ReanimatedSwipeable', () => {
+  const { createElement, Fragment } = jest.requireActual('react');
+  return {
+    __esModule: true,
+    default: ({ children, renderRightActions }: { children: unknown; renderRightActions: (p: unknown, t: unknown, m: { close: () => void }) => unknown }) =>
+      createElement(Fragment, null, children, renderRightActions(null, null, { close: () => undefined })),
   };
 });
 
@@ -118,6 +132,7 @@ describe('Todos', () => {
     expect(screen.getByRole('button', { name: 'Showing All' })).toBeTruthy();
     expect(screen.getAllByRole('header').map((h) => h.props.children)).toEqual(['General', 'Work']);
     expect(titles()).toEqual(['Send invoice', 'Learn Sindhi', 'Quarterly report']);
+    expect(screen.getByRole('button', { name: 'Move Send invoice' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Send invoice, has notes' })).toBeTruthy();
     expect(screen.queryByText(/^\d+$/)).toBeNull();
     expect(screen.queryByText('Today')).toBeNull();
@@ -140,6 +155,33 @@ describe('Todos', () => {
     await fireEvent.press(screen.getByRole('button', { name: 'Add to-do' }));
     await waitFor(() => expect(mockAdd).toHaveBeenLastCalledWith({ title: 'Book flights', listId: 'w' }));
     expect(mockToast).not.toHaveBeenCalled();
+  });
+
+  it('dragging in All reorders a list, or moves a to-do to the list it’s dropped under', async () => {
+    mockTodos = [todo('t1', 'Send invoice'), todo('t2', 'Learn Sindhi'), todo('w1', 'Quarterly report', { listId: 'w' })];
+    await render(<TodosScreen />);
+    await screen.findByText('Send invoice');
+    // [General] Send invoice, Learn Sindhi, [Work] Quarterly report: Learn Sindhi to the top of General.
+    await act(async () => mockReorder?.({ from: 2, to: 1 }));
+    await waitFor(() => expect(mockOrder).toHaveBeenCalledWith('g', ['t2', 't1']));
+    expect(mockSave).not.toHaveBeenCalled();
+    expect(titles()).toEqual(['Learn Sindhi', 'Send invoice', 'Quarterly report']);
+    // Send invoice dropped after Quarterly report: into Work, at its end.
+    await act(async () => mockReorder?.({ from: 2, to: 4 }));
+    await waitFor(() => expect(mockSave).toHaveBeenCalledWith('t1', { title: 'Send invoice', listId: 'w' }));
+    await waitFor(() => expect(mockOrder).toHaveBeenLastCalledWith('w', ['w1', 't1']));
+  });
+
+  it('swiping a to-do left shows Delete; one with notes asks first', async () => {
+    mockTodos = [todo('t1', 'Send invoice'), todo('t2', 'Plan the trip', { noteCount: 3 })];
+    await render(<TodosScreen />);
+    await fireEvent.press(await screen.findByRole('button', { name: 'Delete Send invoice' }));
+    await waitFor(() => expect(mockDelete).toHaveBeenCalledWith('t1'));
+    expect(mockAlert).not.toHaveBeenCalled();
+    expect(screen.queryByText('Send invoice')).toBeNull();
+    await fireEvent.press(screen.getByRole('button', { name: 'Delete Plan the trip' }));
+    expect(mockAlert).toHaveBeenCalledWith('Delete “Plan the trip”?', 'Its notes are deleted with it.', expect.anything());
+    await waitFor(() => expect(mockDelete).toHaveBeenCalledWith('t2'));
   });
 
   it('ticking checks it at once, and a moment later it’s done; tapping again in that moment undoes it', async () => {
@@ -230,6 +272,21 @@ describe('A to-do', () => {
     await fireEvent.press(screen.getByRole('button', { name: 'Work' }));
     await waitFor(() => expect(mockSave).toHaveBeenLastCalledWith('t1', { title: 'Plan the summer trip', listId: 'w' }), { timeout: SAVE_AFTER_MS + 2000 });
     expect(mockSave).toHaveBeenCalledTimes(1);
+  });
+
+  it('can be ticked off from its own screen, then goes back to the list', async () => {
+    jest.useFakeTimers();
+    try {
+      await render(<TodoScreen />);
+      await fireEvent.press(await screen.findByRole('checkbox', { name: 'Done' }));
+      expect(screen.getByRole('checkbox', { name: 'Done' }).props.accessibilityState).toEqual({ checked: true });
+      expect(mockComplete).not.toHaveBeenCalled();
+      await act(async () => jest.advanceTimersByTime(TICK_BACK_MS + 50));
+      expect(mockBack).toHaveBeenCalled();
+      expect(mockComplete).toHaveBeenCalledWith('t1');
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   it('can be deleted, notes and all', async () => {

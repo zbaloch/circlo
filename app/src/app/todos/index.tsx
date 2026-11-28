@@ -1,7 +1,7 @@
 import * as Haptics from 'expo-haptics';
 import { router, useFocusEffect, useNavigation } from 'expo-router';
 import { useCallback, useEffect, useRef, useState, type ReactElement } from 'react';
-import { FlatList, LayoutAnimation, SectionList, View } from 'react-native';
+import { FlatList, LayoutAnimation, View } from 'react-native';
 import ReorderableList, { reorderItems, useReorderableDrag } from 'react-native-reorderable-list';
 
 import { ActionSheet, type SheetAction } from '@/components/action-sheet';
@@ -15,16 +15,18 @@ import { Spinner } from '@/components/ui/spinner';
 import { Text } from '@/components/ui/text';
 import { showAlert } from '@/lib/dialog';
 import { showToast } from '@/lib/toast';
-import { ALL_TODOS, inList, listLabel, listSections, loadCompleted, type Todo, type TodoFilter } from '@/lib/todos';
+import { ALL_TODOS, allItems, dropInAll, inList, listLabel, loadCompleted, type AllItem, type Todo, type TodoFilter } from '@/lib/todos';
 import {
   addListNow,
   addTodoNow,
   completeTodoNow,
   deleteListNow,
+  deleteTodoNow,
   refreshTodos,
   renameListNow,
   reopenTodoNow,
   reorderTodosNow,
+  saveTodoNow,
   useTodos,
 } from '@/lib/todos-store';
 import { usePalette } from '@/theme/use-palette';
@@ -36,9 +38,9 @@ type Row = (t: Todo, showList: boolean, drag?: () => void) => ReactElement;
 
 /**
  * Todos (2.0; owner decisions 2026-11-27/28): my own to-do lists, like pen and paper (no dates or badges). Above
- * them, a list picker ("All" to start, or one list) and a Completed toggle; All shows every open to-do under its
- * list's name; one list keeps my order (long-press to drag). Quick add at the bottom. A to-do's notes are on its own
- * screen.
+ * them, a list picker ("All" to start, or one list) and a Completed toggle. Everywhere, the ≡ handle moves a to-do
+ * (in All, dropping it under another list's heading moves it there) and swiping it left deletes it. Quick add at the
+ * bottom. A to-do's notes are on its own screen.
  */
 export default function TodosScreen() {
   const navigation = useNavigation();
@@ -159,6 +161,20 @@ export default function TodosScreen() {
 
   const open = (t: Todo) => router.push({ pathname: '/todos/[id]', params: { id: t.todoId } });
 
+  // Swiped away: gone at once, unless it has notes, which are asked about first.
+  const remove = (t: Todo) => {
+    const go = () => {
+      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+      deleteTodoNow(t.todoId).catch(() => showToast('Couldn’t delete it. Try again.'));
+    };
+    if (t.noteCount > 0) {
+      showAlert(`Delete “${t.title}”?`, 'Its notes are deleted with it.', [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Delete', style: 'destructive', onPress: go },
+      ]);
+    } else go();
+  };
+
   // Added to the list I'm looking at (General under All); when I'm looking at Completed, said so.
   const add = async (title: string) => {
     try {
@@ -181,7 +197,8 @@ export default function TodosScreen() {
       checked={ticking.has(t.todoId)}
       onToggle={() => toggle(t)}
       onOpen={() => open(t)}
-      onLongPress={drag}
+      onDrag={drag}
+      onDelete={() => remove(t)}
     />
   );
   const name = listLabel(lists, filter.listId);
@@ -201,19 +218,7 @@ export default function TodosScreen() {
         {filter.completed ? (
           <CompletedList listId={filter.listId} showList={all && lists.length > 1} listNames={listNames} />
         ) : all ? (
-          <SectionList
-            sections={listSections(todos, lists).map((s) => ({ title: s.title, data: s.todos }))}
-            keyExtractor={(t) => t.todoId}
-            renderItem={({ item }) => row(item, false)}
-            renderSectionHeader={({ section }) => (
-              <Text accessibilityRole="header" className="bg-surface px-4 pb-1 pt-4 text-sm font-bold text-ink dark:bg-surface-dark dark:text-ink-dark">
-                {section.title}
-              </Text>
-            )}
-            stickySectionHeadersEnabled={false}
-            ListEmptyComponent={<Empty title="Nothing to do" body="Write a to-do below, as you would on paper." />}
-            keyboardShouldPersistTaps="handled"
-          />
+          <AllView items={allItems(todos, lists)} empty={todos.length === 0} row={row} />
         ) : (
           <ListView listId={filter.listId!} todos={inList(todos, filter.listId)} name={name} row={row} />
         )}
@@ -256,7 +261,43 @@ function Empty({ title, body }: { title: string; body: string }) {
   );
 }
 
-/** One list: my order (long-press a to-do to drag it). */
+/**
+ * All, as one list to drag in: each list's heading, then its to-dos. A to-do dropped under another heading moves to
+ * that list, in the place it was dropped.
+ */
+function AllView({ items, empty, row }: { items: AllItem[]; empty: boolean; row: Row }) {
+  const drop = async (from: number, to: number) => {
+    const where = dropInAll(items, from, to);
+    const moved = items[from];
+    if (!where || moved?.kind !== 'todo') return;
+    try {
+      if (where.listId !== moved.todo.listId) await saveTodoNow(where.todoId, { title: moved.todo.title, listId: where.listId });
+      await reorderTodosNow(where.listId, where.order);
+    } catch {
+      showToast('Couldn’t move it. Try again.');
+    }
+  };
+  return (
+    <ReorderableList
+      data={items}
+      keyExtractor={(i) => (i.kind === 'list' ? `list-${i.listId}` : i.todo.todoId)}
+      onReorder={({ from, to }) => void drop(from, to)}
+      renderItem={({ item }) =>
+        item.kind === 'list' ? (
+          <Text accessibilityRole="header" className="bg-surface px-4 pb-1 pt-4 text-sm font-bold text-ink dark:bg-surface-dark dark:text-ink-dark">
+            {item.title}
+          </Text>
+        ) : (
+          <DraggableRow todo={item.todo} row={row} />
+        )
+      }
+      ListFooterComponent={empty ? <Empty title="Nothing to do" body="Write a to-do below, as you would on paper." /> : undefined}
+      keyboardShouldPersistTaps="handled"
+    />
+  );
+}
+
+/** One list: my order (the ≡ handle, or a long press, picks a to-do up). */
 function ListView({ listId, todos, name, row }: { listId: string; todos: Todo[]; name: string; row: Row }) {
   return (
     <ReorderableList

@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from 'react';
 import { Modal, Pressable, ScrollView, View } from 'react-native';
+import Swipeable from 'react-native-gesture-handler/ReanimatedSwipeable';
 
 import { Button } from '@/components/form';
 import { KeyboardSpacer } from '@/components/keyboard-spacer';
@@ -10,20 +11,22 @@ import { usePalette } from '@/theme/use-palette';
 
 /**
  * One to-do, like a line on paper: a round box to tick and the title, crossed through once ticked. Under it, quietly,
- * a mark when it has notes, and its list in All. Tapping opens it; in a list, a long press drags it.
+ * a mark when it has notes, and its list. Tapping opens it. With {@code onDrag}, the ≡ handle (or a long press) picks
+ * it up to move; with {@code onDelete}, swiping it left shows Delete.
  */
-export function TodoRow({ todo, listName, checked, onToggle, onOpen, onLongPress }: {
+export function TodoRow({ todo, listName, checked, onToggle, onOpen, onDrag, onDelete }: {
   todo: Todo;
   listName?: string;
   checked: boolean;
   onToggle: () => void;
   onOpen?: () => void;
-  onLongPress?: () => void;
+  onDrag?: () => void;
+  onDelete?: () => void;
 }) {
   const palette = usePalette();
   const notes = todo.noteCount > 0;
-  return (
-    <View className="flex-row items-start gap-3 bg-surface px-4 py-3 dark:bg-surface-dark">
+  const row = (
+    <View className="flex-row items-start gap-3 bg-surface py-3 pl-4 pr-2 dark:bg-surface-dark">
       <Pressable
         accessibilityRole="checkbox"
         accessibilityLabel={todo.title}
@@ -39,9 +42,9 @@ export function TodoRow({ todo, listName, checked, onToggle, onOpen, onLongPress
         accessibilityRole="button"
         accessibilityLabel={`${todo.title}${notes ? ', has notes' : ''}`}
         accessibilityHint={onOpen ? 'Opens the to-do and its notes' : undefined}
-        disabled={!onOpen && !onLongPress}
+        disabled={!onOpen && !onDrag}
         onPress={onOpen}
-        onLongPress={onLongPress}
+        onLongPress={onDrag}
         delayLongPress={250}
         className="flex-1 gap-0.5">
         <Text className={`text-[16px] leading-snug ${checked ? 'text-muted line-through dark:text-muted-dark' : 'text-ink dark:text-ink-dark'}`}>{todo.title}</Text>
@@ -52,7 +55,44 @@ export function TodoRow({ todo, listName, checked, onToggle, onOpen, onLongPress
           </View>
         ) : null}
       </Pressable>
+      {onDrag ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`Move ${todo.title}`}
+          accessibilityHint="Hold, then drag up or down"
+          onLongPress={onDrag}
+          delayLongPress={120}
+          hitSlop={8}
+          className="px-2 py-0.5">
+          <Icon name="grip" size={20} color={palette.muted} />
+        </Pressable>
+      ) : null}
     </View>
+  );
+  return onDelete ? <SwipeToDelete label={todo.title} onDelete={onDelete}>{row}</SwipeToDelete> : row;
+}
+
+/** Swiping a row left shows a red Delete behind it; tapping that deletes. Phones and web alike. */
+function SwipeToDelete({ label, onDelete, children }: { label: string; onDelete: () => void; children: ReactNode }) {
+  return (
+    <Swipeable
+      friction={2}
+      rightThreshold={40}
+      overshootRight={false}
+      renderRightActions={(_progress, _translation, methods) => (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`Delete ${label}`}
+          onPress={() => {
+            methods.close();
+            onDelete();
+          }}
+          className="w-24 items-center justify-center bg-danger-fill active:opacity-80">
+          <Text className="font-bold text-white">Delete</Text>
+        </Pressable>
+      )}>
+      {children}
+    </Swipeable>
   );
 }
 
