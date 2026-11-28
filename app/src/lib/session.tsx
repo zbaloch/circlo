@@ -13,6 +13,7 @@ import { clearMediaCache } from './media';
 import { clearMessaging } from './messaging';
 import { clearOutbox } from './outbox';
 import { stopPodcast } from './podcast-player';
+import { clearPeople } from './people-store';
 import { clearTodos } from './todos-store';
 import { forgetSignIns } from './security-events';
 import { forgetConnections } from './use-connections';
@@ -43,6 +44,8 @@ async function wipeDevice() {
   // A playing episode stops, and where I stopped in each one is forgotten.
   await stopPodcast().catch(() => undefined);
   clearTodos();
+  // People's reminders are scheduled on the phone: they go too.
+  await clearPeople();
   await stopBackgroundChecks();
   if (current) {
     await forgetConnections(current.userId).catch(() => {});

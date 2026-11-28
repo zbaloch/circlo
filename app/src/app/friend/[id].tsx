@@ -8,6 +8,7 @@ import { CircleBadge } from '@/components/circle-badge';
 import { CircleMatesLine } from '@/components/circle-mates-line';
 import { circlesLine, EveryoneRow, memberLine } from '@/components/circle-choice';
 import { ErrorText } from '@/components/form';
+import { KeepInTouchCard } from '@/components/people-ui';
 import { ProfileFeed } from '@/components/profile-feed';
 import { DialogHost } from '@/components/ui/dialog-host';
 import { Spinner } from '@/components/ui/spinner';
@@ -20,6 +21,7 @@ import { dialogOpen, dismissDialog, showAlert } from '@/lib/dialog';
 import { CHAT_ENABLED } from '@/lib/features';
 import { loadProfile, type Profile } from '@/lib/friends';
 import { startChat } from '@/lib/messaging';
+import { findPerson, refreshPeople, usePeople } from '@/lib/people-store';
 import { showToast } from '@/lib/toast';
 import { displayName, useConnections } from '@/lib/use-connections';
 import { ContentText } from '@/components/content-text';
@@ -56,6 +58,12 @@ export default function FriendScreen() {
     loadBook();
   }, [loadBook]);
   useFocusEffect(reloadBook);
+  // My private notes about them (People): only I see the card.
+  const { people, loaded: peopleLoaded } = usePeople();
+  useEffect(() => {
+    if (!peopleLoaded) refreshPeople().catch(() => undefined);
+  }, [peopleLoaded]);
+  const mine = findPerson(people, `u-${id}`);
 
   const c = connections?.find((x) => x.userId === id);
   if (!account || !c) return null;
@@ -131,6 +139,7 @@ export default function FriendScreen() {
     <View className="gap-2">
       {/* People in the same circle of theirs as me (owner decision 2026-11-20); never which circle. */}
       {c.status === 'accepted' ? <CircleMatesLine ownerId={c.userId} ownerName={name} /> : null}
+      {c.status === 'accepted' && mine ? <KeepInTouchCard entry={mine} today={new Date()} /> : null}
       <ErrorText>{error}</ErrorText>
       {contact && book ? (
         <FriendSheet

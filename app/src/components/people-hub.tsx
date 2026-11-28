@@ -8,6 +8,7 @@ import QRCode from 'react-native-qrcode-svg';
 import { CirclePickerSheet, circlesLine } from '@/components/circle-choice';
 import { CirclesList } from '@/components/circles-list';
 import { InviteSheet } from '@/components/invite-sheet';
+import { PeopleList } from '@/components/people-ui';
 import { PersonRow } from '@/components/person-row';
 import { Avatar } from '@/components/avatar';
 import { Button, ErrorText, TextField } from '@/components/form';
@@ -16,6 +17,7 @@ import { loadAddressBook, refreshAddressBook, type AddressBook } from '@/lib/add
 import { circlesOf, setCircles } from '@/lib/circles';
 import { showAlert } from '@/lib/dialog';
 import { acceptRequest, declineRequest, getInviteLink, INVITE_HOST, InviteError, joinInvite, justJoined, previewInvite, resetInviteLink, type Connection } from '@/lib/friends';
+import { refreshPeople, usePeople } from '@/lib/people-store';
 import { takePendingInvite } from '@/lib/pending-invite';
 import { displayName, markRequestsSeen, useConnections } from '@/lib/use-connections';
 import { usePalette } from '@/theme/use-palette';
@@ -100,6 +102,13 @@ export function PeopleHub({ only }: { only?: 'invite' | 'join' } = {}) {
   const incoming = all.filter((c) => c.status === 'incoming');
   const outgoing = all.filter((c) => c.status === 'outgoing');
   const friends = all.filter((c) => c.status === 'accepted');
+  // People (my personal CRM; owner 2026-11-28): my connections and the people I added, with what I keep about them.
+  // Loaded with the tab and again whenever my connections change (the list holds them all).
+  const { people, loaded: peopleLoaded } = usePeople();
+  const friendKey = friends.map((f) => f.userId).join(',');
+  useEffect(() => {
+    if (account && friendKey !== undefined) refreshPeople().catch(() => undefined);
+  }, [account, friendKey]);
   // My code is on screen only on Invite someone.
   const onInviteScreen = only === 'invite';
   const joiners = onInviteScreen ? justJoined(all, known) : [];
@@ -223,7 +232,8 @@ export function PeopleHub({ only }: { only?: 'invite' | 'join' } = {}) {
     invite: false,
   };
 
-  const tabLabel = (t: { key: Section; label: string }) => (t.key === 'friends' ? `${t.label} (${friends.length})` : t.label);
+  const everyone = peopleLoaded ? people.length : friends.length;
+  const tabLabel = (t: { key: Section; label: string }) => (t.key === 'friends' ? `${t.label} (${everyone})` : t.label);
 
   const feedback = (
     <>
@@ -274,25 +284,29 @@ export function PeopleHub({ only }: { only?: 'invite' | 'join' } = {}) {
       ) : null}
 
       <View className="gap-2">
-        {friends.length === 0 ? (
+        {friends.length === 0 && people.length === 0 ? (
           <View className="items-start gap-3">
             <Text className="text-muted dark:text-muted-dark">No one here yet. Invite someone, or use an invite you were sent.</Text>
             <Button label="Invite someone" onPress={() => router.push('/invite')} />
           </View>
         ) : null}
-        {friends.map((f) => (
-          // Under each person: the circles I put them in (only I see this; they're never told).
-          <PersonRow
-            key={f.userId}
-            id={f.userId}
-            name={displayName(f)}
-            handle={f.profile.handle}
-            bio={f.profile.bio}
-            note={book ? circlesLine(book, circlesOf(book, book.contacts[f.userId])) : undefined}
-            avatarUrl={f.profile.avatarUrl}
-            onPress={() => router.push({ pathname: '/friend/[id]', params: { id: f.userId } })}
-          />
-        ))}
+        {peopleLoaded ? (
+          <PeopleList people={people} friends={friends} book={book} today={new Date()} />
+        ) : (
+          friends.map((f) => (
+            // Under each person: the circles I put them in (only I see this; they're never told).
+            <PersonRow
+              key={f.userId}
+              id={f.userId}
+              name={displayName(f)}
+              handle={f.profile.handle}
+              bio={f.profile.bio}
+              note={book ? circlesLine(book, circlesOf(book, book.contacts[f.userId])) : undefined}
+              avatarUrl={f.profile.avatarUrl}
+              onPress={() => router.push({ pathname: '/friend/[id]', params: { id: f.userId } })}
+            />
+          ))
+        )}
       </View>
     </>
   );
@@ -427,7 +441,7 @@ export function PeopleHub({ only }: { only?: 'invite' | 'join' } = {}) {
         className="flex-1"
         contentContainerClassName="gap-5 p-5"
         keyboardShouldPersistTaps="handled"
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={async () => { setRefreshing(true); await refresh(); setRefreshing(false); }} />}>
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={async () => { setRefreshing(true); await Promise.all([refresh(), refreshPeople().catch(() => undefined)]); setRefreshing(false); }} />}>
         {section === 'friends' ? (
           friendsSection
         ) : section === 'circles' ? (

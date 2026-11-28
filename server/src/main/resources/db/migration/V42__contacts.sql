@@ -1,4 +1,4 @@
--- Keep in touch (personal CRM; owner decision 2026-11-28): my private entries about the people in my life, on Circlo
+-- People, a personal CRM (owner decisions 2026-11-28): my private entries about the people in my life, on Circlo
 -- or not: dates to remember, a catch-up rhythm, and a dated log of notes. Only their owner ever reads them; the person
 -- an entry is about never knows. An entry about a connection is linked to them (linked_user_id) only while we're
 -- connected: unfriending, blocking or deleting the account drops the link and keeps the entry (or lets an empty one go).

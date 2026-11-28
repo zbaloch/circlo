@@ -3,9 +3,9 @@ package com.circlo.server.contacts;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
- * What happens to Keep in touch entries when two people stop being connected (unfriend, decline, block) or one of
- * them deletes their account: each one's entry about the other loses its link but stays, with its notes, as their own
- * record; an entry with nothing written in it (no notes, dates or rhythm) is let go with the link.
+ * What happens to People entries (my personal CRM) when two people stop being connected (unfriend, decline, block)
+ * or one of them deletes their account: each one's entry about the other loses its link but stays, with its notes, as
+ * their own record; an entry with nothing written in it (no notes, dates or rhythm) is let go with the link.
  */
 public final class ContactLinks {
 

@@ -42,7 +42,7 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Keep in touch (personal CRM; owner decision 2026-11-28): my private entries about the people in my life, on Circlo
+ * People, my personal CRM (owner decisions 2026-11-28; shown in the People tab): my private entries about the people in my life, on Circlo
  * or not, with days to remember, a catch-up rhythm and a dated log of notes. Everyone I'm connected to is listed
  * without my adding them; writing about one makes an entry linked to them. Every statement is scoped to the caller's
  * own user id, so someone else's entry or note is simply not found (404), and a linked person's name and photo are

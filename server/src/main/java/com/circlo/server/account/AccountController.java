@@ -286,7 +286,7 @@ public class AccountController {
             }, rs.getBytes("id"), me));
             return list;
         }, (Object) me));
-        out.put("keepInTouch", jdbc.query("SELECT id, name, keep_days, created_at FROM contacts WHERE user_id = ? ORDER BY name", (rs, i) -> {
+        out.put("people", jdbc.query("SELECT id, name, keep_days, created_at FROM contacts WHERE user_id = ? ORDER BY name", (rs, i) -> {
             Map<String, Object> c = new LinkedHashMap<>();
             c.put("name", rs.getString("name"));
             int keep = rs.getInt("keep_days");

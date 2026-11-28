@@ -4655,7 +4655,7 @@ export interface components {
              */
             createdAt: string;
         };
-        /** @description One person in Keep in touch, seen only by me. contactId is null for a connection I haven't written about; person is there only while they're my connection */
+        /** @description One person in People (my personal CRM), seen only by me. contactId is null for a connection I haven't written about; person is there only while they're my connection */
         Contact: {
             contactId: null | components["schemas"]["Id"];
             name: string;

@@ -11,7 +11,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.http.ResponseEntity;
 
 /**
- * Keep in touch (personal CRM; `contacts` in code): my private notes, dates and catch-up rhythm for the people in my
+ * People, my personal CRM (`contacts` in code): my private notes, dates and catch-up rhythm for the people in my
  * life, on Circlo or not. Everyone I'm connected to is listed without my adding them; an entry about a connection is
  * linked to them, and the link drops (keeping my notes) when we stop being connected. Only I ever see any of it.
  */
@@ -217,7 +217,7 @@ class ContactsIT extends IntegrationTest {
         a.call("POST", "/v1/contacts/" + id + "/notes", body("body", "Loves gardening"));
 
         @SuppressWarnings("unchecked")
-        List<Map<String, Object>> exported = (List<Map<String, Object>>) a.call("GET", "/v1/me/export", null).getBody().get("keepInTouch");
+        List<Map<String, Object>> exported = (List<Map<String, Object>>) a.call("GET", "/v1/me/export", null).getBody().get("people");
         assertThat(exported).singleElement().satisfies(e -> {
             assertThat(e).containsEntry("name", "Nan").containsEntry("keepInTouchDays", 14);
             assertThat(e.get("dates").toString()).contains("Birthday");
