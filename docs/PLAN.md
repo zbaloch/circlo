@@ -110,9 +110,32 @@ were built, then dropped as confusing).
 - **App**: "Todos" in the drawer, after Feeds (no dot). `/todos` (picker, Completed, list, quick add) and
   `/todos/[id]` (title, list, notes).
 
-### Logged
+### Keep in touch (personal CRM; owner decisions 2026-11-28)
 
-To be planned before it's built (name and scope still open).
+The third personal tool (after Feeds and Todos), towards a paid plan: a private page of the people in my life, on
+Circlo or not, to remember birthdays and to keep catching up. Replaces the "Logged" placeholder. Working name **Keep
+in touch** ("People" is taken by the People hub, and "connect" already means a Circlo friendship); `contacts` in code
+and the API.
+
+- **Everyone in one place**: every connection is listed without my adding them, alongside the people I add by name
+  (anyone, on Circlo or not). A connection gets an entry of its own once I write something about them.
+- **An entry**: a name, days to remember (Birthday, Anniversary or my own words; day and month, the year if known,
+  for an age), a **keep-in-touch rhythm** (off, or every week, 2 weeks, month, 3 months, 6 months, year) and a
+  **dated log** of notes and catch-ups ("Caught up", with optional words, today or an earlier day). When I last
+  caught up is the latest catch-up in the log; someone is due when that (or when the rhythm started) plus the
+  rhythm has passed. No phone numbers, emails or addresses (owner: people keep those elsewhere; later if asked).
+- **Linking to Circlo**: an entry about a connection is linked to them (their photo, View profile, Message). An entry
+  made before someone joined can be linked once we're connected; each connection is linked to at most one entry.
+  When we stop being connected (unfriend, decline, block, account deleted) the link drops and my entry stays with
+  my notes; an entry with nothing written in it goes. The person never knows they're in anyone's Keep in touch.
+- **Reminders are scheduled on the phone** (local notifications, 9 am on a birthday; when someone becomes due), so
+  the server keeps no reminder times or time zones. The web app shows the same as "Coming up".
+- **Server** (`contacts` package, V42): `contacts` (name, linked_user_id, keep_days, keep_since), `contact_dates`,
+  `contact_notes` (body, caught_up, noted_at). Every read and write is the owner's own; anything else is 404; a
+  linked person's name and photo are sent only while we're connected. Limits: 5,000 people, 20 dates and 500 notes
+  each, 20,000 notes in all, 300 writes an hour. In the data export; deleted with the account. Nothing is logged.
+- **Not now**: phone/email/address details, importing from the phone's contacts, Invite to Circlo from an entry
+  (linking when they join), photos for people not on Circlo.
 
 ---
 

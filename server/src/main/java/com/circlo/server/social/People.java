@@ -1,5 +1,6 @@
 package com.circlo.server.social;
 
+import com.circlo.server.contacts.ContactLinks;
 import com.circlo.server.storage.MediaUrlSigner;
 import com.circlo.server.web.Ids;
 import java.util.Arrays;
@@ -94,9 +95,10 @@ public class People {
 
     /**
      * Ends any connection between two people: the friendship and each other's circle memberships (so access to all
-     * posts). Used by unfriend, decline and block.
+     * posts), and the link from each one's Keep in touch entry about the other. Used by unfriend, decline and block.
      */
     public void disconnect(byte[] a, byte[] b) {
+        ContactLinks.disconnect(jdbc, a, b);
         jdbc.update("DELETE FROM friendships WHERE (user_a = ? AND user_b = ?) OR (user_a = ? AND user_b = ?)", a, b, b, a);
         jdbc.update("DELETE FROM circle_members WHERE (owner_id = ? AND member_id = ?) OR (owner_id = ? AND member_id = ?)", a, b, b, a);
     }

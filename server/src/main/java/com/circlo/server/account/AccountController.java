@@ -3,6 +3,7 @@ package com.circlo.server.account;
 import com.circlo.server.auth.Accounts;
 import com.circlo.server.auth.AuthService;
 import com.circlo.server.auth.TokenService;
+import com.circlo.server.contacts.ContactLinks;
 import com.circlo.server.growth.Admins;
 import com.circlo.server.media.Attachments;
 import com.circlo.server.media.MediaSweeper;
@@ -285,6 +286,20 @@ public class AccountController {
             }, rs.getBytes("id"), me));
             return list;
         }, (Object) me));
+        out.put("keepInTouch", jdbc.query("SELECT id, name, keep_days, created_at FROM contacts WHERE user_id = ? ORDER BY name", (rs, i) -> {
+            Map<String, Object> c = new LinkedHashMap<>();
+            c.put("name", rs.getString("name"));
+            int keep = rs.getInt("keep_days");
+            c.put("keepInTouchDays", rs.wasNull() ? null : keep);
+            c.put("createdAt", rs.getTimestamp("created_at").toInstant());
+            c.put("dates", jdbc.queryForList("""
+                    SELECT label, month_num AS month, day_num AS day, year_num AS year FROM contact_dates WHERE contact_id = ? AND user_id = ?
+                    ORDER BY position""", rs.getBytes("id"), me));
+            c.put("notes", jdbc.query("""
+                    SELECT body, caught_up, noted_at FROM contact_notes WHERE contact_id = ? AND user_id = ? ORDER BY noted_at, created_at""",
+                    (n, k) -> Map.of("body", n.getString(1), "caughtUp", n.getBoolean(2), "at", n.getTimestamp(3).toInstant()), rs.getBytes("id"), me));
+            return c;
+        }, (Object) me));
         return out;
     }
 
@@ -304,6 +319,7 @@ public class AccountController {
         for (String key : jdbc.queryForList("SELECT object_key FROM media_uploads WHERE owner_id = ?", String.class, (Object) me)) {
             store.delete(key);
         }
+        ContactLinks.accountDeleted(jdbc, me);
         jdbc.update("DELETE FROM users WHERE id = ?", (Object) me);
         return Map.of("status", "deleted");
     }
