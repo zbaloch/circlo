@@ -83,34 +83,29 @@ code and the API it's `reading`, because `/v1/feed` and `feed-store` are the Hom
 - **Not in 2.0**: Readability-style extraction of pages whose feed has only a summary, thumbnails in the list,
   email-only newsletters, a podcast player, sharing an article as a post.
 
-### Todos (owner decision 2026-11-27)
+### Todos (owner decisions 2026-11-27, simplified 2026-11-28)
 
-**Personal only**: nobody else ever sees my to-dos (no sharing, assigning or circles). Things' calm design (no badges,
-counts or dots; a satisfying tick) with a quick add at the bottom.
+**Personal only**: nobody else ever sees my to-dos (no sharing, assigning or circles). **Like pen and paper**
+(owner 2026-11-28): a to-do is a title and a tick. No due dates, repeats, reminders or badges (dates and repeats
+were built, then dropped as confusing).
 
 - **Lists.** Every to-do is in a list. **General** is the first list, made for me, can be renamed but not deleted, and
-  is where quick add puts things by default. Lists can be added, renamed, reordered and deleted (with their to-dos).
-- **Quick add** at the bottom: a title, and a calendar button beside it for a date (Today, Tomorrow, Next week, or a
-  day on a month calendar), shown as a chip that can be tapped off. Owner 2026-11-28: no dates read from words ("next
-  Fri" was confusing). Adding in Today with no date makes it due today, in Upcoming tomorrow; in a list, it goes there.
-- **A to-do**: its title, **notes** (plain text, links tappable), a due **date** (no times), a **repeat** (daily,
-  weekly or monthly, from its date), and its list. Tapping one opens it to edit; dates are picked from Today /
-  Tomorrow / Next week / No date or a month calendar.
-- **What I see** (owner 2026-11-28, like Feeds' source picker and Unread): a list picker, **All** to start or one
-  list, and beside it one of **Today** (overdue first, in soft red, then today's), **Upcoming** (grouped by day:
-  Tomorrow, Friday... then by month), **No date** or **Completed**; tapping it again shows everything. All with
-  nothing picked shows every open to-do under its list's name. Within one list the order is mine (drag to reorder);
-  Today and Upcoming sort by date themselves, so there's no sort button.
+  is where new to-dos go under All. Lists can be added, renamed and deleted (with their to-dos and notes).
+- **Notes are a log**, like comments: each to-do has dated entries, oldest first, newest at the bottom; I add one
+  with the field at the bottom of the to-do's screen and long-press one to delete it. Links in them are tappable. A
+  to-do with notes shows a quiet mark in the list.
+- **What I see**: a list picker, **All** to start or one list, and a **Completed** toggle (like Feeds' source picker
+  and Unread). All shows every open to-do under its list's name; one list is in my order (long-press to drag).
+  Completed shows what I ticked in the last 30 days, to untick; completed to-dos are let go after that.
+- **Quick add** at the bottom: type and press return; it goes to the list shown (General under All).
 - **Ticking**: a check, a light haptic, and a moment later it slides away (tapping again in that moment undoes it).
-  A repeating to-do then comes back with its next date (moved past today if it was overdue). **Completed** (in
-  All or a list) is where to find and untick things; completed to-dos are let go after 30 days.
-- **Not in the first version** (on purpose): times and reminder notifications, subtasks, priorities, tags, search,
-  widgets.
-- **Server** (`todos` package, V40): `todo_lists`, `todos` (title, notes, due_date as a calendar date, repeat_rule,
-  position, completed_at). Every read and write is the owner's own; anything else is 404. The app sends its own
-  "today" when completing, so repeats follow the phone's calendar and the server needs no time zone. Limits: 100
-  lists, 5,000 open to-dos. In the data export; deleted with the account. Nothing is logged.
-- **App**: "Todos" in the drawer, after Feeds (no dot). `/todos` (picker + list + quick add) and `/todos/[id]` (edit).
+- **A to-do's screen**: its title and list (saved by themselves as I change them), then its notes and the field for
+  the next one; delete in the header.
+- **Server** (`todos` package, V40 then V41): `todo_lists`, `todos` (title, position, completed_at) and `todo_notes`
+  (body, created_at). Every read and write is the owner's own; anything else is 404. Limits: 100 lists, 5,000 open
+  to-dos, 500 notes a to-do. In the data export; deleted with the account. Nothing is logged.
+- **App**: "Todos" in the drawer, after Feeds (no dot). `/todos` (picker, Completed, list, quick add) and
+  `/todos/[id]` (title, list, notes).
 
 ### Logged
 

@@ -1470,7 +1470,7 @@ paths:
                   lists: { type: array, items: { $ref: "#/components/schemas/TodoList" } }
                   todos: { type: array, items: { $ref: "#/components/schemas/Todo" } }
     post:
-      summary: Add a to-do (to General when listId is left out), at the end of its list. Errors invalid_title, invalid_date, repeat_needs_date (400), too_many_todos (409, 5,000 open)
+      summary: Add a to-do (to General when listId is left out), at the end of its list. Errors invalid_title (400), too_many_todos (409, 5,000 open)
       requestBody: { $ref: "#/components/requestBodies/TodoBody" }
       responses:
         "201": { description: Added, content: { application/json: { schema: { $ref: "#/components/schemas/Todo" } } } }
@@ -1479,7 +1479,7 @@ paths:
         "409": { $ref: "#/components/responses/Error" }
   /v1/todos/{todoId}:
     put:
-      summary: Replace a to-do's title, notes, date, repeat and list (what's left out is cleared; a new list puts it at that list's end)
+      summary: Change a to-do's title and list (a new list puts it at that list's end)
       parameters:
         - { name: todoId, in: path, required: true, schema: { $ref: "#/components/schemas/Id" } }
       requestBody: { $ref: "#/components/requestBodies/TodoBody" }
@@ -1496,27 +1496,46 @@ paths:
         "404": { $ref: "#/components/responses/Error" }
   /v1/todos/{todoId}/complete:
     post:
-      summary: >-
-        Tick a to-do. A repeating one becomes a one-off in Completed and its next one (the next date after `today`, the
-        phone's date) is returned as `next`
+      summary: Tick a to-do (it goes to Completed)
+      parameters:
+        - { name: todoId, in: path, required: true, schema: { $ref: "#/components/schemas/Id" } }
+      responses:
+        "200": { description: Ticked, content: { application/json: { schema: { $ref: "#/components/schemas/Todo" } } } }
+        "404": { $ref: "#/components/responses/Error" }
+  /v1/todos/{todoId}/notes:
+    get:
+      summary: A to-do's notes, oldest first (newest at the bottom, like a conversation)
+      parameters:
+        - { name: todoId, in: path, required: true, schema: { $ref: "#/components/schemas/Id" } }
+      responses:
+        "200":
+          description: Its notes
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: "#/components/schemas/TodoNote" } }
+        "404": { $ref: "#/components/responses/Error" }
+    post:
+      summary: Add a note, stamped now. Errors invalid_note (400), too_many_notes (409, 500)
       parameters:
         - { name: todoId, in: path, required: true, schema: { $ref: "#/components/schemas/Id" } }
       requestBody:
         required: true
         content:
           application/json:
-            schema: { type: object, required: [today], properties: { today: { type: string, format: date } } }
+            schema: { type: object, required: [body], properties: { body: { type: string, maxLength: 10000 } } }
       responses:
-        "200":
-          description: Ticked
-          content:
-            application/json:
-              schema:
-                type: object
-                required: [completed, next]
-                properties:
-                  completed: { $ref: "#/components/schemas/Todo" }
-                  next: { oneOf: [{ type: "null" }, { $ref: "#/components/schemas/Todo" }] }
+        "201": { description: Added, content: { application/json: { schema: { $ref: "#/components/schemas/TodoNote" } } } }
+        "400": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+        "409": { $ref: "#/components/responses/Error" }
+  /v1/todos/{todoId}/notes/{noteId}:
+    delete:
+      summary: Delete a note
+      parameters:
+        - { name: todoId, in: path, required: true, schema: { $ref: "#/components/schemas/Id" } }
+        - { name: noteId, in: path, required: true, schema: { $ref: "#/components/schemas/Id" } }
+      responses:
+        "204": { description: Deleted }
         "404": { $ref: "#/components/responses/Error" }
   /v1/todos/{todoId}/reopen:
     post:
@@ -1614,9 +1633,6 @@ components:
             required: [title]
             properties:
               title: { type: string, maxLength: 500 }
-              notes: { type: [string, "null"], maxLength: 10000 }
-              dueDate: { type: [string, "null"], format: date }
-              repeat: { type: [string, "null"], enum: [daily, weekly, monthly, null], description: Needs a dueDate }
               listId: { oneOf: [{ type: "null" }, { $ref: "#/components/schemas/Id" }], description: "Left out or null: General (or, when editing, where it is)" }
     ListName:
       required: true
@@ -1691,16 +1707,21 @@ components:
         general: { type: boolean, description: General is where quick add puts things; it can be renamed but not deleted }
     Todo:
       type: object
-      required: [todoId, listId, title, notes, dueDate, repeat, completedAt, createdAt]
+      required: [todoId, listId, title, noteCount, completedAt, createdAt]
       properties:
         todoId: { $ref: "#/components/schemas/Id" }
         listId: { $ref: "#/components/schemas/Id" }
         title: { type: string }
-        notes: { type: [string, "null"] }
-        dueDate: { type: [string, "null"], format: date, description: A calendar date (no time or zone) }
-        repeat: { type: [string, "null"], enum: [daily, weekly, monthly, null] }
+        noteCount: { type: integer, description: How many notes it has (the list shows a mark when there are any) }
         completedAt: { type: [string, "null"], format: date-time }
         createdAt: { type: string, format: date-time }
+    TodoNote:
+      type: object
+      required: [noteId, body, createdAt]
+      properties:
+        noteId: { $ref: "#/components/schemas/Id" }
+        body: { type: string }
+        createdAt: { type: string, format: date-time, description: When it was added }
     FoundSource:
       type: object
       required: [feedUrl, title, siteUrl, following, articles, icon]

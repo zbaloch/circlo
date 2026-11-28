@@ -11,7 +11,6 @@ import {
   renameList as apiRenameList,
   reopenTodo,
   saveTodo,
-  todayIso,
   type Todo,
   type TodoFields,
   type TodoList,
@@ -66,9 +65,7 @@ export async function addTodoNow(fields: TodoFields): Promise<Todo> {
     todoId: `new-${Date.now()}-${Math.random().toString(36).slice(2)}`,
     listId: fields.listId ?? general,
     title: fields.title,
-    notes: fields.notes,
-    dueDate: fields.dueDate,
-    repeat: fields.repeat,
+    noteCount: 0,
     completedAt: null,
     createdAt: new Date().toISOString(),
   };
@@ -83,12 +80,12 @@ export async function addTodoNow(fields: TodoFields): Promise<Todo> {
   }
 }
 
-/** Saves a to-do as it is now; a new list puts it at that list's end. */
+/** Saves a to-do's title and list; a new list puts it at that list's end. */
 export async function saveTodoNow(todoId: string, fields: TodoFields): Promise<Todo> {
   const before = state.todos.find((t) => t.todoId === todoId);
   if (before) {
     const moved = fields.listId != null && fields.listId !== before.listId;
-    const updated = { ...before, ...fields, listId: fields.listId ?? before.listId };
+    const updated = { ...before, title: fields.title, listId: fields.listId ?? before.listId };
     set({ todos: moved ? [...state.todos.filter((t) => t.todoId !== todoId), updated] : state.todos.map((t) => (t.todoId === todoId ? updated : t)) });
   }
   try {
@@ -99,6 +96,11 @@ export async function saveTodoNow(todoId: string, fields: TodoFields): Promise<T
     if (before) set({ todos: state.todos.map((t) => (t.todoId === todoId ? before : t)) });
     throw e;
   }
+}
+
+/** A to-do's note count after adding (+1) or deleting (-1) a note, so the list's mark stays right. */
+export function bumpNotes(todoId: string, by: number): void {
+  set({ todos: state.todos.map((t) => (t.todoId === todoId ? { ...t, noteCount: Math.max(0, t.noteCount + by) } : t)) });
 }
 
 export async function deleteTodoNow(todoId: string): Promise<void> {
@@ -112,18 +114,12 @@ export async function deleteTodoNow(todoId: string): Promise<void> {
   }
 }
 
-/** Ticks a to-do; a repeating one comes back with its next date, in the same place. */
-export async function completeTodoNow(todoId: string, today = todayIso()): Promise<void> {
+/** Ticks a to-do: it leaves the list for Completed. */
+export async function completeTodoNow(todoId: string): Promise<void> {
   const before = state.todos;
-  const index = before.findIndex((t) => t.todoId === todoId);
   set({ todos: before.filter((t) => t.todoId !== todoId) });
   try {
-    const { next } = await completeTodo(todoId, today);
-    if (next) {
-      const todos = [...state.todos];
-      todos.splice(Math.min(Math.max(index, 0), todos.length), 0, next);
-      set({ todos });
-    }
+    await completeTodo(todoId);
   } catch (e) {
     set({ todos: before });
     throw e;

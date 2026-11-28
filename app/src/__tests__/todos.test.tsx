@@ -4,15 +4,10 @@ import { View } from 'react-native';
 
 import TodoScreen, { SAVE_AFTER_MS } from '@/app/todos/[id]';
 import TodosScreen, { TICK_MS } from '@/app/todos/index';
-import { addDays, todayIso, type Todo, type TodoFields, type TodoList } from '@/lib/todos';
+import type { Todo, TodoFields, TodoList, TodoNote } from '@/lib/todos';
 import { clearTodos } from '@/lib/todos-store';
 
 jest.setTimeout(20_000);
-
-// Friday 27 November 2026, 10:00 on this phone.
-const NOW = new Date(2026, 10, 27, 10, 0).getTime();
-const TODAY = todayIso(new Date(NOW));
-jest.mock('@/lib/use-now', () => ({ useNow: () => new Date(2026, 10, 27, 10, 0).getTime() }));
 
 const mockPush = jest.fn();
 const mockBack = jest.fn();
@@ -55,29 +50,35 @@ jest.mock('react-native-reorderable-list', () => {
 
 let mockLists: TodoList[] = [];
 let mockTodos: Todo[] = [];
-const mockAdd = jest.fn(async (f: TodoFields): Promise<Todo> => todo(`n${mockAdd.mock.calls.length}`, f.title, { ...f, listId: f.listId ?? 'g' }));
-const mockSave = jest.fn(async (id: string, f: TodoFields): Promise<Todo> => todo(id, f.title, { ...f, listId: f.listId ?? 'g' }));
-const mockComplete = jest.fn(async (_id: string, _today: string): Promise<{ completed: Todo; next: Todo | null }> => ({ completed: todo('x', 'x'), next: null }));
+let mockNotes: TodoNote[] = [];
+const mockAdd = jest.fn(async (f: TodoFields): Promise<Todo> => todo(`n${mockAdd.mock.calls.length}`, f.title, { listId: f.listId ?? 'g' }));
+const mockSave = jest.fn(async (id: string, f: TodoFields): Promise<Todo> => todo(id, f.title, { listId: f.listId ?? 'g' }));
+const mockComplete = jest.fn(async (id: string): Promise<Todo> => todo(id, 'x', { completedAt: '2026-11-28T10:00:00Z' }));
 const mockReopen = jest.fn(async (id: string) => todo(id, 'Reopened'));
 const mockCompleted = jest.fn(async (_listId: string | null): Promise<Todo[]> => []);
 const mockAddList = jest.fn(async (name: string): Promise<TodoList> => ({ listId: 'new-list', name, general: false }));
 const mockDelete = jest.fn(async (_id: string) => {});
 const mockOrder = jest.fn(async (_listId: string, _ids: string[]) => {});
+const mockAddNote = jest.fn(async (_id: string, body: string): Promise<TodoNote> => ({ noteId: 'note-new', body, createdAt: '2026-11-28T09:15:00Z' }));
+const mockDeleteNote = jest.fn(async (_id: string, _noteId: string) => {});
 jest.mock('@/lib/todos', () => ({
   ...jest.requireActual('@/lib/todos'),
   loadTodos: async () => ({ lists: mockLists, todos: mockTodos }),
   addTodo: (f: TodoFields) => mockAdd(f),
   saveTodo: (id: string, f: TodoFields) => mockSave(id, f),
-  completeTodo: (id: string, today: string) => mockComplete(id, today),
+  completeTodo: (id: string) => mockComplete(id),
   reopenTodo: (id: string) => mockReopen(id),
   loadCompleted: (listId: string | null) => mockCompleted(listId),
   addList: (name: string) => mockAddList(name),
   deleteTodo: (id: string) => mockDelete(id),
   orderTodos: (listId: string, ids: string[]) => mockOrder(listId, ids),
+  loadNotes: async () => mockNotes,
+  addNote: (id: string, body: string) => mockAddNote(id, body),
+  deleteNote: (id: string, noteId: string) => mockDeleteNote(id, noteId),
 }));
 
 function todo(id: string, title: string, extra: Partial<Todo> = {}): Todo {
-  return { todoId: id, listId: 'g', title, notes: null, dueDate: null, repeat: null, completedAt: null, createdAt: '2026-11-01T00:00:00Z', ...extra };
+  return { todoId: id, listId: 'g', title, noteCount: 0, completedAt: null, createdAt: '2026-11-01T00:00:00Z', ...extra };
 }
 
 /** The screen with its header's buttons beside it, as the stack would draw them. */
@@ -97,6 +98,8 @@ function WithHeader({ children }: { children: ReactElement }) {
   );
 }
 
+const titles = () => screen.getAllByRole('checkbox').map((c) => c.props.accessibilityLabel);
+
 beforeEach(() => {
   jest.clearAllMocks();
   clearTodos();
@@ -104,132 +107,69 @@ beforeEach(() => {
   mockHeaderRight = undefined;
   mockLists = [{ listId: 'g', name: 'General', general: true }, { listId: 'w', name: 'Work', general: false }];
   mockTodos = [];
+  mockNotes = [];
 });
 
 describe('Todos', () => {
-  it('starts on All: every open to-do under its list’s name, in my order; no counts anywhere', async () => {
-    mockTodos = [
-      todo('t1', 'Send invoice', { dueDate: TODAY }),
-      todo('o1', 'Renew insurance', { dueDate: addDays(TODAY, -7), listId: 'w' }),
-      todo('u1', 'Dentist', { dueDate: addDays(TODAY, 3) }),
-      todo('n1', 'Learn Sindhi'),
-    ];
+  it('starts on All: every open to-do under its list’s name, in my order; a mark when it has notes; no dates or counts', async () => {
+    mockTodos = [todo('t1', 'Send invoice', { noteCount: 2 }), todo('t2', 'Learn Sindhi'), todo('w1', 'Quarterly report', { listId: 'w' })];
     await render(<TodosScreen />);
     expect(await screen.findByText('Send invoice')).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Showing All' })).toBeTruthy();
     expect(screen.getAllByRole('header').map((h) => h.props.children)).toEqual(['General', 'Work']);
-    expect(screen.getAllByRole('checkbox').map((c) => c.props.accessibilityLabel)).toEqual(['Send invoice', 'Dentist', 'Learn Sindhi', 'Renew insurance']);
-    expect(screen.getByText('20 Nov')).toBeTruthy();
+    expect(titles()).toEqual(['Send invoice', 'Learn Sindhi', 'Quarterly report']);
+    expect(screen.getByRole('button', { name: 'Send invoice, has notes' })).toBeTruthy();
     expect(screen.queryByText(/^\d+$/)).toBeNull();
+    expect(screen.queryByText('Today')).toBeNull();
   });
 
-  it('Today, Upcoming and No date narrow All or one list; tapping again shows everything', async () => {
-    mockTodos = [
-      todo('t1', 'Send invoice', { dueDate: TODAY }),
-      todo('o1', 'Renew insurance', { dueDate: addDays(TODAY, -7), listId: 'w' }),
-      todo('u1', 'Dentist', { dueDate: addDays(TODAY, 1) }),
-      todo('u2', 'Party', { dueDate: addDays(TODAY, 8) }),
-      todo('n1', 'Learn Sindhi'),
-      todo('w1', 'Quarterly report', { listId: 'w' }),
-    ];
-    await render(<TodosScreen />);
-    await fireEvent.press(await screen.findByRole('button', { name: 'Today' }));
-    expect(screen.getAllByRole('checkbox').map((c) => c.props.accessibilityLabel)).toEqual(['Renew insurance', 'Send invoice']);
-    // Under All, each shows its list.
-    expect(screen.getByText('Work')).toBeTruthy();
-
-    await fireEvent.press(screen.getByRole('button', { name: 'Upcoming' }));
-    expect(screen.getAllByRole('header').map((h) => h.props.children)).toEqual(['Tomorrow', 'December']);
-    await fireEvent.press(screen.getByRole('button', { name: 'No date' }));
-    expect(screen.getAllByRole('checkbox').map((c) => c.props.accessibilityLabel)).toEqual(['Learn Sindhi', 'Quarterly report']);
-
-    // One list, with No date still picked; then Today with it.
-    await fireEvent.press(screen.getByRole('button', { name: 'Showing All' }));
-    await fireEvent.press(screen.getByRole('button', { name: 'Work' }));
-    expect(screen.getAllByRole('checkbox').map((c) => c.props.accessibilityLabel)).toEqual(['Quarterly report']);
-    await fireEvent.press(screen.getByRole('button', { name: 'Today' }));
-    expect(screen.getAllByRole('checkbox').map((c) => c.props.accessibilityLabel)).toEqual(['Renew insurance']);
-    // Tapping Today again: all of Work, in my order.
-    await fireEvent.press(screen.getByRole('button', { name: 'Today' }));
-    expect(screen.getByRole('button', { name: 'Today' }).props.accessibilityState).toEqual({ selected: false });
-    expect(screen.getAllByRole('checkbox').map((c) => c.props.accessibilityLabel)).toEqual(['Renew insurance', 'Quarterly report']);
-  });
-
-  it('quick add: a title, a date from the calendar button, and the list I’m looking at', async () => {
+  it('one list from the picker; quick add adds to what I’m looking at', async () => {
+    mockTodos = [todo('t1', 'Send invoice'), todo('w1', 'Quarterly report', { listId: 'w' })];
     await render(<TodosScreen />);
     const field = await screen.findByLabelText('New to-do');
-    // Plain words stay plain: no date is read from them.
+    // Words stay words: "tomorrow" is part of the title.
     await fireEvent.changeText(field, 'Call mum tomorrow');
-    await fireEvent.press(screen.getByRole('button', { name: 'Add to-do' }));
-    await waitFor(() => expect(mockAdd).toHaveBeenCalledWith({ title: 'Call mum tomorrow', notes: null, dueDate: null, repeat: null, listId: null }));
-    expect(mockToast).not.toHaveBeenCalled();
-
-    // The calendar button: Tomorrow, shown as a chip that can be taken off; then a day on the calendar.
-    await fireEvent.press(screen.getByRole('button', { name: 'Pick a date' }));
-    await fireEvent.press(screen.getByRole('button', { name: 'Tomorrow' }));
-    expect(screen.getByRole('button', { name: 'Due Tomorrow. Tap to take the date off' })).toBeTruthy();
-    await fireEvent.press(screen.getByRole('button', { name: 'Date: Tomorrow' }));
-    await fireEvent.press(screen.getByRole('button', { name: 'Next month' }));
-    await fireEvent.press(screen.getByRole('button', { name: 'Saturday 5 December 2026' }));
-    await fireEvent.changeText(field, 'Party');
     await fireEvent(field, 'submitEditing');
-    await waitFor(() => expect(mockAdd).toHaveBeenLastCalledWith({ title: 'Party', notes: null, dueDate: '2026-12-05', repeat: null, listId: null }));
+    await waitFor(() => expect(mockAdd).toHaveBeenCalledWith({ title: 'Call mum tomorrow', listId: null }));
+    expect(await screen.findByText('Call mum tomorrow')).toBeTruthy();
 
-    // In Today with no date it's for today.
-    await fireEvent.press(screen.getByRole('button', { name: 'Today' }));
-    await fireEvent.changeText(field, 'Send invoice');
-    await fireEvent(field, 'submitEditing');
-    await waitFor(() => expect(mockAdd).toHaveBeenLastCalledWith({ title: 'Send invoice', notes: null, dueDate: TODAY, repeat: null, listId: null }));
-    expect(await screen.findByText('Send invoice')).toBeTruthy();
-
-    // In Work + Today, a later date goes to Work and says when.
     await fireEvent.press(screen.getByRole('button', { name: 'Showing All' }));
     await fireEvent.press(screen.getByRole('button', { name: 'Work' }));
-    await fireEvent.press(screen.getByRole('button', { name: 'Pick a date' }));
-    await fireEvent.press(screen.getByRole('button', { name: 'Next week' }));
+    expect(titles()).toEqual(['Quarterly report']);
     await fireEvent.changeText(screen.getByPlaceholderText('Add to Work'), 'Book flights');
     await fireEvent.press(screen.getByRole('button', { name: 'Add to-do' }));
-    await waitFor(() => expect(mockAdd).toHaveBeenLastCalledWith(expect.objectContaining({ title: 'Book flights', listId: 'w', dueDate: '2026-11-30' })));
-    expect(mockToast).toHaveBeenCalledWith('Added for Monday');
+    await waitFor(() => expect(mockAdd).toHaveBeenLastCalledWith({ title: 'Book flights', listId: 'w' }));
+    expect(mockToast).not.toHaveBeenCalled();
   });
 
   it('ticking checks it at once, and a moment later it’s done; tapping again in that moment undoes it', async () => {
     jest.useFakeTimers();
     try {
-      mockTodos = [todo('t1', 'Send invoice', { dueDate: TODAY }), todo('t2', 'Water plants', { dueDate: TODAY, repeat: 'weekly' })];
-      mockComplete.mockImplementation(async (id) => ({
-        completed: todo(id, 'x'),
-        next: id === 't2' ? todo('t3', 'Water plants', { dueDate: addDays(TODAY, 7), repeat: 'weekly' }) : null,
-      }));
+      mockTodos = [todo('t1', 'Send invoice'), todo('t2', 'Water plants')];
       await render(<TodosScreen />);
-      await fireEvent.press(await screen.findByRole('button', { name: 'Today' }));
-      await fireEvent.press(screen.getByRole('checkbox', { name: 'Send invoice' }));
+      await fireEvent.press(await screen.findByRole('checkbox', { name: 'Send invoice' }));
       expect(screen.getByRole('checkbox', { name: 'Send invoice' }).props.accessibilityState).toEqual({ checked: true });
       await fireEvent.press(screen.getByRole('checkbox', { name: 'Send invoice' }));
       await act(async () => jest.advanceTimersByTime(TICK_MS + 100));
       expect(mockComplete).not.toHaveBeenCalled();
-      expect(screen.getByRole('checkbox', { name: 'Send invoice' }).props.accessibilityState).toEqual({ checked: false });
 
       await fireEvent.press(screen.getByRole('checkbox', { name: 'Water plants' }));
       await act(async () => jest.advanceTimersByTime(TICK_MS + 100));
-      expect(mockComplete).toHaveBeenCalledWith('t2', TODAY);
-      // A repeating one comes back with its next date: next week, so not in Today, but in All.
+      expect(mockComplete).toHaveBeenCalledWith('t2');
       expect(screen.queryByText('Water plants')).toBeNull();
-      await fireEvent.press(screen.getByRole('button', { name: 'Today' }));
-      expect(screen.getByText('Water plants')).toBeTruthy();
     } finally {
       jest.useRealTimers();
     }
   });
 
-  it('lists: Completed in all or one list, to untick; General can’t be deleted; a new list from the picker', async () => {
+  it('Completed, in all or one list, to untick; General can’t be deleted; a new list from the picker', async () => {
     mockCompleted.mockResolvedValue([todo('c1', 'Old task', { completedAt: '2026-11-26T10:00:00Z', listId: 'w' })]);
     await render(
       <WithHeader>
         <TodosScreen />
       </WithHeader>,
     );
-    await fireEvent.press(await screen.findByRole('button', { name: 'Completed' }));
+    await fireEvent.press(await screen.findByRole('switch', { name: 'Completed' }));
     expect(await screen.findByText('Old task')).toBeTruthy();
     expect(mockCompleted).toHaveBeenLastCalledWith(null);
     expect(screen.getByText('Work')).toBeTruthy();
@@ -257,49 +197,50 @@ describe('Todos', () => {
 describe('A to-do', () => {
   beforeEach(() => {
     mockParams = { id: 't1' };
-    mockTodos = [todo('t1', 'File taxes', { notes: 'Forms in the blue folder https://gov.example', dueDate: TODAY })];
+    mockTodos = [todo('t1', 'Plan the trip', { noteCount: 1 })];
+    mockNotes = [{ noteId: 'n1', body: 'Flights look cheaper on Tuesdays https://air.example', createdAt: '2026-11-27T14:05:00Z' }];
   });
 
-  it('saves itself a moment after I change it: title, a day on the calendar, repeat and list', async () => {
+  it('shows its notes as a dated log, and adds the next one at the bottom', async () => {
     await render(<TodoScreen />);
-    expect(await screen.findByDisplayValue('File taxes')).toBeTruthy();
-    // Notes show with their links until I tap to edit them.
-    expect(screen.getByRole('link', { name: 'https://gov.example' })).toBeTruthy();
+    expect(await screen.findByText(/Flights look cheaper on Tuesdays/)).toBeTruthy();
+    expect(screen.getByRole('link', { name: 'https://air.example' })).toBeTruthy();
+    expect(screen.getByText(/27 Nov 2026/)).toBeTruthy();
 
-    await fireEvent.changeText(screen.getByLabelText('Title'), 'File the taxes');
-    await fireEvent.press(screen.getByRole('button', { name: 'Next month' }));
-    await fireEvent.press(screen.getByRole('button', { name: 'Saturday 5 December 2026' }));
-    expect(screen.getByText('Date · 5 Dec')).toBeTruthy();
-    await fireEvent.press(screen.getByRole('button', { name: 'Every month' }));
-    await fireEvent.press(screen.getByRole('button', { name: 'Work' }));
-    await waitFor(() =>
-      expect(mockSave).toHaveBeenLastCalledWith('t1', {
-        title: 'File the taxes',
-        notes: 'Forms in the blue folder https://gov.example',
-        dueDate: '2026-12-05',
-        repeat: 'monthly',
-        listId: 'w',
-      }),
-      { timeout: SAVE_AFTER_MS + 2000 },
-    );
-    expect(mockSave).toHaveBeenCalledTimes(1);
-
-    // No date takes the repeat with it.
-    await fireEvent.press(screen.getByRole('button', { name: 'No date' }));
-    await waitFor(() => expect(mockSave).toHaveBeenLastCalledWith('t1', expect.objectContaining({ dueDate: null, repeat: null })), {
-      timeout: SAVE_AFTER_MS + 2000,
-    });
+    await fireEvent.changeText(screen.getByLabelText('New note'), '  Booked the 9am  ');
+    await fireEvent.press(screen.getByRole('button', { name: 'Add note' }));
+    await waitFor(() => expect(mockAddNote).toHaveBeenCalledWith('t1', 'Booked the 9am'));
+    expect(await screen.findByText('Booked the 9am')).toBeTruthy();
+    expect(screen.getByText(/28 Nov 2026/)).toBeTruthy();
+    expect(screen.getByLabelText('New note').props.value).toBe('');
   });
 
-  it('can be deleted', async () => {
+  it('a long press deletes a note', async () => {
+    await render(<TodoScreen />);
+    await fireEvent(await screen.findByText(/Flights look cheaper/), 'longPress');
+    expect(mockAlert).toHaveBeenCalledWith('Delete this note?', undefined, expect.anything());
+    await waitFor(() => expect(mockDeleteNote).toHaveBeenCalledWith('t1', 'n1'));
+    expect(screen.queryByText(/Flights look cheaper/)).toBeNull();
+    expect(screen.getByText(/No notes yet/)).toBeTruthy();
+  });
+
+  it('saves its title and list a moment after I change them', async () => {
+    await render(<TodoScreen />);
+    await fireEvent.changeText(await screen.findByLabelText('Title'), 'Plan the summer trip');
+    await fireEvent.press(screen.getByRole('button', { name: 'Work' }));
+    await waitFor(() => expect(mockSave).toHaveBeenLastCalledWith('t1', { title: 'Plan the summer trip', listId: 'w' }), { timeout: SAVE_AFTER_MS + 2000 });
+    expect(mockSave).toHaveBeenCalledTimes(1);
+  });
+
+  it('can be deleted, notes and all', async () => {
     await render(
       <WithHeader>
         <TodoScreen />
       </WithHeader>,
     );
-    await screen.findByDisplayValue('File taxes');
+    await screen.findByDisplayValue('Plan the trip');
     await fireEvent.press(screen.getByRole('button', { name: 'Delete to-do' }));
-    expect(mockAlert).toHaveBeenCalledWith('Delete this to-do?', undefined, expect.anything());
+    expect(mockAlert).toHaveBeenCalledWith('Delete this to-do?', 'Its notes are deleted with it.', expect.anything());
     expect(mockBack).toHaveBeenCalled();
     await waitFor(() => expect(mockDelete).toHaveBeenCalledWith('t1'));
     expect(mockSave).not.toHaveBeenCalled();

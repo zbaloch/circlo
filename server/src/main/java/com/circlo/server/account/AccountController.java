@@ -273,15 +273,14 @@ public class AccountController {
             Map<String, Object> list = new java.util.LinkedHashMap<>();
             list.put("name", rs.getString("name"));
             list.put("todos", jdbc.query("""
-                    SELECT title, notes, due_date, repeat_rule, completed_at, created_at FROM todos WHERE list_id = ? AND user_id = ?
+                    SELECT id, title, completed_at, created_at FROM todos WHERE list_id = ? AND user_id = ?
                     ORDER BY completed_at IS NOT NULL, position, created_at""", (t, j) -> {
                 Map<String, Object> todo = new java.util.LinkedHashMap<>();
                 todo.put("title", t.getString("title"));
-                todo.put("notes", t.getString("notes"));
-                todo.put("dueDate", t.getDate("due_date") == null ? null : t.getDate("due_date").toLocalDate().toString());
-                todo.put("repeat", t.getString("repeat_rule"));
                 todo.put("completedAt", t.getTimestamp("completed_at") == null ? null : t.getTimestamp("completed_at").toInstant());
                 todo.put("createdAt", t.getTimestamp("created_at").toInstant());
+                todo.put("notes", jdbc.query("SELECT body, created_at FROM todo_notes WHERE todo_id = ? AND user_id = ? ORDER BY created_at",
+                        (n, k) -> Map.of("body", n.getString(1), "createdAt", n.getTimestamp(2).toInstant()), t.getBytes("id"), me));
                 return todo;
             }, rs.getBytes("id"), me));
             return list;

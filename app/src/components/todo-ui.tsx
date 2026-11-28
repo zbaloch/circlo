@@ -2,45 +2,26 @@ import { useState, type ReactNode } from 'react';
 import { Modal, Pressable, ScrollView, View } from 'react-native';
 
 import { Button } from '@/components/form';
-import { IconButton } from '@/components/icon-button';
 import { KeyboardSpacer } from '@/components/keyboard-spacer';
 import { Icon } from '@/components/ui/icon';
 import { Text, TextInput } from '@/components/ui/text';
-import {
-  addDays,
-  dayLabel,
-  fullDate,
-  monthOf,
-  monthTitle,
-  monthWeeks,
-  nextWeek,
-  shiftMonth,
-  WEEKDAY_INITIALS,
-  WHEN,
-  type Todo,
-  type TodoList,
-  type When,
-} from '@/lib/todos';
+import type { Todo, TodoList } from '@/lib/todos';
 import { usePalette } from '@/theme/use-palette';
 
 /**
- * One to-do, Things-calm: a round box to tick, the title, and a quiet line under it (its date, in soft red when
- * overdue; a repeat mark; a notes mark; its list in the date views). Tapping opens it; in a list, a long press drags it.
+ * One to-do, like a line on paper: a round box to tick and the title, crossed through once ticked. Under it, quietly,
+ * a mark when it has notes, and its list in All. Tapping opens it; in a list, a long press drags it.
  */
-export function TodoRow({ todo, today, listName, checked, onToggle, onOpen, onLongPress }: {
+export function TodoRow({ todo, listName, checked, onToggle, onOpen, onLongPress }: {
   todo: Todo;
-  today: string;
   listName?: string;
   checked: boolean;
   onToggle: () => void;
-  /** Left out for completed to-dos, which only untick. */
   onOpen?: () => void;
   onLongPress?: () => void;
 }) {
   const palette = usePalette();
-  const overdue = !!todo.dueDate && todo.dueDate < today && !checked;
-  const date = todo.dueDate ? dayLabel(todo.dueDate, today) : null;
-  const meta = date || todo.repeat || todo.notes || listName;
+  const notes = todo.noteCount > 0;
   return (
     <View className="flex-row items-start gap-3 bg-surface px-4 py-3 dark:bg-surface-dark">
       <Pressable
@@ -56,19 +37,17 @@ export function TodoRow({ todo, today, listName, checked, onToggle, onOpen, onLo
       </Pressable>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={`${todo.title}${date ? `, ${overdue ? 'overdue, ' : ''}${date}` : ''}`}
-        accessibilityHint={onOpen ? 'Opens the to-do' : undefined}
+        accessibilityLabel={`${todo.title}${notes ? ', has notes' : ''}`}
+        accessibilityHint={onOpen ? 'Opens the to-do and its notes' : undefined}
         disabled={!onOpen && !onLongPress}
         onPress={onOpen}
         onLongPress={onLongPress}
         delayLongPress={250}
         className="flex-1 gap-0.5">
         <Text className={`text-[16px] leading-snug ${checked ? 'text-muted line-through dark:text-muted-dark' : 'text-ink dark:text-ink-dark'}`}>{todo.title}</Text>
-        {meta ? (
-          <View className="flex-row flex-wrap items-center gap-x-2">
-            {date ? <Text className={`text-sm ${overdue ? 'text-danger dark:text-danger-dark' : 'text-muted dark:text-muted-dark'}`}>{date}</Text> : null}
-            {todo.repeat ? <Icon name="repeat-outline" size={13} color={palette.muted} accessibilityLabel="Repeats" /> : null}
-            {todo.notes ? <Icon name="document-text-outline" size={13} color={palette.muted} accessibilityLabel="Has notes" /> : null}
+        {notes || listName ? (
+          <View className="flex-row items-center gap-2">
+            {notes ? <Icon name="document-text-outline" size={13} color={palette.muted} accessibilityLabel="Has notes" /> : null}
             {listName ? <Text className="text-sm text-muted dark:text-muted-dark">{listName}</Text> : null}
           </View>
         ) : null}
@@ -77,183 +56,45 @@ export function TodoRow({ todo, today, listName, checked, onToggle, onOpen, onLo
   );
 }
 
-/**
- * Quick add, pinned at the bottom: type a to-do and press return (the field stays open for the next one). The
- * calendar button beside it gives it a date (Today, Tomorrow, Next week or a day on the calendar); the date shows as a
- * chip, tapped to take it off. With no date picked, the screen decides (today in Today, tomorrow in Upcoming).
- */
-export function QuickAdd({ placeholder, today, onAdd }: {
-  placeholder: string;
-  today: string;
-  onAdd: (todo: { title: string; dueDate: string | null }) => Promise<void>;
-}) {
+/** Quick add, pinned at the bottom: type a to-do and press return; the field stays open for the next one. */
+export function QuickAdd({ placeholder, onAdd }: { placeholder: string; onAdd: (title: string) => Promise<void> }) {
   const palette = usePalette();
   const [text, setText] = useState('');
-  const [dueDate, setDueDate] = useState<string | null>(null);
-  const [picking, setPicking] = useState(false);
   const [busy, setBusy] = useState(false);
   const title = text.trim();
   const add = async () => {
     if (!title || busy) return;
     setBusy(true);
     try {
-      await onAdd({ title, dueDate });
+      await onAdd(title);
       setText('');
-      setDueDate(null);
     } finally {
       setBusy(false);
     }
   };
   return (
-    <View className="gap-2 border-t border-border bg-surface px-3 py-2 dark:border-border-dark dark:bg-surface-dark">
-      {dueDate ? (
-        <View className="flex-row">
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={`Due ${dayLabel(dueDate, today)}. Tap to take the date off`}
-            onPress={() => setDueDate(null)}
-            className="flex-row items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1 dark:bg-primary-dark/20">
-            <Icon name="calendar-outline" size={14} color={palette.primary} />
-            <Text className="text-sm font-semibold text-primary dark:text-primary-dark">{dayLabel(dueDate, today)}</Text>
-            <Icon name="close" size={14} color={palette.primary} />
-          </Pressable>
-        </View>
-      ) : null}
-      <View className="flex-row items-end gap-2">
-        <IconButton accessibilityLabel={dueDate ? `Date: ${dayLabel(dueDate, today)}` : 'Pick a date'} onPress={() => setPicking(true)}>
-          <Icon name="calendar-outline" size={22} color={dueDate ? palette.primary : palette.muted} />
-        </IconButton>
-        <TextInput
-          accessibilityLabel="New to-do"
-          placeholder={placeholder}
-          placeholderTextColor={palette.muted}
-          value={text}
-          onChangeText={setText}
-          onSubmitEditing={() => void add()}
-          submitBehavior="submit"
-          returnKeyType="done"
-          maxLength={500}
-          className="max-h-28 flex-1 rounded-2xl bg-surface-raised px-4 py-2 text-base text-ink dark:bg-surface-raised-dark dark:text-ink-dark"
-        />
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Add to-do"
-          disabled={!title || busy}
-          onPress={() => void add()}
-          className={`h-10 w-10 items-center justify-center rounded-full bg-primary dark:bg-primary-dark ${!title || busy ? 'opacity-50' : ''}`}>
-          <Icon name="arrow-up" size={20} color={palette.onPrimary} />
-        </Pressable>
-      </View>
-      <DateSheet
-        visible={picking}
-        today={today}
-        value={dueDate}
-        onPick={(d) => {
-          setDueDate(d);
-          setPicking(false);
-        }}
-        onClose={() => setPicking(false)}
+    <View className="flex-row items-end gap-2 border-t border-border bg-surface px-3 py-2 dark:border-border-dark dark:bg-surface-dark">
+      <TextInput
+        accessibilityLabel="New to-do"
+        placeholder={placeholder}
+        placeholderTextColor={palette.muted}
+        value={text}
+        onChangeText={setText}
+        onSubmitEditing={() => void add()}
+        submitBehavior="submit"
+        returnKeyType="done"
+        maxLength={500}
+        className="max-h-28 flex-1 rounded-2xl bg-surface-raised px-4 py-2 text-base text-ink dark:bg-surface-raised-dark dark:text-ink-dark"
       />
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Add to-do"
+        disabled={!title || busy}
+        onPress={() => void add()}
+        className={`h-10 w-10 items-center justify-center rounded-full bg-primary dark:bg-primary-dark ${!title || busy ? 'opacity-50' : ''}`}>
+        <Icon name="arrow-up" size={20} color={palette.onPrimary} />
+      </Pressable>
     </View>
-  );
-}
-
-/** Today, Tomorrow, Next week, No date: the usual dates, one tap each. */
-export function DateShortcuts({ today, value, onPick }: { today: string; value: string | null; onPick: (date: string | null) => void }) {
-  const choices: { value: string; label: string; date: string | null }[] = [
-    { value: 'today', label: 'Today', date: today },
-    { value: 'tomorrow', label: 'Tomorrow', date: addDays(today, 1) },
-    { value: 'nextweek', label: 'Next week', date: nextWeek(today) },
-    { value: 'none', label: 'No date', date: null },
-  ];
-  const selected = choices.find((c) => c.date === value)?.value ?? null;
-  return (
-    <ChoiceChips
-      label="Date"
-      selected={selected}
-      onSelect={(v) => onPick(choices.find((c) => c.value === v)!.date)}
-      options={choices.map((c) => ({ value: c.value, label: c.label }))}
-    />
-  );
-}
-
-/**
- * A month to tap a day in, Monday first: today ringed, the picked day filled. ‹ › move a month; past days can be
- * picked too (for something already overdue).
- */
-export function Calendar({ today, value, onPick }: { today: string; value: string | null; onPick: (date: string) => void }) {
-  const palette = usePalette();
-  const [month, setMonth] = useState(monthOf(value ?? today));
-  return (
-    <View className="gap-2">
-      <View className="flex-row items-center justify-between">
-        <IconButton accessibilityLabel="Previous month" onPress={() => setMonth((m) => shiftMonth(m, -1))}>
-          <Icon name="chevron-back" size={20} color={palette.ink} />
-        </IconButton>
-        <Text accessibilityRole="header" className="text-base font-semibold text-ink dark:text-ink-dark">
-          {monthTitle(month, today)}
-        </Text>
-        <IconButton accessibilityLabel="Next month" onPress={() => setMonth((m) => shiftMonth(m, 1))}>
-          <Icon name="chevron-forward" size={20} color={palette.ink} />
-        </IconButton>
-      </View>
-      <View className="flex-row">
-        {WEEKDAY_INITIALS.map((d, i) => (
-          <Text key={i} importantForAccessibility="no" className="flex-1 text-center text-xs font-semibold text-muted dark:text-muted-dark">
-            {d}
-          </Text>
-        ))}
-      </View>
-      {monthWeeks(month).map((week, w) => (
-        <View key={w} className="flex-row">
-          {week.map((day, i) =>
-            day ? (
-              <Pressable
-                key={day}
-                accessibilityRole="button"
-                accessibilityLabel={fullDate(day)}
-                accessibilityState={{ selected: day === value }}
-                onPress={() => onPick(day)}
-                className="flex-1 items-center py-0.5">
-                <View
-                  className={`h-9 w-9 items-center justify-center rounded-full ${
-                    day === value ? 'bg-primary dark:bg-primary-dark' : day === today ? 'border border-primary dark:border-primary-dark' : ''
-                  }`}>
-                  <Text
-                    className={`text-[15px] ${
-                      day === value ? 'font-bold text-on-primary dark:text-on-primary-dark' : day < today ? 'text-muted dark:text-muted-dark' : 'text-ink dark:text-ink-dark'
-                    }`}>
-                    {Number(day.slice(8))}
-                  </Text>
-                </View>
-              </Pressable>
-            ) : (
-              <View key={`${w}-${i}`} className="flex-1" />
-            ),
-          )}
-        </View>
-      ))}
-    </View>
-  );
-}
-
-/** Picking a date for a new to-do: the shortcuts, then the calendar. */
-function DateSheet({ visible, today, value, onPick, onClose }: {
-  visible: boolean;
-  today: string;
-  value: string | null;
-  onPick: (date: string | null) => void;
-  onClose: () => void;
-}) {
-  return (
-    <Sheet visible={visible} title="Date" onClose={onClose}>
-      {visible ? (
-        <ScrollView contentContainerClassName="gap-4 px-5 pt-1">
-          <DateShortcuts today={today} value={value} onPick={onPick} />
-          <Calendar today={today} value={value} onPick={onPick} />
-        </ScrollView>
-      ) : null}
-    </Sheet>
   );
 }
 
@@ -278,52 +119,40 @@ function Sheet({ visible, title, onClose, children }: { visible: boolean; title:
 }
 
 /**
- * What I'm looking at, above the to-dos: which list ("All ▾", or one, picked from a list) and, beside it, one of
- * Today, Upcoming, No date or Completed (tap it again for everything). The two work together, as in Feeds.
+ * What I'm looking at, above the to-dos: which list ("All ▾", or one, picked from a list) and a Completed toggle, as
+ * in Feeds' source picker and Unread.
  */
-export function TodoFilterBar({ listLabel, when, onPickList, onWhen }: {
+export function TodoFilterBar({ listLabel, completed, onPickList, onCompleted }: {
   listLabel: string;
-  when: When | null;
+  completed: boolean;
   onPickList: () => void;
-  onWhen: (when: When | null) => void;
+  onCompleted: (completed: boolean) => void;
 }) {
   const palette = usePalette();
   return (
-    <ScrollView
-      horizontal
-      showsHorizontalScrollIndicator={false}
-      keyboardShouldPersistTaps="handled"
-      className="grow-0 border-b border-border dark:border-border-dark"
-      contentContainerClassName="items-center gap-2 px-4 py-2.5">
+    <View className="flex-row items-center gap-2 border-b border-border px-4 py-2.5 dark:border-border-dark">
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={`Showing ${listLabel}`}
         accessibilityHint="Choose all lists or one"
         onPress={onPickList}
-        className="flex-row items-center gap-1.5 rounded-full border border-border px-3.5 py-1.5 active:bg-surface-raised dark:border-border-dark dark:active:bg-surface-raised-dark">
-        <Text numberOfLines={1} className="max-w-[160px] font-semibold text-ink dark:text-ink-dark">
+        className="shrink flex-row items-center gap-1.5 rounded-full border border-border px-3.5 py-1.5 active:bg-surface-raised dark:border-border-dark dark:active:bg-surface-raised-dark">
+        <Text numberOfLines={1} className="shrink font-semibold text-ink dark:text-ink-dark">
           {listLabel}
         </Text>
         <Icon name="chevron-down" size={16} color={palette.ink} />
       </Pressable>
-      {WHEN.map((w) => {
-        const on = when === w.value;
-        return (
-          <Pressable
-            key={w.value}
-            accessibilityRole="button"
-            accessibilityLabel={w.label}
-            accessibilityState={{ selected: on }}
-            accessibilityHint={on ? 'Shows everything again' : `Shows only ${w.label.toLowerCase()}`}
-            onPress={() => onWhen(on ? null : w.value)}
-            className={`rounded-full border px-3.5 py-1.5 ${
-              on ? 'border-primary bg-primary dark:border-primary-dark dark:bg-primary-dark' : 'border-border active:bg-surface-raised dark:border-border-dark dark:active:bg-surface-raised-dark'
-            }`}>
-            <Text className={on ? 'font-semibold text-on-primary dark:text-on-primary-dark' : 'text-ink dark:text-ink-dark'}>{w.label}</Text>
-          </Pressable>
-        );
-      })}
-    </ScrollView>
+      <Pressable
+        accessibilityRole="switch"
+        accessibilityLabel="Completed"
+        accessibilityState={{ checked: completed }}
+        onPress={() => onCompleted(!completed)}
+        className={`rounded-full border px-3.5 py-1.5 ${
+          completed ? 'border-primary bg-primary dark:border-primary-dark dark:bg-primary-dark' : 'border-border active:bg-surface-raised dark:border-border-dark dark:active:bg-surface-raised-dark'
+        }`}>
+        <Text className={completed ? 'font-semibold text-on-primary dark:text-on-primary-dark' : 'text-ink dark:text-ink-dark'}>Completed</Text>
+      </Pressable>
+    </View>
   );
 }
 
@@ -425,7 +254,7 @@ function ListNameForm({ initial, onSave, onClose }: { initial: string; onSave: (
   );
 }
 
-/** A choice of chips (date shortcuts, repeat, list), the app's chip look. */
+/** A choice of chips (which list a to-do is in), the app's chip look. */
 export function ChoiceChips<T extends string>({ options, selected, onSelect, label }: {
   options: { value: T; label: string }[];
   selected: T | null;

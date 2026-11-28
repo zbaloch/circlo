@@ -15,22 +15,7 @@ import { Spinner } from '@/components/ui/spinner';
 import { Text } from '@/components/ui/text';
 import { showAlert } from '@/lib/dialog';
 import { showToast } from '@/lib/toast';
-import {
-  addDays,
-  ALL_TODOS,
-  dayLabel,
-  inList,
-  listLabel,
-  listSections,
-  loadCompleted,
-  noDateTodos,
-  todayIso,
-  todayTodos,
-  upcomingGroups,
-  type Todo,
-  type TodoFilter,
-  type When,
-} from '@/lib/todos';
+import { ALL_TODOS, inList, listLabel, listSections, loadCompleted, type Todo, type TodoFilter } from '@/lib/todos';
 import {
   addListNow,
   addTodoNow,
@@ -42,7 +27,6 @@ import {
   reorderTodosNow,
   useTodos,
 } from '@/lib/todos-store';
-import { useNow } from '@/lib/use-now';
 import { usePalette } from '@/theme/use-palette';
 
 /** How long a ticked to-do stays, checked, before it slides away (tapping it again in that moment undoes it). */
@@ -50,25 +34,15 @@ export const TICK_MS = 1000;
 
 type Row = (t: Todo, showList: boolean, drag?: () => void) => ReactElement;
 
-/** Whether a to-do with this date shows under this "when" (so adding can say where it went). Pure. */
-function shows(when: When | null, dueDate: string | null, today: string): boolean {
-  if (when === 'today') return !!dueDate && dueDate <= today;
-  if (when === 'upcoming') return !!dueDate && dueDate > today;
-  if (when === 'nodate') return !dueDate;
-  return when !== 'completed';
-}
-
 /**
- * Todos (2.0; owner decisions 2026-11-27/28): my own to-do lists, Things-calm (no badges or counts). Above them, a
- * list picker ("All" to start, or one list) and one of Today, Upcoming, No date or Completed, which work together:
- * "All" with nothing picked shows every open to-do under its list's name. Quick add at the bottom, with a calendar
- * button for its date. In a list with nothing picked the order is mine (long-press to drag).
+ * Todos (2.0; owner decisions 2026-11-27/28): my own to-do lists, like pen and paper (no dates or badges). Above
+ * them, a list picker ("All" to start, or one list) and a Completed toggle; All shows every open to-do under its
+ * list's name; one list keeps my order (long-press to drag). Quick add at the bottom. A to-do's notes are on its own
+ * screen.
  */
 export default function TodosScreen() {
   const navigation = useNavigation();
   const palette = usePalette();
-  const now = useNow();
-  const today = todayIso(new Date(now));
   const { lists, todos, loaded } = useTodos();
   const [chosen, setChosen] = useState<TodoFilter>(ALL_TODOS);
   const [picking, setPicking] = useState(false);
@@ -93,7 +67,7 @@ export default function TodosScreen() {
 
   // A list that's gone (deleted here or elsewhere) falls back to All.
   const list = chosen.listId ? lists.find((l) => l.listId === chosen.listId) : undefined;
-  const filter: TodoFilter = { listId: list ? list.listId : null, when: chosen.when };
+  const filter: TodoFilter = { listId: list ? list.listId : null, completed: chosen.completed };
   const listNames = new Map(lists.map((l) => [l.listId, l.name]));
 
   const newList = () =>
@@ -136,7 +110,7 @@ export default function TodosScreen() {
                         label: 'Delete list',
                         destructive: true,
                         onPress: () =>
-                          showAlert(`Delete ${list.name}?`, 'Its to-dos are deleted with it.', [
+                          showAlert(`Delete ${list.name}?`, 'Its to-dos and their notes are deleted with it.', [
                             { text: 'Cancel', style: 'cancel' },
                             {
                               text: 'Delete',
@@ -176,7 +150,7 @@ export default function TodosScreen() {
       setTimeout(() => {
         timers.current.delete(t.todoId);
         LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-        completeTodoNow(t.todoId, today)
+        completeTodoNow(t.todoId)
           .catch(() => showToast('Couldn’t tick it. Try again.'))
           .finally(() => setTicking((s) => without(s, t.todoId)));
       }, TICK_MS),
@@ -185,17 +159,15 @@ export default function TodosScreen() {
 
   const open = (t: Todo) => router.push({ pathname: '/todos/[id]', params: { id: t.todoId } });
 
-  // Added to the list I'm looking at (General under All); dated today in Today, tomorrow in Upcoming, unless I picked one.
-  const add = async (q: { title: string; dueDate: string | null }) => {
-    const dueDate = q.dueDate ?? (filter.when === 'today' ? today : filter.when === 'upcoming' ? addDays(today, 1) : null);
+  // Added to the list I'm looking at (General under All); when I'm looking at Completed, said so.
+  const add = async (title: string) => {
     try {
-      await addTodoNow({ title: q.title, notes: null, dueDate, repeat: null, listId: filter.listId });
+      await addTodoNow({ title, listId: filter.listId });
     } catch {
       showToast('Couldn’t add it. Try again.');
       throw new Error('not added');
     }
-    // Said when it lands somewhere other than what I'm looking at.
-    if (!shows(filter.when, dueDate, today)) showToast(dueDate ? `Added for ${dayLabel(dueDate, today)}` : 'Added');
+    if (filter.completed) showToast(`Added to ${listLabel(lists, filter.listId) === 'All' ? 'General' : listLabel(lists, filter.listId)}`);
   };
 
   if (!loaded) {
@@ -205,7 +177,6 @@ export default function TodosScreen() {
   const row: Row = (t, showList, drag) => (
     <TodoRow
       todo={t}
-      today={today}
       listName={showList && lists.length > 1 ? listNames.get(t.listId) : undefined}
       checked={ticking.has(t.todoId)}
       onToggle={() => toggle(t)}
@@ -214,69 +185,41 @@ export default function TodosScreen() {
     />
   );
   const name = listLabel(lists, filter.listId);
-  const scoped = inList(todos, filter.listId);
   const all = !filter.listId;
-  const sectionHeader = (title: string) => (
-    <Text accessibilityRole="header" className="bg-surface px-4 pb-1 pt-4 text-sm font-bold text-ink dark:bg-surface-dark dark:text-ink-dark">
-      {title}
-    </Text>
-  );
 
   return (
     <Screen>
       <TodoFilterBar
         listLabel={name}
-        when={filter.when}
+        completed={filter.completed}
         onPickList={() => setPicking(true)}
-        onWhen={(when) => setChosen((f) => ({ ...f, when }))}
+        onCompleted={(completed) => setChosen((f) => ({ ...f, completed }))}
       />
       {error ? <Text className="px-4 py-2 text-center text-sm text-danger dark:text-danger-dark">{error}</Text> : null}
 
       <View className="flex-1">
-        {filter.when === 'today' ? (
-          <FlatList
-            data={todayTodos(scoped, today)}
-            keyExtractor={(t) => t.todoId}
-            renderItem={({ item }) => row(item, all)}
-            ListEmptyComponent={<Empty title="Nothing for today" body="Add a to-do below; the calendar button beside it gives it a date." />}
-            keyboardShouldPersistTaps="handled"
-          />
-        ) : filter.when === 'upcoming' ? (
-          <SectionList
-            sections={upcomingGroups(scoped, today).map((g) => ({ title: g.title, data: g.todos }))}
-            keyExtractor={(t) => t.todoId}
-            renderItem={({ item }) => row(item, all)}
-            renderSectionHeader={({ section }) => sectionHeader(section.title)}
-            stickySectionHeadersEnabled={false}
-            ListEmptyComponent={<Empty title="Nothing coming up" body="To-dos with a date after today show here, by day." />}
-            keyboardShouldPersistTaps="handled"
-          />
-        ) : filter.when === 'nodate' ? (
-          <FlatList
-            data={noDateTodos(scoped)}
-            keyExtractor={(t) => t.todoId}
-            renderItem={({ item }) => row(item, all)}
-            ListEmptyComponent={<Empty title="Nothing without a date" body="To-dos for some day, with no date yet, gather here." />}
-            keyboardShouldPersistTaps="handled"
-          />
-        ) : filter.when === 'completed' ? (
+        {filter.completed ? (
           <CompletedList listId={filter.listId} showList={all && lists.length > 1} listNames={listNames} />
         ) : all ? (
           <SectionList
             sections={listSections(todos, lists).map((s) => ({ title: s.title, data: s.todos }))}
             keyExtractor={(t) => t.todoId}
             renderItem={({ item }) => row(item, false)}
-            renderSectionHeader={({ section }) => sectionHeader(section.title)}
+            renderSectionHeader={({ section }) => (
+              <Text accessibilityRole="header" className="bg-surface px-4 pb-1 pt-4 text-sm font-bold text-ink dark:bg-surface-dark dark:text-ink-dark">
+                {section.title}
+              </Text>
+            )}
             stickySectionHeadersEnabled={false}
-            ListEmptyComponent={<Empty title="Nothing to do" body="Add a to-do below; the calendar button beside it gives it a date." />}
+            ListEmptyComponent={<Empty title="Nothing to do" body="Write a to-do below, as you would on paper." />}
             keyboardShouldPersistTaps="handled"
           />
         ) : (
-          <ListView listId={filter.listId!} todos={scoped} name={name} row={row} />
+          <ListView listId={filter.listId!} todos={inList(todos, filter.listId)} name={name} row={row} />
         )}
       </View>
 
-      <QuickAdd placeholder={all ? 'Add a to-do' : `Add to ${name}`} today={today} onAdd={add} />
+      <QuickAdd placeholder={all ? 'Add a to-do' : `Add to ${name}`} onAdd={add} />
       <KeyboardSpacer />
 
       <ListPicker
@@ -313,7 +256,7 @@ function Empty({ title, body }: { title: string; body: string }) {
   );
 }
 
-/** One list, nothing else picked: my order (long-press a to-do to drag it). */
+/** One list: my order (long-press a to-do to drag it). */
 function ListView({ listId, todos, name, row }: { listId: string; todos: Todo[]; name: string; row: Row }) {
   return (
     <ReorderableList
@@ -324,7 +267,7 @@ function ListView({ listId, todos, name, row }: { listId: string; todos: Todo[];
         reorderTodosNow(listId, ordered).catch(() => showToast('Couldn’t move it. Try again.'));
       }}
       renderItem={({ item }) => <DraggableRow todo={item} row={row} />}
-      ListEmptyComponent={<Empty title={`Nothing in ${name}`} body="Add a to-do below." />}
+      ListEmptyComponent={<Empty title={`Nothing in ${name}`} body="Write a to-do below." />}
       keyboardShouldPersistTaps="handled"
     />
   );
@@ -337,8 +280,6 @@ function DraggableRow({ todo, row }: { todo: Todo; row: Row }) {
 
 /** Completed to-dos (the last 30 days'), newest first, in one list or all; unticking one puts it back. */
 function CompletedList({ listId, showList, listNames }: { listId: string | null; showList: boolean; listNames: Map<string, string> }) {
-  const now = useNow();
-  const today = todayIso(new Date(now));
   const [done, setDone] = useState<Todo[] | null>(null);
   const { todos } = useTodos();
   // Fetched again when the open to-dos change (something was just ticked or added).
@@ -362,7 +303,6 @@ function CompletedList({ listId, showList, listNames }: { listId: string | null;
       renderItem={({ item: t }) => (
         <TodoRow
           todo={t}
-          today={today}
           listName={showList ? listNames.get(t.listId) : undefined}
           checked
           onToggle={() => {
