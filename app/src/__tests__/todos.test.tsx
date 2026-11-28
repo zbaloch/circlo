@@ -242,17 +242,17 @@ describe('A to-do', () => {
     mockNotes = [{ noteId: 'n1', body: 'Flights look cheaper on Tuesdays https://air.example', createdAt: '2026-11-27T14:05:00Z' }];
   });
 
-  it('shows its notes as a dated log, and adds the next one at the bottom', async () => {
+  it('shows its notes in order, without their times, and adds the next one at the bottom', async () => {
     await render(<TodoScreen />);
     expect(await screen.findByText(/Flights look cheaper on Tuesdays/)).toBeTruthy();
     expect(screen.getByRole('link', { name: 'https://air.example' })).toBeTruthy();
-    expect(screen.getByText(/27 Nov 2026/)).toBeTruthy();
+    expect(screen.queryByText(/Nov 2026/)).toBeNull();
 
     await fireEvent.changeText(screen.getByLabelText('New note'), '  Booked the 9am  ');
     await fireEvent.press(screen.getByRole('button', { name: 'Add note' }));
     await waitFor(() => expect(mockAddNote).toHaveBeenCalledWith('t1', 'Booked the 9am'));
     expect(await screen.findByText('Booked the 9am')).toBeTruthy();
-    expect(screen.getByText(/28 Nov 2026/)).toBeTruthy();
+    expect(screen.queryByText(/Nov 2026/)).toBeNull();
     expect(screen.getByLabelText('New note').props.value).toBe('');
   });
 

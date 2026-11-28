@@ -13,7 +13,6 @@ import { Icon } from '@/components/ui/icon';
 import { Spinner } from '@/components/ui/spinner';
 import { Text, TextInput } from '@/components/ui/text';
 import { showAlert } from '@/lib/dialog';
-import { fullTime } from '@/lib/time';
 import { showToast } from '@/lib/toast';
 import { addNote, deleteNote, loadNotes, type Todo, type TodoNote } from '@/lib/todos';
 import { bumpNotes, completeTodoNow, deleteTodoNow, refreshTodos, saveTodoNow, useTodos } from '@/lib/todos-store';
@@ -26,7 +25,8 @@ export const TICK_BACK_MS = 600;
 
 /**
  * One to-do: a box to tick it off, its title and list (saved by themselves as I change them), then its notes, a log of
- * dated entries like comments, oldest first, and a field at the bottom to add the next one. A long press on a note
+ * entries like comments, oldest first (each keeps its time in the database, not shown), and a field at the bottom to
+ * add the next one. A long press on a note
  * deletes it.
  */
 export default function TodoScreen() {
@@ -213,7 +213,7 @@ function Editor({ todo }: { todo: Todo }) {
             </Text>
             {notes === null ? <Spinner className="py-4" /> : null}
             {notes?.length === 0 ? (
-              <Text className="text-[15px] text-muted dark:text-muted-dark">No notes yet. Add one below; each keeps the time you wrote it.</Text>
+              <Text className="text-[15px] text-muted dark:text-muted-dark">No notes yet. Add one below.</Text>
             ) : null}
           </View>
         }
@@ -223,9 +223,8 @@ function Editor({ todo }: { todo: Todo }) {
             accessibilityHint="Long press to delete"
             onLongPress={() => remove(n)}
             delayLongPress={300}
-            className="mx-5 mb-3 gap-1 rounded-2xl bg-surface-raised px-4 py-3 active:opacity-80 dark:bg-surface-raised-dark">
+            className="mx-5 mb-3 rounded-2xl bg-surface-raised px-4 py-3 active:opacity-80 dark:bg-surface-raised-dark">
             <ContentText text={n.body} className="text-base leading-6 text-ink dark:text-ink-dark" />
-            <Text className="text-xs text-muted dark:text-muted-dark">{fullTime(Date.parse(n.createdAt))}</Text>
           </Pressable>
         )}
       />

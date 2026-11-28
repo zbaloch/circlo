@@ -91,7 +91,8 @@ were built, then dropped as confusing).
 
 - **Lists.** Every to-do is in a list. **General** is the first list, made for me, can be renamed but not deleted, and
   is where new to-dos go under All. Lists can be added, renamed and deleted (with their to-dos and notes).
-- **Notes are a log**, like comments: each to-do has dated entries, oldest first, newest at the bottom; I add one
+- **Notes are a log**, like comments: each to-do has entries, oldest first, newest at the bottom (each keeps the
+  time it was added, in the database and the export, but the app doesn't show it; owner 2026-11-28); I add one
   with the field at the bottom of the to-do's screen and long-press one to delete it. Links in them are tappable. A
   to-do with notes shows a quiet mark in the list.
 - **What I see**: a list picker, **All** to start or one list, and a **Completed** toggle (like Feeds' source picker
