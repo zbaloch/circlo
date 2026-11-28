@@ -14,14 +14,13 @@ import { usePalette } from '@/theme/use-palette';
 import { Avatar } from './avatar';
 import { Text } from '@/components/ui/text';
 
-/** `divider`: a thin line above it, starting a group. */
-type Item = { label: string; icon: IconName; href: Href; dot?: 'reading'; divider?: boolean };
+type Item = { label: string; icon: IconName; href: Href; dot?: 'reading' };
 
 export const DRAWER_ITEMS: Item[] = [
   { label: 'Profile', icon: 'person-outline', href: '/profile' },
-  // The personal tools (2.0), set apart by a divider, people first (owner 2026-11-28): Rolodex, Todos, Feeds.
+  // The personal tools (2.0), people first (owner 2026-11-28): Rolodex, Todos, Feeds.
   // Rolodex: my personal CRM, people on Circlo and not, birthdays and catch-ups. No dot (reminders come on the phone).
-  { label: ROLODEX, icon: 'book-user', href: '/rolodex', divider: true },
+  { label: ROLODEX, icon: 'book-user', href: '/rolodex' },
   // Todos: my own to-do lists. Things-calm: no dot, no count.
   { label: 'Todos', icon: 'list-todo', href: '/todos' },
   // Feeds ("reading" in code and the API, as /v1/feed is the timeline): web feeds. A quiet dot when something arrived since I last looked; no counts, no pushes.
@@ -59,18 +58,16 @@ export function AppDrawer({ navigation, state }: DrawerContentComponentProps) {
         <Text className="text-base text-muted dark:text-muted-dark">@{handle}</Text>
       </View>
       {DRAWER_ITEMS.map((item) => (
-        <View key={item.label}>
-          {item.divider ? <View testID="drawer-divider" className="my-2 h-px bg-border dark:bg-border-dark" /> : null}
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={item.dot === 'reading' && readingNew ? `${item.label}, something new` : item.label}
-            onPress={() => go(item.href)}
-            className="flex-row items-center gap-4 py-4 active:opacity-60">
-            <Icon name={item.icon} size={24} color={palette.ink} />
-            <Text className="text-xl font-bold text-ink dark:text-ink-dark">{item.label}</Text>
-            {item.dot === 'reading' && readingNew ? <View testID="reading-dot" className="h-2 w-2 rounded-full bg-primary dark:bg-primary-dark" /> : null}
-          </Pressable>
-        </View>
+        <Pressable
+          key={item.label}
+          accessibilityRole="button"
+          accessibilityLabel={item.dot === 'reading' && readingNew ? `${item.label}, something new` : item.label}
+          onPress={() => go(item.href)}
+          className="flex-row items-center gap-4 py-4 active:opacity-60">
+          <Icon name={item.icon} size={24} color={palette.ink} />
+          <Text className="text-xl font-bold text-ink dark:text-ink-dark">{item.label}</Text>
+          {item.dot === 'reading' && readingNew ? <View testID="reading-dot" className="h-2 w-2 rounded-full bg-primary dark:bg-primary-dark" /> : null}
+        </Pressable>
       ))}
     </ScrollView>
     <Pressable
