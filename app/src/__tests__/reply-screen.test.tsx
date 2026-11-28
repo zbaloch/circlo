@@ -5,7 +5,10 @@ import ReplyScreen from '@/app/reply/[id]';
 let mockId = 'p1';
 let mockFrom: string | undefined;
 let mockParent: string | undefined;
-const mockPost = (postId: string) => ({ postId, authorId: 'a1', authorName: 'Ana', authorHandle: 'ana', text: 'hello', media: [], createdAtMs: Date.now(), replyCount: 0 });
+let mockPostExtra: Record<string, unknown> = {};
+const mockPost = (postId: string) => ({
+  postId, authorId: 'a1', authorName: 'Ana', authorHandle: 'ana', text: 'hello', media: [], createdAtMs: Date.now(), replyCount: 0, ...mockPostExtra,
+});
 
 jest.mock('expo-router', () => ({
   router: { back: jest.fn(), push: jest.fn() },
@@ -16,7 +19,14 @@ jest.mock('expo-router', () => ({
 jest.mock('@/components/keyboard-spacer', () => ({ KeyboardSpacer: () => null }));
 jest.mock('@/components/post-media', () => ({ MediaImage: () => null }));
 jest.mock('@/components/post-card', () => ({ PostText: () => null }));
-jest.mock('@/components/post-actions', () => ({ authorName: () => ({ name: 'Ana', handle: 'ana' }) }));
+jest.mock('@/components/post-actions', () => ({
+  authorName: () => ({ name: 'Ana', handle: 'ana' }),
+  // The circle line, as on the post's card: only ever for my own posts.
+  audienceBadge: (_book: unknown, post: { mine?: boolean }) => (post.mine ? 'Family, Close friends' : undefined),
+}));
+jest.mock('expo-image', () => ({
+  Image: (p: object) => jest.requireActual('react').createElement('Image', { testID: 'photo', ...p }),
+}));
 jest.mock('@/lib/addressbook', () => ({ loadAddressBook: jest.fn(() => new Promise(() => {})) }));
 jest.mock('@/lib/feed-store', () => ({ putPost: jest.fn(), usePost: (id: string) => mockPost(id) }));
 jest.mock('@/lib/session', () => ({ useSession: () => ({ status: 'signedIn', account: { userId: 'me', handle: 'me' } }) }));
@@ -37,6 +47,23 @@ describe('reply screen', () => {
     mockId = 'p1';
     mockFrom = undefined;
     mockParent = undefined;
+    mockPostExtra = {};
+  });
+
+  it('shows the post’s author with their photo', async () => {
+    mockPostExtra = { authorAvatar: 'https://media.example/ana.jpg?sig=1' };
+    await render(<ReplyScreen />);
+    expect(screen.getAllByTestId('photo').map((p) => p.props.source.uri)).toContain('https://media.example/ana.jpg?sig=1');
+  });
+
+  it('shows who my own post is for, as on its card; never on someone else’s', async () => {
+    mockPostExtra = { mine: true, authorId: 'me', audience: { kind: 'circles', ids: [1, 2] } };
+    const view = await render(<ReplyScreen />);
+    expect(screen.getByText('Family, Close friends')).toBeTruthy();
+
+    mockPostExtra = { mine: false, audience: { kind: 'circles', ids: [1] } };
+    await view.rerender(<ReplyScreen />);
+    expect(screen.queryByText('Family, Close friends')).toBeNull();
   });
 
   it('from the timeline: goes back and shows a "Reply sent · View" toast that opens the reply', async () => {

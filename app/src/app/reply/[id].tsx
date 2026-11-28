@@ -10,7 +10,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Avatar } from '@/components/avatar';
 import { CharRing } from '@/components/char-ring';
 import { MediaImage } from '@/components/post-media';
-import { authorName } from '@/components/post-actions';
+import { audienceBadge, authorName } from '@/components/post-actions';
+import { audienceIcon } from '@/components/audience-icon';
 import { PostText } from '@/components/post-card';
 import { loadAddressBook, type AddressBook } from '@/lib/addressbook';
 import { showAlert } from '@/lib/dialog';
@@ -64,9 +65,12 @@ export default function ReplyScreen() {
   const answering = replyTarget(parent);
   const shown = answering
     ? { authorId: answering.authorId, name: answering.authorName, handle: answering.authorHandle, avatar: answering.authorAvatar, at: answering.createdAtMs, text: answering.text }
-    : { authorId: post.authorId, name: post.authorName, handle: post.authorHandle, avatar: undefined, at: post.createdAtMs, text: post.text };
+    : { authorId: post.authorId, name: post.authorName, handle: post.authorHandle, avatar: post.authorAvatar ?? undefined, at: post.createdAtMs, text: post.text };
   const author = { name: shown.name, handle: shown.handle };
   const me = authorName(account, book, account.userId);
+  // Who my own post is for ("Family, Close friends"), as on its card. Never on someone else's: circle names are only
+  // ever shown to the post's author.
+  const audience = answering ? undefined : audienceBadge(book, post);
   const blocked = !!validateReply(text) || sending;
   // X shows a small preview of the media on the right: a photo's thumbnail or a video's poster.
   const preview = answering ? undefined : post.media[0];
@@ -119,7 +123,16 @@ export default function ReplyScreen() {
               <View className="flex-row items-center gap-1">
                 <Text numberOfLines={1} className="shrink text-[15px] font-bold text-ink dark:text-ink-dark">{author.name}</Text>
                 {author.handle ? <Text numberOfLines={1} className="shrink text-[15px] text-muted dark:text-muted-dark">@{author.handle}</Text> : null}
-                <Text className="text-[15px] text-muted dark:text-muted-dark">· {relativeTime(shown.at, now)}</Text>
+                <Text className="shrink-0 text-[15px] text-muted dark:text-muted-dark">· {relativeTime(shown.at, now)}</Text>
+                {audience ? (
+                  <View className="shrink flex-row items-center gap-1">
+                    <Text className="text-[15px] text-muted dark:text-muted-dark">·</Text>
+                    <Icon name={audienceIcon(post.audience?.kind)} size={12} color={palette.muted} />
+                    <Text numberOfLines={1} className="shrink text-[15px] text-muted dark:text-muted-dark">
+                      {audience}
+                    </Text>
+                  </View>
+                ) : null}
               </View>
               {answering ? <ContentText text={answering.text} className="text-[15px] leading-5 text-ink dark:text-ink-dark" /> : null}
               {!answering && post.text ? <PostText text={post.text} className="text-[15px] leading-5 text-ink dark:text-ink-dark" /> : null}
