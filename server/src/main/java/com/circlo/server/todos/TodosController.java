@@ -110,13 +110,13 @@ public class TodosController {
 
     // --- lists ---
 
-    /** General, made the first time it's needed (one per person: a unique key on general_of). */
+    /** General, made the first time it's needed (one per person: a unique key on user_id and general_key). */
     private UUID general(byte[] me) {
         List<byte[]> found = jdbc.queryForList("SELECT id FROM todo_lists WHERE user_id = ? AND is_general", byte[].class, (Object) me);
         if (!found.isEmpty()) {
             return Ids.uuid(found.get(0));
         }
-        jdbc.update("INSERT IGNORE INTO todo_lists (id, user_id, name, is_general, position, created_at) VALUES (?, ?, 'General', TRUE, 0, ?)",
+        jdbc.update("INSERT IGNORE INTO todo_lists (id, user_id, name, is_general, general_key, position, created_at) VALUES (?, ?, 'General', TRUE, 1, 0, ?)",
                 Ids.bytes(Ids.newId()), me, Timestamp.from(Instant.now()));
         return Ids.uuid(jdbc.queryForObject("SELECT id FROM todo_lists WHERE user_id = ? AND is_general", byte[].class, (Object) me));
     }

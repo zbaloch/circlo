@@ -5,12 +5,14 @@ CREATE TABLE todo_lists (
     id          BINARY(16)   NOT NULL PRIMARY KEY,
     user_id     BINARY(16)   NOT NULL,
     name        VARCHAR(100) NOT NULL,
-    -- General: made for everyone, where quick add puts things; can be renamed, never deleted. One per person.
+    -- General: made for everyone, where quick add puts things; can be renamed, never deleted. One per person:
+    -- general_key is 1 on General and NULL on every other list, and (user_id, general_key) is unique (NULLs never
+    -- clash). A plain column, not a generated one: MySQL refuses a generated column over user_id, which cascades.
     is_general  BOOLEAN      NOT NULL DEFAULT FALSE,
-    general_of  BINARY(16)   AS (IF(is_general, user_id, NULL)) STORED,
+    general_key TINYINT      NULL,
     position    INT          NOT NULL,
     created_at  DATETIME(6)  NOT NULL,
-    CONSTRAINT uq_todo_lists_general UNIQUE (general_of),
+    CONSTRAINT uq_todo_lists_general UNIQUE (user_id, general_key),
     INDEX ix_todo_lists_user (user_id, position),
     CONSTRAINT fk_todo_lists_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
 );
