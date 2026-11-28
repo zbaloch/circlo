@@ -46,6 +46,8 @@ public class ReadingController {
     static final int MAX_SOURCES = 200;
     /** Finding and following fetch other sites, so they're limited per person. */
     private static final int FINDS_PER_HOUR = 60;
+    /** OPML imports: a handful an hour is plenty (each adds up to 200 sources). */
+    static final int IMPORTS_PER_HOUR = 10;
 
     private final JdbcTemplate jdbc;
     private final FeedFinder finder;
@@ -373,6 +375,9 @@ public class ReadingController {
     @PostMapping("/v1/reading/import")
     public Imported importOpml(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody Opml r) {
         byte[] me = me(jwt);
+        if (!limiter.tryAcquire("reading-import", me, IMPORTS_PER_HOUR, 3_600_000)) {
+            throw ApiException.rateLimited();
+        }
         // jsoup's XML parser never loads doctypes or external entities.
         Document doc = Jsoup.parse(r.opml(), "", Parser.xmlParser());
         Integer count = jdbc.queryForObject("SELECT COUNT(*) FROM reading_follows WHERE user_id = ?", Integer.class, (Object) me);

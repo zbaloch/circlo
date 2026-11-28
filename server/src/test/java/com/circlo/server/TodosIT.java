@@ -15,8 +15,9 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
- * Todos (2.0): personal to-do lists. Only their owner can ever see or change them; General is made for everyone and
- * can't be deleted; repeating to-dos come back with their next date when ticked; completed ones are kept 30 days.
+ * Todos (2.0): personal to-do lists, like pen and paper. A to-do is a title and a tick; its notes are a log of dated
+ * entries. Only their owner can ever see or change them; General is made for everyone and can't be deleted;
+ * completed ones are kept 30 days.
  */
 class TodosIT extends IntegrationTest {
 
@@ -55,16 +56,16 @@ class TodosIT extends IntegrationTest {
     }
 
     @Test
-    void everyoneStartsWithGeneralWhereQuickAddPutsThings() {
+    void everyoneStartsWithGeneralWhereNewToDosGo() {
         TestUser a = user("todo_general");
         assertThat(lists(a)).singleElement().satisfies(l -> assertThat(l).containsEntry("name", "General").containsEntry("general", true));
         assertThat(todos(a)).isEmpty();
 
-        Map<String, Object> t = add(a, body("title", "  Call mum  ", "dueDate", "2026-11-28"));
-        assertThat(t).containsEntry("title", "Call mum").containsEntry("dueDate", "2026-11-28").containsEntry("listId", lists(a).get(0).get("listId"))
-                .containsEntry("notes", null).containsEntry("repeat", null).containsEntry("completedAt", null);
-        // Asking again doesn't make a second General.
+        Map<String, Object> t = add(a, body("title", "  Call mum  "));
+        assertThat(t).containsEntry("title", "Call mum").containsEntry("listId", lists(a).get(0).get("listId")).containsEntry("noteCount", 0)
+                .containsEntry("completedAt", null).doesNotContainKeys("dueDate", "repeat", "notes");
         assertThat(lists(a)).hasSize(1);
+        assertThat(a.call("POST", "/v1/todos", body("title", "")).getStatusCode().value()).isEqualTo(400);
     }
 
     @Test
@@ -79,37 +80,76 @@ class TodosIT extends IntegrationTest {
         assertThat(a.call("PUT", "/v1/todos/lists/order", Map.of("listIds", List.of(work, general, groceries))).getStatusCode().value()).isEqualTo(204);
         assertThat(lists(a)).extracting(l -> l.get("name")).containsExactly("Work", "Inbox", "Groceries");
 
-        add(a, body("title", "Milk", "listId", groceries));
+        String milk = (String) add(a, body("title", "Milk", "listId", groceries)).get("todoId");
+        a.call("POST", "/v1/todos/" + milk + "/notes", Map.of("body", "Oat"));
         assertThat(a.call("DELETE", "/v1/todos/lists/" + general, null).getBody()).containsEntry("error", "general_list");
         assertThat(a.call("DELETE", "/v1/todos/lists/" + groceries, null).getStatusCode().value()).isEqualTo(204);
         assertThat(lists(a)).extracting(l -> l.get("name")).containsExactly("Work", "Inbox");
         assertThat(todos(a)).isEmpty();
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM todo_notes", Integer.class)).isZero();
 
         assertThat(a.call("POST", "/v1/todos/lists", Map.of("name", "  ")).getStatusCode().value()).isEqualTo(400);
     }
 
     @Test
-    void aTodoHasNotesADateARepeatAndAListAndCanBeEdited() {
+    void aToDoCanBeRenamedMovedAndDeleted() {
         TestUser a = user("todo_edit");
         String work = (String) a.call("POST", "/v1/todos/lists", Map.of("name", "Work")).getBody().get("listId");
-        Map<String, Object> t = add(a, body("title", "Taxes"));
-        String id = (String) t.get("todoId");
-
-        Map<String, Object> edited = a.call("PUT", "/v1/todos/" + id, body("title", "File taxes", "notes", "Forms in the blue folder\nhttps://gov.example",
-                "dueDate", "2026-12-10", "repeat", "monthly", "listId", work)).getBody();
-        assertThat(edited).containsEntry("title", "File taxes").containsEntry("notes", "Forms in the blue folder\nhttps://gov.example")
-                .containsEntry("dueDate", "2026-12-10").containsEntry("repeat", "monthly").containsEntry("listId", work);
-        // Clearing the date clears the repeat with it (a repeat needs a date to repeat from).
-        assertThat(a.call("PUT", "/v1/todos/" + id, body("title", "File taxes", "notes", null, "dueDate", null, "repeat", "monthly", "listId", work))
-                .getBody()).containsEntry("error", "repeat_needs_date");
-        assertThat(a.call("PUT", "/v1/todos/" + id, body("title", "File taxes", "dueDate", null, "repeat", null, "listId", work)).getBody())
-                .containsEntry("dueDate", null).containsEntry("notes", null);
-
-        assertThat(a.call("POST", "/v1/todos", body("title", "")).getStatusCode().value()).isEqualTo(400);
-        assertThat(a.call("POST", "/v1/todos", body("title", "x", "repeat", "yearly", "dueDate", "2026-12-01")).getStatusCode().value()).isEqualTo(400);
-        assertThat(a.call("POST", "/v1/todos", body("title", "x", "dueDate", "next tuesday")).getStatusCode().value()).isEqualTo(400);
+        String id = (String) add(a, body("title", "Taxes")).get("todoId");
+        assertThat(a.call("PUT", "/v1/todos/" + id, body("title", "File taxes", "listId", work)).getBody()).containsEntry("title", "File taxes")
+                .containsEntry("listId", work);
+        assertThat(a.call("PUT", "/v1/todos/" + id, body("title", "File the taxes")).getBody()).containsEntry("listId", work);
         assertThat(a.call("DELETE", "/v1/todos/" + id, null).getStatusCode().value()).isEqualTo(204);
         assertThat(todos(a)).isEmpty();
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void notesAreALogOfDatedEntries() {
+        TestUser a = user("todo_notes");
+        String id = (String) add(a, body("title", "Plan the trip")).get("todoId");
+        Instant before = Instant.now().minusSeconds(1);
+        Map<String, Object> first = a.call("POST", "/v1/todos/" + id + "/notes", Map.of("body", "  Flights look cheaper on Tuesdays  ")).getBody();
+        assertThat(first).containsEntry("body", "Flights look cheaper on Tuesdays");
+        assertThat(Instant.parse((String) first.get("createdAt"))).isAfter(before);
+        a.call("POST", "/v1/todos/" + id + "/notes", Map.of("body", "Booked: https://air.example/123"));
+
+        // Oldest first, like a conversation; the list shows that it has notes.
+        List<Map<String, Object>> notes = a.list("GET", "/v1/todos/" + id + "/notes", null).getBody();
+        assertThat(notes).extracting(n -> n.get("body")).containsExactly("Flights look cheaper on Tuesdays", "Booked: https://air.example/123");
+        assertThat(todos(a)).singleElement().satisfies(t -> assertThat(t).containsEntry("noteCount", 2));
+
+        assertThat(a.call("DELETE", "/v1/todos/" + id + "/notes/" + first.get("noteId"), null).getStatusCode().value()).isEqualTo(204);
+        assertThat(a.list("GET", "/v1/todos/" + id + "/notes", null).getBody()).hasSize(1);
+        assertThat(a.call("POST", "/v1/todos/" + id + "/notes", Map.of("body", "   ")).getStatusCode().value()).isEqualTo(400);
+
+        // Deleting the to-do takes its notes with it.
+        a.call("DELETE", "/v1/todos/" + id, null);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM todo_notes", Integer.class)).isZero();
+    }
+
+    @Test
+    void addingIsLimitedPerHourAndNotesAltogether() {
+        TestUser a = user("todo_limits");
+        String id = (String) add(a, body("title", "One")).get("todoId");
+        // All my notes together are capped (so one account can't fill the disk).
+        byte[] me = com.circlo.server.web.Ids.bytes(a.userId);
+        byte[] todo = com.circlo.server.web.Ids.bytes(java.util.UUID.fromString(id));
+        Timestamp now = Timestamp.from(Instant.now());
+        jdbc.batchUpdate("INSERT INTO todo_notes (id, todo_id, user_id, body, created_at) VALUES (?, ?, ?, 'n', ?)",
+                java.util.stream.IntStream.range(0, 20_000)
+                        .mapToObj(i -> new Object[] {com.circlo.server.web.Ids.bytes(java.util.UUID.randomUUID()), todo, me, now}).toList());
+        assertThat(a.call("POST", "/v1/todos/" + id + "/notes", Map.of("body", "one more")).getBody()).containsEntry("error", "too_many_notes");
+
+        // Adding to-dos, notes and lists: 300 an hour (the refused note counted too).
+        for (int i = 1; i <= 298; i++) {
+            assertThat(a.call("POST", "/v1/todos", body("title", "T" + i)).getStatusCode().value()).as("add %d", i).isEqualTo(201);
+        }
+        ResponseEntity<Map<String, Object>> over = a.call("POST", "/v1/todos/lists", Map.of("name", "One too many"));
+        assertThat(over.getStatusCode().value()).isEqualTo(429);
+        assertThat(over.getBody()).containsEntry("error", "rate_limited");
+        // Someone else isn't affected.
+        assertThat(user("todo_limits_other").call("POST", "/v1/todos", body("title", "Fine")).getStatusCode().value()).isEqualTo(201);
     }
 
     @Test
@@ -126,18 +166,19 @@ class TodosIT extends IntegrationTest {
     }
 
     @Test
-    @SuppressWarnings("unchecked")
     void tickingMovesItToCompletedAndUntickingBringsItBack() {
         TestUser a = user("todo_tick");
         String id = (String) add(a, body("title", "Buy cake")).get("todoId");
-        Map<String, Object> done = a.call("POST", "/v1/todos/" + id + "/complete", Map.of("today", "2026-11-27")).getBody();
-        assertThat((Map<String, Object>) done.get("completed")).containsEntry("todoId", id).doesNotContainEntry("completedAt", null);
-        assertThat(done).containsEntry("next", null);
+        assertThat(a.call("POST", "/v1/todos/" + id + "/complete", null).getBody()).containsEntry("todoId", id).doesNotContainEntry("completedAt", null);
         assertThat(todos(a)).isEmpty();
 
         String general = (String) lists(a).get(0).get("listId");
-        List<Map<String, Object>> completed = a.list("GET", "/v1/todos/lists/" + general + "/completed", null).getBody();
-        assertThat(titles(completed)).containsExactly("Buy cake");
+        assertThat(titles(a.list("GET", "/v1/todos/lists/" + general + "/completed", null).getBody())).containsExactly("Buy cake");
+        String work = (String) a.call("POST", "/v1/todos/lists", Map.of("name", "Work")).getBody().get("listId");
+        String report = (String) add(a, body("title", "Report", "listId", work)).get("todoId");
+        a.call("POST", "/v1/todos/" + report + "/complete", null);
+        assertThat(titles(a.list("GET", "/v1/todos/completed", null).getBody())).containsExactly("Report", "Buy cake");
+        assertThat(user("todo_tick_other").list("GET", "/v1/todos/completed", null).getBody()).isEmpty();
 
         assertThat(a.call("POST", "/v1/todos/" + id + "/reopen", null).getBody()).containsEntry("completedAt", null);
         assertThat(titles(todos(a))).containsExactly("Buy cake");
@@ -145,51 +186,27 @@ class TodosIT extends IntegrationTest {
     }
 
     @Test
-    @SuppressWarnings("unchecked")
-    void repeatingTodosComeBackWithTheirNextDate() {
-        TestUser a = user("todo_repeat");
-        // Weekly, ticked on time: next week.
-        String plants = (String) add(a, body("title", "Water plants", "dueDate", "2026-11-23", "repeat", "weekly")).get("todoId");
-        Map<String, Object> done = a.call("POST", "/v1/todos/" + plants + "/complete", Map.of("today", "2026-11-23")).getBody();
-        Map<String, Object> next = (Map<String, Object>) done.get("next");
-        assertThat(next).containsEntry("title", "Water plants").containsEntry("dueDate", "2026-11-30").containsEntry("repeat", "weekly");
-        // The ticked one is a one-off in Completed now; unticking it doesn't start a second series.
-        assertThat((Map<String, Object>) done.get("completed")).containsEntry("repeat", null);
-
-        // Monthly, ticked late: the next date after today, keeping its day of the month (no drift from the 31st).
-        String rent = (String) add(a, body("title", "Pay rent", "dueDate", "2026-08-31", "repeat", "monthly")).get("todoId");
-        next = (Map<String, Object>) a.call("POST", "/v1/todos/" + rent + "/complete", Map.of("today", "2026-11-27")).getBody().get("next");
-        assertThat(next).containsEntry("dueDate", "2026-11-30");
-        next = (Map<String, Object>) a.call("POST", "/v1/todos/" + next.get("todoId") + "/complete", Map.of("today", "2026-11-30")).getBody().get("next");
-        assertThat(next).containsEntry("dueDate", "2026-12-31");
-
-        // Daily, three days overdue: tomorrow.
-        String walk = (String) add(a, body("title", "Walk", "dueDate", "2026-11-24", "repeat", "daily")).get("todoId");
-        next = (Map<String, Object>) a.call("POST", "/v1/todos/" + walk + "/complete", Map.of("today", "2026-11-27")).getBody().get("next");
-        assertThat(next).containsEntry("dueDate", "2026-11-28");
-
-        assertThat(titles(todos(a))).containsExactlyInAnyOrder("Water plants", "Pay rent", "Walk");
-    }
-
-    @Test
-    void myTodosAreMineAlone() {
+    void myTodosAndNotesAreMineAlone() {
         TestUser a = user("todo_mine");
         TestUser b = user("todo_theirs");
-        String id = (String) add(a, body("title", "Secret plan", "notes", "Nobody else")).get("todoId");
+        String id = (String) add(a, body("title", "Secret plan")).get("todoId");
+        String note = (String) a.call("POST", "/v1/todos/" + id + "/notes", Map.of("body", "Nobody else")).getBody().get("noteId");
         String list = (String) lists(a).get(0).get("listId");
 
         assertThat(todos(b)).isEmpty();
         for (String[] call : List.of(new String[] {"PUT", "/v1/todos/" + id}, new String[] {"DELETE", "/v1/todos/" + id},
                 new String[] {"POST", "/v1/todos/" + id + "/complete"}, new String[] {"POST", "/v1/todos/" + id + "/reopen"},
+                new String[] {"GET", "/v1/todos/" + id + "/notes"}, new String[] {"POST", "/v1/todos/" + id + "/notes"},
+                new String[] {"DELETE", "/v1/todos/" + id + "/notes/" + note},
                 new String[] {"PUT", "/v1/todos/lists/" + list}, new String[] {"DELETE", "/v1/todos/lists/" + list},
                 new String[] {"GET", "/v1/todos/lists/" + list + "/completed"})) {
-            Object payload = call[0].equals("PUT") ? body("title", "Mine now", "name", "Mine now") : call[1].endsWith("complete") ? Map.of("today", "2026-11-27") : null;
+            Object payload = call[0].equals("PUT") ? body("title", "Mine now", "name", "Mine now") : call[1].endsWith("/notes") ? Map.of("body", "x") : null;
             assertThat(b.call(call[0], call[1], payload).getStatusCode().value()).as(call[0] + " " + call[1]).isEqualTo(404);
         }
-        // Not into someone else's list either.
         assertThat(b.call("POST", "/v1/todos", body("title", "Sneaky", "listId", list)).getStatusCode().value()).isEqualTo(404);
         assertThat(b.call("PUT", "/v1/todos/lists/" + list + "/order", Map.of("todoIds", List.of(id))).getStatusCode().value()).isEqualTo(404);
         assertThat(titles(todos(a))).containsExactly("Secret plan");
+        assertThat(a.list("GET", "/v1/todos/" + id + "/notes", null).getBody()).hasSize(1);
         assertThat(call("GET", "/v1/todos", null, null).getStatusCode().value()).isEqualTo(401);
     }
 
@@ -198,30 +215,33 @@ class TodosIT extends IntegrationTest {
         TestUser a = user("todo_sweep");
         String old = (String) add(a, body("title", "Old")).get("todoId");
         String recent = (String) add(a, body("title", "Recent")).get("todoId");
-        a.call("POST", "/v1/todos/" + old + "/complete", Map.of("today", "2026-11-27"));
-        a.call("POST", "/v1/todos/" + recent + "/complete", Map.of("today", "2026-11-27"));
+        a.call("POST", "/v1/todos/" + old + "/complete", null);
+        a.call("POST", "/v1/todos/" + recent + "/complete", null);
         jdbc.update("UPDATE todos SET completed_at = ? WHERE id = ?", Timestamp.from(Instant.now().minus(Duration.ofDays(31))),
                 com.circlo.server.web.Ids.bytes(java.util.UUID.fromString(old)));
         sweep.sweep(Instant.now());
-        String general = (String) lists(a).get(0).get("listId");
-        assertThat(titles(a.list("GET", "/v1/todos/lists/" + general + "/completed", null).getBody())).containsExactly("Recent");
+        assertThat(titles(a.list("GET", "/v1/todos/completed", null).getBody())).containsExactly("Recent");
     }
 
     @Test
     @SuppressWarnings("unchecked")
-    void myExportHasMyTodosAndDeletingMyAccountForgetsThem() {
+    void myExportHasMyTodosAndNotesAndDeletingMyAccountForgetsThem() {
         TestUser a = user("todo_export");
-        add(a, body("title", "Pack", "notes", "Passport!", "dueDate", "2026-12-01"));
+        String id = (String) add(a, body("title", "Pack")).get("todoId");
+        a.call("POST", "/v1/todos/" + id + "/notes", Map.of("body", "Passport!"));
         Map<String, Object> export = a.call("GET", "/v1/me/export", null).getBody();
         assertThat((List<Map<String, Object>>) export.get("todos")).singleElement().satisfies(l -> {
             assertThat(l).containsEntry("name", "General");
-            assertThat((List<Map<String, Object>>) l.get("todos")).singleElement()
-                    .satisfies(t -> assertThat(t).containsEntry("title", "Pack").containsEntry("notes", "Passport!").containsEntry("dueDate", "2026-12-01"));
+            assertThat((List<Map<String, Object>>) l.get("todos")).singleElement().satisfies(t -> {
+                assertThat(t).containsEntry("title", "Pack");
+                assertThat((List<Map<String, Object>>) t.get("notes")).singleElement().satisfies(n -> assertThat(n).containsEntry("body", "Passport!"));
+            });
         });
 
         assertThat(a.call("DELETE", "/v1/account", Map.of("password", a.password)).getStatusCode().value()).isEqualTo(200);
-        byte[] id = com.circlo.server.web.Ids.bytes(a.userId);
-        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM todos WHERE user_id = ?", Integer.class, (Object) id)).isZero();
-        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM todo_lists WHERE user_id = ?", Integer.class, (Object) id)).isZero();
+        byte[] uid = com.circlo.server.web.Ids.bytes(a.userId);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM todos WHERE user_id = ?", Integer.class, (Object) uid)).isZero();
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM todo_lists WHERE user_id = ?", Integer.class, (Object) uid)).isZero();
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM todo_notes WHERE user_id = ?", Integer.class, (Object) uid)).isZero();
     }
 }

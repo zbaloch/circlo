@@ -1,6 +1,7 @@
+import * as Haptics from 'expo-haptics';
 import { router, useLocalSearchParams, useNavigation } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { Pressable, ScrollView, View } from 'react-native';
+import { FlatList, Pressable, View } from 'react-native';
 
 import { ContentText } from '@/components/content-text';
 import { EmptyState } from '@/components/empty-state';
@@ -13,27 +14,20 @@ import { Spinner } from '@/components/ui/spinner';
 import { Text, TextInput } from '@/components/ui/text';
 import { showAlert } from '@/lib/dialog';
 import { showToast } from '@/lib/toast';
-import { addDays, dayLabel, parseDateWords, todayIso, weekday, type Repeat, type Todo, type TodoFields } from '@/lib/todos';
-import { deleteTodoNow, refreshTodos, saveTodoNow, useTodos } from '@/lib/todos-store';
-import { useNow } from '@/lib/use-now';
+import { addNote, deleteNote, loadNotes, type Todo, type TodoNote } from '@/lib/todos';
+import { bumpNotes, completeTodoNow, deleteTodoNow, refreshTodos, saveTodoNow, useTodos } from '@/lib/todos-store';
 import { usePalette } from '@/theme/use-palette';
 
-/** How long after the last change a to-do saves itself (and when I leave the screen). */
+/** How long after the last change a to-do's title or list saves itself (and when I leave the screen). */
 export const SAVE_AFTER_MS = 600;
-
-type Draft = { title: string; notes: string; dueDate: string | null; repeat: Repeat | null; listId: string };
-
-function draftOf(t: Todo): Draft {
-  return { title: t.title, notes: t.notes ?? '', dueDate: t.dueDate, repeat: (t.repeat as Repeat | null) ?? null, listId: t.listId };
-}
-
-function fieldsOf(d: Draft): TodoFields {
-  return { title: d.title.trim(), notes: d.notes.trim() ? d.notes : null, dueDate: d.dueDate, repeat: d.dueDate ? d.repeat : null, listId: d.listId };
-}
+/** How long the tick shows on a to-do's screen before it goes back to the list. */
+export const TICK_BACK_MS = 600;
 
 /**
- * One to-do, to change: its title, notes (links tappable), date (shortcuts, or typed in words), repeat and list.
- * There's no Save button: it saves itself a moment after each change, and when I leave.
+ * One to-do: a box to tick it off, its title and list (saved by themselves as I change them), then its notes, a log of
+ * entries like comments, oldest first (each keeps its time in the database, not shown), and a field at the bottom to
+ * add the next one. A long press on a note
+ * deletes it.
  */
 export default function TodoScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -47,11 +41,7 @@ export default function TodoScreen() {
   if (!todo) {
     return (
       <Screen>
-        {loaded ? (
-          <EmptyState icon="list-todo" title="Not here any more" body="This to-do was ticked or deleted." />
-        ) : (
-          <Spinner className="flex-1 py-10" />
-        )}
+        {loaded ? <EmptyState icon="list-todo" title="Not here any more" body="This to-do was ticked or deleted." /> : <Spinner className="flex-1 py-10" />}
       </Screen>
     );
   }
@@ -61,32 +51,44 @@ export default function TodoScreen() {
 function Editor({ todo }: { todo: Todo }) {
   const navigation = useNavigation();
   const palette = usePalette();
-  const now = useNow();
-  const today = todayIso(new Date(now));
   const { lists } = useTodos();
-  const [draft, setDraft] = useState<Draft>(() => draftOf(todo));
-  const [editingNotes, setEditingNotes] = useState(!todo.notes);
-  const [dateWords, setDateWords] = useState('');
-  const saved = useRef(JSON.stringify(fieldsOf(draftOf(todo))));
+  const [title, setTitle] = useState(todo.title);
+  const [listId, setListId] = useState(todo.listId);
+  const [notes, setNotes] = useState<TodoNote[] | null>(null);
+  const [note, setNote] = useState('');
+  const [adding, setAdding] = useState(false);
+  const saved = useRef(JSON.stringify({ title: todo.title, listId: todo.listId }));
   // Once deleted, nothing more is saved (the screen closes after it).
   const deleted = useRef(false);
-  const latest = useRef(draft);
+  const latest = useRef({ title, listId });
+  const list = useRef<FlatList<TodoNote>>(null);
   useEffect(() => {
-    latest.current = draft;
-  }, [draft]);
+    latest.current = { title, listId };
+  }, [title, listId]);
 
-  // Saves itself a moment after a change, and on the way out.
-  const save = useRef(async (d: Draft) => {
-    const fields = fieldsOf(d);
-    const key = JSON.stringify(fields);
-    if (deleted.current || !fields.title || key === saved.current) return;
+  useEffect(() => {
+    let live = true;
+    loadNotes(todo.todoId).then(
+      (n) => live && setNotes(n),
+      () => live && setNotes([]),
+    );
+    return () => {
+      live = false;
+    };
+  }, [todo.todoId]);
+
+  // The title and list save themselves a moment after a change, and on the way out.
+  const save = useRef(async (fields: { title: string; listId: string }) => {
+    const t = fields.title.trim();
+    const key = JSON.stringify({ title: t, listId: fields.listId });
+    if (deleted.current || !t || key === saved.current) return;
     saved.current = key;
-    await saveTodoNow(todo.todoId, fields).catch(() => showToast('Couldn’t save the to-do. Try again.'));
+    await saveTodoNow(todo.todoId, { title: t, listId: fields.listId }).catch(() => showToast('Couldn’t save the to-do. Try again.'));
   });
   useEffect(() => {
-    const timer = setTimeout(() => void save.current(draft), SAVE_AFTER_MS);
+    const timer = setTimeout(() => void save.current({ title, listId }), SAVE_AFTER_MS);
     return () => clearTimeout(timer);
-  }, [draft]);
+  }, [title, listId]);
   useEffect(() => {
     const flush = save.current;
     return () => void flush(latest.current);
@@ -99,7 +101,7 @@ function Editor({ todo }: { todo: Todo }) {
           accessibilityLabel="Delete to-do"
           className="mr-2"
           onPress={() =>
-            showAlert('Delete this to-do?', undefined, [
+            showAlert('Delete this to-do?', 'Its notes are deleted with it.', [
               { text: 'Cancel', style: 'cancel' },
               {
                 text: 'Delete',
@@ -118,115 +120,134 @@ function Editor({ todo }: { todo: Todo }) {
     });
   }, [navigation, palette.ink, todo.todoId]);
 
-  const change = (patch: Partial<Draft>) => setDraft((d) => ({ ...d, ...patch }));
-  const nextMonday = addDays(today, ((8 - weekday(today)) % 7) || 7);
-  const dateChoice =
-    draft.dueDate === null ? 'none' : draft.dueDate === today ? 'today' : draft.dueDate === addDays(today, 1) ? 'tomorrow' : draft.dueDate === nextMonday ? 'nextweek' : null;
-  const typed = dateWords.trim() ? parseDateWords(dateWords, today) : null;
+  // Ticking it here: a check and a light tap, then (a moment later, as in the list) back to the list, ticked off.
+  const [done, setDone] = useState(false);
+  const tick = () => {
+    if (done) return;
+    setDone(true);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => undefined);
+    setTimeout(() => {
+      void save.current(latest.current);
+      router.back();
+      completeTodoNow(todo.todoId).catch(() => showToast('Couldn’t tick it. Try again.'));
+    }, TICK_BACK_MS);
+  };
+
+  const add = async () => {
+    const body = note.trim();
+    if (!body || adding) return;
+    setAdding(true);
+    try {
+      const made = await addNote(todo.todoId, body);
+      setNotes((n) => [...(n ?? []), made]);
+      bumpNotes(todo.todoId, 1);
+      setNote('');
+      setTimeout(() => list.current?.scrollToEnd({ animated: true }), 50);
+    } catch {
+      showToast('Couldn’t add the note. Try again.');
+    } finally {
+      setAdding(false);
+    }
+  };
+
+  const remove = (n: TodoNote) =>
+    showAlert('Delete this note?', undefined, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: () => {
+          setNotes((all) => all && all.filter((x) => x.noteId !== n.noteId));
+          bumpNotes(todo.todoId, -1);
+          deleteNote(todo.todoId, n.noteId).catch(() => {
+            setNotes((all) => (all ? [...all, n].sort((a, b) => a.createdAt.localeCompare(b.createdAt)) : all));
+            bumpNotes(todo.todoId, 1);
+            showToast('Couldn’t delete the note. Try again.');
+          });
+        },
+      },
+    ]);
 
   return (
     <Screen>
-      <ScrollView contentContainerClassName="gap-6 px-5 pb-12 pt-4" keyboardShouldPersistTaps="handled">
-        <TextInput
-          accessibilityLabel="Title"
-          value={draft.title}
-          onChangeText={(title) => change({ title })}
-          multiline
-          maxLength={500}
-          placeholder="To-do"
-          placeholderTextColor={palette.muted}
-          className="text-2xl font-bold text-ink dark:text-ink-dark"
-        />
-
-        <View className="gap-2">
-          <Text className="text-sm font-semibold text-muted dark:text-muted-dark">Notes</Text>
-          {editingNotes ? (
-            <TextInput
-              accessibilityLabel="Notes"
-              value={draft.notes}
-              onChangeText={(notes) => change({ notes })}
-              onBlur={() => draft.notes.trim() && setEditingNotes(false)}
-              autoFocus={!!todo.notes}
-              multiline
-              maxLength={10_000}
-              placeholder="Add notes"
-              placeholderTextColor={palette.muted}
-              className="min-h-[88px] rounded-2xl bg-surface-raised px-4 py-3 text-base text-ink dark:bg-surface-raised-dark dark:text-ink-dark"
-            />
-          ) : (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Edit notes"
-              onPress={() => setEditingNotes(true)}
-              className="min-h-[88px] rounded-2xl bg-surface-raised px-4 py-3 dark:bg-surface-raised-dark">
-              <ContentText text={draft.notes} className="text-base leading-6 text-ink dark:text-ink-dark" />
-            </Pressable>
-          )}
-        </View>
-
-        <View className="gap-3">
-          <Text className="text-sm font-semibold text-muted dark:text-muted-dark">
-            Date{draft.dueDate ? ` · ${dayLabel(draft.dueDate, today)}` : ''}
-          </Text>
-          <ChoiceChips
-            label="Date"
-            selected={dateChoice}
-            onSelect={(v) =>
-              change({
-                dueDate: v === 'today' ? today : v === 'tomorrow' ? addDays(today, 1) : v === 'nextweek' ? nextMonday : null,
-                ...(v === 'none' ? { repeat: null } : {}),
-              })
-            }
-            options={[
-              { value: 'today', label: 'Today' },
-              { value: 'tomorrow', label: 'Tomorrow' },
-              { value: 'nextweek', label: 'Next week' },
-              { value: 'none', label: 'No date' },
-            ]}
-          />
-          <TextInput
-            accessibilityLabel="Type a date"
-            value={dateWords}
-            onChangeText={setDateWords}
-            onSubmitEditing={() => {
-              if (!typed) return;
-              change({ dueDate: typed.dueDate, ...(typed.repeat ? { repeat: typed.repeat } : {}) });
-              setDateWords('');
-            }}
-            returnKeyType="done"
-            placeholder="Or type one: fri, dec 5, in 2 weeks"
-            placeholderTextColor={palette.muted}
-            className="rounded-lg border border-border px-4 py-2.5 text-[15px] text-ink focus:border-primary dark:border-border-dark dark:text-ink-dark"
-          />
-          {dateWords.trim() ? (
-            <Text className="text-sm text-muted dark:text-muted-dark">
-              {typed ? `${dayLabel(typed.dueDate, today)} — press return to use it` : 'Not a date I know yet'}
+      <FlatList
+        ref={list}
+        data={notes ?? []}
+        keyExtractor={(n) => n.noteId}
+        keyboardShouldPersistTaps="handled"
+        contentContainerClassName="pb-6"
+        ListHeaderComponent={
+          <View className="gap-5 px-5 pb-2 pt-4">
+            <View className="flex-row items-start gap-3">
+              <Pressable
+                accessibilityRole="checkbox"
+                accessibilityLabel="Done"
+                accessibilityHint="Ticks it off and goes back to the list"
+                accessibilityState={{ checked: done }}
+                hitSlop={10}
+                onPress={tick}
+                className={`mt-1.5 h-7 w-7 items-center justify-center rounded-full border-2 ${
+                  done ? 'border-primary bg-primary dark:border-primary-dark dark:bg-primary-dark' : 'border-muted dark:border-muted-dark'
+                }`}>
+                {done ? <Icon name="checkmark" size={17} color={palette.onPrimary} /> : null}
+              </Pressable>
+              <TextInput
+                accessibilityLabel="Title"
+                value={title}
+                onChangeText={setTitle}
+                multiline
+                maxLength={500}
+                placeholder="To-do"
+                placeholderTextColor={palette.muted}
+                className={`flex-1 text-2xl font-bold ${done ? 'text-muted line-through dark:text-muted-dark' : 'text-ink dark:text-ink-dark'}`}
+              />
+            </View>
+            {lists.length > 1 ? (
+              <View className="gap-3">
+                <Text className="text-sm font-semibold text-muted dark:text-muted-dark">List</Text>
+                <ChoiceChips label="List" selected={listId} onSelect={setListId} options={lists.map((l) => ({ value: l.listId, label: l.name }))} />
+              </View>
+            ) : null}
+            <Text accessibilityRole="header" className="pt-2 text-sm font-semibold text-muted dark:text-muted-dark">
+              Notes
             </Text>
-          ) : null}
-        </View>
-
-        <View className="gap-3">
-          <Text className="text-sm font-semibold text-muted dark:text-muted-dark">Repeat</Text>
-          <ChoiceChips
-            label="Repeat"
-            selected={draft.repeat ?? 'never'}
-            onSelect={(v) => change(v === 'never' ? { repeat: null } : { repeat: v, dueDate: draft.dueDate ?? today })}
-            options={[
-              { value: 'never', label: 'Never' },
-              { value: 'daily', label: 'Every day' },
-              { value: 'weekly', label: 'Every week' },
-              { value: 'monthly', label: 'Every month' },
-            ]}
-          />
-        </View>
-
-        {lists.length > 1 ? (
-          <View className="gap-3">
-            <Text className="text-sm font-semibold text-muted dark:text-muted-dark">List</Text>
-            <ChoiceChips label="List" selected={draft.listId} onSelect={(listId) => change({ listId })} options={lists.map((l) => ({ value: l.listId, label: l.name }))} />
+            {notes === null ? <Spinner className="py-4" /> : null}
+            {notes?.length === 0 ? (
+              <Text className="text-[15px] text-muted dark:text-muted-dark">No notes yet. Add one below.</Text>
+            ) : null}
           </View>
-        ) : null}
-      </ScrollView>
+        }
+        renderItem={({ item: n }) => (
+          <Pressable
+            accessibilityRole="text"
+            accessibilityHint="Long press to delete"
+            onLongPress={() => remove(n)}
+            delayLongPress={300}
+            className="mx-5 mb-3 rounded-2xl bg-surface-raised px-4 py-3 active:opacity-80 dark:bg-surface-raised-dark">
+            <ContentText text={n.body} className="text-base leading-6 text-ink dark:text-ink-dark" />
+          </Pressable>
+        )}
+      />
+      <View className="flex-row items-end gap-2 border-t border-border bg-surface px-3 py-2 dark:border-border-dark dark:bg-surface-dark">
+        <TextInput
+          accessibilityLabel="New note"
+          placeholder="Add a note"
+          placeholderTextColor={palette.muted}
+          value={note}
+          onChangeText={setNote}
+          multiline
+          maxLength={10_000}
+          className="max-h-28 flex-1 rounded-2xl bg-surface-raised px-4 py-2 text-base text-ink dark:bg-surface-raised-dark dark:text-ink-dark"
+        />
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Add note"
+          disabled={!note.trim() || adding}
+          onPress={() => void add()}
+          className={`h-10 w-10 items-center justify-center rounded-full bg-primary dark:bg-primary-dark ${!note.trim() || adding ? 'opacity-50' : ''}`}>
+          {adding ? <Spinner tone="onPrimary" /> : <Icon name="arrow-up" size={20} color={palette.onPrimary} />}
+        </Pressable>
+      </View>
       <KeyboardSpacer />
     </Screen>
   );

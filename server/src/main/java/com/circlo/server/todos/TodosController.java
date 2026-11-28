@@ -3,19 +3,15 @@ package com.circlo.server.todos;
 import com.circlo.server.auth.TokenService;
 import com.circlo.server.web.ApiException;
 import com.circlo.server.web.Ids;
+import com.circlo.server.web.RateLimiter;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
-import java.sql.Date;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.Instant;
-import java.time.LocalDate;
-import java.time.ZoneOffset;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -32,23 +28,37 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Todos (2.0; owner decision 2026-11-27): personal to-do lists. Every statement here is scoped to the caller's own
- * user id, so someone else's list or to-do is simply not found (404). General is made on first use. Nothing about
- * to-dos is logged.
+ * Todos (2.0; owner decisions 2026-11-27/28): personal to-do lists, like pen and paper: a to-do is a title and a tick,
+ * in my order within its list, and its notes are a log of dated entries (like comments). Every statement is scoped to
+ * the caller's own user id, so someone else's list, to-do or note is simply not found (404). General is made on first
+ * use. Nothing about to-dos is logged.
  */
 @RestController
 public class TodosController {
 
     static final int MAX_LISTS = 100;
     static final int MAX_OPEN = 5000;
-    private static final LocalDate EARLIEST = LocalDate.of(2000, 1, 1);
-    private static final LocalDate LATEST = LocalDate.of(2999, 12, 31);
-    private static final String TODO_COLUMNS = "id, list_id, title, notes, due_date, repeat_rule, completed_at, created_at";
+    static final int MAX_NOTES = 500;
+    /** All my notes together, so storage can't be filled by one account. */
+    static final int MAX_NOTES_TOTAL = 20_000;
+    /** Adding to-dos, notes and lists: far more than anyone writes by hand in an hour. */
+    static final int WRITES_PER_HOUR = 300;
+    private static final String TODO_COLUMNS =
+            "t.id, t.list_id, t.title, t.completed_at, t.created_at, (SELECT COUNT(*) FROM todo_notes n WHERE n.todo_id = t.id) AS notes";
 
     private final JdbcTemplate jdbc;
+    private final RateLimiter limiter;
 
-    public TodosController(JdbcTemplate jdbc) {
+    public TodosController(JdbcTemplate jdbc, RateLimiter limiter) {
         this.jdbc = jdbc;
+        this.limiter = limiter;
+    }
+
+    /** Adding things is limited per person per hour (429 rate_limited). */
+    private void write(byte[] me) {
+        if (!limiter.tryAcquire("todos-write", me, WRITES_PER_HOUR, 3_600_000)) {
+            throw ApiException.rateLimited();
+        }
     }
 
     private static byte[] me(Jwt jwt) {
@@ -57,9 +67,11 @@ public class TodosController {
 
     public record TodoList(UUID listId, String name, boolean general) {}
 
-    /** {@code dueDate}: a calendar date ("2026-11-28"); {@code repeat}: daily, weekly or monthly, from that date. */
-    public record Todo(UUID todoId, UUID listId, String title, String notes, LocalDate dueDate, String repeat, Instant completedAt,
-            Instant createdAt) {}
+    /** {@code noteCount}: how many notes it has (the list shows a mark when there are any). */
+    public record Todo(UUID todoId, UUID listId, String title, int noteCount, Instant completedAt, Instant createdAt) {}
+
+    /** A note on a to-do, with when it was added. */
+    public record Note(UUID noteId, String body, Instant createdAt) {}
 
     public record Todos(List<TodoList> lists, List<Todo> todos) {}
 
@@ -69,21 +81,15 @@ public class TodosController {
 
     public record TodoOrder(@NotNull @Size(max = MAX_OPEN) List<UUID> todoIds) {}
 
-    /** A new to-do, or (PUT) the whole of one: what's left out is cleared. {@code listId} null means General. */
-    public record TodoBody(@NotNull @Size(max = 2000) String title, @Size(max = 10_000) String notes, LocalDate dueDate,
-            @Pattern(regexp = "daily|weekly|monthly") String repeat, UUID listId) {}
+    /** A new to-do, or (PUT) its title and list. {@code listId} null means General (or, when editing, where it is). */
+    public record TodoBody(@NotNull @Size(max = 2000) String title, UUID listId) {}
 
-    /** {@code today}: the phone's date, so a repeat's next date follows the calendar I live by. */
-    public record Complete(@NotNull LocalDate today) {}
-
-    public record Completed(Todo completed, Todo next) {}
+    public record NoteBody(@NotNull @Size(max = 20_000) String body) {}
 
     private static Todo todo(ResultSet rs) throws SQLException {
-        Date due = rs.getDate("due_date");
         Timestamp done = rs.getTimestamp("completed_at");
-        return new Todo(Ids.uuid(rs.getBytes("id")), Ids.uuid(rs.getBytes("list_id")), rs.getString("title"), rs.getString("notes"),
-                due == null ? null : due.toLocalDate(), rs.getString("repeat_rule"), done == null ? null : done.toInstant(),
-                rs.getTimestamp("created_at").toInstant());
+        return new Todo(Ids.uuid(rs.getBytes("id")), Ids.uuid(rs.getBytes("list_id")), rs.getString("title"), rs.getInt("notes"),
+                done == null ? null : done.toInstant(), rs.getTimestamp("created_at").toInstant());
     }
 
     private static String name(String raw) {
@@ -92,6 +98,14 @@ public class TodosController {
             throw ApiException.badRequest("invalid_name");
         }
         return n;
+    }
+
+    private static String title(String raw) {
+        String t = raw.strip();
+        if (t.isEmpty() || t.length() > 500) {
+            throw ApiException.badRequest("invalid_title");
+        }
+        return t;
     }
 
     // --- lists ---
@@ -125,10 +139,8 @@ public class TodosController {
     public Todos all(@AuthenticationPrincipal Jwt jwt) {
         byte[] me = me(jwt);
         List<TodoList> lists = lists(me);
-        List<Todo> todos = jdbc.query("""
-                SELECT t.id, t.list_id, t.title, t.notes, t.due_date, t.repeat_rule, t.completed_at, t.created_at
-                FROM todos t JOIN todo_lists l ON l.id = t.list_id
-                WHERE t.user_id = ? AND t.completed_at IS NULL ORDER BY l.position, l.created_at, t.position, t.created_at""",
+        List<Todo> todos = jdbc.query("SELECT " + TODO_COLUMNS + " FROM todos t JOIN todo_lists l ON l.id = t.list_id"
+                + " WHERE t.user_id = ? AND t.completed_at IS NULL ORDER BY l.position, l.created_at, t.position, t.created_at",
                 (rs, i) -> todo(rs), (Object) me);
         return new Todos(lists, todos);
     }
@@ -138,6 +150,7 @@ public class TodosController {
     public TodoList addList(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody ListName r) {
         byte[] me = me(jwt);
         String name = name(r.name());
+        write(me);
         general(me);
         Integer count = jdbc.queryForObject("SELECT COUNT(*) FROM todo_lists WHERE user_id = ?", Integer.class, (Object) me);
         if (count != null && count >= MAX_LISTS) {
@@ -160,7 +173,7 @@ public class TodosController {
         return new TodoList(id, name, list.general());
     }
 
-    /** Deletes a list and its to-dos; General stays (409 general_list). */
+    /** Deletes a list and its to-dos (and their notes); General stays (409 general_list). */
     @DeleteMapping("/v1/todos/lists/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void deleteList(@AuthenticationPrincipal Jwt jwt, @PathVariable("id") UUID id) {
@@ -203,34 +216,23 @@ public class TodosController {
         byte[] me = me(jwt);
         myList(me, id);
         return jdbc.query("SELECT " + TODO_COLUMNS
-                + " FROM todos WHERE list_id = ? AND user_id = ? AND completed_at IS NOT NULL ORDER BY completed_at DESC LIMIT 500",
+                + " FROM todos t WHERE t.list_id = ? AND t.user_id = ? AND t.completed_at IS NOT NULL ORDER BY t.completed_at DESC LIMIT 500",
                 (rs, i) -> todo(rs), Ids.bytes(id), me);
+    }
+
+    /** All my completed to-dos, across my lists, newest first (the last 30 days'). */
+    @GetMapping("/v1/todos/completed")
+    public List<Todo> allCompleted(@AuthenticationPrincipal Jwt jwt) {
+        return jdbc.query("SELECT " + TODO_COLUMNS
+                + " FROM todos t WHERE t.user_id = ? AND t.completed_at IS NOT NULL ORDER BY t.completed_at DESC LIMIT 500",
+                (rs, i) -> todo(rs), (Object) me(jwt));
     }
 
     // --- to-dos ---
 
     private Todo myTodo(byte[] me, UUID id) {
-        return jdbc.query("SELECT " + TODO_COLUMNS + " FROM todos WHERE id = ? AND user_id = ?", (rs, i) -> todo(rs), Ids.bytes(id), me)
+        return jdbc.query("SELECT " + TODO_COLUMNS + " FROM todos t WHERE t.id = ? AND t.user_id = ?", (rs, i) -> todo(rs), Ids.bytes(id), me)
                 .stream().findFirst().orElseThrow(ApiException::notFound);
-    }
-
-    /** Title, notes, date and repeat, checked and tidied. */
-    private record Fields(String title, String notes, LocalDate due, String repeat) {}
-
-    private static Fields fields(TodoBody r) {
-        String title = r.title().strip();
-        if (title.isEmpty() || title.length() > 500) {
-            throw ApiException.badRequest("invalid_title");
-        }
-        String notes = r.notes() == null || r.notes().isBlank() ? null : r.notes().stripTrailing();
-        LocalDate due = r.dueDate();
-        if (due != null && (due.isBefore(EARLIEST) || due.isAfter(LATEST))) {
-            throw ApiException.badRequest("invalid_date");
-        }
-        if (r.repeat() != null && due == null) {
-            throw ApiException.badRequest("repeat_needs_date");
-        }
-        return new Fields(title, notes, due, r.repeat());
     }
 
     private int nextPosition(UUID list) {
@@ -239,53 +241,36 @@ public class TodosController {
         return max == null ? 0 : max + 1;
     }
 
-    /** A monthly repeat's day of the month: the date's own, unless it's carried on from earlier ones. */
-    private static Integer anchor(Fields f, Integer carried) {
-        if (!"monthly".equals(f.repeat()) || f.due() == null) {
-            return null;
-        }
-        return carried != null ? carried : f.due().getDayOfMonth();
-    }
-
-    private Todo insert(byte[] me, UUID list, Fields f, int position, Integer day) {
-        UUID id = Ids.newId();
-        Instant now = Instant.now();
-        jdbc.update("""
-                INSERT INTO todos (id, user_id, list_id, title, notes, due_date, repeat_rule, repeat_day, position, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                Ids.bytes(id), me, Ids.bytes(list), f.title(), f.notes(), f.due() == null ? null : Date.valueOf(f.due()), f.repeat(), anchor(f, day),
-                position, Timestamp.from(now));
-        return new Todo(id, list, f.title(), f.notes(), f.due(), f.repeat(), null, now);
-    }
-
+    /** Adds a to-do at the end of its list (General when no list is given). */
     @PostMapping("/v1/todos")
     @ResponseStatus(HttpStatus.CREATED)
     public Todo add(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody TodoBody r) {
         byte[] me = me(jwt);
-        Fields f = fields(r);
+        String title = title(r.title());
         UUID list = r.listId() == null ? general(me) : myList(me, r.listId()).listId();
+        write(me);
         Integer open = jdbc.queryForObject("SELECT COUNT(*) FROM todos WHERE user_id = ? AND completed_at IS NULL", Integer.class, (Object) me);
         if (open != null && open >= MAX_OPEN) {
             throw ApiException.conflict("too_many_todos");
         }
-        return insert(me, list, f, nextPosition(list), null);
+        UUID id = Ids.newId();
+        Instant now = Instant.now();
+        jdbc.update("INSERT INTO todos (id, user_id, list_id, title, position, created_at) VALUES (?, ?, ?, ?, ?, ?)", Ids.bytes(id), me,
+                Ids.bytes(list), title, nextPosition(list), Timestamp.from(now));
+        return new Todo(id, list, title, 0, null, now);
     }
 
-    /** The whole to-do as it should be now; moving it to another list puts it at that list's end. */
+    /** Its title and list; moving it to another list puts it at that list's end. */
     @PutMapping("/v1/todos/{id}")
     public Todo edit(@AuthenticationPrincipal Jwt jwt, @PathVariable("id") UUID id, @Valid @RequestBody TodoBody r) {
         byte[] me = me(jwt);
         Todo old = myTodo(me, id);
-        Fields f = fields(r);
+        String title = title(r.title());
         UUID list = r.listId() == null ? old.listId() : myList(me, r.listId()).listId();
         if (!list.equals(old.listId())) {
             jdbc.update("UPDATE todos SET list_id = ?, position = ? WHERE id = ? AND user_id = ?", Ids.bytes(list), nextPosition(list), Ids.bytes(id), me);
         }
-        // Saved with the same date and repeat: a monthly one keeps the day it started on.
-        Integer kept = java.util.Objects.equals(f.due(), old.dueDate()) && java.util.Objects.equals(f.repeat(), old.repeat())
-                ? jdbc.queryForObject("SELECT repeat_day FROM todos WHERE id = ?", Integer.class, (Object) Ids.bytes(id)) : null;
-        jdbc.update("UPDATE todos SET title = ?, notes = ?, due_date = ?, repeat_rule = ?, repeat_day = ? WHERE id = ? AND user_id = ?", f.title(),
-                f.notes(), f.due() == null ? null : Date.valueOf(f.due()), f.repeat(), anchor(f, kept), Ids.bytes(id), me);
+        jdbc.update("UPDATE todos SET title = ? WHERE id = ? AND user_id = ?", title, Ids.bytes(id), me);
         return myTodo(me, id);
     }
 
@@ -297,31 +282,14 @@ public class TodosController {
         }
     }
 
-    /**
-     * Ticks a to-do. A repeating one becomes a one-off in Completed, and its next one (same title, notes, list and
-     * place, the next date after {@code today}) is returned as {@code next}.
-     */
+    /** Ticks a to-do: it goes to Completed. */
     @PostMapping("/v1/todos/{id}/complete")
-    @Transactional
-    public Completed complete(@AuthenticationPrincipal Jwt jwt, @PathVariable("id") UUID id, @Valid @RequestBody Complete r) {
+    public Todo complete(@AuthenticationPrincipal Jwt jwt, @PathVariable("id") UUID id) {
         byte[] me = me(jwt);
-        Todo t = myTodo(me, id);
-        if (t.completedAt() != null) {
-            return new Completed(t, null);
-        }
-        // The phone's date, unless it's far from the server's (a wrong clock): then the server's.
-        LocalDate utc = LocalDate.now(ZoneOffset.UTC);
-        LocalDate today = Math.abs(r.today().toEpochDay() - utc.toEpochDay()) <= 2 ? r.today() : utc;
-        Map<String, Object> row = jdbc.queryForMap("SELECT position, repeat_day FROM todos WHERE id = ?", (Object) Ids.bytes(id));
-        Integer day = row.get("repeat_day") == null ? null : ((Number) row.get("repeat_day")).intValue();
-        jdbc.update("UPDATE todos SET completed_at = ?, repeat_rule = NULL, repeat_day = NULL WHERE id = ? AND user_id = ?",
-                Timestamp.from(Instant.now()), Ids.bytes(id), me);
-        Todo next = null;
-        if (t.repeat() != null && t.dueDate() != null) {
-            next = insert(me, t.listId(), new Fields(t.title(), t.notes(), Repeat.next(t.dueDate(), t.repeat(), day, today), t.repeat()),
-                    ((Number) row.get("position")).intValue(), day);
-        }
-        return new Completed(myTodo(me, id), next);
+        myTodo(me, id);
+        jdbc.update("UPDATE todos SET completed_at = ? WHERE id = ? AND user_id = ? AND completed_at IS NULL", Timestamp.from(Instant.now()),
+                Ids.bytes(id), me);
+        return myTodo(me, id);
     }
 
     /** Unticks a to-do; it goes back to the end of its list. */
@@ -333,5 +301,47 @@ public class TodosController {
             jdbc.update("UPDATE todos SET completed_at = NULL, position = ? WHERE id = ? AND user_id = ?", nextPosition(t.listId()), Ids.bytes(id), me);
         }
         return myTodo(me, id);
+    }
+
+    // --- notes: a log under each to-do ---
+
+    /** A to-do's notes, oldest first (newest at the bottom, like a conversation). */
+    @GetMapping("/v1/todos/{id}/notes")
+    public List<Note> notes(@AuthenticationPrincipal Jwt jwt, @PathVariable("id") UUID id) {
+        byte[] me = me(jwt);
+        myTodo(me, id);
+        return jdbc.query("SELECT id, body, created_at FROM todo_notes WHERE todo_id = ? AND user_id = ? ORDER BY created_at, id",
+                (rs, i) -> new Note(Ids.uuid(rs.getBytes(1)), rs.getString(2), rs.getTimestamp(3).toInstant()), Ids.bytes(id), me);
+    }
+
+    /** Adds a note, stamped now. */
+    @PostMapping("/v1/todos/{id}/notes")
+    @ResponseStatus(HttpStatus.CREATED)
+    public Note addNote(@AuthenticationPrincipal Jwt jwt, @PathVariable("id") UUID id, @Valid @RequestBody NoteBody r) {
+        byte[] me = me(jwt);
+        myTodo(me, id);
+        String body = r.body().strip();
+        if (body.isEmpty() || body.length() > 10_000) {
+            throw ApiException.badRequest("invalid_note");
+        }
+        write(me);
+        Integer count = jdbc.queryForObject("SELECT COUNT(*) FROM todo_notes WHERE todo_id = ?", Integer.class, (Object) Ids.bytes(id));
+        Integer total = jdbc.queryForObject("SELECT COUNT(*) FROM todo_notes WHERE user_id = ?", Integer.class, (Object) me);
+        if (count != null && count >= MAX_NOTES || total != null && total >= MAX_NOTES_TOTAL) {
+            throw ApiException.conflict("too_many_notes");
+        }
+        UUID noteId = Ids.newId();
+        Instant now = Instant.now();
+        jdbc.update("INSERT INTO todo_notes (id, todo_id, user_id, body, created_at) VALUES (?, ?, ?, ?, ?)", Ids.bytes(noteId), Ids.bytes(id), me,
+                body, Timestamp.from(now));
+        return new Note(noteId, body, now);
+    }
+
+    @DeleteMapping("/v1/todos/{id}/notes/{noteId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteNote(@AuthenticationPrincipal Jwt jwt, @PathVariable("id") UUID id, @PathVariable("noteId") UUID noteId) {
+        if (jdbc.update("DELETE FROM todo_notes WHERE id = ? AND todo_id = ? AND user_id = ?", Ids.bytes(noteId), Ids.bytes(id), me(jwt)) == 0) {
+            throw ApiException.notFound();
+        }
     }
 }

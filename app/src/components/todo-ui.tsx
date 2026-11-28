@@ -1,31 +1,31 @@
 import { useState, type ReactNode } from 'react';
 import { Modal, Pressable, ScrollView, View } from 'react-native';
+import Swipeable from 'react-native-gesture-handler/ReanimatedSwipeable';
 
 import { Button } from '@/components/form';
+import { KeyboardSpacer } from '@/components/keyboard-spacer';
 import { Icon } from '@/components/ui/icon';
 import { Text, TextInput } from '@/components/ui/text';
-import { dayLabel, parseQuickAdd, quickAddLabel, sameView, type QuickAdd as Parsed, type Todo, type TodoList, type TodoView } from '@/lib/todos';
+import type { Todo, TodoList } from '@/lib/todos';
 import { usePalette } from '@/theme/use-palette';
 
 /**
- * One to-do, Things-calm: a round box to tick, the title, and a quiet line under it (its date, in soft red when
- * overdue; a repeat mark; a notes mark; its list in the date views). Tapping opens it; in a list, a long press drags it.
+ * One to-do, like a line on paper: a round box to tick and the title, crossed through once ticked, with a quiet mark
+ * beside it when it has notes (and its list under it, in Completed under All). Tapping opens it; with
+ * {@code onDrag}, a long press picks it up to move; with {@code onDelete}, swiping it left shows Delete.
  */
-export function TodoRow({ todo, today, listName, checked, onToggle, onOpen, onLongPress }: {
+export function TodoRow({ todo, listName, checked, onToggle, onOpen, onDrag, onDelete }: {
   todo: Todo;
-  today: string;
   listName?: string;
   checked: boolean;
   onToggle: () => void;
-  /** Left out for completed to-dos, which only untick. */
   onOpen?: () => void;
-  onLongPress?: () => void;
+  onDrag?: () => void;
+  onDelete?: () => void;
 }) {
   const palette = usePalette();
-  const overdue = !!todo.dueDate && todo.dueDate < today && !checked;
-  const date = todo.dueDate ? dayLabel(todo.dueDate, today) : null;
-  const meta = date || todo.repeat || todo.notes || listName;
-  return (
+  const notes = todo.noteCount > 0;
+  const row = (
     <View className="flex-row items-start gap-3 bg-surface px-4 py-3 dark:bg-surface-dark">
       <Pressable
         accessibilityRole="checkbox"
@@ -40,95 +40,100 @@ export function TodoRow({ todo, today, listName, checked, onToggle, onOpen, onLo
       </Pressable>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={`${todo.title}${date ? `, ${overdue ? 'overdue, ' : ''}${date}` : ''}`}
-        accessibilityHint={onOpen ? 'Opens the to-do' : undefined}
-        disabled={!onOpen && !onLongPress}
+        accessibilityLabel={`${todo.title}${notes ? ', has notes' : ''}`}
+        accessibilityHint={onOpen ? 'Opens the to-do and its notes' : undefined}
+        disabled={!onOpen && !onDrag}
         onPress={onOpen}
-        onLongPress={onLongPress}
+        onLongPress={onDrag}
         delayLongPress={250}
         className="flex-1 gap-0.5">
-        <Text className={`text-[16px] leading-snug ${checked ? 'text-muted line-through dark:text-muted-dark' : 'text-ink dark:text-ink-dark'}`}>{todo.title}</Text>
-        {meta ? (
-          <View className="flex-row flex-wrap items-center gap-x-2">
-            {date ? <Text className={`text-sm ${overdue ? 'text-danger dark:text-danger-dark' : 'text-muted dark:text-muted-dark'}`}>{date}</Text> : null}
-            {todo.repeat ? <Icon name="repeat-outline" size={13} color={palette.muted} accessibilityLabel="Repeats" /> : null}
-            {todo.notes ? <Icon name="document-text-outline" size={13} color={palette.muted} accessibilityLabel="Has notes" /> : null}
-            {listName ? <Text className="text-sm text-muted dark:text-muted-dark">{listName}</Text> : null}
-          </View>
-        ) : null}
+        <View className="flex-row items-start gap-1.5">
+          <Text className={`shrink text-[16px] leading-snug ${checked ? 'text-muted line-through dark:text-muted-dark' : 'text-ink dark:text-ink-dark'}`}>
+            {todo.title}
+          </Text>
+          {notes ? (
+            <View className="pt-1">
+              <Icon name="document-text-outline" size={14} color={palette.muted} accessibilityLabel="Has notes" />
+            </View>
+          ) : null}
+        </View>
+        {listName ? <Text className="text-sm text-muted dark:text-muted-dark">{listName}</Text> : null}
+      </Pressable>
+    </View>
+  );
+  return onDelete ? <SwipeToDelete label={todo.title} onDelete={onDelete}>{row}</SwipeToDelete> : row;
+}
+
+/** Swiping a row left shows a red Delete behind it; tapping that deletes. Phones and web alike. */
+function SwipeToDelete({ label, onDelete, children }: { label: string; onDelete: () => void; children: ReactNode }) {
+  return (
+    <Swipeable
+      friction={2}
+      rightThreshold={40}
+      overshootRight={false}
+      renderRightActions={(_progress, _translation, methods) => (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`Delete ${label}`}
+          onPress={() => {
+            methods.close();
+            onDelete();
+          }}
+          className="w-24 items-center justify-center bg-danger-fill active:opacity-80">
+          <Text className="font-bold text-white">Delete</Text>
+        </Pressable>
+      )}>
+      {children}
+    </Swipeable>
+  );
+}
+
+/** Quick add, pinned at the bottom: type a to-do and press return; the field stays open for the next one. */
+export function QuickAdd({ placeholder, onAdd }: { placeholder: string; onAdd: (title: string) => Promise<void> }) {
+  const palette = usePalette();
+  const [text, setText] = useState('');
+  const [busy, setBusy] = useState(false);
+  const title = text.trim();
+  const add = async () => {
+    if (!title || busy) return;
+    setBusy(true);
+    try {
+      await onAdd(title);
+      setText('');
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <View className="flex-row items-end gap-2 border-t border-border bg-surface px-3 py-2 dark:border-border-dark dark:bg-surface-dark">
+      <TextInput
+        accessibilityLabel="New to-do"
+        placeholder={placeholder}
+        placeholderTextColor={palette.muted}
+        value={text}
+        onChangeText={setText}
+        onSubmitEditing={() => void add()}
+        submitBehavior="submit"
+        returnKeyType="done"
+        maxLength={500}
+        className="max-h-28 flex-1 rounded-2xl bg-surface-raised px-4 py-2 text-base text-ink dark:bg-surface-raised-dark dark:text-ink-dark"
+      />
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Add to-do"
+        disabled={!title || busy}
+        onPress={() => void add()}
+        className={`h-10 w-10 items-center justify-center rounded-full bg-primary dark:bg-primary-dark ${!title || busy ? 'opacity-50' : ''}`}>
+        <Icon name="arrow-up" size={20} color={palette.onPrimary} />
       </Pressable>
     </View>
   );
 }
 
 /**
- * Quick add, pinned at the bottom: type a to-do with its date in words ("Call mum tomorrow", "Pay rent every month");
- * a chip shows what will be set, and tapping its × keeps the words as they are. Return adds it and leaves the field
- * open for the next one.
+ * A bottom sheet, the app's look: a handle, a title, its rows. Scrolls when long. It rises with the keyboard, so a
+ * field in it (a list's name) stays above it: keyboard-controller follows the keyboard inside modals too.
  */
-export function QuickAdd({ placeholder, today, onAdd }: { placeholder: string; today: string; onAdd: (q: Parsed) => Promise<void> }) {
-  const palette = usePalette();
-  const [text, setText] = useState('');
-  const [ignore, setIgnore] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-  const parsed = parseQuickAdd(text, today, ignore);
-  const chip = parsed.phrase ? quickAddLabel(parsed, today) : null;
-  const add = async () => {
-    if (!parsed.title || busy) return;
-    setBusy(true);
-    try {
-      await onAdd(parsed);
-      setText('');
-      setIgnore(null);
-    } finally {
-      setBusy(false);
-    }
-  };
-  return (
-    <View className="gap-2 border-t border-border bg-surface px-3 py-2 dark:border-border-dark dark:bg-surface-dark">
-      {chip ? (
-        <View className="flex-row">
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={`${chip}. Tap to keep the words “${parsed.phrase}” in the title instead`}
-            onPress={() => setIgnore(parsed.phrase)}
-            className="flex-row items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1 dark:bg-primary-dark/20">
-            <Icon name={parsed.repeat ? 'repeat-outline' : 'time-outline'} size={14} color={palette.primary} />
-            <Text className="text-sm font-semibold text-primary dark:text-primary-dark">{chip}</Text>
-            <Icon name="close" size={14} color={palette.primary} />
-          </Pressable>
-        </View>
-      ) : null}
-      <View className="flex-row items-end gap-2">
-        <TextInput
-          accessibilityLabel="New to-do"
-          placeholder={placeholder}
-          placeholderTextColor={palette.muted}
-          value={text}
-          onChangeText={(t) => {
-            setText(t);
-            if (ignore && !t.toLowerCase().includes(ignore.toLowerCase())) setIgnore(null);
-          }}
-          onSubmitEditing={() => void add()}
-          submitBehavior="submit"
-          returnKeyType="done"
-          maxLength={500}
-          className="max-h-28 flex-1 rounded-2xl bg-surface-raised px-4 py-2 text-base text-ink dark:bg-surface-raised-dark dark:text-ink-dark"
-        />
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Add to-do"
-          disabled={!parsed.title || busy}
-          onPress={() => void add()}
-          className={`h-10 w-10 items-center justify-center rounded-full bg-primary dark:bg-primary-dark ${!parsed.title || busy ? 'opacity-50' : ''}`}>
-          <Icon name="arrow-up" size={20} color={palette.onPrimary} />
-        </Pressable>
-      </View>
-    </View>
-  );
-}
-
-/** A bottom sheet, the app's look: a handle, a title, its rows. Scrolls when long. */
 function Sheet({ visible, title, onClose, children }: { visible: boolean; title: string; onClose: () => void; children: ReactNode }) {
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
@@ -139,23 +144,62 @@ function Sheet({ visible, title, onClose, children }: { visible: boolean; title:
         </View>
         <Text className="px-5 pb-2 text-base font-bold text-ink dark:text-ink-dark">{title}</Text>
         {children}
+        <KeyboardSpacer />
       </View>
     </Modal>
   );
 }
 
-/** Where to look: Today, Upcoming, No date, then each list, and New list. A check on the one shown. */
-export function ViewPicker({ visible, lists, selected, onSelect, onNewList, onClose }: {
+/**
+ * What I'm looking at, above the to-dos: which list ("All ▾", or one, picked from a list) and a Completed toggle, as
+ * in Feeds' source picker and Unread.
+ */
+export function TodoFilterBar({ listLabel, completed, onPickList, onCompleted }: {
+  listLabel: string;
+  completed: boolean;
+  onPickList: () => void;
+  onCompleted: (completed: boolean) => void;
+}) {
+  const palette = usePalette();
+  return (
+    <View className="flex-row items-center gap-2 border-b border-border px-4 py-2.5 dark:border-border-dark">
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`Showing ${listLabel}`}
+        accessibilityHint="Choose all lists or one"
+        onPress={onPickList}
+        className="shrink flex-row items-center gap-1.5 rounded-full border border-border px-3.5 py-1.5 active:bg-surface-raised dark:border-border-dark dark:active:bg-surface-raised-dark">
+        <Text numberOfLines={1} className="shrink font-semibold text-ink dark:text-ink-dark">
+          {listLabel}
+        </Text>
+        <Icon name="chevron-down" size={16} color={palette.ink} />
+      </Pressable>
+      <Pressable
+        accessibilityRole="switch"
+        accessibilityLabel="Completed"
+        accessibilityState={{ checked: completed }}
+        onPress={() => onCompleted(!completed)}
+        className={`rounded-full border px-3.5 py-1.5 ${
+          completed ? 'border-primary bg-primary dark:border-primary-dark dark:bg-primary-dark' : 'border-border active:bg-surface-raised dark:border-border-dark dark:active:bg-surface-raised-dark'
+        }`}>
+        <Text className={completed ? 'font-semibold text-on-primary dark:text-on-primary-dark' : 'text-ink dark:text-ink-dark'}>Completed</Text>
+      </Pressable>
+    </View>
+  );
+}
+
+/** All, then each list, and New list; a check on the one shown. */
+export function ListPicker({ visible, lists, selected, onSelect, onNewList, onClose }: {
   visible: boolean;
   lists: TodoList[];
-  selected: TodoView;
-  onSelect: (view: TodoView) => void;
+  selected: string | null;
+  onSelect: (listId: string | null) => void;
   onNewList: () => void;
   onClose: () => void;
 }) {
   const palette = usePalette();
-  const row = (key: string, view: TodoView, label: string, icon: Parameters<typeof Icon>[0]['name']) => {
-    const on = sameView(view, selected);
+  const row = (key: string, listId: string | null, label: string) => {
+    const on = listId === selected;
     return (
       <Pressable
         key={key}
@@ -164,10 +208,10 @@ export function ViewPicker({ visible, lists, selected, onSelect, onNewList, onCl
         accessibilityState={{ selected: on }}
         onPress={() => {
           onClose();
-          onSelect(view);
+          onSelect(listId);
         }}
         className="flex-row items-center gap-3 px-5 py-3 active:bg-surface-raised dark:active:bg-surface-raised-dark">
-        <Icon name={icon} size={20} color={palette.muted} />
+        <Icon name="list-todo" size={20} color={palette.muted} />
         <Text numberOfLines={1} className={`flex-1 text-base ${on ? 'font-bold' : ''} text-ink dark:text-ink-dark`}>
           {label}
         </Text>
@@ -178,11 +222,8 @@ export function ViewPicker({ visible, lists, selected, onSelect, onNewList, onCl
   return (
     <Sheet visible={visible} title="Show" onClose={onClose}>
       <ScrollView>
-        {row('today', { kind: 'today' }, 'Today', 'star')}
-        {row('upcoming', { kind: 'upcoming' }, 'Upcoming', 'time-outline')}
-        {row('nodate', { kind: 'nodate' }, 'No date', 'layers-outline')}
-        <Text className="px-5 pb-1 pt-4 text-sm font-semibold text-muted dark:text-muted-dark">Lists</Text>
-        {lists.map((l) => row(l.listId, { kind: 'list', listId: l.listId }, l.name, 'list-todo'))}
+        {row('all', null, 'All')}
+        {lists.map((l) => row(l.listId, l.listId, l.name))}
         <Pressable
           accessibilityRole="button"
           onPress={() => {
@@ -245,7 +286,7 @@ function ListNameForm({ initial, onSave, onClose }: { initial: string; onSave: (
   );
 }
 
-/** A choice of chips (date shortcuts, repeat, list), the app's chip look. */
+/** A choice of chips (which list a to-do is in), the app's chip look. */
 export function ChoiceChips<T extends string>({ options, selected, onSelect, label }: {
   options: { value: T; label: string }[];
   selected: T | null;

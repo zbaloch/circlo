@@ -346,6 +346,16 @@ class ReadingIT extends IntegrationTest {
     }
 
     @Test
+    void importsAreLimitedPerHour() {
+        TestUser a = user("read_import_limit");
+        String opml = "<opml version=\"2.0\"><body></body></opml>";
+        for (int i = 0; i < 10; i++) {
+            assertThat(a.call("POST", "/v1/reading/import", Map.of("opml", opml)).getStatusCode().value()).as("import %d", i).isEqualTo(200);
+        }
+        assertThat(a.call("POST", "/v1/reading/import", Map.of("opml", opml)).getBody()).containsEntry("error", "rate_limited");
+    }
+
+    @Test
     void importAndExportOpml() {
         String one = blog("opml1");
         String two = blog("opml2");

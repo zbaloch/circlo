@@ -3746,7 +3746,7 @@ export interface paths {
             };
         };
         put?: never;
-        /** Add a to-do (to General when listId is left out), at the end of its list. Errors invalid_title, invalid_date, repeat_needs_date (400), too_many_todos (409, 5,000 open) */
+        /** Add a to-do (to General when listId is left out), at the end of its list. Errors invalid_title (400), too_many_todos (409, 5,000 open) */
         post: {
             parameters: {
                 query?: never;
@@ -3784,7 +3784,7 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /** Replace a to-do's title, notes, date, repeat and list (what's left out is cleared; a new list puts it at that list's end) */
+        /** Change a to-do's title and list (a new list puts it at that list's end) */
         put: {
             parameters: {
                 query?: never;
@@ -3846,7 +3846,69 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Tick a to-do. A repeating one becomes a one-off in Completed and its next one (the next date after `today`, the phone's date) is returned as `next` */
+        /** Tick a to-do (it goes to Completed) */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    todoId: components["schemas"]["Id"];
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Ticked */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Todo"];
+                    };
+                };
+                404: components["responses"]["Error"];
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/todos/{todoId}/notes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** A to-do's notes, oldest first (newest at the bottom, like a conversation) */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    todoId: components["schemas"]["Id"];
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Its notes */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["TodoNote"][];
+                    };
+                };
+                404: components["responses"]["Error"];
+            };
+        };
+        put?: never;
+        /** Add a note, stamped now. Errors invalid_note (400), too_many_notes (409, 500) */
         post: {
             parameters: {
                 query?: never;
@@ -3859,28 +3921,64 @@ export interface paths {
             requestBody: {
                 content: {
                     "application/json": {
-                        /** Format: date */
-                        today: string;
+                        body: string;
                     };
                 };
             };
             responses: {
-                /** @description Ticked */
-                200: {
+                /** @description Added */
+                201: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            completed: components["schemas"]["Todo"];
-                            next: null | components["schemas"]["Todo"];
-                        };
+                        "application/json": components["schemas"]["TodoNote"];
                     };
+                };
+                400: components["responses"]["Error"];
+                404: components["responses"]["Error"];
+                409: components["responses"]["Error"];
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/todos/{todoId}/notes/{noteId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete a note */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    todoId: components["schemas"]["Id"];
+                    noteId: components["schemas"]["Id"];
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Deleted */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
                 };
                 404: components["responses"]["Error"];
             };
         };
-        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -4108,6 +4206,42 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/todos/completed": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** All my completed to-dos, across my lists, newest first (kept 30 days) */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Completed to-dos */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Todo"][];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/todos/lists/{listId}/completed": {
         parameters: {
             query?: never;
@@ -4163,17 +4297,20 @@ export interface components {
             todoId: components["schemas"]["Id"];
             listId: components["schemas"]["Id"];
             title: string;
-            notes: string | null;
-            /**
-             * Format: date
-             * @description A calendar date (no time or zone)
-             */
-            dueDate: string | null;
-            /** @enum {string|null} */
-            repeat: "daily" | "weekly" | "monthly" | null;
+            /** @description How many notes it has (the list shows a mark when there are any) */
+            noteCount: number;
             /** Format: date-time */
             completedAt: string | null;
             /** Format: date-time */
+            createdAt: string;
+        };
+        TodoNote: {
+            noteId: components["schemas"]["Id"];
+            body: string;
+            /**
+             * Format: date-time
+             * @description When it was added
+             */
             createdAt: string;
         };
         FoundSource: {
@@ -4477,14 +4614,6 @@ export interface components {
             content: {
                 "application/json": {
                     title: string;
-                    notes?: string | null;
-                    /** Format: date */
-                    dueDate?: string | null;
-                    /**
-                     * @description Needs a dueDate
-                     * @enum {string|null}
-                     */
-                    repeat?: "daily" | "weekly" | "monthly" | null;
                     /** @description Left out or null: General (or, when editing, where it is) */
                     listId?: null | components["schemas"]["Id"];
                 };
