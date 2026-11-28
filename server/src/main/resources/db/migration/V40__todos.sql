@@ -7,7 +7,7 @@ CREATE TABLE todo_lists (
     name        VARCHAR(100) NOT NULL,
     -- General: made for everyone, where quick add puts things; can be renamed, never deleted. One per person.
     is_general  BOOLEAN      NOT NULL DEFAULT FALSE,
-    general_of  BINARY(16)   AS (IF(is_general, user_id, NULL)) PERSISTENT,
+    general_of  BINARY(16)   AS (IF(is_general, user_id, NULL)) STORED,
     position    INT          NOT NULL,
     created_at  DATETIME(6)  NOT NULL,
     CONSTRAINT uq_todo_lists_general UNIQUE (general_of),

@@ -102,9 +102,9 @@ public class ReadingStore {
                     INSERT INTO reading_articles (id, source_id, guid_hash, url, title, summary, author, published_at, created_at, content, has_content,
                       audio_url, audio_type, duration_seconds, image_url)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    ON DUPLICATE KEY UPDATE url = VALUE(url), title = VALUE(title), summary = VALUE(summary), author = VALUE(author),
-                      content = VALUE(content), has_content = VALUE(has_content), audio_url = VALUE(audio_url), audio_type = VALUE(audio_type),
-                      duration_seconds = VALUE(duration_seconds), image_url = VALUE(image_url)""", Ids.bytes(Ids.newId()), Ids.bytes(source),
+                    ON DUPLICATE KEY UPDATE url = VALUES(url), title = VALUES(title), summary = VALUES(summary), author = VALUES(author),
+                      content = VALUES(content), has_content = VALUES(has_content), audio_url = VALUES(audio_url), audio_type = VALUES(audio_type),
+                      duration_seconds = VALUES(duration_seconds), image_url = VALUES(image_url)""", Ids.bytes(Ids.newId()), Ids.bytes(source),
                     sha256(i.guid()), i.url(), i.title(), i.summary(), i.author(), Timestamp.from(i.published()), Timestamp.from(now), content,
                     i.hasContent(), audio == null ? null : audio.url(), audio == null ? null : audio.type(), audio == null ? null : audio.seconds(),
                     i.image());
